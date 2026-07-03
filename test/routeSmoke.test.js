@@ -84,6 +84,17 @@ test('phase 1 signup capture stays wired through Netlify Functions and Blobs', (
   assert.match(hostingClientSource, /generateTournamentBracket/);
 });
 
+test('Spades match results can report winners through a narrow callback token', () => {
+  const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
+  const readmeSource = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
+
+  assert.match(tournamentBracketSource, /TOURNAMENT_MATCH_RESULT_TOKEN/);
+  assert.match(tournamentBracketSource, /requireMatchReporter/);
+  assert.match(tournamentBracketSource, /reportWinnerWithRetry/);
+  assert.match(readmeSource, /Spades Match Result Callback/);
+  assert.match(readmeSource, /"action": "report-winner"/);
+});
+
 test('the private admin route stays wired to the hub editor shell', () => {
   assert.ok(existsSync(adminRouteFile));
 });

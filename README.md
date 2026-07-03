@@ -74,3 +74,28 @@ Future edits:
 - Public tournament pages link to `/check-in/[slug]` for a static signup/check-in preview.
 - The route is read-only and does not submit any registrations yet.
 - The allowlisted flow currently lives in the localhost admin server, with the browser fallback still available on `/admin`.
+
+## Spades Match Result Callback
+
+The Spades app should report completed tournament rooms back to the tournament hub:
+
+- Endpoint: `POST https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=spades-summer-series`
+- Header: `Authorization: Bearer $TOURNAMENT_MATCH_RESULT_TOKEN`
+- Header: `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "action": "report-winner",
+  "matchId": "spades-summer-series-r1-m1",
+  "winnerId": "player-id-from-bracket"
+}
+```
+
+The `matchId` is the final path segment from the room URL, for example
+`https://1v1spades.com/match/spades-summer-series-r1-m1`.
+The `winnerId` must match one of the two bracket player IDs for that match.
+
+Successful responses return the updated bracket. The hub advances the winner into the next round and marks the tournament
+complete when the final is reported. Concurrent winner reports use conditional Blob writes and retry before returning
+`409`, so the Spades app can safely retry that response once.

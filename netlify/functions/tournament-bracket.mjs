@@ -21,6 +21,10 @@ function getAdminToken() {
   return process.env.TOURNAMENT_ADMIN_TOKEN || '';
 }
 
+function getMatchResultToken() {
+  return process.env.TOURNAMENT_MATCH_RESULT_TOKEN || getAdminToken();
+}
+
 function getBearerToken(event) {
   const header = event.headers.authorization || event.headers.Authorization || '';
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -351,6 +355,22 @@ function requireAdmin(event) {
   return { ok: true };
 }
 
+function requireMatchReporter(event) {
+  const adminToken = getAdminToken();
+  const matchResultToken = getMatchResultToken();
+  const bearerToken = getBearerToken(event);
+
+  if (!matchResultToken) {
+    return { error: json(503, { error: 'Tournament match result token is not configured on Netlify.' }) };
+  }
+
+  if (bearerToken !== matchResultToken && bearerToken !== adminToken) {
+    return { error: json(401, { error: 'Enter the tournament match result token to report winners.' }) };
+  }
+
+  return { ok: true };
+}
+
 export async function handler(event) {
   if (event.blobs) {
     connectLambda(event);
@@ -380,12 +400,6 @@ export async function handler(event) {
     return json(405, { error: 'Use GET to load a bracket or POST to manage one.' });
   }
 
-  const adminCheck = requireAdmin(event);
-
-  if (adminCheck.error) {
-    return adminCheck.error;
-  }
-
   let payload;
 
   try {
@@ -396,6 +410,12 @@ export async function handler(event) {
 
   try {
     if (payload.action === 'generate') {
+      const adminCheck = requireAdmin(event);
+
+      if (adminCheck.error) {
+        return adminCheck.error;
+      }
+
       const signups = await loadTournamentSignups(tournamentSlug);
 
       if (signups.length < 2) {
@@ -409,6 +429,12 @@ export async function handler(event) {
     }
 
     if (payload.action === 'report-winner') {
+      const reporterCheck = requireMatchReporter(event);
+
+      if (reporterCheck.error) {
+        return reporterCheck.error;
+      }
+
       const matchId = cleanText(payload.matchId);
       const winnerId = cleanText(payload.winnerId);
       const result = await reportWinnerWithRetry(tournamentSlug, matchId, winnerId);
