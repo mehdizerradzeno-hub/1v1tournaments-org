@@ -269,22 +269,72 @@ async function loadBracket(tournamentSlug) {
   return store.get(`${tournamentSlug}.json`, { type: 'json' });
 }
 
-async function saveBracket(bracket) {
+async function loadBracketWithMetadata(tournamentSlug) {
+  const store = getStoreWithFallback('tournament-brackets');
+  const result = await store.getWithMetadata(`${tournamentSlug}.json`, { type: 'json' });
+
+  if (!result) {
+    return null;
+  }
+
+  return {
+    bracket: result.data,
+    etag: result.etag,
+  };
+}
+
+async function saveBracket(bracket, options = {}) {
   const store = getStoreWithFallback('tournament-brackets');
   const updatedBracket = {
     ...bracket,
     updatedAt: new Date().toISOString(),
   };
 
-  await store.setJSON(`${bracket.tournamentSlug}.json`, updatedBracket, {
+  const writeResult = await store.setJSON(`${bracket.tournamentSlug}.json`, updatedBracket, {
     metadata: {
       tournamentSlug: bracket.tournamentSlug,
       status: updatedBracket.status,
       updatedAt: updatedBracket.updatedAt,
     },
+    ...options,
   });
 
+  if (writeResult.modified === false) {
+    return { modified: false };
+  }
+
   return updatedBracket;
+}
+
+async function reportWinnerWithRetry(tournamentSlug, matchId, winnerId) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const loaded = await loadBracketWithMetadata(tournamentSlug);
+
+    if (!loaded) {
+      return { error: json(404, { error: 'Generate a bracket before reporting winners.' }) };
+    }
+
+    const match = findMatch(loaded.bracket, matchId);
+
+    if (!match) {
+      return { error: json(404, { error: 'That match was not found in this bracket.' }) };
+    }
+
+    const winner = match.players.find((player) => player?.id === winnerId);
+
+    if (!winner) {
+      return { error: json(400, { error: 'Choose one of the players in this match as the winner.' }) };
+    }
+
+    setMatchWinner(loaded.bracket, match, winner);
+    const savedBracket = await saveBracket(loaded.bracket, { onlyIfMatch: loaded.etag });
+
+    if (savedBracket.modified !== false) {
+      return { bracket: savedBracket };
+    }
+  }
+
+  return { error: json(409, { error: 'The bracket changed while saving this result. Try reporting the winner again.' }) };
 }
 
 function requireAdmin(event) {
@@ -361,28 +411,13 @@ export async function handler(event) {
     if (payload.action === 'report-winner') {
       const matchId = cleanText(payload.matchId);
       const winnerId = cleanText(payload.winnerId);
-      const bracket = await loadBracket(tournamentSlug);
+      const result = await reportWinnerWithRetry(tournamentSlug, matchId, winnerId);
 
-      if (!bracket) {
-        return json(404, { error: 'Generate a bracket before reporting winners.' });
+      if (result.error) {
+        return result.error;
       }
 
-      const match = findMatch(bracket, matchId);
-
-      if (!match) {
-        return json(404, { error: 'That match was not found in this bracket.' });
-      }
-
-      const winner = match.players.find((player) => player?.id === winnerId);
-
-      if (!winner) {
-        return json(400, { error: 'Choose one of the players in this match as the winner.' });
-      }
-
-      setMatchWinner(bracket, match, winner);
-      const savedBracket = await saveBracket(bracket);
-
-      return json(200, { ok: true, bracket: savedBracket });
+      return json(200, { ok: true, bracket: result.bracket });
     }
 
     return json(400, { error: 'Choose a supported bracket action.' });
