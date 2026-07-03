@@ -1,6 +1,7 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
+let hasConnectedRuntime = false;
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -28,6 +29,10 @@ function getBearerToken(event) {
 }
 
 function getStoreWithFallback(name) {
+  if (hasConnectedRuntime) {
+    return getStore(name);
+  }
+
   const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
   const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
 
@@ -305,6 +310,7 @@ function requireAdmin(event) {
 export async function handler(event) {
   if (event.blobs) {
     connectLambda(event);
+    hasConnectedRuntime = true;
   }
 
   if (event.httpMethod === 'OPTIONS') {
