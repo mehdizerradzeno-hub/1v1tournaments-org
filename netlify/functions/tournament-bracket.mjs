@@ -1,7 +1,6 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
-let hasConnectedRuntime = false;
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -29,10 +28,6 @@ function getBearerToken(event) {
 }
 
 function getStoreWithFallback(name) {
-  if (hasConnectedRuntime) {
-    return getStore(name);
-  }
-
   const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
   const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
 
@@ -231,8 +226,8 @@ function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
 
 async function loadTournamentSignups(tournamentSlug) {
   const store = getStoreWithFallback('tournament-signups');
-  const { blobs } = await store.list({ prefix: `${tournamentSlug}/`, consistency: 'strong' });
-  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json', consistency: 'strong' })));
+  const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
+  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
 
   return signups.filter(Boolean);
 }
@@ -271,7 +266,7 @@ function publicBracket(bracket) {
 
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  return store.get(`${tournamentSlug}.json`, { type: 'json', consistency: 'strong' });
+  return store.get(`${tournamentSlug}.json`, { type: 'json' });
 }
 
 async function saveBracket(bracket) {
@@ -282,7 +277,6 @@ async function saveBracket(bracket) {
   };
 
   await store.setJSON(`${bracket.tournamentSlug}.json`, updatedBracket, {
-    consistency: 'strong',
     metadata: {
       tournamentSlug: bracket.tournamentSlug,
       status: updatedBracket.status,
@@ -310,7 +304,6 @@ function requireAdmin(event) {
 export async function handler(event) {
   if (event.blobs) {
     connectLambda(event);
-    hasConnectedRuntime = true;
   }
 
   if (event.httpMethod === 'OPTIONS') {
