@@ -226,8 +226,8 @@ function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
 
 async function loadTournamentSignups(tournamentSlug) {
   const store = getStoreWithFallback('tournament-signups');
-  const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
-  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
+  const { blobs } = await store.list({ prefix: `${tournamentSlug}/`, consistency: 'strong' });
+  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json', consistency: 'strong' })));
 
   return signups.filter(Boolean);
 }
@@ -266,7 +266,7 @@ function publicBracket(bracket) {
 
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  return store.get(`${tournamentSlug}.json`, { type: 'json' });
+  return store.get(`${tournamentSlug}.json`, { type: 'json', consistency: 'strong' });
 }
 
 async function saveBracket(bracket) {
@@ -277,6 +277,7 @@ async function saveBracket(bracket) {
   };
 
   await store.setJSON(`${bracket.tournamentSlug}.json`, updatedBracket, {
+    consistency: 'strong',
     metadata: {
       tournamentSlug: bracket.tournamentSlug,
       status: updatedBracket.status,
