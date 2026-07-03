@@ -1,0 +1,58 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  getCheckInPath,
+  getGamePath,
+  getTournamentBySlug,
+  getTournamentPath,
+  siteData,
+} from '../src/lib/siteData.js';
+
+const spadesRouteFile = fileURLToPath(new URL('../app/spades.jsx', import.meta.url));
+const euchreRouteFile = fileURLToPath(new URL('../app/euchre.jsx', import.meta.url));
+const aboutRouteFile = fileURLToPath(new URL('../app/about.jsx', import.meta.url));
+const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta.url));
+const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
+const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
+const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
+
+test('/spades stays wired to the dedicated Spades route file', () => {
+  assert.equal(getGamePath('spades'), '/spades');
+  assert.ok(existsSync(spadesRouteFile));
+});
+
+test('/euchre stays wired to the dedicated Euchre route file', () => {
+  assert.equal(getGamePath('euchre'), '/euchre');
+  assert.ok(existsSync(euchreRouteFile));
+});
+
+test('/about stays wired to the public organization page', () => {
+  assert.ok(existsSync(aboutRouteFile));
+});
+
+test('/contact stays wired to the public contact page', () => {
+  assert.ok(existsSync(contactRouteFile));
+});
+
+test('the featured tournament route stays wired to the Spades launch event', () => {
+  const featuredSlug = siteData.site.primaryTournamentSlug;
+  const tournament = getTournamentBySlug(featuredSlug);
+
+  assert.equal(getTournamentPath(featuredSlug), '/tournaments/spades-summer-series');
+  assert.ok(existsSync(tournamentRouteFile));
+  assert.ok(tournament);
+  assert.equal(tournament?.gameSlug, 'spades');
+  assert.deepEqual(tournament?.streamSlugs, ['main-live', 'replay-archive']);
+});
+
+test('the check-in placeholder route stays wired to the public tournament path', () => {
+  assert.equal(getCheckInPath('spades-summer-series'), '/check-in/spades-summer-series');
+  assert.ok(existsSync(checkInRouteFile));
+});
+
+test('the private admin route stays wired to the hub editor shell', () => {
+  assert.ok(existsSync(adminRouteFile));
+});

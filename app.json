@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "1v1 Tournaments",
+    "slug": "one-v-one-tournaments",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "onev1tournaments",
+    "ios": {
+      "bundleIdentifier": "com.mehdizerrad.onev1tournaments",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.mehdizerrad.onev1tournaments",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {}
+    },
+    "owner": "mehdizerrad"
+  }
+}

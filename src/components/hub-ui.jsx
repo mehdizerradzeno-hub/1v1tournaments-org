@@ -1,0 +1,1251 @@
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link, usePathname } from 'expo-router';
+
+import { theme } from '../lib/theme.js';
+import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
+
+const NAV_ITEMS = [
+  { label: 'Home', href: '/' },
+  { label: 'Spades', href: '/spades' },
+  { label: 'About', href: '/about' },
+  { label: 'Contact', href: '/contact' },
+  { label: 'Rules', href: '/rules' },
+  { label: 'Results', href: '/results' },
+  { label: 'Live', href: '/live' },
+];
+
+const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
+
+function isInternalHref(href) {
+  return typeof href === 'string' && href.startsWith('/');
+}
+
+function isActivePath(pathname, href) {
+  if (href === '/') {
+    return pathname === '/';
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false }) {
+  const linkStyles = ({ pressed }) => [
+    styles.button,
+    variant === 'secondary' && styles.buttonSecondary,
+    variant === 'ghost' && styles.buttonGhost,
+    pressed && styles.buttonPressed,
+    style,
+  ];
+
+  if (href && isInternalHref(href) && !external) {
+    return (
+      <Link accessibilityLabel={accessibilityLabel} href={href} asChild>
+        <Pressable accessibilityRole="link" style={linkStyles}>
+          {children}
+        </Pressable>
+      </Link>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="link"
+      onPress={() => {
+        if (onPress) {
+          onPress();
+          return;
+        }
+
+        if (href) {
+          Linking.openURL(href).catch(() => {});
+        }
+      }}
+      style={linkStyles}>
+      {children}
+    </Pressable>
+  );
+}
+
+function CardLink({ href, children, style, accent = theme.colors.accent, external = false, accessibilityLabel, onPress }) {
+  return (
+    <LinkShell
+      accessibilityLabel={accessibilityLabel}
+      external={external}
+      href={href}
+      onPress={onPress}
+      style={style}>
+      <View style={[styles.card, { borderColor: accent }]}>{children}</View>
+    </LinkShell>
+  );
+}
+
+export function Surface({ children, style }) {
+  return <View style={[styles.surface, style]}>{children}</View>;
+}
+
+export function Badge({ children, tone = 'neutral', style }) {
+  return (
+    <View style={[styles.badge, styles[`badge${tone[0].toUpperCase()}${tone.slice(1)}`], style]}>
+      <Text style={[styles.badgeText, tone === 'neutral' && styles.badgeTextNeutral]}>{children}</Text>
+    </View>
+  );
+}
+
+export function ActionButton({ href, onPress, children, variant = 'primary', external = false, style, accessibilityLabel }) {
+  return (
+    <LinkShell
+      accessibilityLabel={accessibilityLabel}
+      external={external}
+      href={href}
+      onPress={onPress}
+      style={[styles.actionButtonWrap, style]}
+      variant={variant}>
+      <View
+        style={[
+          styles.actionButtonInner,
+          variant === 'secondary' && styles.actionButtonInnerSecondary,
+          variant === 'ghost' && styles.actionButtonInnerGhost,
+        ]}>
+        <Text
+          style={[
+            styles.actionButtonText,
+            variant === 'secondary' && styles.actionButtonTextSecondary,
+            variant === 'ghost' && styles.actionButtonTextSecondary,
+          ]}>
+          {children}
+        </Text>
+      </View>
+    </LinkShell>
+  );
+}
+
+export function StatPill({ label, value, tone = 'neutral' }) {
+  return (
+    <View style={[styles.statPill, styles[`stat${tone[0].toUpperCase()}${tone.slice(1)}`]]}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+export function Section({ eyebrow, title, description, action, children, style }) {
+  return (
+    <View style={[styles.section, style]}>
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionTitleGroup}>
+          {eyebrow ? <Text style={styles.sectionEyebrow}>{eyebrow}</Text> : null}
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
+        </View>
+        {action ? <View style={styles.sectionAction}>{action}</View> : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+export function BulletList({ items, tone = 'accent', compact = false }) {
+  if (!items?.length) {
+    return null;
+  }
+
+  return (
+    <View style={compact ? styles.listCompact : styles.list}>
+      {items.map((item) => (
+        <View key={item} style={styles.listItem}>
+          <View style={[styles.listDot, styles[`listDot${tone[0].toUpperCase()}${tone.slice(1)}`]]} />
+          <Text style={styles.listText}>{item}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function AgendaList({ items }) {
+  if (!items?.length) {
+    return null;
+  }
+
+  return (
+    <View style={styles.timeline}>
+      {items.map((item, index) => (
+        <View key={`${item.time}-${item.label}`} style={styles.timelineRow}>
+          <View style={styles.timelineRail}>
+            <View style={styles.timelineNode} />
+            {index < items.length - 1 ? <View style={styles.timelineLine} /> : null}
+          </View>
+          <View style={styles.timelineContent}>
+            <Text style={styles.timelineTime}>{item.time}</Text>
+            <Text style={styles.timelineLabel}>{item.label}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function EmptyState({ title, body, action }) {
+  return (
+    <Surface style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyBody}>{body}</Text>
+      {action ? <View style={styles.emptyAction}>{action}</View> : null}
+    </Surface>
+  );
+}
+
+export function GameCard({ game, href }) {
+  const card = (
+    <>
+      <View style={styles.cardTopRow}>
+        <Badge tone={game.status === 'active' ? 'green' : 'blue'}>{game.badge}</Badge>
+        <Text style={styles.cardStatus}>{game.status.toUpperCase()}</Text>
+      </View>
+      <Text style={styles.cardTitle}>{game.name}</Text>
+      <Text style={styles.cardSubtitle}>{game.summary}</Text>
+      <Text style={styles.cardHeroCopy}>{game.heroCopy}</Text>
+      <View style={styles.factRow}>
+        {game.quickFacts.map((fact) => (
+          <StatPill key={fact.label} label={fact.label} value={fact.value} tone={game.status === 'active' ? 'green' : 'neutral'} />
+        ))}
+      </View>
+      <BulletList items={game.highlights} />
+    </>
+  );
+
+  if (!href) {
+    return <Surface style={[styles.cardSurface, { borderColor: game.accent }]}>{card}</Surface>;
+  }
+
+  return (
+    <CardLink accessibilityLabel={`${game.name} page`} accent={game.accent} href={href}>
+      {card}
+    </CardLink>
+  );
+}
+
+export function TournamentCard({ tournament, gameName, href }) {
+  const [month = '', day = ''] = formatShortDate(tournament.date, tournament.timeZone).split(' ');
+  const card = (
+    <>
+      <View style={styles.cardTopRow}>
+        <Badge tone={tournament.status === 'upcoming' ? 'accent' : 'neutral'}>{tournament.badge}</Badge>
+        <Text style={styles.cardStatus}>{tournament.status.toUpperCase()}</Text>
+      </View>
+      <View style={styles.tournamentHeaderRow}>
+        <View style={styles.dateBadge}>
+          <Text style={styles.dateMonth}>{month}</Text>
+          <Text style={styles.dateDay}>{day}</Text>
+        </View>
+        <View style={styles.tournamentHeaderCopy}>
+          <Text style={styles.cardTitle}>{tournament.title}</Text>
+          <Text style={styles.cardSubtitle}>{gameName}</Text>
+        </View>
+      </View>
+      <Text style={styles.cardHeroCopy}>{tournament.summary}</Text>
+      <View style={styles.factRow}>
+        <StatPill label="Format" value={tournament.format} tone="neutral" />
+        <StatPill label="Location" value={tournament.location} tone="neutral" />
+      </View>
+      {tournament.callout ? <Text style={styles.callout}>{tournament.callout}</Text> : null}
+    </>
+  );
+
+  if (!href) {
+    return <Surface style={styles.cardSurface}>{card}</Surface>;
+  }
+
+  return (
+    <CardLink accessibilityLabel={`${tournament.title} details`} href={href}>
+      {card}
+    </CardLink>
+  );
+}
+
+export function ResultCard({ result, href }) {
+  const dateLabel = formatResultDate(result.date);
+  const placements = result.placements || [];
+  const card = (
+    <>
+      <View style={styles.cardTopRow}>
+        <Badge tone="neutral">{result.badge}</Badge>
+        <Text style={styles.cardStatus}>{result.status.toUpperCase()}</Text>
+      </View>
+      <Text style={styles.cardTitle}>{result.title}</Text>
+      <View style={styles.resultScoreRow}>
+        <View>
+          <Text style={styles.resultWinner}>{result.winner}</Text>
+          <Text style={styles.cardSubtitle}>{result.summary}</Text>
+        </View>
+        <View style={styles.scoreBadge}>
+          <Text style={styles.scoreValue}>{result.score}</Text>
+        </View>
+      </View>
+      <Text style={styles.resultDate}>{dateLabel}</Text>
+      <View style={styles.placementList}>
+        {placements.map((placement) => (
+          <View key={`${result.slug}-${placement.place}`} style={styles.placementRow}>
+            <Text style={styles.placementLabel}>{formatPlacement(placement.place)}</Text>
+            <Text style={styles.placementName}>{placement.name}</Text>
+          </View>
+        ))}
+      </View>
+      {result.notes?.length ? <BulletList items={result.notes} compact /> : null}
+    </>
+  );
+
+  if (!href) {
+    return <Surface style={styles.cardSurface}>{card}</Surface>;
+  }
+
+  return (
+    <CardLink accessibilityLabel={`${result.title} results`} href={href}>
+      {card}
+    </CardLink>
+  );
+}
+
+export function StreamCard({ stream }) {
+  return (
+    <Surface style={styles.streamCard}>
+      <View style={styles.cardTopRow}>
+        <Badge tone={stream.kind === 'live' ? 'rose' : 'blue'}>{stream.label}</Badge>
+        <Text style={styles.cardStatus}>{stream.kind.toUpperCase()}</Text>
+      </View>
+      <Text style={styles.cardTitle}>{stream.title}</Text>
+      <Text style={styles.cardHeroCopy}>{stream.description}</Text>
+      <View style={styles.streamActionRow}>
+        <ActionButton external href={stream.href}>
+          Open link
+        </ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
+export function CheckInPanel({ checkIn, checkInPath }) {
+  if (!checkIn) {
+    return (
+      <EmptyState
+        body="Add a check-in block to the tournament record and the placeholder flow will appear here."
+        title="Check-in is not configured yet"
+      />
+    );
+  }
+
+  return (
+    <Surface style={styles.checkInCard}>
+      <View style={styles.checkInTopRow}>
+        <Badge tone="blue">{checkIn.status || 'Placeholder flow'}</Badge>
+        <Text style={styles.checkInWindow}>{checkIn.window}</Text>
+      </View>
+      <Text style={styles.checkInTitle}>{checkIn.title || 'Signup and check-in'}</Text>
+      {checkIn.note ? <Text style={styles.checkInCopy}>{checkIn.note}</Text> : null}
+      <BulletList items={checkIn.steps} tone="blue" />
+      <View style={styles.checkInActions}>
+        {checkInPath ? <ActionButton href={checkInPath}>Open check-in page</ActionButton> : null}
+        <ActionButton href="/rules" variant="secondary">
+          Review rules
+        </ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
+export function BracketBoard({ bracket }) {
+  if (!bracket?.rounds?.length) {
+    return (
+      <EmptyState
+        body="Add a bracket object to the tournament record and the preview will appear here."
+        title="Bracket preview is not configured yet"
+      />
+    );
+  }
+
+  return (
+    <Surface style={styles.bracketCard}>
+      <View style={styles.bracketHeader}>
+        <Badge tone="accent">{bracket.title || 'Bracket preview'}</Badge>
+        <Text style={styles.bracketStatus}>{bracket.rounds.length} rounds</Text>
+      </View>
+      {bracket.note ? <Text style={styles.bracketNote}>{bracket.note}</Text> : null}
+      <View style={styles.bracketRounds}>
+        {bracket.rounds.map((round) => (
+          <View key={round.title} style={styles.bracketRound}>
+            <Text style={styles.bracketRoundTitle}>{round.title}</Text>
+            <View style={styles.bracketMatchList}>
+              {round.matches.map((match) => (
+                <View key={`${round.title}-${match.label}`} style={styles.bracketMatch}>
+                  <View style={styles.bracketMatchTopRow}>
+                    <Text style={styles.bracketMatchLabel}>{match.label}</Text>
+                    {match.winner ? <Text style={styles.bracketWinnerLabel}>{match.winner}</Text> : null}
+                  </View>
+                  <Text style={styles.bracketMatchTeams}>{match.teams?.join(' vs ')}</Text>
+                  {match.note ? <Text style={styles.bracketMatchNote}>{match.note}</Text> : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+    </Surface>
+  );
+}
+
+export function RuleBlock({ section }) {
+  return (
+    <Surface style={styles.ruleCard}>
+      <Text style={styles.ruleTitle}>{section.title}</Text>
+      <BulletList items={section.items} tone="blue" />
+    </Surface>
+  );
+}
+
+export function HubScreen({
+  eyebrow,
+  title,
+  subtitle,
+  lead,
+  actions = [],
+  stats = [],
+  children,
+  footerNote,
+}) {
+  const pathname = usePathname();
+
+  return (
+    <View style={styles.root}>
+      <View pointerEvents="none" style={styles.backdrop}>
+        <View style={styles.glowAmber} />
+        <View style={styles.glowBlue} />
+        <View style={styles.glowRed} />
+      </View>
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.page}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandMark}>
+                <Text style={styles.brandMarkText}>1v1</Text>
+              </View>
+              <View style={styles.brandCopy}>
+                <Text style={styles.brandTitle}>1v1 Tournaments</Text>
+                <Text style={styles.brandDomain}>1v1tournaments.org</Text>
+              </View>
+              <Badge tone="blue">Official site</Badge>
+            </View>
+
+            <View style={styles.navRow}>
+              {NAV_ITEMS.map((item) => {
+                const active = isActivePath(pathname, item.href);
+                return (
+                  <LinkShell key={item.href} href={item.href} style={styles.navWrap} variant={active ? 'primary' : 'secondary'}>
+                    <View style={[styles.navChip, active && styles.navChipActive]}>
+                      <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
+                    </View>
+                  </LinkShell>
+                );
+              })}
+            </View>
+
+            <Surface style={styles.heroSurface}>
+              <View style={styles.heroTopRow}>
+                {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
+                <Text style={styles.heroDomain}>1v1tournaments.org</Text>
+              </View>
+              <Text style={styles.heroTitle}>{title}</Text>
+              {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
+              {lead ? <Text style={styles.heroLead}>{lead}</Text> : null}
+
+              {actions.length ? (
+                <View style={styles.actionRow}>
+                  {actions.map((action) => (
+                    <ActionButton
+                      key={`${action.label}-${action.href || action.variant}`}
+                      external={action.external}
+                      href={action.href}
+                      onPress={action.onPress}
+                      variant={action.variant || 'primary'}>
+                      {action.label}
+                    </ActionButton>
+                  ))}
+                </View>
+              ) : null}
+
+              {stats.length ? (
+                <View style={styles.statsRow}>
+                  {stats.map((stat) => (
+                    <StatPill key={stat.label} label={stat.label} value={stat.value} tone={stat.tone || 'neutral'} />
+                  ))}
+                </View>
+              ) : null}
+            </Surface>
+
+            {children}
+
+            {footerNote ? (
+              <Surface style={styles.footerSurface}>
+                <Text style={styles.footerLabel}>Site note</Text>
+                <Text style={styles.footerText}>{footerNote}</Text>
+              </Surface>
+            ) : null}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const sharedCardShadow = {
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 24,
+  shadowOffset: { width: 0, height: 12 },
+  elevation: 8,
+};
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  glowAmber: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 320,
+    height: 320,
+    borderRadius: 999,
+    backgroundColor: theme.colors.accentGlow,
+  },
+  glowBlue: {
+    position: 'absolute',
+    top: 220,
+    left: -110,
+    width: 260,
+    height: 260,
+    borderRadius: 999,
+    backgroundColor: theme.colors.blueSoft,
+  },
+  glowRed: {
+    position: 'absolute',
+    bottom: -90,
+    right: 36,
+    width: 240,
+    height: 240,
+    borderRadius: 999,
+    backgroundColor: theme.colors.roseSoft,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  page: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  brandMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceLift,
+    borderWidth: 1,
+    borderColor: theme.colors.lineStrong,
+    ...sharedCardShadow,
+  },
+  brandMarkText: {
+    color: theme.colors.accent,
+    fontSize: 18,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  brandTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  brandDomain: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.4,
+  },
+  navRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 18,
+  },
+  navWrap: {
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  navChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+  },
+  navChipActive: {
+    backgroundColor: theme.colors.accentSoft,
+    borderColor: theme.colors.accent,
+  },
+  navText: {
+    color: theme.colors.muted,
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  navTextActive: {
+    color: theme.colors.text,
+  },
+  heroSurface: {
+    padding: 22,
+    borderRadius: 30,
+    marginBottom: 22,
+    borderColor: theme.colors.accentSoft,
+    overflow: 'hidden',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  heroDomain: {
+    color: theme.colors.muted,
+    fontFamily: MONO_FONT,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    color: theme.colors.text,
+    fontSize: 42,
+    lineHeight: 46,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    maxWidth: 720,
+  },
+  heroSubtitle: {
+    color: theme.colors.accent,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginTop: 12,
+    textTransform: 'uppercase',
+  },
+  heroLead: {
+    color: theme.colors.text,
+    fontSize: 18,
+    lineHeight: 27,
+    marginTop: 10,
+    maxWidth: 760,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 20,
+  },
+  actionButtonWrap: {
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  button: {
+    borderRadius: theme.radius.pill,
+  },
+  buttonPressed: {
+    opacity: 0.86,
+    transform: [{ translateY: 1 }],
+  },
+  actionButtonInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.accent,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
+  actionButtonInnerSecondary: {
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: theme.colors.lineStrong,
+  },
+  actionButtonInnerGhost: {
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.lineStrong,
+  },
+  actionButtonText: {
+    color: '#101010',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  actionButtonTextSecondary: {
+    color: theme.colors.text,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 18,
+  },
+  statPill: {
+    minWidth: 112,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceLift,
+    borderWidth: 1,
+    borderColor: theme.colors.lineStrong,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  statNeutral: {
+    backgroundColor: theme.colors.surface,
+  },
+  statAccent: {
+    backgroundColor: theme.colors.accentSoft,
+    borderColor: theme.colors.accent,
+  },
+  statBlue: {
+    backgroundColor: theme.colors.blueSoft,
+    borderColor: theme.colors.blue,
+  },
+  statGreen: {
+    backgroundColor: theme.colors.greenSoft,
+    borderColor: theme.colors.green,
+  },
+  statRose: {
+    backgroundColor: theme.colors.roseSoft,
+    borderColor: theme.colors.rose,
+  },
+  statLabel: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    fontFamily: MONO_FONT,
+  },
+  statValue: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  section: {
+    marginBottom: 22,
+  },
+  sectionHead: {
+    marginBottom: 12,
+  },
+  sectionTitleGroup: {
+    maxWidth: 760,
+  },
+  sectionEyebrow: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    fontFamily: MONO_FONT,
+  },
+  sectionTitle: {
+    color: theme.colors.text,
+    fontSize: 26,
+    lineHeight: 30,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  sectionDescription: {
+    color: theme.colors.muted,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 6,
+  },
+  sectionAction: {
+    marginTop: 10,
+  },
+  surface: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    padding: 18,
+    ...sharedCardShadow,
+  },
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    overflow: 'hidden',
+    ...sharedCardShadow,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardStatus: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    fontWeight: '800',
+    fontFamily: MONO_FONT,
+  },
+  cardTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    lineHeight: 26,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  cardSubtitle: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  cardHeroCopy: {
+    color: theme.colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  factRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
+  },
+  callout: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 12,
+    fontWeight: '700',
+  },
+  list: {
+    marginTop: 14,
+  },
+  listCompact: {
+    marginTop: 12,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  listDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    marginTop: 7,
+    marginRight: 10,
+    backgroundColor: theme.colors.accent,
+  },
+  listDotAccent: {
+    backgroundColor: theme.colors.accent,
+  },
+  listDotBlue: {
+    backgroundColor: theme.colors.blue,
+  },
+  listDotGreen: {
+    backgroundColor: theme.colors.green,
+  },
+  listDotRose: {
+    backgroundColor: theme.colors.rose,
+  },
+  listText: {
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+    flex: 1,
+  },
+  timeline: {
+    marginTop: 12,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  timelineRail: {
+    width: 20,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  timelineNode: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: theme.colors.accent,
+    borderWidth: 3,
+    borderColor: theme.colors.surfaceLift,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: theme.colors.lineStrong,
+    marginTop: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: 2,
+  },
+  timelineTime: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  timelineLabel: {
+    color: theme.colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  emptyState: {
+    marginTop: 4,
+  },
+  emptyTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    fontFamily: DISPLAY_FONT,
+  },
+  emptyBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  emptyAction: {
+    marginTop: 14,
+  },
+  tournamentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateBadge: {
+    width: 72,
+    height: 84,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surfaceBright,
+    borderWidth: 1,
+    borderColor: theme.colors.lineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  dateMonth: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  dateDay: {
+    color: theme.colors.text,
+    fontSize: 24,
+    lineHeight: 28,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+  },
+  tournamentHeaderCopy: {
+    flex: 1,
+  },
+  resultScoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginTop: 12,
+  },
+  resultWinner: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    fontFamily: DISPLAY_FONT,
+  },
+  scoreBadge: {
+    minWidth: 92,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: theme.colors.accentSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    alignItems: 'center',
+  },
+  scoreValue: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    fontFamily: MONO_FONT,
+  },
+  resultDate: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    marginTop: 10,
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.5,
+  },
+  placementList: {
+    marginTop: 12,
+  },
+  placementRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.line,
+  },
+  placementLabel: {
+    color: theme.colors.accent,
+    fontWeight: '800',
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.5,
+  },
+  placementName: {
+    color: theme.colors.text,
+    fontSize: 14,
+  },
+  streamCard: {
+    marginBottom: 14,
+  },
+  streamActionRow: {
+    marginTop: 16,
+  },
+  checkInActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
+  },
+  checkInCard: {
+    borderColor: 'rgba(108, 199, 255, 0.24)',
+  },
+  checkInCopy: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  checkInTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    lineHeight: 26,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  checkInTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  checkInWindow: {
+    color: theme.colors.blue,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  bracketCard: {
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+  },
+  bracketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  bracketStatus: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    fontWeight: '800',
+    fontFamily: MONO_FONT,
+  },
+  bracketNote: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  bracketRounds: {
+    gap: 14,
+  },
+  bracketRound: {
+    gap: 10,
+  },
+  bracketRoundTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    fontFamily: DISPLAY_FONT,
+  },
+  bracketMatchList: {
+    gap: 10,
+  },
+  bracketMatch: {
+    borderWidth: 1,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceBright,
+    padding: 14,
+  },
+  bracketMatchTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  bracketMatchLabel: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: MONO_FONT,
+  },
+  bracketWinnerLabel: {
+    color: theme.colors.green,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+    flexShrink: 1,
+    fontFamily: MONO_FONT,
+  },
+  bracketMatchTeams: {
+    color: theme.colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
+    fontWeight: '700',
+  },
+  bracketMatchNote: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  ruleCard: {
+    marginBottom: 14,
+  },
+  ruleTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  footerSurface: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  footerLabel: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    fontFamily: MONO_FONT,
+    marginBottom: 6,
+  },
+  footerText: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+  },
+  badgeText: {
+    color: theme.colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: MONO_FONT,
+  },
+  badgeTextNeutral: {
+    color: theme.colors.muted,
+  },
+  badgeNeutral: {
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: theme.colors.lineStrong,
+  },
+  badgeAccent: {
+    backgroundColor: theme.colors.accentSoft,
+    borderColor: theme.colors.accent,
+  },
+  badgeBlue: {
+    backgroundColor: theme.colors.blueSoft,
+    borderColor: theme.colors.blue,
+  },
+  badgeGreen: {
+    backgroundColor: theme.colors.greenSoft,
+    borderColor: theme.colors.green,
+  },
+  badgeRose: {
+    backgroundColor: theme.colors.roseSoft,
+    borderColor: theme.colors.rose,
+  },
+  cardSurface: {
+    marginBottom: 14,
+    padding: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.surface,
+    ...sharedCardShadow,
+  },
+});
