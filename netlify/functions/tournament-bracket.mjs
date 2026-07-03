@@ -290,7 +290,7 @@ async function saveBracket(bracket, options = {}) {
     updatedAt: new Date().toISOString(),
   };
 
-  const writeResult = await store.setJSON(`${bracket.tournamentSlug}.json`, updatedBracket, {
+  const writeResult = await store.set(`${bracket.tournamentSlug}.json`, JSON.stringify(updatedBracket), {
     metadata: {
       tournamentSlug: bracket.tournamentSlug,
       status: updatedBracket.status,
