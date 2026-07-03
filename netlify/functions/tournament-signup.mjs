@@ -1,4 +1,6 @@
-import { getDatabase } from '@netlify/database';
+import { createHash, randomUUID } from 'node:crypto';
+
+import { getStore } from '@netlify/blobs';
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -29,14 +31,26 @@ function isEmailLike(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function publicSignup(row) {
+function getSignupStore() {
+  return getStore('tournament-signups');
+}
+
+function emailKey(value) {
+  return createHash('sha256').update(value).digest('hex').slice(0, 32);
+}
+
+function signupKey(tournamentSlug, contactEmail) {
+  return `${tournamentSlug}/${emailKey(contactEmail)}.json`;
+}
+
+function publicSignup(signup) {
   return {
-    id: row.id,
-    tournamentSlug: row.tournament_slug,
-    playerName: row.player_name,
-    playerHandle: row.player_handle,
-    status: row.status,
-    createdAt: row.created_at,
+    id: signup.id,
+    tournamentSlug: signup.tournamentSlug,
+    playerName: signup.playerName,
+    playerHandle: signup.playerHandle,
+    status: signup.status,
+    createdAt: signup.createdAt,
   };
 }
 
@@ -76,38 +90,40 @@ export async function handler(event) {
   }
 
   try {
-    const { pool } = getDatabase();
-    const result = await pool.query(
-      `
-        INSERT INTO tournament_signups (
-          tournament_slug,
-          player_name,
-          contact_email,
-          player_handle,
-          notes
-        )
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, tournament_slug, player_name, player_handle, status, created_at
-      `,
-      [tournamentSlug, playerName, contactEmail, playerHandle, notes],
-    );
+    const store = getSignupStore();
+    const key = signupKey(tournamentSlug, contactEmail);
+    const existing = await store.get(key, { type: 'json' });
 
-    return json(201, {
-      ok: true,
-      signup: publicSignup(result.rows[0]),
-    });
-  } catch (error) {
-    if (error?.code === '23505') {
+    if (existing) {
       return json(409, { error: 'That email is already signed up for this tournament.' });
     }
 
-    return json(500, {
-      error: 'Signup storage is not available yet.',
-      diagnostic: {
-        errorName: error?.name || 'UnknownError',
-        hasDatabaseUrl: Boolean(process.env.NETLIFY_DB_URL),
-        hasDatabaseDriver: Boolean(process.env.NETLIFY_DB_DRIVER),
+    const signup = {
+      id: randomUUID(),
+      tournamentSlug,
+      playerName,
+      contactEmail,
+      playerHandle,
+      notes,
+      status: 'registered',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await store.setJSON(key, signup, {
+      metadata: {
+        tournamentSlug,
+        status: signup.status,
+        createdAt: signup.createdAt,
       },
     });
+
+    return json(201, {
+      ok: true,
+      signup: publicSignup(signup),
+    });
+  } catch (error) {
+    console.error('Tournament signup failed', error);
+    return json(500, { error: 'Signup storage is not available yet.' });
   }
 }

@@ -16,7 +16,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@netlify/database": "^1.1.0",
+    "@netlify/blobs": "^10.7.9",
     "expo": "~56.0.12",
     "expo-router": "~56.2.11",
     "expo-status-bar": "~56.0.4",
