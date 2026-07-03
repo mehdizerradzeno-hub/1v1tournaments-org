@@ -30,6 +30,17 @@ function cleanSlug(value) {
 }
 
 function getSignupStore() {
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+
+  if (siteID && token) {
+    return getStore({
+      name: 'tournament-signups',
+      siteID,
+      token,
+    });
+  }
+
   return getStore('tournament-signups');
 }
 
