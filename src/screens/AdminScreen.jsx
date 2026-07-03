@@ -19,6 +19,7 @@ import {
 } from '../lib/adminServerClient.js';
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
+import { fetchTournamentRoster } from '../lib/tournamentHostingClient.js';
 import {
   buildAdminDraftPacket,
   clearAdminSessionRecord,
@@ -84,6 +85,12 @@ export default function AdminScreen() {
   const [error, setError] = useState('');
   const [serverMessage, setServerMessage] = useState('');
   const [serverError, setServerError] = useState('');
+  const [rosterToken, setRosterToken] = useState('');
+  const [rosterSlug, setRosterSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const [rosters, setRosters] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterMessage, setRosterMessage] = useState('');
+  const [rosterError, setRosterError] = useState('');
   const selectedDraft = useMemo(
     () => drafts.find((draft) => draft.slug === selectedDraftSlug) || drafts[0] || null,
     [drafts, selectedDraftSlug],
@@ -104,6 +111,10 @@ export default function AdminScreen() {
       }),
     [drafts, serverAllowlistText],
   );
+  const selectedRoster = useMemo(
+    () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || rosters[0] || null,
+    [rosters, rosterSlug],
+  );
 
   function setFeedback(nextMessage = '', nextError = '') {
     setMessage(nextMessage);
@@ -113,6 +124,11 @@ export default function AdminScreen() {
   function setServerFeedback(nextMessage = '', nextError = '') {
     setServerMessage(nextMessage);
     setServerError(nextError);
+  }
+
+  function setRosterFeedback(nextMessage = '', nextError = '') {
+    setRosterMessage(nextMessage);
+    setRosterError(nextError);
   }
 
   function handleCreateAccess() {
@@ -352,6 +368,51 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleLoadRoster() {
+    const token = rosterToken.trim();
+
+    if (!token) {
+      setRosterFeedback('', 'Enter the tournament admin token before loading signups.');
+      return;
+    }
+
+    setRosterLoading(true);
+    setRosterFeedback('', '');
+
+    try {
+      const result = await fetchTournamentRoster({
+        token,
+        slug: rosterSlug,
+      });
+      const nextRosters = result.rosters || [];
+      const signupCount = nextRosters.reduce((total, roster) => total + (roster.signups?.length || 0), 0);
+
+      setRosters(nextRosters);
+      setRosterFeedback(`Loaded ${signupCount} signup${signupCount === 1 ? '' : 's'}.`, '');
+    } catch (error) {
+      setRosterFeedback('', error instanceof Error ? error.message : 'Could not load tournament signups.');
+    } finally {
+      setRosterLoading(false);
+    }
+  }
+
+  async function handleCopyRoster() {
+    const text = JSON.stringify(rosters, null, 2);
+
+    try {
+      if (canUseClipboard()) {
+        await globalThis.navigator.clipboard.writeText(text);
+        setRosterFeedback('Roster JSON copied to the clipboard.', '');
+        return;
+      }
+
+      Alert.alert('Copy roster JSON', text);
+      setRosterFeedback('Clipboard is not available here, so the roster JSON was shown in an alert.', '');
+    } catch {
+      setRosterFeedback('', 'Could not copy the roster JSON from this browser.');
+    }
+  }
+
   function renderServerUnlockSection() {
     return (
       <Section
@@ -463,6 +524,91 @@ export default function AdminScreen() {
               Copy packet
             </ActionButton>
           </View>
+        </Surface>
+      </Section>
+    );
+  }
+
+  function renderLiveRosterSection() {
+    const signupCount = selectedRoster?.signups?.length || 0;
+
+    return (
+      <Section
+        description="Phase 1 signups are saved in Netlify Database and can be reviewed here before you seed a bracket."
+        title="Live signup roster">
+        <Surface style={styles.rosterPanel}>
+          <View style={styles.metaRow}>
+            <Badge tone="green">Phase 1</Badge>
+            <Text style={styles.metaText}>Use the tournament admin token to load player registrations.</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Admin token</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={setRosterToken}
+              placeholder="Netlify TOURNAMENT_ADMIN_TOKEN"
+              placeholderTextColor="#6B766F"
+              secureTextEntry
+              style={styles.input}
+              value={rosterToken}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Tournament</Text>
+            <View style={styles.tournamentPicker}>
+              {siteData.tournaments.map((tournament) => (
+                <ActionButton
+                  key={tournament.slug}
+                  onPress={() => setRosterSlug(tournament.slug)}
+                  variant={rosterSlug === tournament.slug ? 'primary' : 'secondary'}>
+                  {tournament.title}
+                </ActionButton>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.buttonRow}>
+            <ActionButton onPress={handleLoadRoster}>{rosterLoading ? 'Loading...' : 'Load signups'}</ActionButton>
+            <ActionButton onPress={handleCopyRoster} variant="secondary">
+              Copy roster JSON
+            </ActionButton>
+          </View>
+
+          {rosterError ? <Text style={styles.errorText}>{rosterError}</Text> : null}
+          {rosterMessage ? <Text style={styles.successText}>{rosterMessage}</Text> : null}
+
+          <View style={styles.rosterSummary}>
+            <Badge tone={signupCount ? 'green' : 'blue'}>{signupCount} registered</Badge>
+            <Text style={styles.metaText}>{selectedRoster?.tournamentSlug || rosterSlug}</Text>
+          </View>
+
+          {selectedRoster?.signups?.length ? (
+            <View style={styles.signupList}>
+              {selectedRoster.signups.map((signup, index) => (
+                <View key={signup.id} style={styles.signupRow}>
+                  <View style={styles.signupRank}>
+                    <Text style={styles.signupRankText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.signupCopy}>
+                    <Text style={styles.signupName}>{signup.playerName}</Text>
+                    <Text style={styles.signupMeta}>
+                      {signup.playerHandle || 'No handle'} • {signup.contactEmail}
+                    </Text>
+                    {signup.notes ? <Text style={styles.signupNotes}>{signup.notes}</Text> : null}
+                  </View>
+                  <Badge tone="green">{signup.status || 'registered'}</Badge>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <EmptyState
+              body="Load a tournament roster after players submit the public check-in form."
+              title="No signups loaded yet"
+            />
+          )}
         </Surface>
       </Section>
     );
@@ -651,6 +797,8 @@ export default function AdminScreen() {
           {message ? <Text style={styles.successText}>{message}</Text> : null}
         </Surface>
       </Section>
+
+      {renderLiveRosterSection()}
 
       {renderServerAllowlistSection()}
 
@@ -896,11 +1044,74 @@ const styles = StyleSheet.create({
   panel: {
     borderColor: 'rgba(108, 199, 255, 0.24)',
   },
+  rosterPanel: {
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  rosterSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 18,
+  },
+  signupCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  signupList: {
+    marginTop: 14,
+  },
+  signupMeta: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  signupName: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  signupNotes: {
+    color: '#D6A24E',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  signupRank: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.17)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 36,
+  },
+  signupRankText: {
+    color: '#F4EFE6',
+    fontFamily: CODE_FONT,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  signupRow: {
+    alignItems: 'center',
+    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 12,
+  },
   successText: {
     color: '#61D291',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
     fontWeight: '700',
+  },
+  tournamentPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
 });

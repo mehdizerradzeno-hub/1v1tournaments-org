@@ -18,6 +18,10 @@ const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
+const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
+const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admin-roster.mjs', import.meta.url));
+const signupMigrationFile = fileURLToPath(new URL('../netlify/database/migrations/0001_tournament_signups.sql', import.meta.url));
+const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 
 test('/spades stays wired to the dedicated Spades route file', () => {
   assert.equal(getGamePath('spades'), '/spades');
@@ -61,6 +65,13 @@ test('dynamic public routes declare static export params for Netlify deep links'
 test('the check-in placeholder route stays wired to the public tournament path', () => {
   assert.equal(getCheckInPath('spades-summer-series'), '/check-in/spades-summer-series');
   assert.ok(existsSync(checkInRouteFile));
+});
+
+test('phase 1 signup capture stays wired through Netlify Database functions', () => {
+  assert.ok(existsSync(signupFunctionFile));
+  assert.ok(existsSync(adminRosterFunctionFile));
+  assert.ok(existsSync(signupMigrationFile));
+  assert.ok(existsSync(hostingClientFile));
 });
 
 test('the private admin route stays wired to the hub editor shell', () => {

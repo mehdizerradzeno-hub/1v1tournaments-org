@@ -1,12 +1,12 @@
 const sharedCheckIn = {
   title: 'Signup and check-in',
-  status: 'Placeholder flow',
+  status: 'Registration open',
   preview: '30 min early',
   window: 'Opens 30 minutes before the start time.',
-  note: 'This is a static placeholder until a safe admin flow is connected.',
+  note: 'Submit the public signup form, then return here before the first round for final check-in notes.',
   steps: [
     'Review the event page and rules first.',
-    'Use the private check-in page when the admin tools are live.',
+    'Submit one signup per player using an email the admin can contact.',
     'Return here for live coverage once play begins.',
   ],
 };
@@ -50,7 +50,7 @@ export const siteData = {
     headline: 'Official organization website for 1v1 Tournaments.',
     tagline: 'Spades tournaments are live now, and Euchre is coming soon.',
     entryPolicy: 'Free entry, no buy-in, no wagering.',
-    adminNote: 'Public schedules, stream URLs, and event copy are maintained here by hand.',
+    adminNote: 'Public schedules, stream URLs, and event copy are maintained here by hand. Player signups are stored by the Phase 1 roster backend.',
     contactEmail: 'hello@1v1tournaments.org',
     primaryGameSlug: 'spades',
     primaryTournamentSlug: 'spades-summer-series',
@@ -61,7 +61,7 @@ export const siteData = {
     focus: [
       'Spades tournaments and posted results',
       'Euchre coming soon',
-      'Stream links, replays, and tournament pages in one place',
+      'Stream links, signups, replays, and tournament pages in one place',
     ],
     contactEmail: 'hello@1v1tournaments.org',
     responseNote: 'Replies are handled manually for now.',

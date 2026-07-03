@@ -10,11 +10,13 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "build:netlify": "npm run build:web",
     "admin:server": "node ./server/adminServer.mjs",
     "lint": "eslint .",
     "test": "node --test"
   },
   "dependencies": {
+    "@netlify/database": "^1.1.0",
     "expo": "~56.0.12",
     "expo-router": "~56.2.11",
     "expo-status-bar": "~56.0.4",
