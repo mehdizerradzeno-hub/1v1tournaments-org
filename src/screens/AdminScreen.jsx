@@ -19,7 +19,12 @@ import {
 } from '../lib/adminServerClient.js';
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
-import { fetchTournamentRoster } from '../lib/tournamentHostingClient.js';
+import {
+  fetchTournamentBracket,
+  fetchTournamentRoster,
+  generateTournamentBracket,
+  reportTournamentMatchWinner,
+} from '../lib/tournamentHostingClient.js';
 import {
   buildAdminDraftPacket,
   clearAdminSessionRecord,
@@ -91,6 +96,10 @@ export default function AdminScreen() {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterMessage, setRosterMessage] = useState('');
   const [rosterError, setRosterError] = useState('');
+  const [bracket, setBracket] = useState(null);
+  const [bracketLoading, setBracketLoading] = useState(false);
+  const [bracketMessage, setBracketMessage] = useState('');
+  const [bracketError, setBracketError] = useState('');
   const selectedDraft = useMemo(
     () => drafts.find((draft) => draft.slug === selectedDraftSlug) || drafts[0] || null,
     [drafts, selectedDraftSlug],
@@ -129,6 +138,11 @@ export default function AdminScreen() {
   function setRosterFeedback(nextMessage = '', nextError = '') {
     setRosterMessage(nextMessage);
     setRosterError(nextError);
+  }
+
+  function setBracketFeedback(nextMessage = '', nextError = '') {
+    setBracketMessage(nextMessage);
+    setBracketError(nextError);
   }
 
   function handleCreateAccess() {
@@ -388,11 +402,93 @@ export default function AdminScreen() {
       const signupCount = nextRosters.reduce((total, roster) => total + (roster.signups?.length || 0), 0);
 
       setRosters(nextRosters);
+      setBracket(null);
       setRosterFeedback(`Loaded ${signupCount} signup${signupCount === 1 ? '' : 's'}.`, '');
     } catch (error) {
       setRosterFeedback('', error instanceof Error ? error.message : 'Could not load tournament signups.');
     } finally {
       setRosterLoading(false);
+    }
+  }
+
+  async function handleLoadBracket() {
+    setBracketLoading(true);
+    setBracketFeedback('', '');
+
+    try {
+      const result = await fetchTournamentBracket({ slug: rosterSlug });
+      setBracket(result.bracket || null);
+      setBracketFeedback(result.bracket ? 'Loaded the published bracket.' : 'No bracket is published for this tournament yet.', '');
+    } catch (error) {
+      setBracketFeedback('', error instanceof Error ? error.message : 'Could not load the tournament bracket.');
+    } finally {
+      setBracketLoading(false);
+    }
+  }
+
+  async function handleGenerateBracket() {
+    const token = rosterToken.trim();
+
+    if (!token) {
+      setBracketFeedback('', 'Enter the tournament admin token before generating a bracket.');
+      return;
+    }
+
+    setBracketLoading(true);
+    setBracketFeedback('', '');
+
+    try {
+      const result = await generateTournamentBracket({ token, slug: rosterSlug });
+      setBracket(result.bracket || null);
+      setBracketFeedback('Generated and published the bracket from the live signup roster.', '');
+    } catch (error) {
+      setBracketFeedback('', error instanceof Error ? error.message : 'Could not generate the tournament bracket.');
+    } finally {
+      setBracketLoading(false);
+    }
+  }
+
+  async function handleReportWinner(match, player) {
+    const token = rosterToken.trim();
+
+    if (!token) {
+      setBracketFeedback('', 'Enter the tournament admin token before reporting a winner.');
+      return;
+    }
+
+    setBracketLoading(true);
+    setBracketFeedback('', '');
+
+    try {
+      const result = await reportTournamentMatchWinner({
+        token,
+        slug: rosterSlug,
+        matchId: match.id,
+        winnerId: player.id,
+      });
+      setBracket(result.bracket || null);
+      setBracketFeedback(`${player.name} advanced from ${match.label}.`, '');
+    } catch (error) {
+      setBracketFeedback('', error instanceof Error ? error.message : 'Could not save the match winner.');
+    } finally {
+      setBracketLoading(false);
+    }
+  }
+
+  async function handleCopyBracket() {
+    const text = JSON.stringify(bracket || {}, null, 2);
+
+    try {
+      if (canUseClipboard()) {
+        await globalThis.navigator.clipboard.writeText(text);
+        setBracketFeedback('Bracket JSON copied to the clipboard.', '');
+        return;
+      }
+
+      Alert.alert('Copy bracket JSON', text);
+      setBracketFeedback('Clipboard is not available here, so the bracket JSON was shown in an alert.', '');
+    } catch {
+      setBracketFeedback('', 'Could not copy the bracket JSON from this browser.');
     }
   }
 
@@ -614,6 +710,100 @@ export default function AdminScreen() {
     );
   }
 
+  function renderBracketManagerSection() {
+    const readyMatches = bracket?.rounds
+      ?.flatMap((round) => round.matches.map((match) => ({ ...match, roundTitle: round.title })))
+      ?.filter((match) => match.players?.filter(Boolean).length === 2) || [];
+    const completedCount = bracket?.rounds
+      ?.flatMap((round) => round.matches)
+      ?.filter((match) => match.status === 'final').length || 0;
+
+    return (
+      <Section
+        description="Phase 2 creates a public bracket from signups and gives each match a Spades room link."
+        title="Bracket manager">
+        <Surface style={styles.bracketPanel}>
+          <View style={styles.metaRow}>
+            <Badge tone={bracket ? 'green' : 'blue'}>{bracket ? bracket.status : 'Not generated'}</Badge>
+            <Text style={styles.metaText}>
+              Matches open in 1v1spades.com rooms while this hub tracks bracket state and winners.
+            </Text>
+          </View>
+
+          <View style={styles.buttonRow}>
+            <ActionButton onPress={handleLoadBracket} variant="secondary">
+              {bracketLoading ? 'Loading...' : 'Load bracket'}
+            </ActionButton>
+            <ActionButton onPress={handleGenerateBracket}>Generate from signups</ActionButton>
+            <ActionButton onPress={handleCopyBracket} variant="ghost">
+              Copy bracket JSON
+            </ActionButton>
+          </View>
+
+          {bracketError ? <Text style={styles.errorText}>{bracketError}</Text> : null}
+          {bracketMessage ? <Text style={styles.successText}>{bracketMessage}</Text> : null}
+
+          {bracket ? (
+            <>
+              <View style={styles.rosterSummary}>
+                <Badge tone="accent">{bracket.participantCount} players</Badge>
+                <Badge tone="green">{completedCount} final</Badge>
+                {bracket.winner ? <Badge tone="green">Winner: {bracket.winner.name}</Badge> : null}
+              </View>
+
+              <View style={styles.bracketRounds}>
+                {bracket.rounds.map((round) => (
+                  <View key={round.index} style={styles.bracketRound}>
+                    <Text style={styles.bracketRoundTitle}>{round.title}</Text>
+                    {round.matches.map((match) => {
+                      const players = match.players || [];
+                      const canReport = players.filter(Boolean).length === 2;
+
+                      return (
+                        <View key={match.id} style={styles.bracketMatchCard}>
+                          <View style={styles.metaRow}>
+                            <Badge tone={match.status === 'final' ? 'green' : canReport ? 'accent' : 'blue'}>{match.status}</Badge>
+                            <Text style={styles.metaText}>{match.label}</Text>
+                          </View>
+                          <Text style={styles.matchTitle}>
+                            {players.map((player) => player?.name || 'TBD').join(' vs ')}
+                          </Text>
+                          {match.winnerName ? <Text style={styles.signupNotes}>Winner: {match.winnerName}</Text> : null}
+                          <View style={styles.buttonRow}>
+                            <ActionButton external href={match.roomUrl} variant="secondary">
+                              Open match room
+                            </ActionButton>
+                            {players.filter(Boolean).map((player) => (
+                              <ActionButton
+                                key={`${match.id}-${player.id}`}
+                                onPress={() => handleReportWinner(match, player)}
+                                variant={match.winnerId === player.id ? 'primary' : 'ghost'}>
+                                {match.winnerId === player.id ? 'Winner' : `Advance ${player.name}`}
+                              </ActionButton>
+                            ))}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+
+              {!readyMatches.length && !bracket.winner ? (
+                <Text style={styles.copy}>Waiting for enough players to reach the next match.</Text>
+              ) : null}
+            </>
+          ) : (
+            <EmptyState
+              body="Load or generate the bracket after at least two players have registered."
+              title="No bracket loaded yet"
+            />
+          )}
+        </Surface>
+      </Section>
+    );
+  }
+
   const actions = [
     { label: 'Home', href: '/' },
     { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
@@ -799,6 +989,8 @@ export default function AdminScreen() {
       </Section>
 
       {renderLiveRosterSection()}
+
+      {renderBracketManagerSection()}
 
       {renderServerAllowlistSection()}
 
@@ -1046,6 +1238,36 @@ const styles = StyleSheet.create({
   },
   rosterPanel: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  bracketPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  bracketRounds: {
+    marginTop: 16,
+  },
+  bracketRound: {
+    marginBottom: 14,
+  },
+  bracketRoundTitle: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  bracketMatchCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 14,
+  },
+  matchTitle: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 8,
   },
   rosterSummary: {
     flexDirection: 'row',

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -26,9 +27,47 @@ import {
   getTournamentBySlug,
   siteData,
 } from '../lib/siteData.js';
+import { fetchTournamentBracket } from '../lib/tournamentHostingClient.js';
 
 export default function TournamentScreen({ slug }) {
+  const [liveBracket, setLiveBracket] = useState(null);
+  const [bracketState, setBracketState] = useState({ loading: true, error: '' });
   const tournament = getTournamentBySlug(slug);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBracket() {
+      if (!slug) {
+        return;
+      }
+
+      setBracketState({ loading: true, error: '' });
+
+      try {
+        const result = await fetchTournamentBracket({ slug });
+
+        if (active) {
+          setLiveBracket(result.bracket || null);
+          setBracketState({ loading: false, error: '' });
+        }
+      } catch (error) {
+        if (active) {
+          setLiveBracket(null);
+          setBracketState({
+            loading: false,
+            error: error instanceof Error ? error.message : 'Could not load the live bracket.',
+          });
+        }
+      }
+    }
+
+    loadBracket();
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
 
   if (!tournament) {
     return (
@@ -100,9 +139,19 @@ export default function TournamentScreen({ slug }) {
       </Section>
 
       <Section
-        description="The bracket display is data-driven, mobile-first, and ready for a future live bracket service."
-        title="Bracket preview">
-        <BracketBoard bracket={tournament.bracket} />
+        description="Once admin generates a bracket, this section becomes the live match board with Spades room links."
+        title={liveBracket ? 'Live bracket' : 'Bracket preview'}>
+        {liveBracket ? (
+          <LiveBracketBoard bracket={liveBracket} />
+        ) : (
+          <>
+            <BracketBoard bracket={tournament.bracket} />
+            {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
+            {!bracketState.loading && !bracketState.error ? (
+              <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
+            ) : null}
+          </>
+        )}
       </Section>
 
       {isPrimaryGame && gamePath ? (
@@ -182,6 +231,58 @@ export default function TournamentScreen({ slug }) {
   );
 }
 
+function playerLabel(player) {
+  if (!player) return 'TBD';
+  return player.handle ? `${player.name} (${player.handle})` : player.name;
+}
+
+function LiveBracketBoard({ bracket }) {
+  const completedCount = bracket.rounds
+    .flatMap((round) => round.matches)
+    .filter((match) => match.status === 'final').length;
+
+  return (
+    <Surface style={styles.liveBracketCard}>
+      <View style={styles.liveBracketHeader}>
+        <Badge tone={bracket.status === 'complete' ? 'green' : 'accent'}>{bracket.status}</Badge>
+        <Text style={styles.liveBracketMeta}>
+          {bracket.participantCount} players • {completedCount} final
+        </Text>
+      </View>
+      {bracket.winner ? <Text style={styles.liveBracketWinner}>Champion: {bracket.winner.name}</Text> : null}
+
+      <View style={styles.liveRounds}>
+        {bracket.rounds.map((round) => (
+          <View key={round.index} style={styles.liveRound}>
+            <Text style={styles.liveRoundTitle}>{round.title}</Text>
+            {round.matches.map((match) => {
+              const players = match.players || [];
+
+              return (
+                <View key={match.id} style={styles.liveMatch}>
+                  <View style={styles.liveMatchTopRow}>
+                    <Badge tone={match.status === 'final' ? 'green' : match.status === 'ready' ? 'accent' : 'blue'}>
+                      {match.status}
+                    </Badge>
+                    <Text style={styles.liveMatchLabel}>{match.label}</Text>
+                  </View>
+                  <Text style={styles.liveMatchPlayers}>{players.map(playerLabel).join(' vs ')}</Text>
+                  {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {match.winnerName}</Text> : null}
+                  <View style={styles.liveMatchActions}>
+                    <ActionButton external href={match.roomUrl} variant="secondary">
+                      Play match
+                    </ActionButton>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    </Surface>
+  );
+}
+
 const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
@@ -226,6 +327,86 @@ const styles = StyleSheet.create({
   linkButton: {
     marginRight: 10,
     marginBottom: 10,
+  },
+  bracketLoadNote: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 10,
+  },
+  liveBracketCard: {
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  liveBracketHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 10,
+  },
+  liveBracketMeta: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  liveBracketWinner: {
+    color: '#61D291',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  liveRounds: {
+    marginTop: 8,
+  },
+  liveRound: {
+    marginBottom: 14,
+  },
+  liveRoundTitle: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  liveMatch: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 14,
+  },
+  liveMatchTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  liveMatchLabel: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  liveMatchPlayers: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  liveMatchWinner: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  liveMatchActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
   },
   snapshotCard: {
     borderColor: 'rgba(214, 162, 78, 0.24)',
