@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import { getStore } from '@netlify/blobs';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -66,6 +66,10 @@ function publicSignup(signup) {
 }
 
 export async function handler(event) {
+  if (event.blobs) {
+    connectLambda(event);
+  }
+
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
   }

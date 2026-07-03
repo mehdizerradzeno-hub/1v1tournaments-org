@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -84,6 +84,10 @@ async function loadSignups(store, requestedSlug) {
 }
 
 export async function handler(event) {
+  if (event.blobs) {
+    connectLambda(event);
+  }
+
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
   }
