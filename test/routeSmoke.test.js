@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,6 +46,16 @@ test('the featured tournament route stays wired to the Spades launch event', () 
   assert.ok(tournament);
   assert.equal(tournament?.gameSlug, 'spades');
   assert.deepEqual(tournament?.streamSlugs, ['main-live', 'replay-archive']);
+});
+
+test('dynamic public routes declare static export params for Netlify deep links', () => {
+  const tournamentRouteSource = readFileSync(tournamentRouteFile, 'utf8');
+  const checkInRouteSource = readFileSync(checkInRouteFile, 'utf8');
+
+  assert.match(tournamentRouteSource, /export function generateStaticParams/);
+  assert.match(tournamentRouteSource, /siteData\.tournaments\.map/);
+  assert.match(checkInRouteSource, /export function generateStaticParams/);
+  assert.match(checkInRouteSource, /siteData\.tournaments\.map/);
 });
 
 test('the check-in placeholder route stays wired to the public tournament path', () => {
