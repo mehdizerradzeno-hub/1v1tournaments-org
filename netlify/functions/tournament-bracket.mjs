@@ -310,6 +310,11 @@ async function saveBracket(bracket, options = {}) {
   return updatedBracket;
 }
 
+async function deleteBracket(tournamentSlug) {
+  const store = getStoreWithFallback('tournament-brackets');
+  await store.delete(`${tournamentSlug}.json`);
+}
+
 async function reportWinnerWithRetry(tournamentSlug, matchId, winnerId) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const loaded = await loadBracketWithMetadata(tournamentSlug);
@@ -426,6 +431,18 @@ export async function handler(event) {
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });
+    }
+
+    if (payload.action === 'reset') {
+      const adminCheck = requireAdmin(event);
+
+      if (adminCheck.error) {
+        return adminCheck.error;
+      }
+
+      await deleteBracket(tournamentSlug);
+
+      return json(200, { ok: true, bracket: null });
     }
 
     if (payload.action === 'report-winner') {

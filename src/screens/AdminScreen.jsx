@@ -24,6 +24,7 @@ import {
   fetchTournamentRoster,
   generateTournamentBracket,
   reportTournamentMatchWinner,
+  resetTournamentBracket,
 } from '../lib/tournamentHostingClient.js';
 import {
   buildAdminDraftPacket,
@@ -448,6 +449,28 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleResetBracket() {
+    const token = rosterToken.trim();
+
+    if (!token) {
+      setBracketFeedback('', 'Enter the tournament admin token before resetting a bracket.');
+      return;
+    }
+
+    setBracketLoading(true);
+    setBracketFeedback('', '');
+
+    try {
+      await resetTournamentBracket({ token, slug: rosterSlug });
+      setBracket(null);
+      setBracketFeedback('Reset the published bracket for this tournament.', '');
+    } catch (error) {
+      setBracketFeedback('', error instanceof Error ? error.message : 'Could not reset the tournament bracket.');
+    } finally {
+      setBracketLoading(false);
+    }
+  }
+
   async function handleReportWinner(match, player) {
     const token = rosterToken.trim();
 
@@ -489,6 +512,39 @@ export default function AdminScreen() {
       setBracketFeedback('Clipboard is not available here, so the bracket JSON was shown in an alert.', '');
     } catch {
       setBracketFeedback('', 'Could not copy the bracket JSON from this browser.');
+    }
+  }
+
+  async function handleCopyMatchCallback(match) {
+    const payload = {
+      action: 'report-winner',
+      matchId: match.id,
+      winnerId: 'winner-player-id-from-this-match',
+    };
+    const text = [
+      `POST https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(rosterSlug)}`,
+      'Authorization: Bearer $TOURNAMENT_MATCH_RESULT_TOKEN',
+      'Content-Type: application/json',
+      '',
+      JSON.stringify(payload, null, 2),
+      '',
+      `curl -sS -X POST 'https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(rosterSlug)}' \\`,
+      "  -H 'Authorization: Bearer $TOURNAMENT_MATCH_RESULT_TOKEN' \\",
+      "  -H 'Content-Type: application/json' \\",
+      `  --data '${JSON.stringify(payload)}'`,
+    ].join('\n');
+
+    try {
+      if (canUseClipboard()) {
+        await globalThis.navigator.clipboard.writeText(text);
+        setBracketFeedback(`${match.id} callback packet copied.`, '');
+        return;
+      }
+
+      Alert.alert('Copy match callback', text);
+      setBracketFeedback('Clipboard is not available here, so the callback packet was shown in an alert.', '');
+    } catch {
+      setBracketFeedback('', 'Could not copy the match callback packet from this browser.');
     }
   }
 
@@ -735,6 +791,9 @@ export default function AdminScreen() {
               {bracketLoading ? 'Loading...' : 'Load bracket'}
             </ActionButton>
             <ActionButton onPress={handleGenerateBracket}>Generate from signups</ActionButton>
+            <ActionButton onPress={handleResetBracket} variant="secondary">
+              Reset bracket
+            </ActionButton>
             <ActionButton onPress={handleCopyBracket} variant="ghost">
               Copy bracket JSON
             </ActionButton>
@@ -769,9 +828,13 @@ export default function AdminScreen() {
                             {players.map((player) => player?.name || 'TBD').join(' vs ')}
                           </Text>
                           {match.winnerName ? <Text style={styles.signupNotes}>Winner: {match.winnerName}</Text> : null}
+                          <Text style={styles.callbackText}>{match.id}</Text>
                           <View style={styles.buttonRow}>
                             <ActionButton external href={match.roomUrl} variant="secondary">
                               Open match room
+                            </ActionButton>
+                            <ActionButton onPress={() => handleCopyMatchCallback(match)} variant="secondary">
+                              Copy callback
                             </ActionButton>
                             {players.filter(Boolean).map((player) => (
                               <ActionButton
@@ -1268,6 +1331,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 22,
     marginTop: 8,
+  },
+  callbackText: {
+    color: '#AAB4AE',
+    fontFamily: CODE_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
   },
   rosterSummary: {
     flexDirection: 'row',

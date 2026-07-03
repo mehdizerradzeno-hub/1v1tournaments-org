@@ -18,6 +18,7 @@ const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
+const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admin-roster.mjs', import.meta.url));
 const tournamentBracketFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-bracket.mjs', import.meta.url));
@@ -91,10 +92,18 @@ test('Spades match results can report winners through a narrow callback token', 
   assert.match(tournamentBracketSource, /TOURNAMENT_MATCH_RESULT_TOKEN/);
   assert.match(tournamentBracketSource, /requireMatchReporter/);
   assert.match(tournamentBracketSource, /reportWinnerWithRetry/);
+  assert.match(tournamentBracketSource, /payload\.action === 'reset'/);
   assert.match(readmeSource, /Spades Match Result Callback/);
   assert.match(readmeSource, /"action": "report-winner"/);
 });
 
 test('the private admin route stays wired to the hub editor shell', () => {
   assert.ok(existsSync(adminRouteFile));
+  assert.ok(existsSync(adminScreenFile));
+  const adminScreenSource = readFileSync(adminScreenFile, 'utf8');
+  const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
+
+  assert.match(adminScreenSource, /resetTournamentBracket/);
+  assert.match(adminScreenSource, /handleCopyMatchCallback/);
+  assert.match(hostingClientSource, /resetTournamentBracket/);
 });

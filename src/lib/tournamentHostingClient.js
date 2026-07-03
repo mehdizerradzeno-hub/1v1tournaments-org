@@ -76,6 +76,25 @@ export async function generateTournamentBracket({ token, slug }) {
   return result;
 }
 
+export async function resetTournamentBracket({ token, slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'reset' }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Bracket could not be reset.');
+  }
+
+  return result;
+}
+
 export async function reportTournamentMatchWinner({ token, slug, matchId, winnerId }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
