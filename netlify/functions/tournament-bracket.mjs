@@ -46,6 +46,19 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
+function getTournamentSlug(event, payload = {}) {
+  const explicitSlug = cleanText(event.queryStringParameters?.slug || payload.tournamentSlug);
+
+  if (explicitSlug) {
+    return explicitSlug;
+  }
+
+  const matchId = cleanText(event.queryStringParameters?.matchId || payload.matchId);
+  const match = matchId.match(/^(.+)-r\d+-m\d+$/);
+
+  return match ? match[1] : '';
+}
+
 function nextPowerOfTwo(value) {
   let power = 1;
 
@@ -268,6 +281,53 @@ function publicBracket(bracket) {
   };
 }
 
+function publicMatchDetails(bracket, matchId) {
+  if (!bracket) {
+    return null;
+  }
+
+  for (const round of bracket.rounds) {
+    const match = round.matches.find((item) => item.id === matchId);
+
+    if (match) {
+      return {
+        tournamentSlug: bracket.tournamentSlug,
+        bracketStatus: bracket.status,
+        gameSlug: bracket.gameSlug,
+        round: {
+          index: round.index,
+          title: round.title,
+        },
+        match: {
+          ...match,
+          players: match.players.map((player) =>
+            player
+              ? {
+                  id: player.id,
+                  seed: player.seed,
+                  name: player.name,
+                  handle: player.handle || '',
+                }
+              : null,
+          ),
+        },
+        resultCallback: {
+          endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
+          method: 'POST',
+          tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
+          bodyTemplate: {
+            action: 'report-winner',
+            matchId,
+            winnerId: 'winner-player-id-from-this-match',
+          },
+        },
+      };
+    }
+  }
+
+  return null;
+}
+
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
   return store.get(`${tournamentSlug}.json`, { type: 'json' });
@@ -385,15 +445,28 @@ export async function handler(event) {
     return json(204, {});
   }
 
-  const tournamentSlug = cleanText(event.queryStringParameters?.slug);
-
-  if (!tournamentSlug) {
-    return json(400, { error: 'Choose a tournament before loading a bracket.' });
-  }
+  const requestedMatchId = cleanText(event.queryStringParameters?.matchId);
 
   if (event.httpMethod === 'GET') {
+    const tournamentSlug = getTournamentSlug(event);
+
+    if (!tournamentSlug) {
+      return json(400, { error: 'Choose a tournament before loading a bracket.' });
+    }
+
     try {
       const bracket = await loadBracket(tournamentSlug);
+
+      if (requestedMatchId) {
+        const matchDetails = publicMatchDetails(bracket, requestedMatchId);
+
+        if (!matchDetails) {
+          return json(404, { error: 'That match was not found in this bracket.' });
+        }
+
+        return json(200, { ok: true, match: matchDetails });
+      }
+
       return json(200, { ok: true, bracket: publicBracket(bracket) });
     } catch (error) {
       console.error('Public bracket load failed', error);
@@ -411,6 +484,12 @@ export async function handler(event) {
     payload = JSON.parse(event.body || '{}');
   } catch {
     return json(400, { error: 'Bracket payload must be valid JSON.' });
+  }
+
+  const tournamentSlug = getTournamentSlug(event, payload);
+
+  if (!tournamentSlug) {
+    return json(400, { error: 'Choose a tournament before loading a bracket.' });
   }
 
   try {

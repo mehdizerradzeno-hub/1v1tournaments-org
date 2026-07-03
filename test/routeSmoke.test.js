@@ -83,6 +83,7 @@ test('phase 1 signup capture stays wired through Netlify Functions and Blobs', (
   assert.match(adminRosterSource, /@netlify\/blobs/);
   assert.match(tournamentBracketSource, /tournament-brackets/);
   assert.match(hostingClientSource, /generateTournamentBracket/);
+  assert.match(hostingClientSource, /fetchTournamentMatch/);
 });
 
 test('Spades match results can report winners through a narrow callback token', () => {
@@ -92,8 +93,12 @@ test('Spades match results can report winners through a narrow callback token', 
   assert.match(tournamentBracketSource, /TOURNAMENT_MATCH_RESULT_TOKEN/);
   assert.match(tournamentBracketSource, /requireMatchReporter/);
   assert.match(tournamentBracketSource, /reportWinnerWithRetry/);
+  assert.match(tournamentBracketSource, /publicMatchDetails/);
+  assert.match(tournamentBracketSource, /resultCallback/);
+  assert.match(tournamentBracketSource, /getTournamentSlug/);
   assert.match(tournamentBracketSource, /payload\.action === 'reset'/);
   assert.match(readmeSource, /Spades Match Result Callback/);
+  assert.match(readmeSource, /GET https:\/\/1v1tournaments\.org\/\.netlify\/functions\/tournament-bracket\?matchId=/);
   assert.match(readmeSource, /"action": "report-winner"/);
 });
 

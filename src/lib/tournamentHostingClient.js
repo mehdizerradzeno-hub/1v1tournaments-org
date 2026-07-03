@@ -57,6 +57,28 @@ export async function fetchTournamentBracket({ slug }) {
   return result;
 }
 
+export async function fetchTournamentMatch({ slug, matchId }) {
+  const params = new URLSearchParams();
+
+  if (slug) {
+    params.set('slug', slug);
+  }
+
+  if (matchId) {
+    params.set('matchId', matchId);
+  }
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const response = await fetch(`${BRACKET_ENDPOINT}${query}`);
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Match could not be loaded.');
+  }
+
+  return result;
+}
+
 export async function generateTournamentBracket({ token, slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {

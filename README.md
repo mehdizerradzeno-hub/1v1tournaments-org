@@ -77,7 +77,36 @@ Future edits:
 
 ## Spades Match Result Callback
 
-The Spades app should report completed tournament rooms back to the tournament hub:
+The Spades app can load public match details directly from the tournament hub:
+
+- Endpoint: `GET https://1v1tournaments.org/.netlify/functions/tournament-bracket?matchId=spades-summer-series-r1-m1`
+- Response shape:
+
+```json
+{
+  "ok": true,
+  "match": {
+    "tournamentSlug": "spades-summer-series",
+    "bracketStatus": "published",
+    "gameSlug": "spades",
+    "round": {
+      "index": 1,
+      "title": "Semifinals"
+    },
+    "match": {
+      "id": "spades-summer-series-r1-m1",
+      "players": []
+    },
+    "resultCallback": {
+      "endpoint": "https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=spades-summer-series",
+      "method": "POST",
+      "tokenEnv": "TOURNAMENT_MATCH_RESULT_TOKEN"
+    }
+  }
+}
+```
+
+After the room completes, the Spades app should report the winner back to the tournament hub:
 
 - Endpoint: `POST https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=spades-summer-series`
 - Header: `Authorization: Bearer $TOURNAMENT_MATCH_RESULT_TOKEN`
