@@ -445,7 +445,9 @@ export default function CheckInScreen({ slug }) {
                     <Text style={styles.requirementTitle}>Password requirements</Text>
                     {passwordRequirements.map((item) => (
                       <View key={item.key} style={styles.requirementRow}>
-                        <Badge tone={item.met ? 'green' : 'accent'}>{item.met ? 'OK' : 'Needed'}</Badge>
+                        <Badge style={styles.requirementBadge} tone={item.met ? 'green' : 'accent'}>
+                          {item.met ? 'OK' : 'Needed'}
+                        </Badge>
                         <Text style={styles.requirementText}>{item.label}</Text>
                       </View>
                     ))}
@@ -577,6 +579,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  passwordRequirements: {
+    borderWidth: 1,
+    borderColor: 'rgba(108, 199, 255, 0.26)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(108, 199, 255, 0.08)',
+    marginTop: 12,
+    padding: 12,
+  },
+  requirementBadge: {
+    minWidth: 74,
+  },
+  requirementRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 10,
+  },
+  requirementText: {
+    color: '#F4EFE6',
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  requirementTitle: {
+    color: '#6CC7FF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   notesInput: {
     color: '#F4EFE6',
