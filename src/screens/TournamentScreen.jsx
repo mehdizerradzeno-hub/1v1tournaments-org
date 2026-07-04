@@ -29,6 +29,7 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import {
+  fetchTournamentPlayerStatus,
   fetchSignupSummary,
   fetchTournamentBracket,
   issueTournamentMatchTicket,
@@ -42,6 +43,7 @@ function signupCountLabel(count, loading = false) {
 export default function TournamentScreen({ slug }) {
   const [liveBracket, setLiveBracket] = useState(null);
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
+  const [playerStatus, setPlayerStatus] = useState({ loading: true, error: '', data: null });
   const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
   const tournament = getTournamentBySlug(slug);
 
@@ -100,6 +102,28 @@ export default function TournamentScreen({ slug }) {
     }
 
     loadSignupSummary();
+
+    async function loadPlayerStatus() {
+      setPlayerStatus((current) => ({ ...current, loading: true, error: '' }));
+
+      try {
+        const result = await fetchTournamentPlayerStatus({ slug });
+
+        if (active) {
+          setPlayerStatus({ loading: false, error: '', data: result });
+        }
+      } catch (error) {
+        if (active) {
+          setPlayerStatus({
+            loading: false,
+            error: error instanceof Error ? error.message : 'Player tournament status could not be loaded.',
+            data: null,
+          });
+        }
+      }
+    }
+
+    loadPlayerStatus();
 
     return () => {
       active = false;
@@ -170,6 +194,16 @@ export default function TournamentScreen({ slug }) {
           signupCount={signupSummary.count}
           signupError={signupSummary.error}
           signupLoading={signupSummary.loading}
+        />
+      </Section>
+
+      <Section
+        description="Sign in once, then use this card to find your current match without reading the whole bracket."
+        title="Your tournament status">
+        <PlayerTournamentStatus
+          checkInPath={checkInPath}
+          playerStatus={playerStatus}
+          slug={tournament.slug}
         />
       </Section>
 
@@ -309,6 +343,94 @@ function playerLabel(player) {
   return player.handle ? `${player.name} (${player.handle})` : player.name;
 }
 
+function statusTone(nextStep) {
+  if (nextStep === 'ready-match' || nextStep === 'champion') return 'green';
+  if (nextStep === 'sign-in' || nextStep === 'sign-up') return 'accent';
+  if (nextStep === 'eliminated' || nextStep === 'complete') return 'neutral';
+  return 'blue';
+}
+
+function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
+  const data = playerStatus.data;
+  const currentMatch = data?.currentMatch || null;
+
+  async function handlePlayMyMatch() {
+    if (!currentMatch) return;
+    setOpenError('');
+    setOpening(true);
+
+    try {
+      const result = await issueTournamentMatchTicket({
+        slug,
+        matchId: currentMatch.id,
+      });
+
+      if (result.roomUrl && globalThis.location?.assign) {
+        globalThis.location.assign(result.roomUrl);
+      }
+    } catch (error) {
+      setOpenError(error instanceof Error ? error.message : 'Match access could not be opened.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <Surface style={styles.playerStatusCard}>
+      <View style={styles.playerStatusTopRow}>
+        <Badge tone={statusTone(data?.nextStep)}>{data?.nextStep || 'checking'}</Badge>
+        <Text style={styles.playerStatusMeta}>
+          {playerStatus.loading ? 'Checking account' : data?.account?.playerName || 'No player account open'}
+        </Text>
+      </View>
+
+      <Text style={styles.playerStatusTitle}>
+        {playerStatus.loading ? 'Checking your tournament status...' : data?.statusLabel || 'Status unavailable'}
+      </Text>
+
+      {playerStatus.error ? <Text style={styles.playerStatusWarning}>{playerStatus.error}</Text> : null}
+      {openError ? <Text style={styles.playerStatusWarning}>{openError}</Text> : null}
+
+      {data?.signup ? (
+        <Text style={styles.playerStatusCopy}>
+          Signed up as {playerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
+        </Text>
+      ) : null}
+
+      {currentMatch ? (
+        <View style={styles.playerMatchBox}>
+          <Text style={styles.playerMatchLabel}>
+            {currentMatch.round.title} • {currentMatch.label}
+          </Text>
+          <Text style={styles.playerMatchPlayers}>{currentMatch.players.map(playerLabel).join(' vs ')}</Text>
+        </View>
+      ) : null}
+
+      {data?.waitingMatch ? (
+        <View style={styles.playerMatchBox}>
+          <Text style={styles.playerMatchLabel}>
+            {data.waitingMatch.round.title} • {data.waitingMatch.label}
+          </Text>
+          <Text style={styles.playerMatchPlayers}>{data.waitingMatch.players.map(playerLabel).join(' vs ')}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.playerStatusActions}>
+        {currentMatch ? (
+          <ActionButton onPress={handlePlayMyMatch}>{opening ? 'Opening...' : 'Play my match'}</ActionButton>
+        ) : (
+          <ActionButton href={checkInPath}>{data?.account ? 'Open signup' : 'Create or sign in'}</ActionButton>
+        )}
+        <ActionButton href="/rules" variant="secondary">
+          Rules
+        </ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
 function LiveBracketBoard({ bracket }) {
   const [openingMatchId, setOpeningMatchId] = useState('');
   const [accessError, setAccessError] = useState('');
@@ -440,6 +562,70 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 10,
+  },
+  playerStatusCard: {
+    borderColor: 'rgba(214, 162, 78, 0.26)',
+  },
+  playerStatusTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 12,
+  },
+  playerStatusMeta: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  playerStatusTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 28,
+  },
+  playerStatusCopy: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  playerStatusWarning: {
+    color: '#FFB4A8',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  playerMatchBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  playerMatchLabel: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  playerMatchPlayers: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  playerStatusActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
   },
   liveBracketCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',

@@ -3,6 +3,7 @@ const ACCOUNT_ENDPOINT = '/.netlify/functions/player-account';
 const ROSTER_ENDPOINT = '/.netlify/functions/admin-roster';
 const BRACKET_ENDPOINT = '/.netlify/functions/tournament-bracket';
 const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
+const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -156,6 +157,20 @@ export async function fetchTournamentMatch({ slug, matchId }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Match could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchTournamentPlayerStatus({ slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${PLAYER_STATUS_ENDPOINT}${query}`, {
+    credentials: 'include',
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player tournament status could not be loaded.');
   }
 
   return result;
