@@ -25,7 +25,7 @@ export default function ResultsScreen() {
       ]}
       eyebrow="Results"
       footerNote={siteData.site.adminNote}
-      lead="Archived scoreboards and final tables live here. The page stays data-driven so future results can be added by hand."
+      lead="Archived scoreboards and final tables live here after events are complete."
       stats={[
         { label: 'Results', value: String(results.length), tone: 'accent' },
         { label: 'Games', value: String(games.length), tone: 'blue' },
@@ -42,7 +42,7 @@ export default function ResultsScreen() {
         {!results.length ? (
           <EmptyState
             action={<ActionButton href="/spades">View Spades</ActionButton>}
-            body="Add a completed result record and it will appear here immediately."
+            body="Completed events will appear here after winners are posted."
             title="No results recorded yet"
           />
         ) : null}

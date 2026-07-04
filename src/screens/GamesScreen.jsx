@@ -36,10 +36,10 @@ export default function GamesScreen() {
         ))}
       </Section>
 
-      <Section description="This route keeps the current lineup visible and gives future games a place to land." title="Why this page exists">
+      <Section description="The active game is ready now. Future games will use the same tournament flow." title="Lineup note">
         <Surface style={styles.noteCard}>
           <Text style={styles.noteCopy}>
-            Add another game object, give it a slug, and it can be surfaced here immediately with the same card layout.
+            Spades is the current live game. Euchre is reserved for a later launch.
           </Text>
           <ActionButton href="/rules" variant="secondary">
             Keep the format notes nearby
@@ -50,7 +50,7 @@ export default function GamesScreen() {
       {!games.length ? (
         <EmptyState
           action={<ActionButton href="/">Back home</ActionButton>}
-          body="The shared content file is empty, so there are no games to display yet."
+          body="Games will appear here when they are published."
           title="No games configured"
         />
       ) : null}

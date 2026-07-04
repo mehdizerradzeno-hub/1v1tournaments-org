@@ -30,12 +30,12 @@ export default function GameScreen({ gameSlug }) {
       <HubScreen
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Game not found"
-        lead="That game does not exist in the current content file yet."
-        subtitle="Check the game slug or add a new game record."
+        lead="That game page is not available."
+        subtitle="Check the game link and try again."
         title="Unknown game">
         <EmptyState
           action={<ActionButton href="/">Back home</ActionButton>}
-          body="Add a matching game object in the content file and the route will render automatically."
+          body="Use the home page to return to the active game and tournament paths."
           title="Nothing to show here"
         />
       </HubScreen>
@@ -89,7 +89,7 @@ export default function GameScreen({ gameSlug }) {
               : 'Coming soon'
       }
       title={game.name}>
-      <Section description="This page is driven by the same editable game record that powers the home and tournament pages." title="Game snapshot">
+      <Section description="Where this game fits in the tournament hub." title="Game snapshot">
         <Surface style={styles.snapshotCard}>
           <Text style={styles.snapshotLabel}>{game.summary}</Text>
           <BulletList items={game.highlights} />
@@ -100,7 +100,7 @@ export default function GameScreen({ gameSlug }) {
         <Section
           description={
             isPrimaryGame
-              ? 'Spades is the launch lane for the hub, with the featured event and its live coverage pinned at the top.'
+              ? 'Spades is the launch game, with the featured event and live coverage pinned at the top.'
               : 'The featured event is pinned first so the main tournament stays easy to find.'
           }
           title={isPrimaryGame ? 'Launch coverage' : 'Featured event'}>
@@ -141,7 +141,7 @@ export default function GameScreen({ gameSlug }) {
       ) : null}
 
       <Section
-        description="The upcoming cards are filtered from the shared tournament data and keep the featured event separate when needed."
+        description="Future public events for this game."
         title="Upcoming tournaments">
         {visibleUpcomingTournaments.map((tournament) => (
           <View key={tournament.slug} style={styles.block}>
@@ -156,7 +156,7 @@ export default function GameScreen({ gameSlug }) {
           <EmptyState
             body={
               game.status === 'active'
-                ? 'Add a future event to the content file and it will appear here with no extra route work.'
+                ? 'Future events will appear here when they are scheduled.'
                 : 'This game is coming soon. Add the first public event once the format is ready.'
             }
             title={game.status === 'active' ? 'No upcoming events for this game' : 'No public events posted yet'}
@@ -165,7 +165,7 @@ export default function GameScreen({ gameSlug }) {
       </Section>
 
       <Section
-        description="Game rules are stored next to the game record so new titles can be added later without changing the layout."
+        description="Current public notes for this game."
         title="Rule blocks">
         {game.ruleSections.map((section) => (
           <View key={section.title} style={styles.block}>
@@ -175,7 +175,7 @@ export default function GameScreen({ gameSlug }) {
       </Section>
 
       <Section
-        description="Results stay tied to the same game slug, so the archive can grow without new code."
+        description="Recent final tables for this game."
         title="Latest results">
         {results.map((result) => (
           <View key={result.slug} style={styles.block}>
@@ -185,7 +185,7 @@ export default function GameScreen({ gameSlug }) {
         {!results.length ? (
           <EmptyState
             action={<ActionButton href="/results">Open results page</ActionButton>}
-            body="Add a completed result record and it will surface here."
+            body="Posted results will appear here after an event is complete."
             title="No results recorded yet"
           />
         ) : null}

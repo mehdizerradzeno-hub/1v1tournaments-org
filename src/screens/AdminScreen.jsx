@@ -686,11 +686,11 @@ export default function AdminScreen() {
 
     return (
       <Section
-        description="Phase 1 signups are saved in Netlify Database and can be reviewed here before you seed a bracket."
+        description="Live account-linked signups can be reviewed here before you seed a bracket."
         title="Live signup roster">
         <Surface style={styles.rosterPanel}>
           <View style={styles.metaRow}>
-            <Badge tone="green">Phase 1</Badge>
+            <Badge tone="green">Live roster</Badge>
             <Text style={styles.metaText}>Use the tournament admin token to load player registrations.</Text>
           </View>
 
@@ -1039,7 +1039,7 @@ export default function AdminScreen() {
             </ActionButton>
           </View>
         }
-        description="These drafts stay private on this device until you copy them into the final backend later."
+        description="These drafts stay private on this device until you are ready to publish an event."
         title="Access and tools">
         <Surface style={styles.panel}>
           <View style={styles.metaRow}>
@@ -1143,7 +1143,7 @@ export default function AdminScreen() {
       <Section description="Edit the local JSON payload directly if you want a quick placeholder workflow." title="JSON editor">
         <Surface style={styles.editorCard}>
           <Text style={styles.copy}>
-            The editor keeps the data portable. Save the JSON locally, then move it into a real backend when the admin flow is ready.
+            The editor keeps draft event data portable while the host workflow grows.
           </Text>
           <TextInput
             autoCapitalize="none"

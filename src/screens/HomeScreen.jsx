@@ -5,8 +5,10 @@ import {
   Badge,
   GameCard,
   HubScreen,
+  QuickActionCard,
   ResultCard,
   Section,
+  StepStrip,
   StreamCard,
   StatPill,
   Surface,
@@ -20,6 +22,7 @@ import {
   getGames,
   getResults,
   getStreams,
+  getCheckInPath,
   getTournamentPath,
   getUpcomingTournaments,
   siteData,
@@ -27,7 +30,9 @@ import {
 
 function getHomeStats(upcomingCount, gameCount, streamCount) {
   return [
-    { label: 'Upcoming', value: String(upcomingCount), tone: 'accent' },
+    { label: 'Next event', value: 'Jul 18', tone: 'accent' },
+    { label: 'Signup', value: 'Open', tone: 'green' },
+    { label: 'Events', value: String(upcomingCount), tone: 'accent' },
     { label: 'Games', value: String(gameCount), tone: 'blue' },
     { label: 'Streams', value: String(streamCount), tone: 'green' },
   ];
@@ -40,40 +45,92 @@ export default function HomeScreen() {
   const results = getResults();
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
+  const featuredTournament = getUpcomingTournaments().find(
+    (tournament) => tournament.slug === siteData.site.primaryTournamentSlug,
+  ) || upcoming[0] || null;
+  const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
+  const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
 
   return (
     <HubScreen
       actions={[
-        { label: 'Open Spades', href: getGamePath(siteData.site.primaryGameSlug) },
-        { label: 'About', href: '/about', variant: 'secondary' },
-        { label: 'Contact', href: '/contact', variant: 'secondary' },
-        { label: 'Live links', href: '/live', variant: 'secondary' },
-        { label: 'Rules', href: '/rules', variant: 'ghost' },
+        { label: 'Sign up for Spades', href: featuredSignupPath },
+        { label: 'View tournament', href: featuredTournamentPath, variant: 'secondary' },
+        { label: 'Open Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
+        { label: 'Host admin', href: '/admin', variant: 'ghost' },
       ]}
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
-      lead={siteData.site.tagline}
+      lead="Create a player account, join the roster, open your match link, and let the hub track the bracket."
       stats={getHomeStats(upcoming.length, games.length, streams.length)}
-      subtitle={siteData.site.headline}
+      subtitle="Free-entry Spades tournaments with account-based signup and hosted brackets."
       title={siteData.site.name}>
       <Section
-        description="This is the public organization site while Spades is live and Euchre is still being prepared."
-        title="Organization snapshot">
-        <Surface style={styles.organizationCard}>
-          <Text style={styles.organizationTitle}>{siteData.organization.mission}</Text>
-          <BulletList items={siteData.organization.focus} tone="blue" />
-          <View style={styles.organizationActions}>
-            <ActionButton href="/about">About the organization</ActionButton>
-            <ActionButton href={`mailto:${siteData.site.contactEmail}`} external variant="secondary">
-              Contact by email
-            </ActionButton>
-          </View>
-        </Surface>
+        description="The main paths for players and the host are always one tap away."
+        title="Start here">
+        <View style={styles.quickGrid}>
+          <QuickActionCard
+            actionLabel="Create account and join"
+            body="Reserve your spot with a player account so future match rooms can verify your seat."
+            href={featuredSignupPath}
+            meta="Player"
+            title="Sign up"
+            tone="green"
+          />
+          <QuickActionCard
+            actionLabel="See roster and matches"
+            body="Open the event page for live signup count, bracket status, match links, streams, and rules."
+            href={featuredTournamentPath}
+            meta="Event"
+            title="Tournament page"
+            tone="accent"
+          />
+          <QuickActionCard
+            actionLabel="Launch game"
+            body="Use Spades for gameplay. Tournament links send players into the right match room."
+            href={getGamePath(siteData.site.primaryGameSlug)}
+            meta="Game"
+            title="Play Spades"
+            tone="blue"
+          />
+          <QuickActionCard
+            actionLabel="Load roster and bracket"
+            body="Host controls live in the private admin console for roster review and bracket generation."
+            href="/admin"
+            meta="Host"
+            title="Admin console"
+            tone="rose"
+          />
+        </View>
       </Section>
+
+      <Section description="This is the operating flow for the first live Spades bracket." title="How a tournament runs">
+        <StepStrip
+          steps={[
+            { title: 'Players sign up', body: 'Each signup is tied to a player account on the hub.' },
+            { title: 'Host generates bracket', body: 'The admin console seeds matches from the live roster.' },
+            { title: 'Players open match links', body: 'Spades handles gameplay while the hub owns tournament state.' },
+            { title: 'Winner advances', body: 'Match results report back to the hub and update the bracket.' },
+          ]}
+        />
+      </Section>
+
+      {featuredTournament ? (
+        <Section
+          action={<ActionButton href={featuredSignupPath}>Sign up</ActionButton>}
+          description="This is the next event players should use for testing and real signups."
+          title="Featured tournament">
+          <TournamentCard
+            gameName={gameLookup.get(featuredTournament.gameSlug)?.name || featuredTournament.gameSlug}
+            href={featuredTournamentPath}
+            tournament={featuredTournament}
+          />
+        </Section>
+      ) : null}
 
       {spades ? (
         <Section
-          description="Spades is the launch lane for the public site, with a direct route and the featured tournament already attached."
+          description="Spades is the gameplay app. The tournament hub creates the match links and bracket context."
           title="Spades spotlight">
           <Surface style={styles.spadesSpotlight}>
             <View style={styles.spadesTopRow}>
@@ -91,7 +148,7 @@ export default function HomeScreen() {
             <View style={styles.spadesActions}>
               <ActionButton href={getGamePath(spades.slug)}>Open Spades</ActionButton>
               <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
-                Featured event
+                Tournament page
               </ActionButton>
             </View>
           </Surface>
@@ -99,9 +156,9 @@ export default function HomeScreen() {
       ) : null}
 
       <Section
-        description="Upcoming events are sorted by date and stay free to edit in one config file."
-        title="Upcoming tournaments">
-        {upcoming.map((tournament) => (
+        description="All public events are listed here after the featured event."
+        title="Upcoming events">
+        {upcoming.filter((tournament) => tournament.slug !== featuredTournament?.slug).map((tournament) => (
           <View key={tournament.slug} style={styles.block}>
             <TournamentCard
               gameName={gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug}
@@ -112,14 +169,14 @@ export default function HomeScreen() {
         ))}
         {!upcoming.length ? (
           <EmptyState
-            body="Add a tournament entry to the content file and it will show up here immediately."
+            body="New public events will appear here when they are scheduled."
             title="No upcoming tournaments yet"
           />
         ) : null}
       </Section>
 
       <Section
-        description="Spades is active now. Euchre is coming soon."
+        description="Spades is active now. More games can use the same tournament flow later."
         title="Games on deck">
         {games.map((game) => (
           <View key={game.slug} style={styles.block}>
@@ -129,7 +186,7 @@ export default function HomeScreen() {
       </Section>
 
       <Section
-        description="Stream links stay in one editable file and point at the live table, replay archive, and channel page."
+        description="Live table and replay links for current events."
         title="Stream and YouTube links">
         {streams.map((stream) => (
           <StreamCard key={stream.slug} stream={stream} />
@@ -138,7 +195,7 @@ export default function HomeScreen() {
 
       <Section
         action={<ActionButton href="/results" variant="secondary">All results</ActionButton>}
-        description="Scoreboards are captured from the same editable event data."
+        description="Completed events show here after winners are posted."
         title="Latest results">
         {results.slice(0, 2).map((result) => (
           <View key={result.slug} style={styles.block}>
@@ -160,20 +217,10 @@ const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
   },
-  organizationActions: {
+  quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 16,
-  },
-  organizationCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
-  },
-  organizationTitle: {
-    color: '#F4EFE6',
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '700',
-    marginBottom: 12,
+    marginRight: -12,
   },
   spadesSpotlight: {
     borderColor: 'rgba(214, 162, 78, 0.28)',

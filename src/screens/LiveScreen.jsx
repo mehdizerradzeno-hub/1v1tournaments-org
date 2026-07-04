@@ -22,7 +22,7 @@ export default function LiveScreen() {
       ]}
       eyebrow="Watch"
       footerNote={siteData.site.adminNote}
-      lead="The live and replay URLs live in the config file so they can be swapped without changing any page code."
+      lead="Use this page for the current live table, YouTube channel, and replay archive."
       stats={[
         { label: 'Links', value: String(streams.length), tone: 'accent' },
         { label: 'Channel', value: 'YouTube', tone: 'blue' },
@@ -39,16 +39,16 @@ export default function LiveScreen() {
         {!streams.length ? (
           <EmptyState
             action={<ActionButton href="https://www.youtube.com/" external>Open YouTube</ActionButton>}
-            body="Add stream records in the data file and the cards will render here automatically."
+            body="Live links will appear here when coverage is assigned."
             title="No live links are assigned yet"
           />
         ) : null}
       </Section>
 
-      <Section description="This note is here so the next person knows where to edit the URLs." title="Update note">
+      <Section description="The official stream path for tournament day." title="Coverage note">
         <Surface style={styles.noteCard}>
           <Text style={styles.noteCopy}>
-            Update the shared data file when the official live channel or replay archive changes.
+            Keep this page open during events when players or viewers need the broadcast link.
           </Text>
           <ActionButton href="/rules" variant="secondary">
             Keep the rules and live links aligned

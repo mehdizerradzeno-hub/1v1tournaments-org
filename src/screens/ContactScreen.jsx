@@ -64,7 +64,7 @@ export default function ContactScreen() {
         />
       </Section>
 
-      <Section description="Keep messages short so they are easy to route by hand for now." title="What to include in your message">
+      <Section description="Include the event name and game so the question can be handled quickly." title="What to include">
         <EmptyState
           body="Send the tournament name, the game, and the date if you need help with a public event page."
           title="Tournament questions"

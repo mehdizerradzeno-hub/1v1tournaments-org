@@ -10,6 +10,7 @@ import {
   CheckInPanel,
   EmptyState,
   HubScreen,
+  QuickActionCard,
   ResultCard,
   RuleBlock,
   Section,
@@ -106,7 +107,7 @@ export default function TournamentScreen({ slug }) {
       <HubScreen
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Tournament not found"
-        lead="That tournament slug is not present in the current content file."
+        lead="That tournament page is not available."
         subtitle="Add the event record or check the route."
         title="Unknown tournament">
         <EmptyState
@@ -129,11 +130,11 @@ export default function TournamentScreen({ slug }) {
     || (tournament.status === 'complete' ? getResultsForGame(tournament.gameSlug)[0] || null : null);
 
   const heroActions = [
-    isPrimaryGame && gamePath ? { label: 'Open /spades', href: gamePath } : null,
-    { label: 'Sign up', href: checkInPath, variant: 'secondary' },
-    streams.length ? { label: 'Watch live', href: '/live' } : null,
+    { label: 'Sign up now', href: checkInPath },
+    isPrimaryGame && gamePath ? { label: 'Open Spades', href: gamePath, variant: 'secondary' } : null,
+    streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
+    { label: 'Host admin', href: '/admin', variant: 'ghost' },
     { label: 'Rules', href: '/rules', variant: 'secondary' },
-    { label: 'Results', href: '/results', variant: 'ghost' },
   ].filter(Boolean);
 
   const quickLinks = (tournament.links || []).filter((link) => link.href !== `/tournaments/${tournament.slug}`);
@@ -156,17 +157,8 @@ export default function TournamentScreen({ slug }) {
           : formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)
       }
       title={tournament.title}>
-      <Section description="Everything about the event should be visible on one phone-sized page." title="Event snapshot">
-        <Surface style={styles.snapshotCard}>
-          <Text style={styles.snapshotLabel}>{tournament.summary}</Text>
-          <Text style={styles.snapshotCopy}>{tournament.entryLine}</Text>
-          {tournament.callout ? <Text style={styles.snapshotCallout}>{tournament.callout}</Text> : null}
-          <BulletList items={tournament.highlights} />
-        </Surface>
-      </Section>
-
       <Section
-        description="The roster count updates from the live signup store, then the host generates the bracket from that roster."
+        description="Players start here. The count updates from the live account-based signup store."
         title="Sign up">
         <CheckInPanel
           checkIn={tournament.checkIn}
@@ -178,7 +170,7 @@ export default function TournamentScreen({ slug }) {
       </Section>
 
       <Section
-        description="Once admin generates a bracket, this section becomes the live match board with Spades room links."
+        description="After the host generates a bracket, match cards show the assigned players and Spades room links."
         title={liveBracket ? 'Live bracket' : 'Bracket preview'}>
         {liveBracket ? (
           <LiveBracketBoard bracket={liveBracket} />
@@ -193,9 +185,47 @@ export default function TournamentScreen({ slug }) {
         )}
       </Section>
 
+      <Section description="Quick paths for players, viewers, and the host." title="Event links">
+        <View style={styles.quickGrid}>
+          <QuickActionCard
+            actionLabel="Create account and join"
+            body="Use this before the bracket is seeded."
+            href={checkInPath}
+            meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
+            title="Player signup"
+            tone="green"
+          />
+          <QuickActionCard
+            actionLabel="Launch gameplay"
+            body="Players use Spades when their match link is ready."
+            href={gamePath || '/spades'}
+            meta="Gameplay"
+            title="Open Spades"
+            tone="blue"
+          />
+          <QuickActionCard
+            actionLabel="Open controls"
+            body="Load signups, generate the bracket, and manage winners."
+            href="/admin"
+            meta="Host"
+            title="Admin console"
+            tone="rose"
+          />
+        </View>
+      </Section>
+
+      <Section description="Format, entry rules, and event notes." title="Event snapshot">
+        <Surface style={styles.snapshotCard}>
+          <Text style={styles.snapshotLabel}>{tournament.summary}</Text>
+          <Text style={styles.snapshotCopy}>{tournament.entryLine}</Text>
+          {tournament.callout ? <Text style={styles.snapshotCallout}>{tournament.callout}</Text> : null}
+          <BulletList items={tournament.highlights} />
+        </Surface>
+      </Section>
+
       {isPrimaryGame && gamePath ? (
         <Section
-          description="Spades is the hub's launch lane, and this page keeps the featured event one tap away from the main game route."
+          description="Tournament links open Spades rooms while this page owns the roster, bracket, and winner state."
           title="Spades launch lane">
           <Surface style={styles.launchCard}>
             <View style={styles.launchTopRow}>
@@ -204,7 +234,7 @@ export default function TournamentScreen({ slug }) {
             </View>
             <Text style={styles.launchTitle}>The featured event for the first live game</Text>
             <Text style={styles.launchCopy}>
-              Keep this page updated with the Spades schedule, live coverage, and result notes so the launch experience stays focused.
+              Use the hub for tournament state and use Spades for the actual table. That keeps brackets, match IDs, and results in one place.
             </Text>
             <View style={styles.launchActions}>
               <ActionButton href={gamePath}>Open /spades</ActionButton>
@@ -217,7 +247,7 @@ export default function TournamentScreen({ slug }) {
       ) : null}
 
       {quickLinks.length ? (
-        <Section description="Quick links are editable alongside the tournament copy." title="Quick links">
+        <Section description="Useful tournament paths in one place." title="Quick links">
           <View style={styles.linkRow}>
             {quickLinks.map((link) => (
               <View key={link.href} style={styles.linkButton}>
@@ -255,7 +285,7 @@ export default function TournamentScreen({ slug }) {
         ))}
       </Section>
 
-      <Section description="If the event is complete, the scorecard can be shown here from the same data file." title="Results">
+      <Section description="Completed events show final standings here." title="Results">
         {result ? (
           <ResultCard result={result} />
         ) : (
@@ -366,6 +396,11 @@ const styles = StyleSheet.create({
   linkButton: {
     marginRight: 10,
     marginBottom: 10,
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: -12,
   },
   bracketLoadNote: {
     color: '#AAB4AE',

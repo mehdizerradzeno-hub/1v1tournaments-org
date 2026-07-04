@@ -4,15 +4,17 @@ import { Link, usePathname } from 'expo-router';
 
 import { theme } from '../lib/theme.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
+import { getCheckInPath, getTournamentPath, siteData } from '../lib/siteData.js';
 
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
+  { label: 'Tournament', href: getTournamentPath(siteData.site.primaryTournamentSlug) },
+  { label: 'Sign up', href: getCheckInPath(siteData.site.primaryTournamentSlug) },
   { label: 'Spades', href: '/spades' },
-  { label: 'About', href: '/about' },
-  { label: 'Contact', href: '/contact' },
-  { label: 'Rules', href: '/rules' },
-  { label: 'Results', href: '/results' },
   { label: 'Live', href: '/live' },
+  { label: 'Results', href: '/results' },
+  { label: 'Rules', href: '/rules' },
+  { label: 'Admin', href: '/admin' },
 ];
 
 const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
@@ -28,6 +30,14 @@ function isActivePath(pathname, href) {
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getToneColor(tone) {
+  if (tone === 'blue') return theme.colors.blue;
+  if (tone === 'green') return theme.colors.green;
+  if (tone === 'rose') return theme.colors.rose;
+  if (tone === 'neutral') return theme.colors.lineStrong;
+  return theme.colors.accent;
 }
 
 function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false }) {
@@ -194,6 +204,52 @@ export function EmptyState({ title, body, action }) {
       <Text style={styles.emptyBody}>{body}</Text>
       {action ? <View style={styles.emptyAction}>{action}</View> : null}
     </Surface>
+  );
+}
+
+export function QuickActionCard({
+  title,
+  body,
+  meta,
+  href,
+  actionLabel,
+  tone = 'accent',
+  external = false,
+}) {
+  const borderColor = getToneColor(tone);
+
+  return (
+    <CardLink accessibilityLabel={title} accent={borderColor} external={external} href={href} style={styles.quickActionWrap}>
+      <View style={styles.quickActionTopRow}>
+        <Badge tone={tone}>{meta}</Badge>
+        <Text style={styles.quickActionArrow}>Go</Text>
+      </View>
+      <Text style={styles.quickActionTitle}>{title}</Text>
+      <Text style={styles.quickActionBody}>{body}</Text>
+      {actionLabel ? <Text style={styles.quickActionCta}>{actionLabel}</Text> : null}
+    </CardLink>
+  );
+}
+
+export function StepStrip({ steps }) {
+  if (!steps?.length) {
+    return null;
+  }
+
+  return (
+    <View style={styles.stepStrip}>
+      {steps.map((step, index) => (
+        <View key={step.title} style={styles.stepItem}>
+          <View style={styles.stepNumber}>
+            <Text style={styles.stepNumberText}>{index + 1}</Text>
+          </View>
+          <View style={styles.stepCopy}>
+            <Text style={styles.stepTitle}>{step.title}</Text>
+            <Text style={styles.stepBody}>{step.body}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -425,22 +481,32 @@ export function HubScreen({
   return (
     <View style={styles.root}>
       <View pointerEvents="none" style={styles.backdrop}>
-        <View style={styles.glowAmber} />
-        <View style={styles.glowBlue} />
-        <View style={styles.glowRed} />
+        <View style={styles.backdropBandTop} />
+        <View style={styles.backdropBandBottom} />
       </View>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.page}>
             <View style={styles.brandRow}>
-              <View style={styles.brandMark}>
-                <Text style={styles.brandMarkText}>1v1</Text>
+              <Link href="/" asChild>
+                <Pressable accessibilityRole="link" style={styles.brandLink}>
+                  <View style={styles.brandMark}>
+                    <Text style={styles.brandMarkText}>1v1</Text>
+                  </View>
+                  <View style={styles.brandCopy}>
+                    <Text style={styles.brandTitle}>1v1 Tournaments</Text>
+                    <Text style={styles.brandDomain}>Free-entry Spades events</Text>
+                  </View>
+                </Pressable>
+              </Link>
+              <View style={styles.brandUtility}>
+                <ActionButton href={getCheckInPath(siteData.site.primaryTournamentSlug)} style={styles.brandButton}>
+                  Sign up
+                </ActionButton>
+                <ActionButton href="/admin" variant="secondary" style={styles.brandButton}>
+                  Host
+                </ActionButton>
               </View>
-              <View style={styles.brandCopy}>
-                <Text style={styles.brandTitle}>1v1 Tournaments</Text>
-                <Text style={styles.brandDomain}>1v1tournaments.org</Text>
-              </View>
-              <Badge tone="blue">Official site</Badge>
             </View>
 
             <View style={styles.navRow}>
@@ -459,7 +525,7 @@ export function HubScreen({
             <Surface style={styles.heroSurface}>
               <View style={styles.heroTopRow}>
                 {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
-                <Text style={styles.heroDomain}>1v1tournaments.org</Text>
+                <Text style={styles.heroDomain}>Tournament hub</Text>
               </View>
               <Text style={styles.heroTitle}>{title}</Text>
               {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
@@ -524,32 +590,23 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
-  glowAmber: {
+  backdropBandTop: {
     position: 'absolute',
-    top: -100,
-    right: -100,
-    width: 320,
-    height: 320,
-    borderRadius: 999,
-    backgroundColor: theme.colors.accentGlow,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.line,
   },
-  glowBlue: {
+  backdropBandBottom: {
     position: 'absolute',
-    top: 220,
-    left: -110,
-    width: 260,
+    left: 0,
+    right: 0,
+    bottom: 0,
     height: 260,
-    borderRadius: 999,
-    backgroundColor: theme.colors.blueSoft,
-  },
-  glowRed: {
-    position: 'absolute',
-    bottom: -90,
-    right: 36,
-    width: 240,
-    height: 240,
-    borderRadius: 999,
-    backgroundColor: theme.colors.roseSoft,
+    backgroundColor: 'rgba(108, 199, 255, 0.04)',
   },
   scrollContent: {
     flexGrow: 1,
@@ -566,13 +623,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 14,
   },
+  brandLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 220,
+  },
   brandMark: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.surfaceLift,
@@ -590,6 +654,7 @@ const styles = StyleSheet.create({
   brandCopy: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 12,
   },
   brandTitle: {
     color: theme.colors.text,
@@ -604,6 +669,17 @@ const styles = StyleSheet.create({
     fontFamily: MONO_FONT,
     letterSpacing: 0.4,
   },
+  brandUtility: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  brandButton: {
+    marginRight: 0,
+    marginLeft: 8,
+    marginBottom: 8,
+  },
   navRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -614,9 +690,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   navChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: theme.radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.line,
@@ -637,7 +713,7 @@ const styles = StyleSheet.create({
   },
   heroSurface: {
     padding: 22,
-    borderRadius: 30,
+    borderRadius: 22,
     marginBottom: 22,
     borderColor: theme.colors.accentSoft,
     overflow: 'hidden',
@@ -646,6 +722,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 10,
     marginBottom: 14,
   },
   heroDomain: {
@@ -654,14 +732,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
+    flexShrink: 1,
   },
   heroTitle: {
     color: theme.colors.text,
-    fontSize: 42,
-    lineHeight: 46,
+    fontSize: 32,
+    lineHeight: 36,
     fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: -0.8,
+    letterSpacing: 0,
     maxWidth: 720,
   },
   heroSubtitle: {
@@ -793,7 +872,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
   sectionDescription: {
     color: theme.colors.muted,
@@ -806,7 +885,7 @@ const styles = StyleSheet.create({
   },
   surface: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: theme.colors.line,
     padding: 18,
@@ -814,7 +893,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 18,
     overflow: 'hidden',
@@ -839,7 +918,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   },
   cardSubtitle: {
     color: theme.colors.muted,
@@ -962,6 +1041,114 @@ const styles = StyleSheet.create({
   },
   emptyAction: {
     marginTop: 14,
+  },
+  quickActionWrap: {
+    flexBasis: 240,
+    flexGrow: 1,
+    marginRight: 12,
+    marginBottom: 12,
+  },
+  quickActionAccent: {
+    borderColor: theme.colors.accent,
+  },
+  quickActionBlue: {
+    borderColor: theme.colors.blue,
+  },
+  quickActionGreen: {
+    borderColor: theme.colors.green,
+  },
+  quickActionRose: {
+    borderColor: theme.colors.rose,
+  },
+  quickActionNeutral: {
+    borderColor: theme.colors.lineStrong,
+  },
+  quickActionTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 10,
+  },
+  quickActionArrow: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    fontFamily: MONO_FONT,
+  },
+  quickActionTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    lineHeight: 24,
+    fontFamily: DISPLAY_FONT,
+    fontWeight: '800',
+  },
+  quickActionBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  quickActionCta: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    marginTop: 14,
+    textTransform: 'uppercase',
+  },
+  stepStrip: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  stepItem: {
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexBasis: 260,
+    flexDirection: 'row',
+    flexGrow: 1,
+    marginBottom: 12,
+    marginRight: 12,
+    padding: 14,
+  },
+  stepNumber: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.accentSoft,
+    borderColor: theme.colors.accent,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 34,
+  },
+  stepNumberText: {
+    color: theme.colors.text,
+    fontFamily: MONO_FONT,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stepCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  stepTitle: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  stepBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
   },
   tournamentHeaderRow: {
     flexDirection: 'row',
@@ -1087,7 +1274,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   },
   checkInTopRow: {
     flexDirection: 'row',
@@ -1255,7 +1442,7 @@ const styles = StyleSheet.create({
   cardSurface: {
     marginBottom: 14,
     padding: 18,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surface,

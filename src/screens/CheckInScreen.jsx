@@ -4,10 +4,10 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ActionButton,
   Badge,
-  BulletList,
   EmptyState,
   HubScreen,
   Section,
+  StepStrip,
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
@@ -38,6 +38,7 @@ export default function CheckInScreen({ slug }) {
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
   const [account, setAccount] = useState(null);
+  const [accountMode, setAccountMode] = useState('create');
   const [accountLoading, setAccountLoading] = useState(true);
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
@@ -220,7 +221,7 @@ export default function CheckInScreen({ slug }) {
       <HubScreen
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Check-in not found"
-        lead="That tournament slug is not present in the current public content file."
+        lead="That tournament signup page is not available."
         subtitle="Use the tournament page if you were looking for an event."
         title="Unknown check-in page">
         <EmptyState
@@ -254,15 +255,15 @@ export default function CheckInScreen({ slug }) {
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`}
       title={`Sign up for ${tournament.title}`}>
-      <Section description="Account first, then one tap to join the roster." title="Sign up now">
+      <Section description="Create or open your player account, then join the event roster." title="Sign up now">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
             <Text style={styles.summaryWindow}>{checkIn?.window || 'Registration open'}</Text>
           </View>
-          <Text style={styles.summaryTitle}>Reserve your spot</Text>
+          <Text style={styles.summaryTitle}>{account ? 'Reserve your spot' : 'Start with a player account'}</Text>
           <Text style={styles.summaryCopy}>
-            Your account is what lets the hub know whether you are allowed to sit in a future match room.
+            Your account connects the roster, bracket, and future match-room access.
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
@@ -303,17 +304,40 @@ export default function CheckInScreen({ slug }) {
             </>
           ) : (
             <>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Player name</Text>
-                <TextInput
-                  autoCapitalize="words"
-                  onChangeText={setPlayerName}
-                  placeholder="Your tournament name"
-                  placeholderTextColor="#6B766F"
-                  style={styles.input}
-                  value={playerName}
-                />
+              <View style={styles.modeRow}>
+                <ActionButton
+                  onPress={() => {
+                    setAccountMode('create');
+                    setAccountError('');
+                    setAccountMessage('');
+                  }}
+                  variant={accountMode === 'create' ? 'primary' : 'secondary'}>
+                  Create account
+                </ActionButton>
+                <ActionButton
+                  onPress={() => {
+                    setAccountMode('login');
+                    setAccountError('');
+                    setAccountMessage('');
+                  }}
+                  variant={accountMode === 'login' ? 'primary' : 'secondary'}>
+                  Sign in
+                </ActionButton>
               </View>
+
+              {accountMode === 'create' ? (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Player name</Text>
+                  <TextInput
+                    autoCapitalize="words"
+                    onChangeText={setPlayerName}
+                    placeholder="Your tournament name"
+                    placeholderTextColor="#6B766F"
+                    style={styles.input}
+                    value={playerName}
+                  />
+                </View>
+              ) : null}
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Account email</Text>
@@ -343,26 +367,31 @@ export default function CheckInScreen({ slug }) {
                 />
               </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Player handle</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setPlayerHandle}
-                  placeholder="Optional Spades name, Discord, or YouTube"
-                  placeholderTextColor="#6B766F"
-                  style={styles.input}
-                  value={playerHandle}
-                />
-              </View>
+              {accountMode === 'create' ? (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Player handle</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onChangeText={setPlayerHandle}
+                    placeholder="Optional Spades name, Discord, or YouTube"
+                    placeholderTextColor="#6B766F"
+                    style={styles.input}
+                    value={playerHandle}
+                  />
+                </View>
+              ) : null}
 
               <View style={styles.buttonRow}>
-                <ActionButton onPress={handleCreateAccount}>
-                  {accountSubmitting ? 'Saving...' : 'Create account'}
-                </ActionButton>
-                <ActionButton onPress={handleLoginAccount} variant="secondary">
-                  {accountSubmitting ? 'Opening...' : 'Sign in'}
-                </ActionButton>
+                {accountMode === 'create' ? (
+                  <ActionButton onPress={handleCreateAccount}>
+                    {accountSubmitting ? 'Saving...' : 'Create account and continue'}
+                  </ActionButton>
+                ) : (
+                  <ActionButton onPress={handleLoginAccount}>
+                    {accountSubmitting ? 'Opening...' : 'Sign in and continue'}
+                  </ActionButton>
+                )}
               </View>
             </>
           )}
@@ -379,22 +408,13 @@ export default function CheckInScreen({ slug }) {
       </Section>
 
       <Section description="What happens after your signup is saved." title="What happens next">
-        <Surface style={styles.summaryCard}>
-          <View style={styles.summaryTopRow}>
-            <Badge tone="blue">{checkIn?.status || 'Registration flow'}</Badge>
-            <Text style={styles.summaryWindow}>{checkIn?.window || 'TBD'}</Text>
-          </View>
-          <Text style={styles.summaryTitle}>Play from the match link</Text>
-          {checkIn?.note ? <Text style={styles.summaryCopy}>{checkIn.note}</Text> : null}
-          <BulletList
-            items={[
-              'The host loads the roster and generates the bracket.',
-              'Your match card links to the Spades room.',
-              'When the game reports a winner, the hub advances the bracket.',
-            ]}
-            tone="blue"
-          />
-        </Surface>
+        <StepStrip
+          steps={[
+            { title: 'Join roster', body: 'Your account becomes the tournament identity for this event.' },
+            { title: 'Wait for bracket', body: 'The host generates match IDs from the live signup roster.' },
+            { title: 'Open match link', body: 'Your match card opens the Spades room when the bracket is ready.' },
+          ]}
+        />
       </Section>
     </HubScreen>
   );
@@ -409,9 +429,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,
-  },
-  summaryCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
   },
   signupCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
@@ -459,6 +476,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 8,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
   },
   input: {
     color: '#F4EFE6',

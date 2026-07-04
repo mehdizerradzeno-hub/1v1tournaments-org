@@ -5,9 +5,9 @@ const sharedCheckIn = {
   window: 'Opens 30 minutes before the start time.',
   note: 'Submit the form once. The host uses this roster to generate your match link.',
   steps: [
-    'Enter your player name and email.',
-    'Wait for the host to publish the bracket.',
-    'Open your Spades match link when the bracket is ready.',
+    'Create or sign in to your player account.',
+    'Join the roster for the tournament.',
+    'Open your Spades match link after the bracket is published.',
   ],
 };
 
@@ -47,21 +47,22 @@ export const siteData = {
   site: {
     name: '1v1 Tournaments',
     domain: '1v1tournaments.org',
-    headline: 'Official organization website for 1v1 Tournaments.',
-    tagline: 'Spades tournaments are live now, and Euchre is coming soon.',
+    headline: 'Free-entry card tournaments with account-based signups, hosted brackets, and Spades match links.',
+    tagline: 'Sign up, get seeded, open your match link, and play.',
     entryPolicy: 'Free entry, no buy-in, no wagering.',
-    adminNote: 'Public schedules, stream URLs, and event copy are maintained here by hand. Player signups are stored by the Phase 1 roster backend.',
+    adminNote: 'Tournament pages manage signups, brackets, match links, and winner advancement. Spades remains the gameplay app.',
     contactEmail: 'hello@1v1tournaments.org',
     primaryGameSlug: 'spades',
     primaryTournamentSlug: 'spades-summer-series',
   },
   organization: {
     summary: '1v1 Tournaments is the public home for free-entry, skill-based card-game events.',
-    mission: 'Give Spades a clean public launch site now and add Euchre and future games later without rebuilding the website.',
+    mission: 'Run simple free-entry card tournaments with one clear path for players and one private path for the host.',
     focus: [
-      'Spades tournaments and posted results',
+      'Account-based Spades signups',
+      'Hosted brackets and match links',
+      'Posted results and stream links',
       'Euchre coming soon',
-      'Stream links, signups, replays, and tournament pages in one place',
     ],
     contactEmail: 'hello@1v1tournaments.org',
     responseNote: 'Replies are handled manually for now.',
@@ -111,7 +112,7 @@ export const siteData = {
       sortOrder: 1,
       shortPath: '/spades',
       summary: 'The first featured game on the hub, built for live tournament pages and posted results.',
-      heroCopy: 'The /spades route is the launch point, with stream links, rules, and result notes in one clean card flow.',
+      heroCopy: 'Spades is where matches are played. The hub owns signups, brackets, match IDs, and results.',
       accent: '#D6A24E',
       featuredTournamentSlug: 'spades-summer-series',
       quickFacts: [
@@ -120,9 +121,9 @@ export const siteData = {
         { label: 'Status', value: 'Active' },
       ],
       highlights: [
-        'The /spades shortcut is the launch point for the hub.',
-        'Rules, results, and live links all come from the same editable data file.',
-        'The same structure can support future games without changing the layout.',
+        'Tournament match links open directly in Spades.',
+        'The hub keeps bracket state separate from gameplay.',
+        'Results and stream links stay attached to each event.',
       ],
       ruleSections: [
         {
@@ -130,22 +131,23 @@ export const siteData = {
           items: [
             'Spades is the first live game on the hub.',
             'Each tournament page shows the schedule, stream links, and result notes together.',
-            'Admins can update copy and dates in this file without wiring a backend.',
+            'The host loads account-linked signups before generating the bracket.',
           ],
         },
         {
           title: 'Match flow',
           items: [
             'Use the tournament page for check-in, start time, and format details.',
-            'Results are posted after play ends and the results page updates from the same data source.',
+            'Use the Spades match link when your bracket card is ready.',
+            'Results are posted after play ends.',
             'The layout stays mobile-first for quick updates from a phone.',
           ],
         },
         {
           title: 'Future-ready model',
           items: [
-            'New games only need another game object and related tournament entries.',
-            'Future games are already reserved in the content structure.',
+            'New games can reuse the same signup, bracket, and results flow.',
+            'Future games stay separate from Spades gameplay rooms.',
           ],
         },
       ],
@@ -169,14 +171,14 @@ export const siteData = {
       highlights: [
         'The same tournament page template will work for future Euchre events.',
         'Only Spades tournaments are public for now.',
-        'The site is already prepared for Euchre without any production data connection.',
+        'Euchre can reuse the account signup and bracket flow later.',
       ],
       ruleSections: [
         {
           title: 'Coming soon',
           items: [
             'Euchre will use the same dark, mobile-first card layout as the Spades pages.',
-            'The first public event can be added from the shared content file without a backend.',
+            'The first public event can use the same account-based signup path.',
             'Free-entry wording stays on every public page.',
           ],
         },
@@ -256,7 +258,7 @@ export const siteData = {
       ],
       highlights: [
         'Recurring event template',
-        'Bracket updates from the same content file',
+        'Bracket updates from the hosted roster',
         'Easy to swap in future live links',
       ],
       streamSlugs: ['main-live', 'replay-archive'],
@@ -340,7 +342,7 @@ export const siteData = {
       ],
       notes: [
         'The live link card is ready to swap to a real YouTube URL later.',
-        'No backend work is required to update this result copy.',
+        'Result copy can stay short and easy to scan.',
       ],
     },
   ],
@@ -377,23 +379,23 @@ export const siteData = {
         items: [
           'Entries are free.',
           'No buy-in or wagering is used for this hub.',
-          'The event pages are maintained by hand until live data is wired in later.',
+          'Event pages show the current schedule, signup path, and match flow.',
         ],
       },
       {
         title: 'Admin workflow',
         items: [
-          'Edit this file to change dates, links, and copy.',
-          'Add another game object when a new game is ready.',
-          'Add another tournament object whenever a new public event is scheduled, or keep a draft in the admin section first.',
+          'Use the private admin page to load account-linked signups.',
+          'Generate the bracket from the live roster.',
+          'Advance winners from the admin console until automatic gameplay reporting is fully locked in.',
         ],
       },
       {
         title: 'Site scope',
         items: [
-          'The hub does not connect to production game databases yet.',
-          'The current setup is intentionally simple so it can be maintained by hand.',
-          'The same layout works for a future, data-backed version of the site.',
+          'The hub owns tournament registration and bracket state.',
+          'Spades owns gameplay.',
+          'Match-room account locking is the next build phase.',
         ],
       },
       {

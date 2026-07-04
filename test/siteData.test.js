@@ -18,8 +18,10 @@ import {
 
 test('the site policy copy stays free-entry and no-wagering', () => {
   assert.equal(siteData.site.entryPolicy, 'Free entry, no buy-in, no wagering.');
-  assert.match(siteData.site.tagline, /Spades tournaments are live now/i);
-  assert.match(siteData.site.tagline, /Euchre is coming soon/i);
+  assert.match(siteData.site.headline, /account-based signups/i);
+  assert.match(siteData.site.headline, /Spades match links/i);
+  assert.match(siteData.site.tagline, /Sign up/i);
+  assert.match(siteData.site.tagline, /match link/i);
   assert.equal(siteData.site.contactEmail, 'hello@1v1tournaments.org');
 });
 
