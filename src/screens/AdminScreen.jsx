@@ -101,6 +101,8 @@ export default function AdminScreen() {
   const [bracketLoading, setBracketLoading] = useState(false);
   const [bracketMessage, setBracketMessage] = useState('');
   const [bracketError, setBracketError] = useState('');
+  const [hostMessage, setHostMessage] = useState('');
+  const [hostError, setHostError] = useState('');
   const selectedDraft = useMemo(
     () => drafts.find((draft) => draft.slug === selectedDraftSlug) || drafts[0] || null,
     [drafts, selectedDraftSlug],
@@ -144,6 +146,11 @@ export default function AdminScreen() {
   function setBracketFeedback(nextMessage = '', nextError = '') {
     setBracketMessage(nextMessage);
     setBracketError(nextError);
+  }
+
+  function setHostFeedback(nextMessage = '', nextError = '') {
+    setHostMessage(nextMessage);
+    setHostError(nextError);
   }
 
   function handleCreateAccess() {
@@ -563,6 +570,140 @@ export default function AdminScreen() {
     } catch {
       setRosterFeedback('', 'Could not copy the roster JSON from this browser.');
     }
+  }
+
+  async function handleCopyPlayerInstructions() {
+    const tournamentPath = getTournamentPath(rosterSlug);
+    const tournament = siteData.tournaments.find((item) => item.slug === rosterSlug);
+    const text = [
+      `${tournament?.title || '1v1 tournament'} player link:`,
+      `https://1v1tournaments.org${tournamentPath}`,
+      '',
+      'What to do:',
+      '1. Open that tournament page.',
+      '2. Create or sign in to your player account.',
+      '3. Sign up if you have not already.',
+      '4. After the bracket is live, use "Your tournament status" and press "Play my match."',
+      '',
+      'Do not join from bare Spades room links. Player seats are account-gated from the tournament page.',
+    ].join('\n');
+
+    try {
+      if (canUseClipboard()) {
+        await globalThis.navigator.clipboard.writeText(text);
+        setHostFeedback('Player instructions copied to the clipboard.', '');
+        return;
+      }
+
+      Alert.alert('Copy player instructions', text);
+      setHostFeedback('Clipboard is not available here, so the player instructions were shown in an alert.', '');
+    } catch {
+      setHostFeedback('', 'Could not copy player instructions from this browser.');
+    }
+  }
+
+  function renderRunStatusItem({ label, value, tone = 'blue', body }) {
+    return (
+      <View style={styles.runStatusItem}>
+        <View style={styles.metaRow}>
+          <Badge tone={tone}>{value}</Badge>
+          <Text style={styles.runStatusLabel}>{label}</Text>
+        </View>
+        {body ? <Text style={styles.runStatusBody}>{body}</Text> : null}
+      </View>
+    );
+  }
+
+  function renderHostRunSection() {
+    const tournament = siteData.tournaments.find((item) => item.slug === rosterSlug) || siteData.tournaments[0] || null;
+    const tournamentPath = getTournamentPath(rosterSlug);
+    const signupCount = selectedRoster?.signups?.length || 0;
+    const matches = bracket?.rounds?.flatMap((round) =>
+      round.matches.map((match) => ({ ...match, roundTitle: round.title })),
+    ) || [];
+    const readyMatches = matches.filter((match) => match.status === 'ready');
+    const finalMatches = matches.filter((match) => match.status === 'final');
+    const pendingMatches = matches.filter((match) => match.status !== 'final');
+    let nextAction = 'Enter the admin token, then load signups.';
+
+    if (rosterToken.trim() && !selectedRoster) {
+      nextAction = 'Load signups for the selected tournament.';
+    } else if (signupCount > 0 && signupCount < 2) {
+      nextAction = 'Wait for at least two signups before generating a bracket.';
+    } else if (signupCount >= 2 && !bracket) {
+      nextAction = 'Generate the bracket, then send players the tournament page.';
+    } else if (readyMatches.length) {
+      nextAction = 'Tell players to open the tournament page and press Play my match.';
+    } else if (bracket?.winner) {
+      nextAction = `Tournament complete. Winner: ${bracket.winner.name}.`;
+    } else if (bracket) {
+      nextAction = 'Waiting for match results or next-round opponents.';
+    }
+
+    return (
+      <Section
+        description="Use this during a live tournament so the host flow is obvious at a glance."
+        title="Run command center">
+        <Surface style={styles.runPanel}>
+          <View style={styles.metaRow}>
+            <Badge tone="accent">Host flow</Badge>
+            <Text style={styles.metaText}>{tournament?.title || rosterSlug}</Text>
+          </View>
+          <Text style={styles.runTitle}>{nextAction}</Text>
+
+          <View style={styles.runStatusGrid}>
+            {renderRunStatusItem({
+              label: 'Admin token',
+              value: rosterToken.trim() ? 'ready' : 'needed',
+              tone: rosterToken.trim() ? 'green' : 'accent',
+              body: rosterToken.trim() ? 'Host actions can call Netlify functions.' : 'Paste the token before loading signups or generating brackets.',
+            })}
+            {renderRunStatusItem({
+              label: 'Signups',
+              value: selectedRoster ? String(signupCount) : 'not loaded',
+              tone: signupCount >= 2 ? 'green' : signupCount ? 'accent' : 'blue',
+              body: selectedRoster ? `${signupCount} player${signupCount === 1 ? '' : 's'} loaded for this event.` : 'Load signups before bracket generation.',
+            })}
+            {renderRunStatusItem({
+              label: 'Bracket',
+              value: bracket?.status || 'none',
+              tone: bracket ? 'green' : 'blue',
+              body: bracket ? `${matches.length} match${matches.length === 1 ? '' : 'es'} generated.` : 'Generate after at least two players are signed up.',
+            })}
+            {renderRunStatusItem({
+              label: 'Ready matches',
+              value: String(readyMatches.length),
+              tone: readyMatches.length ? 'green' : 'blue',
+              body: readyMatches.length ? 'Players can launch these from their status card.' : 'Ready matches appear after both seats are assigned.',
+            })}
+          </View>
+
+          {bracket ? (
+            <View style={styles.rosterSummary}>
+              <Badge tone="green">{finalMatches.length} final</Badge>
+              <Badge tone="blue">{pendingMatches.length} open</Badge>
+              {bracket.winner ? <Badge tone="green">Winner: {bracket.winner.name}</Badge> : null}
+            </View>
+          ) : null}
+
+          {hostError ? <Text style={styles.errorText}>{hostError}</Text> : null}
+          {hostMessage ? <Text style={styles.successText}>{hostMessage}</Text> : null}
+
+          <View style={styles.buttonRow}>
+            <ActionButton href={tournamentPath}>Open player page</ActionButton>
+            <ActionButton onPress={handleCopyPlayerInstructions} variant="secondary">
+              Copy player instructions
+            </ActionButton>
+            <ActionButton onPress={handleLoadRoster} variant="secondary">
+              {rosterLoading ? 'Loading...' : 'Load signups'}
+            </ActionButton>
+            <ActionButton onPress={handleLoadBracket} variant="ghost">
+              {bracketLoading ? 'Loading...' : 'Load bracket'}
+            </ActionButton>
+          </View>
+        </Surface>
+      </Section>
+    );
   }
 
   function renderServerUnlockSection() {
@@ -1054,6 +1195,8 @@ export default function AdminScreen() {
         </Surface>
       </Section>
 
+      {renderHostRunSection()}
+
       {renderLiveRosterSection()}
 
       {renderBracketManagerSection()}
@@ -1307,6 +1450,45 @@ const styles = StyleSheet.create({
   },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  runPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+  },
+  runTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 28,
+    marginTop: 10,
+  },
+  runStatusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
+  },
+  runStatusItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexBasis: 220,
+    flexGrow: 1,
+    marginBottom: 10,
+    marginRight: 10,
+    padding: 12,
+  },
+  runStatusLabel: {
+    color: '#F4EFE6',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  runStatusBody: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
   },
   bracketRounds: {
     marginTop: 16,

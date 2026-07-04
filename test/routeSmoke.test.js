@@ -144,5 +144,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
 
   assert.match(adminScreenSource, /resetTournamentBracket/);
   assert.match(adminScreenSource, /handleCopyMatchCallback/);
+  assert.match(adminScreenSource, /Run command center/);
+  assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
   assert.match(hostingClientSource, /resetTournamentBracket/);
 });
