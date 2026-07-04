@@ -15,6 +15,16 @@ async function readJsonResponse(response) {
   }
 }
 
+function adminHeaders(token, headers = {}) {
+  const nextHeaders = { ...headers };
+
+  if (token) {
+    nextHeaders.Authorization = `Bearer ${token}`;
+  }
+
+  return nextHeaders;
+}
+
 export async function submitTournamentSignup(payload) {
   const response = await fetch(SIGNUP_ENDPOINT, {
     method: 'POST',
@@ -115,9 +125,8 @@ export async function fetchSignupSummary({ slug }) {
 export async function fetchTournamentRoster({ token, slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${ROSTER_ENDPOINT}${query}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: 'include',
+    headers: adminHeaders(token),
   });
   const result = await readJsonResponse(response);
 
@@ -202,10 +211,10 @@ export async function generateTournamentBracket({ token, slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
+    credentials: 'include',
+    headers: adminHeaders(token, {
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ action: 'generate' }),
   });
   const result = await readJsonResponse(response);
@@ -221,10 +230,10 @@ export async function resetTournamentBracket({ token, slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
+    credentials: 'include',
+    headers: adminHeaders(token, {
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ action: 'reset' }),
   });
   const result = await readJsonResponse(response);
@@ -240,10 +249,10 @@ export async function reportTournamentMatchWinner({ token, slug, matchId, winner
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
+    credentials: 'include',
+    headers: adminHeaders(token, {
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ action: 'report-winner', matchId, winnerId }),
   });
   const result = await readJsonResponse(response);

@@ -19,6 +19,7 @@ import {
   verifyPassword,
   withCookie,
 } from './_account-utils.mjs';
+import { isHostAccount } from './_host-auth.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -53,6 +54,19 @@ function requirePassword(value, confirmation) {
   }
 
   return { password };
+}
+
+function publicPlayerAccount(account) {
+  const publicProfile = publicAccount(account);
+
+  if (!publicProfile) {
+    return null;
+  }
+
+  return {
+    ...publicProfile,
+    hostApproved: isHostAccount(account),
+  };
 }
 
 async function createAccount(payload) {
@@ -102,7 +116,7 @@ async function createAccount(payload) {
 
   const session = await createSession(account);
 
-  return withCookie(json(201, { ok: true, account: publicAccount(account) }), sessionCookie(session.id));
+  return withCookie(json(201, { ok: true, account: publicPlayerAccount(account) }), sessionCookie(session.id));
 }
 
 async function loginAccount(payload) {
@@ -121,7 +135,7 @@ async function loginAccount(payload) {
 
   const session = await createSession(account);
 
-  return withCookie(json(200, { ok: true, account: publicAccount(account) }), sessionCookie(session.id));
+  return withCookie(json(200, { ok: true, account: publicPlayerAccount(account) }), sessionCookie(session.id));
 }
 
 async function logoutAccount(event) {
@@ -144,7 +158,7 @@ export async function handler(event) {
 
     return json(200, {
       ok: true,
-      account: publicAccount(account),
+      account: publicPlayerAccount(account),
     });
   }
 

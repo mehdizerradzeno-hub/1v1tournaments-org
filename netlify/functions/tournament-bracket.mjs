@@ -1,5 +1,11 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import {
+  getAdminToken,
+  getBearerToken,
+  requireTournamentAdmin,
+} from './_host-auth.mjs';
+
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
 const headers = {
@@ -17,18 +23,8 @@ function json(statusCode, body) {
   };
 }
 
-function getAdminToken() {
-  return process.env.TOURNAMENT_ADMIN_TOKEN || '';
-}
-
 function getMatchResultToken() {
   return process.env.TOURNAMENT_MATCH_RESULT_TOKEN || getAdminToken();
-}
-
-function getBearerToken(event) {
-  const header = event.headers.authorization || event.headers.Authorization || '';
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1].trim() : '';
 }
 
 function getStoreWithFallback(name) {
@@ -408,34 +404,36 @@ async function reportWinnerWithRetry(tournamentSlug, matchId, winnerId) {
   return { error: json(409, { error: 'The bracket changed while saving this result. Try reporting the winner again.' }) };
 }
 
-function requireAdmin(event) {
-  const adminToken = getAdminToken();
+async function requireAdmin(event) {
+  const adminCheck = await requireTournamentAdmin(event);
 
-  if (!adminToken) {
-    return { error: json(503, { error: 'Tournament admin token is not configured on Netlify.' }) };
+  if (adminCheck.error) {
+    return { error: json(adminCheck.error.statusCode, { error: adminCheck.error.message }) };
   }
 
-  if (getBearerToken(event) !== adminToken) {
-    return { error: json(401, { error: 'Enter the tournament admin token to manage brackets.' }) };
-  }
-
-  return { ok: true };
+  return adminCheck;
 }
 
-function requireMatchReporter(event) {
+async function requireMatchReporter(event) {
   const adminToken = getAdminToken();
   const matchResultToken = getMatchResultToken();
   const bearerToken = getBearerToken(event);
+
+  if ((matchResultToken && bearerToken === matchResultToken) || (adminToken && bearerToken === adminToken)) {
+    return { ok: true, method: 'token' };
+  }
+
+  const adminCheck = await requireTournamentAdmin(event);
+
+  if (adminCheck.ok) {
+    return adminCheck;
+  }
 
   if (!matchResultToken) {
     return { error: json(503, { error: 'Tournament match result token is not configured on Netlify.' }) };
   }
 
-  if (bearerToken !== matchResultToken && bearerToken !== adminToken) {
-    return { error: json(401, { error: 'Enter the tournament match result token to report winners.' }) };
-  }
-
-  return { ok: true };
+  return { error: json(401, { error: 'Enter the tournament match result token or sign in with a host-approved account.' }) };
 }
 
 export async function handler(event) {
@@ -496,7 +494,7 @@ export async function handler(event) {
 
   try {
     if (payload.action === 'generate') {
-      const adminCheck = requireAdmin(event);
+      const adminCheck = await requireAdmin(event);
 
       if (adminCheck.error) {
         return adminCheck.error;
@@ -515,7 +513,7 @@ export async function handler(event) {
     }
 
     if (payload.action === 'reset') {
-      const adminCheck = requireAdmin(event);
+      const adminCheck = await requireAdmin(event);
 
       if (adminCheck.error) {
         return adminCheck.error;
@@ -527,7 +525,7 @@ export async function handler(event) {
     }
 
     if (payload.action === 'report-winner') {
-      const reporterCheck = requireMatchReporter(event);
+      const reporterCheck = await requireMatchReporter(event);
 
       if (reporterCheck.error) {
         return reporterCheck.error;

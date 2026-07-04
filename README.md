@@ -63,9 +63,11 @@ Future edits:
 ## Admin Access
 
 - Keep public events in `siteData.tournaments`, `siteData.results`, and `siteData.streams`.
-- The preferred private admin flow is the localhost allowlist server started with `npm run admin:server`.
-- Treat your account ID as the allowlist entry on that server, not as a password.
-- The browser-local passphrase stays in place as a fallback for when the server is not running yet.
+- The preferred production host flow is a signed-in player account on the Netlify allowlist.
+- Set `TOURNAMENT_HOST_ACCOUNT_EMAILS` to one or more host account emails, separated by commas or spaces.
+- You can also set `TOURNAMENT_HOST_ACCOUNT_IDS` when you want to allowlist immutable account IDs instead of emails.
+- Keep `TOURNAMENT_ADMIN_TOKEN` as a fallback admin token for emergencies and setup.
+- The localhost allowlist server started with `npm run admin:server` and the browser-local passphrase remain fallback paths for draft editing.
 - Put private draft tournament placeholders under `siteData.admin.draftTournaments` until a real remote auth layer exists.
 - The server state file lives at `.data/admin-state.json`, which is ignored by git.
 

@@ -1,5 +1,7 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import { requireTournamentAdmin } from './_host-auth.mjs';
+
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -13,16 +15,6 @@ function json(statusCode, body) {
     headers,
     body: JSON.stringify(body),
   };
-}
-
-function getAdminToken() {
-  return process.env.TOURNAMENT_ADMIN_TOKEN || '';
-}
-
-function getBearerToken(event) {
-  const header = event.headers.authorization || event.headers.Authorization || '';
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1].trim() : '';
 }
 
 function cleanSlug(value) {
@@ -98,14 +90,10 @@ export async function handler(event) {
     return json(405, { error: 'Use GET to load the admin roster.' });
   }
 
-  const adminToken = getAdminToken();
+  const adminCheck = await requireTournamentAdmin(event);
 
-  if (!adminToken) {
-    return json(503, { error: 'Tournament admin token is not configured on Netlify.' });
-  }
-
-  if (getBearerToken(event) !== adminToken) {
-    return json(401, { error: 'Enter the tournament admin token to view signups.' });
+  if (adminCheck.error) {
+    return json(adminCheck.error.statusCode, { error: adminCheck.error.message });
   }
 
   const requestedSlug = cleanSlug(event.queryStringParameters?.slug);
@@ -116,6 +104,7 @@ export async function handler(event) {
 
     return json(200, {
       ok: true,
+      hostAuth: adminCheck.method,
       rosters: requestedSlug && signups.length === 0
         ? [{ tournamentSlug: requestedSlug, signups: [] }]
         : groupSignups(signups),

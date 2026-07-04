@@ -23,6 +23,7 @@ const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.js
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/player-account.mjs', import.meta.url));
 const accountUtilsFunctionFile = fileURLToPath(new URL('../netlify/functions/_account-utils.mjs', import.meta.url));
+const hostAuthFunctionFile = fileURLToPath(new URL('../netlify/functions/_host-auth.mjs', import.meta.url));
 const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admin-roster.mjs', import.meta.url));
 const tournamentBracketFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-bracket.mjs', import.meta.url));
 const tournamentMatchAccessFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-match-access.mjs', import.meta.url));
@@ -77,6 +78,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(signupFunctionFile));
   assert.ok(existsSync(playerAccountFunctionFile));
   assert.ok(existsSync(accountUtilsFunctionFile));
+  assert.ok(existsSync(hostAuthFunctionFile));
   assert.ok(existsSync(adminRosterFunctionFile));
   assert.ok(existsSync(tournamentBracketFunctionFile));
   assert.ok(existsSync(tournamentMatchAccessFunctionFile));
@@ -87,6 +89,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
   const playerAccountSource = readFileSync(playerAccountFunctionFile, 'utf8');
   const accountUtilsSource = readFileSync(accountUtilsFunctionFile, 'utf8');
+  const hostAuthSource = readFileSync(hostAuthFunctionFile, 'utf8');
   const adminRosterSource = readFileSync(adminRosterFunctionFile, 'utf8');
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
   const tournamentMatchAccessSource = readFileSync(tournamentMatchAccessFunctionFile, 'utf8');
@@ -103,9 +106,13 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(playerAccountSource, /sessionCookie/);
   assert.match(playerAccountSource, /confirmPassword/);
   assert.match(playerAccountSource, /number or symbol/);
+  assert.match(playerAccountSource, /hostApproved/);
   assert.match(accountUtilsSource, /player-accounts/);
   assert.match(accountUtilsSource, /player-sessions/);
+  assert.match(hostAuthSource, /TOURNAMENT_HOST_ACCOUNT_EMAILS/);
+  assert.match(hostAuthSource, /requireTournamentAdmin/);
   assert.match(adminRosterSource, /@netlify\/blobs/);
+  assert.match(adminRosterSource, /requireTournamentAdmin/);
   assert.match(adminRosterSource, /accountId/);
   assert.match(tournamentBracketSource, /tournament-brackets/);
   assert.match(tournamentBracketSource, /accountId/);
@@ -153,5 +160,9 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /handleCopyMatchCallback/);
   assert.match(adminScreenSource, /Run command center/);
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
+  assert.match(adminScreenSource, /Host approved/);
+  assert.match(adminScreenSource, /hostApproved/);
   assert.match(hostingClientSource, /resetTournamentBracket/);
+  assert.match(hostingClientSource, /adminHeaders/);
+  assert.match(hostingClientSource, /credentials: 'include'/);
 });

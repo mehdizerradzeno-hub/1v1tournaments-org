@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -20,6 +20,7 @@ import {
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import {
+  fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentRoster,
   generateTournamentBracket,
@@ -103,6 +104,9 @@ export default function AdminScreen() {
   const [bracketError, setBracketError] = useState('');
   const [hostMessage, setHostMessage] = useState('');
   const [hostError, setHostError] = useState('');
+  const [playerAccount, setPlayerAccount] = useState(null);
+  const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
+  const [playerAccountError, setPlayerAccountError] = useState('');
   const selectedDraft = useMemo(
     () => drafts.find((draft) => draft.slug === selectedDraftSlug) || drafts[0] || null,
     [drafts, selectedDraftSlug],
@@ -127,6 +131,39 @@ export default function AdminScreen() {
     () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || rosters[0] || null,
     [rosters, rosterSlug],
   );
+  const hasHostCredential = Boolean(playerAccount?.hostApproved || rosterToken.trim());
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPlayerAccount() {
+      setPlayerAccountLoading(true);
+      setPlayerAccountError('');
+
+      try {
+        const result = await fetchPlayerAccount();
+
+        if (active) {
+          setPlayerAccount(result.account || null);
+        }
+      } catch (loadError) {
+        if (active) {
+          setPlayerAccount(null);
+          setPlayerAccountError(loadError instanceof Error ? loadError.message : 'Player account could not be loaded.');
+        }
+      } finally {
+        if (active) {
+          setPlayerAccountLoading(false);
+        }
+      }
+    }
+
+    loadPlayerAccount();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function setFeedback(nextMessage = '', nextError = '') {
     setMessage(nextMessage);
@@ -393,8 +430,8 @@ export default function AdminScreen() {
   async function handleLoadRoster() {
     const token = rosterToken.trim();
 
-    if (!token) {
-      setRosterFeedback('', 'Enter the tournament admin token before loading signups.');
+    if (!hasHostCredential) {
+      setRosterFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before loading signups.');
       return;
     }
 
@@ -437,8 +474,8 @@ export default function AdminScreen() {
   async function handleGenerateBracket() {
     const token = rosterToken.trim();
 
-    if (!token) {
-      setBracketFeedback('', 'Enter the tournament admin token before generating a bracket.');
+    if (!hasHostCredential) {
+      setBracketFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before generating a bracket.');
       return;
     }
 
@@ -459,8 +496,8 @@ export default function AdminScreen() {
   async function handleResetBracket() {
     const token = rosterToken.trim();
 
-    if (!token) {
-      setBracketFeedback('', 'Enter the tournament admin token before resetting a bracket.');
+    if (!hasHostCredential) {
+      setBracketFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before resetting a bracket.');
       return;
     }
 
@@ -481,8 +518,8 @@ export default function AdminScreen() {
   async function handleReportWinner(match, player) {
     const token = rosterToken.trim();
 
-    if (!token) {
-      setBracketFeedback('', 'Enter the tournament admin token before reporting a winner.');
+    if (!hasHostCredential) {
+      setBracketFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before reporting a winner.');
       return;
     }
 
@@ -624,9 +661,9 @@ export default function AdminScreen() {
     const readyMatches = matches.filter((match) => match.status === 'ready');
     const finalMatches = matches.filter((match) => match.status === 'final');
     const pendingMatches = matches.filter((match) => match.status !== 'final');
-    let nextAction = 'Enter the admin token, then load signups.';
+    let nextAction = 'Sign in as an approved host or enter the fallback token, then load signups.';
 
-    if (rosterToken.trim() && !selectedRoster) {
+    if (hasHostCredential && !selectedRoster) {
       nextAction = 'Load signups for the selected tournament.';
     } else if (signupCount > 0 && signupCount < 2) {
       nextAction = 'Wait for at least two signups before generating a bracket.';
@@ -653,10 +690,12 @@ export default function AdminScreen() {
 
           <View style={styles.runStatusGrid}>
             {renderRunStatusItem({
-              label: 'Admin token',
-              value: rosterToken.trim() ? 'ready' : 'needed',
-              tone: rosterToken.trim() ? 'green' : 'accent',
-              body: rosterToken.trim() ? 'Host actions can call Netlify functions.' : 'Paste the token before loading signups or generating brackets.',
+              label: 'Host access',
+              value: hasHostCredential ? 'ready' : 'needed',
+              tone: hasHostCredential ? 'green' : 'accent',
+              body: playerAccount?.hostApproved
+                ? `Signed in as host ${playerAccount.playerName}.`
+                : 'Paste the token before loading signups or generating brackets.',
             })}
             {renderRunStatusItem({
               label: 'Signups',
@@ -832,16 +871,33 @@ export default function AdminScreen() {
         <Surface style={styles.rosterPanel}>
           <View style={styles.metaRow}>
             <Badge tone="green">Live roster</Badge>
-            <Text style={styles.metaText}>Use the tournament admin token to load player registrations.</Text>
+            <Text style={styles.metaText}>Use a host-approved account or the fallback admin token to load player registrations.</Text>
+          </View>
+
+          <View style={styles.hostAccountPanel}>
+            <View style={styles.metaRow}>
+              <Badge tone={playerAccount?.hostApproved ? 'green' : playerAccount ? 'accent' : 'blue'}>
+                {playerAccountLoading ? 'Checking' : playerAccount?.hostApproved ? 'Host approved' : playerAccount ? 'Signed in' : 'No account'}
+              </Badge>
+              <Text style={styles.metaText}>
+                {playerAccount?.email || (playerAccountLoading ? 'Checking player account...' : 'Sign in on the public signup page first.')}
+              </Text>
+            </View>
+            {playerAccount && !playerAccount.hostApproved ? (
+              <Text style={styles.hostAccountCopy}>
+                This player account is signed in, but it is not on the Netlify host allowlist yet.
+              </Text>
+            ) : null}
+            {playerAccountError ? <Text style={styles.errorText}>{playerAccountError}</Text> : null}
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Admin token</Text>
+            <Text style={styles.fieldLabel}>Fallback admin token</Text>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={setRosterToken}
-              placeholder="Netlify TOURNAMENT_ADMIN_TOKEN"
+              placeholder={playerAccount?.hostApproved ? 'Optional fallback token' : 'Netlify TOURNAMENT_ADMIN_TOKEN'}
               placeholderTextColor="#6B766F"
               secureTextEntry
               style={styles.input}
@@ -1447,6 +1503,21 @@ const styles = StyleSheet.create({
   },
   rosterPanel: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  hostAccountPanel: {
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.24)',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  hostAccountCopy: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
   },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
