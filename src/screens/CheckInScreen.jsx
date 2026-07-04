@@ -304,10 +304,10 @@ export default function CheckInScreen({ slug }) {
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
       lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
       stats={[
-        { label: 'Status', value: 'Open', tone: 'green' },
+        { label: 'Registration', value: checkIn?.status || 'Open', tone: 'green' },
         { label: 'Account', value: account ? 'Signed in' : 'Required', tone: account ? 'green' : 'accent' },
         { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
-        { label: 'Window', value: checkIn?.preview || 'TBD', tone: 'accent' },
+        { label: 'Check-in', value: checkIn?.preview || 'TBD', tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`}
@@ -321,6 +321,9 @@ export default function CheckInScreen({ slug }) {
           <Text style={styles.summaryTitle}>{account ? 'Reserve your spot' : 'Start with a player account'}</Text>
           <Text style={styles.summaryCopy}>
             Your account connects the roster, bracket, and future match-room access.
+          </Text>
+          <Text style={styles.timelineCopy}>
+            Registration is open now. The host publishes the bracket and match links when the event is ready to run.
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
@@ -499,7 +502,7 @@ export default function CheckInScreen({ slug }) {
         <StepStrip
           steps={[
             { title: 'Join roster', body: 'Your account becomes the tournament identity for this event.' },
-            { title: 'Wait for bracket', body: 'The host generates match IDs from the live signup roster.' },
+            { title: 'Wait for bracket', body: 'The host publishes match IDs from the live signup roster near start time.' },
             { title: 'Open match link', body: 'Your match card opens the Spades room when the bracket is ready.' },
           ]}
         />
@@ -629,6 +632,13 @@ const styles = StyleSheet.create({
     color: '#AAB4AE',
     fontSize: 14,
     lineHeight: 21,
+    marginTop: 8,
+  },
+  timelineCopy: {
+    color: '#6CC7FF',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
     marginTop: 8,
   },
   mutedWarning: {
