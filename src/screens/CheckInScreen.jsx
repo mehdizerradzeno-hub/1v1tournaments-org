@@ -26,6 +26,50 @@ function signupCountLabel(count, loading = false) {
   return `${count} signed up`;
 }
 
+const PASSWORD_REQUIREMENT_ITEMS = [
+  {
+    key: 'length',
+    label: 'At least 8 characters',
+    isMet: (value) => value.length >= 8,
+  },
+  {
+    key: 'mix',
+    label: 'Includes a number or symbol',
+    isMet: (value) => /[0-9\W_]/.test(value),
+  },
+];
+
+function getPasswordRequirements(password, confirmPassword) {
+  return [
+    ...PASSWORD_REQUIREMENT_ITEMS.map((item) => ({
+      key: item.key,
+      label: item.label,
+      met: item.isMet(password),
+    })),
+    {
+      key: 'match',
+      label: 'Passwords match',
+      met: Boolean(confirmPassword) && password === confirmPassword,
+    },
+  ];
+}
+
+function getPasswordError(password, confirmPassword) {
+  if (password.length < 8) {
+    return 'Use at least 8 characters for your account password.';
+  }
+
+  if (!/[0-9\W_]/.test(password)) {
+    return 'Include at least one number or symbol in your account password.';
+  }
+
+  if (password !== confirmPassword) {
+    return 'Enter the same password in both password fields.';
+  }
+
+  return '';
+}
+
 export default function CheckInScreen({ slug }) {
   const tournament = getTournamentBySlug(slug);
   const tournamentSlug = tournament?.slug || '';
@@ -33,6 +77,7 @@ export default function CheckInScreen({ slug }) {
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [signup, setSignup] = useState(null);
@@ -155,6 +200,14 @@ export default function CheckInScreen({ slug }) {
   }
 
   async function handleCreateAccount() {
+    const passwordError = getPasswordError(password, confirmPassword);
+
+    if (passwordError) {
+      setAccountError(passwordError);
+      setAccountMessage('');
+      return;
+    }
+
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -165,10 +218,12 @@ export default function CheckInScreen({ slug }) {
         contactEmail,
         playerHandle,
         password,
+        confirmPassword,
       });
 
       setAccount(result.account);
       setPassword('');
+      setConfirmPassword('');
       setAccountMessage(`Signed in as ${result.account.playerName}.`);
     } catch (createError) {
       setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
@@ -192,6 +247,7 @@ export default function CheckInScreen({ slug }) {
       setPlayerName(result.account.playerName || '');
       setPlayerHandle(result.account.playerHandle || '');
       setPassword('');
+      setConfirmPassword('');
       setAccountMessage(`Signed in as ${result.account.playerName}.`);
     } catch (loginError) {
       setAccountError(loginError instanceof Error ? loginError.message : 'Player account could not be opened.');
@@ -235,6 +291,7 @@ export default function CheckInScreen({ slug }) {
 
   const game = getGameBySlug(tournament.gameSlug);
   const checkIn = tournament.checkIn;
+  const passwordRequirements = getPasswordRequirements(password, confirmPassword);
 
   return (
     <HubScreen
@@ -317,6 +374,7 @@ export default function CheckInScreen({ slug }) {
                 <ActionButton
                   onPress={() => {
                     setAccountMode('login');
+                    setConfirmPassword('');
                     setAccountError('');
                     setAccountMessage('');
                   }}
@@ -366,6 +424,34 @@ export default function CheckInScreen({ slug }) {
                   value={password}
                 />
               </View>
+
+              {accountMode === 'create' ? (
+                <>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Confirm password</Text>
+                    <TextInput
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onChangeText={setConfirmPassword}
+                      placeholder="Type it again"
+                      placeholderTextColor="#6B766F"
+                      secureTextEntry
+                      style={styles.input}
+                      value={confirmPassword}
+                    />
+                  </View>
+
+                  <View style={styles.passwordRequirements}>
+                    <Text style={styles.requirementTitle}>Password requirements</Text>
+                    {passwordRequirements.map((item) => (
+                      <View key={item.key} style={styles.requirementRow}>
+                        <Badge tone={item.met ? 'green' : 'accent'}>{item.met ? 'OK' : 'Needed'}</Badge>
+                        <Text style={styles.requirementText}>{item.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : null}
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>

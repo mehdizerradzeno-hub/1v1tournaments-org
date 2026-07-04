@@ -36,11 +36,20 @@ function json(statusCode, body) {
   };
 }
 
-function requirePassword(value) {
+function requirePassword(value, confirmation) {
   const password = String(value || '');
+  const confirmPassword = String(confirmation || '');
 
   if (password.length < 8) {
     return { error: 'Use at least 8 characters for your account password.' };
+  }
+
+  if (!/[0-9\W_]/.test(password)) {
+    return { error: 'Include at least one number or symbol in your account password.' };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: 'Enter the same password in both password fields.' };
   }
 
   return { password };
@@ -50,7 +59,7 @@ async function createAccount(payload) {
   const email = cleanEmail(payload.contactEmail || payload.email);
   const playerName = cleanText(payload.playerName);
   const playerHandle = cleanText(payload.playerHandle);
-  const passwordCheck = requirePassword(payload.password);
+  const passwordCheck = requirePassword(payload.password, payload.confirmPassword);
 
   if (!playerName) {
     return json(400, { error: 'Enter the player name for this account.' });

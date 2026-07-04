@@ -19,6 +19,7 @@ const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
+const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/player-account.mjs', import.meta.url));
 const accountUtilsFunctionFile = fileURLToPath(new URL('../netlify/functions/_account-utils.mjs', import.meta.url));
@@ -80,6 +81,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(tournamentBracketFunctionFile));
   assert.ok(existsSync(tournamentMatchAccessFunctionFile));
   assert.ok(existsSync(tournamentPlayerStatusFunctionFile));
+  assert.ok(existsSync(checkInScreenFile));
   assert.ok(existsSync(hostingClientFile));
 
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
@@ -89,6 +91,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
   const tournamentMatchAccessSource = readFileSync(tournamentMatchAccessFunctionFile, 'utf8');
   const tournamentPlayerStatusSource = readFileSync(tournamentPlayerStatusFunctionFile, 'utf8');
+  const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
 
   assert.match(signupFunctionSource, /@netlify\/blobs/);
@@ -98,6 +101,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(signupFunctionSource, /accountId/);
   assert.match(playerAccountSource, /createPasswordRecord/);
   assert.match(playerAccountSource, /sessionCookie/);
+  assert.match(playerAccountSource, /confirmPassword/);
+  assert.match(playerAccountSource, /number or symbol/);
   assert.match(accountUtilsSource, /player-accounts/);
   assert.match(accountUtilsSource, /player-sessions/);
   assert.match(adminRosterSource, /@netlify\/blobs/);
@@ -111,6 +116,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
+  assert.match(checkInScreenSource, /Confirm password/);
+  assert.match(checkInScreenSource, /Password requirements/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
   assert.match(hostingClientSource, /fetchSignupSummary/);
