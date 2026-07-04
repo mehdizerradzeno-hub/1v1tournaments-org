@@ -77,6 +77,19 @@ Future edits:
 
 ## Spades Match Result Callback
 
+Players should enter Spades through a hub-issued match ticket, not a bare room link:
+
+- Issue endpoint: `POST https://1v1tournaments.org/.netlify/functions/tournament-match-access`
+- Issue body: `{ "action": "issue-ticket", "matchId": "spades-summer-series-r1-m1" }`
+- Requires the signed-in `one_v_one_player_session` cookie on the tournament hub.
+- Returns a short-lived `roomUrl` like `https://1v1spades.com/match/spades-summer-series-r1-m1?ticket=...`.
+
+The Spades server verifies the ticket before seating a player:
+
+- Verify endpoint: `POST https://1v1tournaments.org/.netlify/functions/tournament-match-access`
+- Verify body: `{ "action": "verify-ticket", "matchId": "spades-summer-series-r1-m1", "ticket": "..." }`
+- The response includes the assigned `seatIndex` and public player details. Spades should use those values instead of client-entered names.
+
 The Spades app can load public match details directly from the tournament hub:
 
 - Endpoint: `GET https://1v1tournaments.org/.netlify/functions/tournament-bracket?matchId=spades-summer-series-r1-m1`

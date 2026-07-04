@@ -24,6 +24,7 @@ const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/pl
 const accountUtilsFunctionFile = fileURLToPath(new URL('../netlify/functions/_account-utils.mjs', import.meta.url));
 const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admin-roster.mjs', import.meta.url));
 const tournamentBracketFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-bracket.mjs', import.meta.url));
+const tournamentMatchAccessFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-match-access.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 
 test('/spades stays wired to the dedicated Spades route file', () => {
@@ -76,6 +77,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(accountUtilsFunctionFile));
   assert.ok(existsSync(adminRosterFunctionFile));
   assert.ok(existsSync(tournamentBracketFunctionFile));
+  assert.ok(existsSync(tournamentMatchAccessFunctionFile));
   assert.ok(existsSync(hostingClientFile));
 
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
@@ -83,6 +85,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const accountUtilsSource = readFileSync(accountUtilsFunctionFile, 'utf8');
   const adminRosterSource = readFileSync(adminRosterFunctionFile, 'utf8');
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
+  const tournamentMatchAccessSource = readFileSync(tournamentMatchAccessFunctionFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
 
   assert.match(signupFunctionSource, /@netlify\/blobs/);
@@ -98,11 +101,16 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(adminRosterSource, /accountId/);
   assert.match(tournamentBracketSource, /tournament-brackets/);
   assert.match(tournamentBracketSource, /accountId/);
+  assert.match(tournamentMatchAccessSource, /tournament-match-tickets/);
+  assert.match(tournamentMatchAccessSource, /getAccountFromEvent/);
+  assert.match(tournamentMatchAccessSource, /issue-ticket/);
+  assert.match(tournamentMatchAccessSource, /verify-ticket/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
   assert.match(hostingClientSource, /fetchSignupSummary/);
   assert.match(hostingClientSource, /generateTournamentBracket/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
+  assert.match(hostingClientSource, /issueTournamentMatchTicket/);
 });
 
 test('Spades match results can report winners through a narrow callback token', () => {

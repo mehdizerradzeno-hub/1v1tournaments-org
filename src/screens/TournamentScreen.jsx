@@ -28,7 +28,11 @@ import {
   getTournamentBySlug,
   siteData,
 } from '../lib/siteData.js';
-import { fetchSignupSummary, fetchTournamentBracket } from '../lib/tournamentHostingClient.js';
+import {
+  fetchSignupSummary,
+  fetchTournamentBracket,
+  issueTournamentMatchTicket,
+} from '../lib/tournamentHostingClient.js';
 
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
@@ -306,9 +310,31 @@ function playerLabel(player) {
 }
 
 function LiveBracketBoard({ bracket }) {
+  const [openingMatchId, setOpeningMatchId] = useState('');
+  const [accessError, setAccessError] = useState('');
   const completedCount = bracket.rounds
     .flatMap((round) => round.matches)
     .filter((match) => match.status === 'final').length;
+
+  async function handleOpenMatch(match) {
+    setAccessError('');
+    setOpeningMatchId(match.id);
+
+    try {
+      const result = await issueTournamentMatchTicket({
+        slug: bracket.tournamentSlug,
+        matchId: match.id,
+      });
+
+      if (result.roomUrl && globalThis.location?.assign) {
+        globalThis.location.assign(result.roomUrl);
+      }
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : 'Match access could not be opened.');
+    } finally {
+      setOpeningMatchId('');
+    }
+  }
 
   return (
     <Surface style={styles.liveBracketCard}>
@@ -319,6 +345,7 @@ function LiveBracketBoard({ bracket }) {
         </Text>
       </View>
       {bracket.winner ? <Text style={styles.liveBracketWinner}>Champion: {bracket.winner.name}</Text> : null}
+      {accessError ? <Text style={styles.liveBracketError}>{accessError}</Text> : null}
 
       <View style={styles.liveRounds}>
         {bracket.rounds.map((round) => (
@@ -338,9 +365,15 @@ function LiveBracketBoard({ bracket }) {
                   <Text style={styles.liveMatchPlayers}>{players.map(playerLabel).join(' vs ')}</Text>
                   {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {match.winnerName}</Text> : null}
                   <View style={styles.liveMatchActions}>
-                    <ActionButton external href={match.roomUrl} variant="secondary">
-                      Play match
-                    </ActionButton>
+                    {match.status === 'ready' ? (
+                      <ActionButton onPress={() => handleOpenMatch(match)} variant="secondary">
+                        {openingMatchId === match.id ? 'Opening...' : 'Play match'}
+                      </ActionButton>
+                    ) : (
+                      <Text style={styles.liveMatchLocked}>
+                        {match.status === 'final' ? 'Match complete' : 'Opens when both players are set'}
+                      </Text>
+                    )}
                   </View>
                 </View>
               );
@@ -431,6 +464,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
+  liveBracketError: {
+    color: '#FFB4A8',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
   liveRounds: {
     marginTop: 8,
   },
@@ -481,6 +521,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
+  },
+  liveMatchLocked: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+    textTransform: 'uppercase',
   },
   snapshotCard: {
     borderColor: 'rgba(214, 162, 78, 0.24)',

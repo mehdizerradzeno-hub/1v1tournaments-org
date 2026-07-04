@@ -2,6 +2,7 @@ const SIGNUP_ENDPOINT = '/.netlify/functions/tournament-signup';
 const ACCOUNT_ENDPOINT = '/.netlify/functions/player-account';
 const ROSTER_ENDPOINT = '/.netlify/functions/admin-roster';
 const BRACKET_ENDPOINT = '/.netlify/functions/tournament-bracket';
+const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -155,6 +156,28 @@ export async function fetchTournamentMatch({ slug, matchId }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Match could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function issueTournamentMatchTicket({ slug, matchId }) {
+  const response = await fetch(MATCH_ACCESS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'issue-ticket',
+      tournamentSlug: slug,
+      matchId,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Match access could not be opened.');
   }
 
   return result;
