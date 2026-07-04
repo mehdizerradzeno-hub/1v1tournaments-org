@@ -79,6 +79,7 @@ function roundName(index, totalRounds) {
 function publicParticipant(signup, index) {
   return {
     id: signup.id,
+    accountId: signup.accountId || '',
     seed: index + 1,
     name: signup.playerName,
     handle: signup.playerHandle || '',
@@ -88,6 +89,7 @@ function publicParticipant(signup, index) {
 function adminParticipant(signup, index) {
   return {
     ...publicParticipant(signup, index),
+    accountEmail: signup.accountEmail || '',
     contactEmail: signup.contactEmail,
     notes: signup.notes || '',
   };

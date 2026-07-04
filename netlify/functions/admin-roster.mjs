@@ -58,6 +58,8 @@ function groupSignups(signups) {
     lookup.get(signup.tournamentSlug).signups.push({
       id: signup.id,
       tournamentSlug: signup.tournamentSlug,
+      accountId: signup.accountId || '',
+      accountEmail: signup.accountEmail || '',
       playerName: signup.playerName,
       contactEmail: signup.contactEmail,
       playerHandle: signup.playerHandle,

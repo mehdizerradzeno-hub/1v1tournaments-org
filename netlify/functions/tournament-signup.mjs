@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { connectLambda, getStore } from '@netlify/blobs';
 
+import { getAccountFromEvent } from './_account-utils.mjs';
+
 const MAX_FIELD_LENGTH = 500;
 
 const headers = {
@@ -127,9 +129,22 @@ export async function handler(event) {
   }
 
   const tournamentSlug = cleanText(payload.tournamentSlug);
-  const playerName = cleanText(payload.playerName);
-  const contactEmail = cleanEmail(payload.contactEmail);
-  const playerHandle = cleanText(payload.playerHandle);
+  let account;
+
+  try {
+    account = await getAccountFromEvent(event);
+  } catch (accountError) {
+    console.error('Account lookup failed during signup', accountError);
+    return json(500, { error: 'Player account lookup is not available yet.' });
+  }
+
+  if (!account) {
+    return json(401, { error: 'Create or sign in to a player account before signing up.' });
+  }
+
+  const playerName = cleanText(account.playerName || payload.playerName);
+  const contactEmail = cleanEmail(account.email);
+  const playerHandle = cleanText(account.playerHandle || payload.playerHandle);
   const notes = cleanText(payload.notes);
 
   if (!tournamentSlug) {
@@ -146,16 +161,19 @@ export async function handler(event) {
 
   try {
     const store = getSignupStore();
-    const key = signupKey(tournamentSlug, contactEmail);
-    const existing = await store.get(key, { type: 'json' });
+    const key = signupKey(tournamentSlug, account.id);
+    const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
+    const existing = await store.get(key, { type: 'json' }) || await store.get(legacyEmailKey, { type: 'json' });
 
     if (existing) {
-      return json(409, { error: 'That email is already signed up for this tournament.' });
+      return json(409, { error: 'That player account is already signed up for this tournament.' });
     }
 
     const signup = {
       id: randomUUID(),
       tournamentSlug,
+      accountId: account.id,
+      accountEmail: account.email,
       playerName,
       contactEmail,
       playerHandle,

@@ -749,6 +749,9 @@ export default function AdminScreen() {
                     <Text style={styles.signupMeta}>
                       {signup.playerHandle || 'No handle'} • {signup.contactEmail}
                     </Text>
+                    <Text style={styles.signupMeta}>
+                      {signup.accountId ? `Account linked: ${signup.accountId}` : 'Legacy signup: no account linked'}
+                    </Text>
                     {signup.notes ? <Text style={styles.signupNotes}>{signup.notes}</Text> : null}
                   </View>
                   <Badge tone="green">{signup.status || 'registered'}</Badge>

@@ -12,7 +12,14 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
-import { fetchSignupSummary, submitTournamentSignup } from '../lib/tournamentHostingClient.js';
+import {
+  createPlayerAccount,
+  fetchPlayerAccount,
+  fetchSignupSummary,
+  loginPlayerAccount,
+  logoutPlayerAccount,
+  submitTournamentSignup,
+} from '../lib/tournamentHostingClient.js';
 
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
@@ -25,11 +32,49 @@ export default function CheckInScreen({ slug }) {
   const [playerName, setPlayerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
+  const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
+  const [account, setAccount] = useState(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountSubmitting, setAccountSubmitting] = useState(false);
+  const [accountMessage, setAccountMessage] = useState('');
+  const [accountError, setAccountError] = useState('');
   const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPlayerAccount() {
+      setAccountLoading(true);
+      setAccountError('');
+
+      try {
+        const result = await fetchPlayerAccount();
+
+        if (active) {
+          setAccount(result.account || null);
+        }
+      } catch (loadError) {
+        if (active) {
+          setAccount(null);
+          setAccountError(loadError instanceof Error ? loadError.message : 'Player account could not be loaded.');
+        }
+      } finally {
+        if (active) {
+          setAccountLoading(false);
+        }
+      }
+    }
+
+    loadPlayerAccount();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +121,11 @@ export default function CheckInScreen({ slug }) {
       return;
     }
 
+    if (!account) {
+      setError('Create or sign in to a player account before signing up.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setSignup(null);
@@ -83,9 +133,6 @@ export default function CheckInScreen({ slug }) {
     try {
       const result = await submitTournamentSignup({
         tournamentSlug: tournament.slug,
-        playerName,
-        contactEmail,
-        playerHandle,
         notes,
       });
 
@@ -103,6 +150,68 @@ export default function CheckInScreen({ slug }) {
       setError(submitError instanceof Error ? submitError.message : 'Signup could not be saved.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleCreateAccount() {
+    setAccountSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await createPlayerAccount({
+        playerName,
+        contactEmail,
+        playerHandle,
+        password,
+      });
+
+      setAccount(result.account);
+      setPassword('');
+      setAccountMessage(`Signed in as ${result.account.playerName}.`);
+    } catch (createError) {
+      setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
+    } finally {
+      setAccountSubmitting(false);
+    }
+  }
+
+  async function handleLoginAccount() {
+    setAccountSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await loginPlayerAccount({
+        contactEmail,
+        password,
+      });
+
+      setAccount(result.account);
+      setPlayerName(result.account.playerName || '');
+      setPlayerHandle(result.account.playerHandle || '');
+      setPassword('');
+      setAccountMessage(`Signed in as ${result.account.playerName}.`);
+    } catch (loginError) {
+      setAccountError(loginError instanceof Error ? loginError.message : 'Player account could not be opened.');
+    } finally {
+      setAccountSubmitting(false);
+    }
+  }
+
+  async function handleLogoutAccount() {
+    setAccountSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      await logoutPlayerAccount();
+      setAccount(null);
+      setAccountMessage('Signed out. Sign back in before joining another tournament.');
+    } catch (logoutError) {
+      setAccountError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');
+    } finally {
+      setAccountSubmitting(false);
     }
   }
 
@@ -134,17 +243,18 @@ export default function CheckInScreen({ slug }) {
         { label: 'Live', href: '/live', variant: 'ghost' },
       ]}
       eyebrow="Tournament signup"
-      footerNote="Player signups are stored server-side for admin review. Entry is free and no wagering is allowed."
-      lead="Sign up in under a minute. Player name and email are the only required fields."
+      footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
+      lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
       stats={[
         { label: 'Status', value: 'Open', tone: 'green' },
+        { label: 'Account', value: account ? 'Signed in' : 'Required', tone: account ? 'green' : 'accent' },
         { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
         { label: 'Window', value: checkIn?.preview || 'TBD', tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`}
       title={`Sign up for ${tournament.title}`}>
-      <Section description="Two required fields, then you are on the tournament roster." title="Sign up now">
+      <Section description="Account first, then one tap to join the roster." title="Sign up now">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
@@ -152,68 +262,113 @@ export default function CheckInScreen({ slug }) {
           </View>
           <Text style={styles.summaryTitle}>Reserve your spot</Text>
           <Text style={styles.summaryCopy}>
-            Required: player name and email. Handle and notes are optional.
+            Your account is what lets the hub know whether you are allowed to sit in a future match room.
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Player name</Text>
-            <TextInput
-              autoCapitalize="words"
-              onChangeText={setPlayerName}
-              placeholder="Your tournament name"
-              placeholderTextColor="#6B766F"
-              style={styles.input}
-              value={playerName}
-            />
-          </View>
+          {accountLoading ? <Text style={styles.summaryCopy}>Checking account status...</Text> : null}
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Contact email</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              inputMode="email"
-              onChangeText={setContactEmail}
-              placeholder="you@example.com"
-              placeholderTextColor="#6B766F"
-              style={styles.input}
-              value={contactEmail}
-            />
-          </View>
+          {account ? (
+            <>
+              <View style={styles.accountPanel}>
+                <View style={styles.summaryTopRow}>
+                  <Badge tone="green">Account linked</Badge>
+                  <Text style={styles.accountEmail}>{account.email}</Text>
+                </View>
+                <Text style={styles.accountName}>{account.playerName}</Text>
+                {account.playerHandle ? <Text style={styles.summaryCopy}>{account.playerHandle}</Text> : null}
+              </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Player handle</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setPlayerHandle}
-              placeholder="Optional Spades name, Discord, or YouTube"
-              placeholderTextColor="#6B766F"
-              style={styles.input}
-              value={playerHandle}
-            />
-          </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Notes</Text>
+                <TextInput
+                  multiline
+                  onChangeText={setNotes}
+                  placeholder="Optional availability note"
+                  placeholderTextColor="#6B766F"
+                  style={styles.notesInput}
+                  value={notes}
+                />
+              </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Notes</Text>
-            <TextInput
-              multiline
-              onChangeText={setNotes}
-              placeholder="Optional availability note"
-              placeholderTextColor="#6B766F"
-              style={styles.notesInput}
-              value={notes}
-            />
-          </View>
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleSubmitSignup}>{submitting ? 'Saving...' : 'Sign up'}</ActionButton>
+                <ActionButton href={getTournamentPath(tournament.slug)} variant="secondary">
+                  Event details
+                </ActionButton>
+                <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                  {accountSubmitting ? 'Signing out...' : 'Sign out'}
+                </ActionButton>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Player name</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  onChangeText={setPlayerName}
+                  placeholder="Your tournament name"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={playerName}
+                />
+              </View>
 
-          <View style={styles.buttonRow}>
-            <ActionButton onPress={handleSubmitSignup}>{submitting ? 'Saving...' : 'Sign up'}</ActionButton>
-            <ActionButton href={getTournamentPath(tournament.slug)} variant="secondary">
-              Event details
-            </ActionButton>
-          </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Account email</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  inputMode="email"
+                  onChangeText={setContactEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={contactEmail}
+                />
+              </View>
 
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Password</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setPassword}
+                  placeholder="At least 8 characters"
+                  placeholderTextColor="#6B766F"
+                  secureTextEntry
+                  style={styles.input}
+                  value={password}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Player handle</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setPlayerHandle}
+                  placeholder="Optional Spades name, Discord, or YouTube"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={playerHandle}
+                />
+              </View>
+
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleCreateAccount}>
+                  {accountSubmitting ? 'Saving...' : 'Create account'}
+                </ActionButton>
+                <ActionButton onPress={handleLoginAccount} variant="secondary">
+                  {accountSubmitting ? 'Opening...' : 'Sign in'}
+                </ActionButton>
+              </View>
+            </>
+          )}
+
+          {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
+          {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
           {signup ? (
             <Text style={styles.successText}>
               Signup saved for {signup.playerName}. Confirmation ID: {signup.id}
@@ -265,6 +420,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
+  },
+  accountPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    marginTop: 16,
+    padding: 14,
+  },
+  accountEmail: {
+    color: '#6CC7FF',
+    fontSize: 12,
+    fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  accountName: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
   },
   errorText: {
     color: '#E06A5C',

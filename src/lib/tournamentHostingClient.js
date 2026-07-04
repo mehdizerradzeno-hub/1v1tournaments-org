@@ -1,4 +1,5 @@
 const SIGNUP_ENDPOINT = '/.netlify/functions/tournament-signup';
+const ACCOUNT_ENDPOINT = '/.netlify/functions/player-account';
 const ROSTER_ENDPOINT = '/.netlify/functions/admin-roster';
 const BRACKET_ENDPOINT = '/.netlify/functions/tournament-bracket';
 
@@ -15,6 +16,7 @@ async function readJsonResponse(response) {
 export async function submitTournamentSignup(payload) {
   const response = await fetch(SIGNUP_ENDPOINT, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -24,6 +26,73 @@ export async function submitTournamentSignup(payload) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Signup could not be saved.');
+  }
+
+  return result;
+}
+
+export async function fetchPlayerAccount() {
+  const response = await fetch(ACCOUNT_ENDPOINT, {
+    credentials: 'include',
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player account could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function createPlayerAccount(payload) {
+  const response = await fetch(ACCOUNT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...payload, action: 'create' }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player account could not be created.');
+  }
+
+  return result;
+}
+
+export async function loginPlayerAccount(payload) {
+  const response = await fetch(ACCOUNT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...payload, action: 'login' }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player account could not be opened.');
+  }
+
+  return result;
+}
+
+export async function logoutPlayerAccount() {
+  const response = await fetch(ACCOUNT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'logout' }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player account could not be signed out.');
   }
 
   return result;
