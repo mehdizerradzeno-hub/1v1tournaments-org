@@ -1,19 +1,19 @@
 const sharedCheckIn = {
-  title: 'Signup and check-in',
+  title: 'Signup',
   status: 'Registration open',
   preview: '30 min early',
   window: 'Opens 30 minutes before the start time.',
-  note: 'Submit the public signup form, then return here before the first round for final check-in notes.',
+  note: 'Submit the form once. The host uses this roster to generate your match link.',
   steps: [
-    'Review the event page and rules first.',
-    'Submit one signup per player using an email the admin can contact.',
-    'Return here for live coverage once play begins.',
+    'Enter your player name and email.',
+    'Wait for the host to publish the bracket.',
+    'Open your Spades match link when the bracket is ready.',
   ],
 };
 
 const sharedBracket = {
   title: 'Bracket preview',
-  note: 'Static preview until live bracket data is connected.',
+  note: 'The live bracket appears here after the host generates it from signups.',
   rounds: [
     {
       title: 'Round 1',

@@ -6,7 +6,7 @@ const MAX_FIELD_LENGTH = 500;
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Content-Type': 'application/json',
 };
@@ -65,6 +65,25 @@ function publicSignup(signup) {
   };
 }
 
+async function loadTournamentSignups(store, tournamentSlug) {
+  const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
+  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
+
+  return signups.filter(Boolean).sort((first, second) => {
+    return String(first.createdAt || '').localeCompare(String(second.createdAt || ''));
+  });
+}
+
+async function publicSignupSummary(store, tournamentSlug) {
+  const signups = await loadTournamentSignups(store, tournamentSlug);
+
+  return {
+    tournamentSlug,
+    signupCount: signups.length,
+    signups: signups.map(publicSignup),
+  };
+}
+
 export async function handler(event) {
   if (event.blobs) {
     connectLambda(event);
@@ -74,8 +93,29 @@ export async function handler(event) {
     return json(204, {});
   }
 
+  if (event.httpMethod === 'GET') {
+    const tournamentSlug = cleanText(event.queryStringParameters?.slug);
+
+    if (!tournamentSlug) {
+      return json(400, { error: 'Choose a tournament before loading signups.' });
+    }
+
+    try {
+      const store = getSignupStore();
+      const summary = await publicSignupSummary(store, tournamentSlug);
+
+      return json(200, {
+        ok: true,
+        ...summary,
+      });
+    } catch (error) {
+      console.error('Tournament signup summary failed', error);
+      return json(500, { error: 'Signup storage is not available yet.' });
+    }
+  }
+
   if (event.httpMethod !== 'POST') {
-    return json(405, { error: 'Use POST to submit a tournament signup.' });
+    return json(405, { error: 'Use GET to load signups or POST to submit a tournament signup.' });
   }
 
   let payload;
@@ -137,6 +177,7 @@ export async function handler(event) {
     return json(201, {
       ok: true,
       signup: publicSignup(signup),
+      summary: await publicSignupSummary(store, tournamentSlug),
     });
   } catch (error) {
     console.error('Tournament signup failed', error);

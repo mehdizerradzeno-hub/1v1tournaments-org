@@ -29,6 +29,18 @@ export async function submitTournamentSignup(payload) {
   return result;
 }
 
+export async function fetchSignupSummary({ slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${SIGNUP_ENDPOINT}${query}`);
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Signup count could not be loaded.');
+  }
+
+  return result;
+}
+
 export async function fetchTournamentRoster({ token, slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${ROSTER_ENDPOINT}${query}`, {

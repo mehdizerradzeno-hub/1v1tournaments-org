@@ -326,11 +326,16 @@ export function StreamCard({ stream }) {
   );
 }
 
-export function CheckInPanel({ checkIn, checkInPath }) {
+function signupCountLabel(count = 0, loading = false) {
+  if (loading) return 'Loading';
+  return `${count} signed up`;
+}
+
+export function CheckInPanel({ checkIn, checkInPath, signupCount = 0, signupError = '', signupLoading = false }) {
   if (!checkIn) {
     return (
       <EmptyState
-        body="Add a check-in block to the tournament record and the placeholder flow will appear here."
+        body="Add a check-in block to the tournament record and the signup flow will appear here."
         title="Check-in is not configured yet"
       />
     );
@@ -339,14 +344,15 @@ export function CheckInPanel({ checkIn, checkInPath }) {
   return (
     <Surface style={styles.checkInCard}>
       <View style={styles.checkInTopRow}>
-        <Badge tone="blue">{checkIn.status || 'Placeholder flow'}</Badge>
+        <Badge tone="green">{signupCountLabel(signupCount, signupLoading)}</Badge>
         <Text style={styles.checkInWindow}>{checkIn.window}</Text>
       </View>
       <Text style={styles.checkInTitle}>{checkIn.title || 'Signup and check-in'}</Text>
       {checkIn.note ? <Text style={styles.checkInCopy}>{checkIn.note}</Text> : null}
+      {signupError ? <Text style={styles.checkInWarning}>{signupError}</Text> : null}
       <BulletList items={checkIn.steps} tone="blue" />
       <View style={styles.checkInActions}>
-        {checkInPath ? <ActionButton href={checkInPath}>Open check-in page</ActionButton> : null}
+        {checkInPath ? <ActionButton href={checkInPath}>Sign up now</ActionButton> : null}
         <ActionButton href="/rules" variant="secondary">
           Review rules
         </ActionButton>
@@ -1066,6 +1072,13 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 21,
+    marginTop: 8,
+  },
+  checkInWarning: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
     marginTop: 8,
   },
   checkInTitle: {

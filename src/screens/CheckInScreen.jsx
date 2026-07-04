@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -11,31 +11,17 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
-import { getGameBySlug, getTournamentBySlug, getTournamentPath, siteData } from '../lib/siteData.js';
-import { submitTournamentSignup } from '../lib/tournamentHostingClient.js';
+import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
+import { fetchSignupSummary, submitTournamentSignup } from '../lib/tournamentHostingClient.js';
+
+function signupCountLabel(count, loading = false) {
+  if (loading) return 'Loading';
+  return `${count} signed up`;
+}
 
 export default function CheckInScreen({ slug }) {
   const tournament = getTournamentBySlug(slug);
-
-  if (!tournament) {
-    return (
-      <HubScreen
-        actions={[{ label: 'Home', href: '/' }]}
-        eyebrow="Check-in not found"
-        lead="That tournament slug is not present in the current public content file."
-        subtitle="Use the tournament page if you were looking for an event."
-        title="Unknown check-in page">
-        <EmptyState
-          action={<ActionButton href="/">Back home</ActionButton>}
-          body="The check-in placeholder route is ready, but the matching public tournament record still needs to be added."
-          title="Nothing to display"
-        />
-      </HubScreen>
-    );
-  }
-
-  const game = getGameBySlug(tournament.gameSlug);
-  const checkIn = tournament.checkIn;
+  const tournamentSlug = tournament?.slug || '';
   const [playerName, setPlayerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
@@ -43,8 +29,53 @@ export default function CheckInScreen({ slug }) {
   const [submitting, setSubmitting] = useState(false);
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
+  const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSignupSummary() {
+      if (!tournamentSlug) {
+        setSignupSummary({ count: 0, loading: false, error: '' });
+        return;
+      }
+
+      setSignupSummary((current) => ({ ...current, loading: true, error: '' }));
+
+      try {
+        const result = await fetchSignupSummary({ slug: tournamentSlug });
+
+        if (active) {
+          setSignupSummary({
+            count: result.signupCount || 0,
+            loading: false,
+            error: '',
+          });
+        }
+      } catch (summaryError) {
+        if (active) {
+          setSignupSummary({
+            count: 0,
+            loading: false,
+            error: summaryError instanceof Error ? summaryError.message : 'Signup count could not be loaded.',
+          });
+        }
+      }
+    }
+
+    loadSignupSummary();
+
+    return () => {
+      active = false;
+    };
+  }, [tournamentSlug]);
 
   async function handleSubmitSignup() {
+    if (!tournament) {
+      setError('Choose a valid tournament before signing up.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setSignup(null);
@@ -59,6 +90,11 @@ export default function CheckInScreen({ slug }) {
       });
 
       setSignup(result.signup);
+      setSignupSummary((current) => ({
+        count: result.summary?.signupCount || current.count + 1,
+        loading: false,
+        error: '',
+      }));
       setPlayerName('');
       setContactEmail('');
       setPlayerHandle('');
@@ -70,6 +106,26 @@ export default function CheckInScreen({ slug }) {
     }
   }
 
+  if (!tournament) {
+    return (
+      <HubScreen
+        actions={[{ label: 'Home', href: '/' }]}
+        eyebrow="Check-in not found"
+        lead="That tournament slug is not present in the current public content file."
+        subtitle="Use the tournament page if you were looking for an event."
+        title="Unknown check-in page">
+        <EmptyState
+          action={<ActionButton href="/">Back home</ActionButton>}
+          body="The signup route is ready, but the matching public tournament record still needs to be added."
+          title="Nothing to display"
+        />
+      </HubScreen>
+    );
+  }
+
+  const game = getGameBySlug(tournament.gameSlug);
+  const checkIn = tournament.checkIn;
+
   return (
     <HubScreen
       actions={[
@@ -79,31 +135,33 @@ export default function CheckInScreen({ slug }) {
       ]}
       eyebrow="Tournament signup"
       footerNote="Player signups are stored server-side for admin review. Entry is free and no wagering is allowed."
-      lead="Use this page to register for the tournament. The admin roster updates on the private admin page after the signup is saved."
+      lead="Sign up in under a minute. Player name and email are the only required fields."
       stats={[
         { label: 'Status', value: 'Open', tone: 'green' },
+        { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
         { label: 'Window', value: checkIn?.preview || 'TBD', tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`}
-      title={`${tournament.title} check-in`}>
-      <Section description="This form saves the player to the server-side tournament roster." title="Register for this tournament">
+      title={`Sign up for ${tournament.title}`}>
+      <Section description="Two required fields, then you are on the tournament roster." title="Sign up now">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
-            <Badge tone="green">Live signup</Badge>
+            <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
             <Text style={styles.summaryWindow}>{checkIn?.window || 'Registration open'}</Text>
           </View>
-          <Text style={styles.summaryTitle}>Reserve a spot</Text>
+          <Text style={styles.summaryTitle}>Reserve your spot</Text>
           <Text style={styles.summaryCopy}>
-            Enter the player details below. Use an email you can check in case the admin needs to confirm table assignments.
+            Required: player name and email. Handle and notes are optional.
           </Text>
+          {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Player name</Text>
             <TextInput
               autoCapitalize="words"
               onChangeText={setPlayerName}
-              placeholder="Name shown on the roster"
+              placeholder="Your tournament name"
               placeholderTextColor="#6B766F"
               style={styles.input}
               value={playerName}
@@ -130,7 +188,7 @@ export default function CheckInScreen({ slug }) {
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={setPlayerHandle}
-              placeholder="Discord, YouTube, or table name"
+              placeholder="Optional Spades name, Discord, or YouTube"
               placeholderTextColor="#6B766F"
               style={styles.input}
               value={playerHandle}
@@ -142,7 +200,7 @@ export default function CheckInScreen({ slug }) {
             <TextInput
               multiline
               onChangeText={setNotes}
-              placeholder="Optional availability or stream notes"
+              placeholder="Optional availability note"
               placeholderTextColor="#6B766F"
               style={styles.notesInput}
               value={notes}
@@ -150,7 +208,7 @@ export default function CheckInScreen({ slug }) {
           </View>
 
           <View style={styles.buttonRow}>
-            <ActionButton onPress={handleSubmitSignup}>{submitting ? 'Saving...' : 'Submit signup'}</ActionButton>
+            <ActionButton onPress={handleSubmitSignup}>{submitting ? 'Saving...' : 'Sign up'}</ActionButton>
             <ActionButton href={getTournamentPath(tournament.slug)} variant="secondary">
               Event details
             </ActionButton>
@@ -165,37 +223,22 @@ export default function CheckInScreen({ slug }) {
         </Surface>
       </Section>
 
-      <Section description="Check-in timing and player expectations for this event." title="Check-in details">
+      <Section description="What happens after your signup is saved." title="What happens next">
         <Surface style={styles.summaryCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="blue">{checkIn?.status || 'Registration flow'}</Badge>
             <Text style={styles.summaryWindow}>{checkIn?.window || 'TBD'}</Text>
           </View>
-          <Text style={styles.summaryTitle}>{checkIn?.title || 'Signup and check-in'}</Text>
+          <Text style={styles.summaryTitle}>Play from the match link</Text>
           {checkIn?.note ? <Text style={styles.summaryCopy}>{checkIn.note}</Text> : null}
-          <BulletList items={checkIn?.steps} tone="blue" />
-        </Surface>
-      </Section>
-
-      <Section description="Phase 1 gets registration online. Brackets and score reporting come next." title="Still to build">
-        <Surface style={styles.todoCard}>
           <BulletList
             items={[
-              'Generate seeds and brackets from the registered player roster.',
-              'Let players report scores after each match.',
-              'Let admins approve results and publish final standings.',
+              'The host loads the roster and generates the bracket.',
+              'Your match card links to the Spades room.',
+              'When the game reports a winner, the hub advances the bracket.',
             ]}
-            tone="accent"
+            tone="blue"
           />
-        </Surface>
-      </Section>
-
-      <Section description="Use the tournament page when you only need event details." title="Back to the event">
-        <Surface style={styles.backCard}>
-          <Text style={styles.backCopy}>
-            This placeholder flow stays separate so the public tournament page can keep the schedule, rules, and stream links clean.
-          </Text>
-          <ActionButton href={getTournamentPath(tournament.slug)}>Return to tournament</ActionButton>
         </Surface>
       </Section>
     </HubScreen>
@@ -269,6 +312,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
+  },
+  mutedWarning: {
+    color: '#D6A24E',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+    fontWeight: '700',
   },
   summaryTitle: {
     color: '#F4EFE6',

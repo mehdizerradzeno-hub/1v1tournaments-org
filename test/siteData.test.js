@@ -67,12 +67,13 @@ test('general rules keep the no-buy-in wording visible in one place', () => {
   assert.ok(sections.some((section) => section.items.some((item) => /Apple is not a sponsor or involved/i.test(item))));
 });
 
-test('public tournaments expose the placeholder check-in and bracket flow', () => {
+test('public tournaments expose the signup and bracket flow', () => {
   const tournament = getTournamentBySlug('spades-summer-series');
 
   assert.equal(getCheckInPath('spades-summer-series'), '/check-in/spades-summer-series');
   assert.equal(tournament?.checkIn?.preview, '30 min early');
   assert.equal(tournament?.checkIn?.window, 'Opens 30 minutes before the start time.');
+  assert.match(tournament?.checkIn?.note || '', /match link/i);
   assert.ok((tournament?.bracket?.rounds || []).length > 0);
 });
 

@@ -27,11 +27,17 @@ import {
   getTournamentBySlug,
   siteData,
 } from '../lib/siteData.js';
-import { fetchTournamentBracket } from '../lib/tournamentHostingClient.js';
+import { fetchSignupSummary, fetchTournamentBracket } from '../lib/tournamentHostingClient.js';
+
+function signupCountLabel(count, loading = false) {
+  if (loading) return 'Loading';
+  return `${count} signed up`;
+}
 
 export default function TournamentScreen({ slug }) {
   const [liveBracket, setLiveBracket] = useState(null);
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
+  const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
   const tournament = getTournamentBySlug(slug);
 
   useEffect(() => {
@@ -63,6 +69,32 @@ export default function TournamentScreen({ slug }) {
     }
 
     loadBracket();
+
+    async function loadSignupSummary() {
+      setSignupSummary((current) => ({ ...current, loading: true, error: '' }));
+
+      try {
+        const result = await fetchSignupSummary({ slug });
+
+        if (active) {
+          setSignupSummary({
+            count: result.signupCount || 0,
+            loading: false,
+            error: '',
+          });
+        }
+      } catch (error) {
+        if (active) {
+          setSignupSummary({
+            count: 0,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Signup count could not be loaded.',
+          });
+        }
+      }
+    }
+
+    loadSignupSummary();
 
     return () => {
       active = false;
@@ -98,7 +130,7 @@ export default function TournamentScreen({ slug }) {
 
   const heroActions = [
     isPrimaryGame && gamePath ? { label: 'Open /spades', href: gamePath } : null,
-    { label: 'Check in', href: checkInPath, variant: 'secondary' },
+    { label: 'Sign up', href: checkInPath, variant: 'secondary' },
     streams.length ? { label: 'Watch live', href: '/live' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
     { label: 'Results', href: '/results', variant: 'ghost' },
@@ -114,6 +146,7 @@ export default function TournamentScreen({ slug }) {
       lead={tournament.detail}
       stats={[
         { label: 'Format', value: tournament.format, tone: 'blue' },
+        { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
         { label: 'Location', value: tournament.location, tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
@@ -133,9 +166,15 @@ export default function TournamentScreen({ slug }) {
       </Section>
 
       <Section
-        description="This is a static placeholder check-in flow for now. It keeps the future registration path visible without needing a backend."
-        title="Signup and check-in">
-        <CheckInPanel checkIn={tournament.checkIn} checkInPath={checkInPath} />
+        description="The roster count updates from the live signup store, then the host generates the bracket from that roster."
+        title="Sign up">
+        <CheckInPanel
+          checkIn={tournament.checkIn}
+          checkInPath={checkInPath}
+          signupCount={signupSummary.count}
+          signupError={signupSummary.error}
+          signupLoading={signupSummary.loading}
+        />
       </Section>
 
       <Section

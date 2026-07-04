@@ -63,12 +63,12 @@ test('dynamic public routes declare static export params for Netlify deep links'
   assert.match(checkInRouteSource, /siteData\.tournaments\.map/);
 });
 
-test('the check-in placeholder route stays wired to the public tournament path', () => {
+test('the signup route stays wired to the public tournament path', () => {
   assert.equal(getCheckInPath('spades-summer-series'), '/check-in/spades-summer-series');
   assert.ok(existsSync(checkInRouteFile));
 });
 
-test('phase 1 signup capture stays wired through Netlify Functions and Blobs', () => {
+test('phase 1 signup capture and public counts stay wired through Netlify Functions and Blobs', () => {
   assert.ok(existsSync(signupFunctionFile));
   assert.ok(existsSync(adminRosterFunctionFile));
   assert.ok(existsSync(tournamentBracketFunctionFile));
@@ -80,8 +80,11 @@ test('phase 1 signup capture stays wired through Netlify Functions and Blobs', (
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
 
   assert.match(signupFunctionSource, /@netlify\/blobs/);
+  assert.match(signupFunctionSource, /event\.httpMethod === 'GET'/);
+  assert.match(signupFunctionSource, /signupCount/);
   assert.match(adminRosterSource, /@netlify\/blobs/);
   assert.match(tournamentBracketSource, /tournament-brackets/);
+  assert.match(hostingClientSource, /fetchSignupSummary/);
   assert.match(hostingClientSource, /generateTournamentBracket/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
 });
