@@ -20,13 +20,24 @@ import {
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import {
+  dateToScheduleFields,
+  getRegistrationStatusMeta,
+  getScheduleFieldDefaults,
+  mergeTournamentSettings,
+  REGISTRATION_STATUS_OPTIONS,
+  zonedDateTimeToIso,
+} from '../lib/tournamentSettings.js';
+import {
   clearTournamentData,
   fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentRoster,
+  fetchTournamentSettings,
   generateTournamentBracket,
   reportTournamentMatchWinner,
+  resetTournamentSettings,
   resetTournamentBracket,
+  saveTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
 import {
   buildAdminDraftPacket,
@@ -95,6 +106,19 @@ export default function AdminScreen() {
   const [serverError, setServerError] = useState('');
   const [rosterToken, setRosterToken] = useState('');
   const [rosterSlug, setRosterSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const initialScheduleDefaults = getScheduleFieldDefaults(
+    siteData.tournaments.find((tournament) => tournament.slug === rosterSlug) || siteData.tournaments[0],
+  );
+  const [scheduleSettings, setScheduleSettings] = useState(null);
+  const [scheduleDate, setScheduleDate] = useState(() => initialScheduleDefaults.date);
+  const [scheduleTime, setScheduleTime] = useState(() => initialScheduleDefaults.time);
+  const [scheduleTimeZone, setScheduleTimeZone] = useState(() => initialScheduleDefaults.timeZone);
+  const [scheduleTimeZoneLabel, setScheduleTimeZoneLabel] = useState(() => initialScheduleDefaults.timeZoneLabel);
+  const [scheduleRegistrationStatus, setScheduleRegistrationStatus] = useState(() => initialScheduleDefaults.registrationStatus);
+  const [scheduleCheckInLeadMinutes, setScheduleCheckInLeadMinutes] = useState(() => initialScheduleDefaults.checkInLeadMinutes);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
   const [rosters, setRosters] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterMessage, setRosterMessage] = useState('');
@@ -135,6 +159,15 @@ export default function AdminScreen() {
     () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || null,
     [rosters, rosterSlug],
   );
+  const selectedTournament = useMemo(
+    () => siteData.tournaments.find((tournament) => tournament.slug === rosterSlug) || siteData.tournaments[0] || null,
+    [rosterSlug],
+  );
+  const liveTournament = useMemo(
+    () => mergeTournamentSettings(selectedTournament, scheduleSettings),
+    [selectedTournament, scheduleSettings],
+  );
+  const liveRegistrationMeta = getRegistrationStatusMeta(liveTournament?.registrationStatus);
   const isHostApproved = Boolean(playerAccount?.hostApproved);
   const hasPrivateAdminAccess = mode === 'unlocked';
   const canShowHostConsole = isHostApproved || hasPrivateAdminAccess;
@@ -172,6 +205,49 @@ export default function AdminScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedTournament) {
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadScheduleSettings() {
+      setScheduleSettings(null);
+      applyScheduleFields(selectedTournament, null);
+      setScheduleLoading(true);
+      setScheduleFeedback('', '');
+
+      try {
+        const result = await fetchTournamentSettings({ slug: selectedTournament.slug });
+
+        if (!active) {
+          return;
+        }
+
+        setScheduleSettings(result.settings || null);
+        applyScheduleFields(selectedTournament, result.settings || null);
+        setScheduleFeedback(result.settings ? 'Loaded saved schedule settings.' : 'Using seeded schedule defaults.', '');
+      } catch (loadError) {
+        if (active) {
+          setScheduleSettings(null);
+          applyScheduleFields(selectedTournament, null);
+          setScheduleFeedback('', loadError instanceof Error ? loadError.message : 'Could not load tournament schedule settings.');
+        }
+      } finally {
+        if (active) {
+          setScheduleLoading(false);
+        }
+      }
+    }
+
+    loadScheduleSettings();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTournament]);
+
   function setFeedback(nextMessage = '', nextError = '') {
     setMessage(nextMessage);
     setError(nextError);
@@ -180,6 +256,11 @@ export default function AdminScreen() {
   function setServerFeedback(nextMessage = '', nextError = '') {
     setServerMessage(nextMessage);
     setServerError(nextError);
+  }
+
+  function setScheduleFeedback(nextMessage = '', nextError = '') {
+    setScheduleMessage(nextMessage);
+    setScheduleError(nextError);
   }
 
   function setRosterFeedback(nextMessage = '', nextError = '') {
@@ -195,6 +276,18 @@ export default function AdminScreen() {
   function setHostFeedback(nextMessage = '', nextError = '') {
     setHostMessage(nextMessage);
     setHostError(nextError);
+  }
+
+  function applyScheduleFields(tournament, settings = null) {
+    const mergedTournament = mergeTournamentSettings(tournament, settings);
+    const fields = dateToScheduleFields(mergedTournament?.date, mergedTournament?.timeZone);
+
+    setScheduleDate(fields.date);
+    setScheduleTime(fields.time);
+    setScheduleTimeZone(mergedTournament?.timeZone || 'America/New_York');
+    setScheduleTimeZoneLabel(mergedTournament?.timeZoneLabel || 'ET');
+    setScheduleRegistrationStatus(mergedTournament?.registrationStatus || 'open');
+    setScheduleCheckInLeadMinutes(String(mergedTournament?.checkInLeadMinutes ?? 30));
   }
 
   function handleCreateAccess() {
@@ -432,6 +525,187 @@ export default function AdminScreen() {
     } catch {
       setServerFeedback('', 'Could not copy the server packet from this browser.');
     }
+  }
+
+  async function handleSaveScheduleSettings() {
+    const token = rosterToken.trim();
+
+    if (!hasHostCredential) {
+      setScheduleFeedback('', 'Sign in with a host-approved account or enter the fallback token before saving schedule settings.');
+      return;
+    }
+
+    let date;
+
+    try {
+      date = zonedDateTimeToIso(scheduleDate, scheduleTime, scheduleTimeZone.trim() || 'America/New_York');
+    } catch (saveError) {
+      setScheduleFeedback('', saveError instanceof Error ? saveError.message : 'Enter a valid schedule date and time.');
+      return;
+    }
+
+    setScheduleLoading(true);
+    setScheduleFeedback('', '');
+
+    try {
+      const result = await saveTournamentSettings({
+        token,
+        slug: rosterSlug,
+        settings: {
+          tournamentSlug: rosterSlug,
+          date,
+          timeZone: scheduleTimeZone.trim() || 'America/New_York',
+          timeZoneLabel: scheduleTimeZoneLabel.trim() || 'ET',
+          registrationStatus: scheduleRegistrationStatus,
+          checkInLeadMinutes: scheduleCheckInLeadMinutes,
+        },
+      });
+
+      setScheduleSettings(result.settings || null);
+      applyScheduleFields(selectedTournament, result.settings || null);
+      setScheduleFeedback('Schedule and registration settings saved.', '');
+    } catch (saveError) {
+      setScheduleFeedback('', saveError instanceof Error ? saveError.message : 'Could not save tournament schedule settings.');
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  async function handleResetScheduleSettings() {
+    const token = rosterToken.trim();
+
+    if (!hasHostCredential) {
+      setScheduleFeedback('', 'Sign in with a host-approved account or enter the fallback token before resetting schedule settings.');
+      return;
+    }
+
+    setScheduleLoading(true);
+    setScheduleFeedback('', '');
+
+    try {
+      await resetTournamentSettings({ token, slug: rosterSlug });
+      setScheduleSettings(null);
+      applyScheduleFields(selectedTournament, null);
+      setScheduleFeedback('Schedule override reset to the seeded tournament defaults.', '');
+    } catch (resetError) {
+      setScheduleFeedback('', resetError instanceof Error ? resetError.message : 'Could not reset tournament schedule settings.');
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  function renderScheduleSection() {
+    return (
+      <Section
+        description="This controls what players see on the tournament and signup pages."
+        title="Schedule and registration">
+        <Surface style={styles.schedulePanel}>
+          <View style={styles.metaRow}>
+            <Badge tone={liveRegistrationMeta.tone}>{liveRegistrationMeta.label}</Badge>
+            <Text style={styles.metaText}>
+              {liveTournament?.title || rosterSlug} starts {scheduleDate || 'TBD'} at {scheduleTime || 'TBD'} {scheduleTimeZoneLabel || ''}
+            </Text>
+          </View>
+
+          <View style={styles.scheduleGrid}>
+            <View style={styles.scheduleField}>
+              <Text style={styles.fieldLabel}>Date</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setScheduleDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#6B766F"
+                style={styles.input}
+                value={scheduleDate}
+              />
+            </View>
+            <View style={styles.scheduleField}>
+              <Text style={styles.fieldLabel}>Start time</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setScheduleTime}
+                placeholder="18:00"
+                placeholderTextColor="#6B766F"
+                style={styles.input}
+                value={scheduleTime}
+              />
+            </View>
+            <View style={styles.scheduleField}>
+              <Text style={styles.fieldLabel}>Time zone</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setScheduleTimeZone}
+                placeholder="America/New_York"
+                placeholderTextColor="#6B766F"
+                style={styles.input}
+                value={scheduleTimeZone}
+              />
+            </View>
+            <View style={styles.scheduleField}>
+              <Text style={styles.fieldLabel}>Time label</Text>
+              <TextInput
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onChangeText={setScheduleTimeZoneLabel}
+                placeholder="ET"
+                placeholderTextColor="#6B766F"
+                style={styles.input}
+                value={scheduleTimeZoneLabel}
+              />
+            </View>
+            <View style={styles.scheduleField}>
+              <Text style={styles.fieldLabel}>Check-in lead minutes</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                inputMode="numeric"
+                onChangeText={setScheduleCheckInLeadMinutes}
+                placeholder="30"
+                placeholderTextColor="#6B766F"
+                style={styles.input}
+                value={scheduleCheckInLeadMinutes}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Registration</Text>
+            <View style={styles.tournamentPicker}>
+              {REGISTRATION_STATUS_OPTIONS.map((option) => (
+                <ActionButton
+                  key={option.value}
+                  onPress={() => setScheduleRegistrationStatus(option.value)}
+                  variant={scheduleRegistrationStatus === option.value ? 'primary' : 'secondary'}>
+                  {option.label}
+                </ActionButton>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.rosterSummary}>
+            <Badge tone={scheduleSettings ? 'green' : 'blue'}>{scheduleSettings ? 'Saved override' : 'Seed default'}</Badge>
+            <Text style={styles.metaText}>
+              {scheduleSettings?.updatedAt ? `Last saved ${new Date(scheduleSettings.updatedAt).toLocaleString()}` : 'No live override saved yet.'}
+            </Text>
+          </View>
+
+          {scheduleError ? <Text style={styles.errorText}>{scheduleError}</Text> : null}
+          {scheduleMessage ? <Text style={styles.successText}>{scheduleMessage}</Text> : null}
+
+          <View style={styles.buttonRow}>
+            <ActionButton onPress={handleSaveScheduleSettings}>
+              {scheduleLoading ? 'Saving...' : 'Save schedule'}
+            </ActionButton>
+            <ActionButton onPress={handleResetScheduleSettings} variant="secondary">
+              Reset schedule
+            </ActionButton>
+          </View>
+        </Surface>
+      </Section>
+    );
   }
 
   async function handleLoadRoster() {
@@ -756,7 +1030,7 @@ export default function AdminScreen() {
   }
 
   function renderHostRunSection() {
-    const tournament = siteData.tournaments.find((item) => item.slug === rosterSlug) || siteData.tournaments[0] || null;
+    const tournament = liveTournament || selectedTournament;
     const tournamentPath = getTournamentPath(rosterSlug);
     const signupCount = selectedRoster?.signups?.length || 0;
     const matches = bracket?.rounds?.flatMap((round) =>
@@ -1515,6 +1789,8 @@ export default function AdminScreen() {
         </Surface>
       </Section>
 
+      {renderScheduleSection()}
+
       {renderHostRunSection()}
 
       {renderLiveRosterSection()}
@@ -1803,6 +2079,21 @@ const styles = StyleSheet.create({
   },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  schedulePanel: {
+    borderColor: 'rgba(108, 199, 255, 0.26)',
+  },
+  scheduleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: -10,
+    marginTop: 4,
+  },
+  scheduleField: {
+    flexBasis: 220,
+    flexGrow: 1,
+    marginRight: 10,
+    marginTop: 14,
   },
   runPanel: {
     borderColor: 'rgba(214, 162, 78, 0.34)',

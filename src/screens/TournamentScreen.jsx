@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -29,6 +29,7 @@ import {
   getTournamentPath,
   siteData,
 } from '../lib/siteData.js';
+import { getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchTournamentPlayerStatus,
   fetchSignupSummary,
@@ -46,7 +47,12 @@ export default function TournamentScreen({ slug }) {
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
   const [playerStatus, setPlayerStatus] = useState({ loading: true, error: '', data: null });
   const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+  const [tournamentSettings, setTournamentSettings] = useState(null);
   const tournament = getTournamentBySlug(slug);
+  const liveTournament = useMemo(
+    () => mergeTournamentSettings(tournament, tournamentSettings),
+    [tournament, tournamentSettings],
+  );
 
   useEffect(() => {
     let active = true;
@@ -85,6 +91,7 @@ export default function TournamentScreen({ slug }) {
         const result = await fetchSignupSummary({ slug });
 
         if (active) {
+          setTournamentSettings(result.settings || null);
           setSignupSummary({
             count: result.signupCount || 0,
             loading: false,
@@ -93,6 +100,7 @@ export default function TournamentScreen({ slug }) {
         }
       } catch (error) {
         if (active) {
+          setTournamentSettings(null);
           setSignupSummary({
             count: 0,
             loading: false,
@@ -148,51 +156,53 @@ export default function TournamentScreen({ slug }) {
     );
   }
 
-  const game = getGameBySlug(tournament.gameSlug);
+  const visibleTournament = liveTournament || tournament;
+  const registrationMeta = getRegistrationStatusMeta(visibleTournament.registrationStatus);
+  const game = getGameBySlug(visibleTournament.gameSlug);
   const isPrimaryGame = game?.slug === siteData.site.primaryGameSlug;
   const gamePath = game ? getGamePath(game.slug) : null;
-  const streams = (tournament.streamSlugs || [])
+  const streams = (visibleTournament.streamSlugs || [])
     .map((streamSlug) => getStreamBySlug(streamSlug))
     .filter(Boolean);
-  const checkInPath = getCheckInPath(tournament.slug);
-  const tournamentPath = getTournamentPath(tournament.slug);
+  const checkInPath = getCheckInPath(visibleTournament.slug);
+  const tournamentPath = getTournamentPath(visibleTournament.slug);
   const matchStatusPath = `${tournamentPath}#my-match`;
-  const result = getResultByTournamentSlug(tournament.slug)
-    || (tournament.status === 'complete' ? getResultsForGame(tournament.gameSlug)[0] || null : null);
+  const result = getResultByTournamentSlug(visibleTournament.slug)
+    || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
 
   const heroActions = [
-    { label: 'Sign up now', href: checkInPath },
+    { label: visibleTournament.registrationStatus === 'open' ? 'Sign up now' : registrationMeta.label, href: checkInPath },
     { label: 'My match', href: matchStatusPath, variant: 'secondary' },
     streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
     isPrimaryGame && gamePath ? { label: 'Open Spades', href: gamePath, variant: 'secondary' } : null,
   ].filter(Boolean);
 
-  const quickLinks = (tournament.links || []).filter((link) => link.href !== `/tournaments/${tournament.slug}`);
+  const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
 
   return (
     <HubScreen
       actions={heroActions}
       eyebrow={game?.badge || 'Tournament'}
       footerNote={siteData.site.adminNote}
-      lead={tournament.detail}
+      lead={visibleTournament.detail}
       stats={[
-        { label: 'Format', value: tournament.format, tone: 'blue' },
+        { label: 'Format', value: visibleTournament.format, tone: 'blue' },
+        { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
         { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
-        { label: 'Location', value: tournament.location, tone: 'accent' },
-        { label: 'Entry', value: 'Free', tone: 'green' },
+        { label: 'Location', value: visibleTournament.location, tone: 'accent' },
       ]}
       subtitle={
         isPrimaryGame
-          ? `Spades launch event • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`
-          : formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)
+          ? `Spades launch event • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`
+          : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
       }
-      title={tournament.title}>
+      title={visibleTournament.title}>
       <Section
         description="Players start here. The count updates from the live account-based signup store."
         title="Sign up">
         <CheckInPanel
-          checkIn={tournament.checkIn}
+          checkIn={visibleTournament.checkIn}
           checkInPath={checkInPath}
           signupCount={signupSummary.count}
           signupError={signupSummary.error}
@@ -207,7 +217,7 @@ export default function TournamentScreen({ slug }) {
         <PlayerTournamentStatus
           checkInPath={checkInPath}
           playerStatus={playerStatus}
-          slug={tournament.slug}
+          slug={visibleTournament.slug}
         />
       </Section>
 
@@ -218,7 +228,7 @@ export default function TournamentScreen({ slug }) {
           <LiveBracketBoard bracket={liveBracket} />
         ) : (
           <>
-            <BracketBoard bracket={tournament.bracket} />
+            <BracketBoard bracket={visibleTournament.bracket} />
             {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
             {!bracketState.loading && !bracketState.error ? (
               <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
@@ -258,10 +268,10 @@ export default function TournamentScreen({ slug }) {
 
       <Section description="Format, entry rules, and event notes." title="Event snapshot">
         <Surface style={styles.snapshotCard}>
-          <Text style={styles.snapshotLabel}>{tournament.summary}</Text>
-          <Text style={styles.snapshotCopy}>{tournament.entryLine}</Text>
-          {tournament.callout ? <Text style={styles.snapshotCallout}>{tournament.callout}</Text> : null}
-          <BulletList items={tournament.highlights} />
+          <Text style={styles.snapshotLabel}>{visibleTournament.summary}</Text>
+          <Text style={styles.snapshotCopy}>{visibleTournament.entryLine}</Text>
+          {visibleTournament.callout ? <Text style={styles.snapshotCallout}>{visibleTournament.callout}</Text> : null}
+          <BulletList items={visibleTournament.highlights} />
         </Surface>
       </Section>
 
@@ -303,7 +313,7 @@ export default function TournamentScreen({ slug }) {
       ) : null}
 
       <Section description="Agenda items are shown in order so check-in and start times are easy to scan." title="Agenda">
-        <AgendaList items={tournament.agenda} />
+        <AgendaList items={visibleTournament.agenda} />
       </Section>
 
       <Section description="Use this section for the active live table and the replay archive." title="Watch and replay">

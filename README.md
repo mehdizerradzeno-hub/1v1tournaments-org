@@ -67,16 +67,18 @@ Future edits:
 - Set `TOURNAMENT_HOST_ACCOUNT_EMAILS` to one or more host account emails, separated by commas or spaces.
 - You can also set `TOURNAMENT_HOST_ACCOUNT_IDS` when you want to allowlist immutable account IDs instead of emails.
 - Keep `TOURNAMENT_ADMIN_TOKEN` as a fallback admin token for emergencies and setup.
+- Use the host dashboard `Schedule and registration` controls to update event date, time zone, check-in lead time, and registration status without editing code.
 - Use the host dashboard `Clear test data` control to wipe one tournament's roster and bracket during smoke tests while keeping player accounts intact.
+- Live schedule overrides are stored in the Netlify Blobs `tournament-settings` store and merged over the seeded `siteData.tournaments` records.
 - The localhost allowlist server started with `npm run admin:server` and the browser-local passphrase remain fallback paths for draft editing.
 - Put private draft tournament placeholders under `siteData.admin.draftTournaments` until a real remote auth layer exists.
 - The server state file lives at `.data/admin-state.json`, which is ignored by git.
 
 ## Check-In Placeholder Flow
 
-- Public tournament pages link to `/check-in/[slug]` for a static signup/check-in preview.
-- The route is read-only and does not submit any registrations yet.
-- The allowlisted flow currently lives in the localhost admin server, with the browser fallback still available on `/admin`.
+- Public tournament pages link to `/check-in/[slug]` for account-based tournament signup.
+- The route reads live signup counts and schedule settings from Netlify Functions.
+- Host-controlled registration status is enforced server-side before a signup is saved.
 
 ## Spades Match Result Callback
 

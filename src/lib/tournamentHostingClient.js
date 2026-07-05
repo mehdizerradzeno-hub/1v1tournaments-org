@@ -4,6 +4,7 @@ const ROSTER_ENDPOINT = '/.netlify/functions/admin-roster';
 const BRACKET_ENDPOINT = '/.netlify/functions/tournament-bracket';
 const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
+const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -117,6 +118,63 @@ export async function fetchSignupSummary({ slug }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Signup count could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchTournamentSettings({ slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${SETTINGS_ENDPOINT}${query}`);
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament schedule settings could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function saveTournamentSettings({ token, slug, settings }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${SETTINGS_ENDPOINT}${query}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'save',
+      tournamentSlug: slug,
+      settings,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament schedule settings could not be saved.');
+  }
+
+  return result;
+}
+
+export async function resetTournamentSettings({ token, slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${SETTINGS_ENDPOINT}${query}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'reset',
+      tournamentSlug: slug,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament schedule settings could not be reset.');
   }
 
   return result;

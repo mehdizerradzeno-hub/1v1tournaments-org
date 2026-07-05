@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { connectLambda, getStore } from '@netlify/blobs';
 
 import { getAccountFromEvent } from './_account-utils.mjs';
+import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -78,12 +79,26 @@ async function loadTournamentSignups(store, tournamentSlug) {
 
 async function publicSignupSummary(store, tournamentSlug) {
   const signups = await loadTournamentSignups(store, tournamentSlug);
+  const settings = await loadTournamentSettings(tournamentSlug);
 
   return {
     tournamentSlug,
     signupCount: signups.length,
     signups: signups.map(publicSignup),
+    settings,
   };
+}
+
+function registrationClosedMessage(status) {
+  if (status === 'closed') {
+    return 'Registration is closed for this tournament.';
+  }
+
+  if (status === 'coming-soon') {
+    return 'Registration is not open for this tournament yet.';
+  }
+
+  return '';
 }
 
 export async function handler(event) {
@@ -161,6 +176,14 @@ export async function handler(event) {
 
   try {
     const store = getSignupStore();
+    const settings = await loadTournamentSettings(tournamentSlug);
+    const registrationStatus = normalizeRegistrationStatus(settings?.registrationStatus);
+    const blockedMessage = registrationClosedMessage(registrationStatus);
+
+    if (blockedMessage) {
+      return json(403, { error: blockedMessage, settings });
+    }
+
     const key = signupKey(tournamentSlug, account.id);
     const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
     const existing = await store.get(key, { type: 'json' }) || await store.get(legacyEmailKey, { type: 'json' });

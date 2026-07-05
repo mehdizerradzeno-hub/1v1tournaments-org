@@ -31,7 +31,10 @@ const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admi
 const tournamentBracketFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-bracket.mjs', import.meta.url));
 const tournamentMatchAccessFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-match-access.mjs', import.meta.url));
 const tournamentPlayerStatusFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-player-status.mjs', import.meta.url));
+const tournamentSettingsFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-settings.mjs', import.meta.url));
+const tournamentSettingsUtilsFile = fileURLToPath(new URL('../netlify/functions/_tournament-settings-utils.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
+const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
 
 test('/spades stays wired to the dedicated Spades route file', () => {
   assert.equal(getGamePath('spades'), '/spades');
@@ -86,11 +89,14 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(tournamentBracketFunctionFile));
   assert.ok(existsSync(tournamentMatchAccessFunctionFile));
   assert.ok(existsSync(tournamentPlayerStatusFunctionFile));
+  assert.ok(existsSync(tournamentSettingsFunctionFile));
+  assert.ok(existsSync(tournamentSettingsUtilsFile));
   assert.ok(existsSync(hubUiFile));
   assert.ok(existsSync(homeScreenFile));
   assert.ok(existsSync(checkInScreenFile));
   assert.ok(existsSync(tournamentScreenFile));
   assert.ok(existsSync(hostingClientFile));
+  assert.ok(existsSync(tournamentSettingsClientFile));
 
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
   const playerAccountSource = readFileSync(playerAccountFunctionFile, 'utf8');
@@ -100,17 +106,22 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
   const tournamentMatchAccessSource = readFileSync(tournamentMatchAccessFunctionFile, 'utf8');
   const tournamentPlayerStatusSource = readFileSync(tournamentPlayerStatusFunctionFile, 'utf8');
+  const tournamentSettingsSource = readFileSync(tournamentSettingsFunctionFile, 'utf8');
+  const tournamentSettingsUtilsSource = readFileSync(tournamentSettingsUtilsFile, 'utf8');
   const hubUiSource = readFileSync(hubUiFile, 'utf8');
   const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
   const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
   const tournamentScreenSource = readFileSync(tournamentScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
+  const tournamentSettingsClientSource = readFileSync(tournamentSettingsClientFile, 'utf8');
 
   assert.match(signupFunctionSource, /@netlify\/blobs/);
   assert.match(signupFunctionSource, /event\.httpMethod === 'GET'/);
   assert.match(signupFunctionSource, /signupCount/);
   assert.match(signupFunctionSource, /getAccountFromEvent/);
   assert.match(signupFunctionSource, /accountId/);
+  assert.match(signupFunctionSource, /loadTournamentSettings/);
+  assert.match(signupFunctionSource, /registrationStatus/);
   assert.match(playerAccountSource, /createPasswordRecord/);
   assert.match(playerAccountSource, /sessionCookie/);
   assert.match(playerAccountSource, /confirmPassword/);
@@ -135,26 +146,40 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
+  assert.match(tournamentSettingsSource, /requireTournamentAdmin/);
+  assert.match(tournamentSettingsSource, /saveTournamentSettings/);
+  assert.match(tournamentSettingsSource, /action === 'reset'/);
+  assert.match(tournamentSettingsUtilsSource, /tournament-settings/);
+  assert.match(tournamentSettingsUtilsSource, /registrationStatus/);
   assert.match(hubUiSource, /MOBILE_NAV_ITEMS/);
   assert.match(hubUiSource, /My match/);
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
   assert.match(homeScreenSource, /title="My match"/);
+  assert.match(homeScreenSource, /mergeTournamentSettings/);
   assert.doesNotMatch(homeScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /title="My match"/);
+  assert.match(tournamentScreenSource, /mergeTournamentSettings/);
   assert.doesNotMatch(tournamentScreenSource, /Host admin/);
   assert.match(checkInScreenSource, /Confirm password/);
   assert.match(checkInScreenSource, /Password requirements/);
+  assert.match(checkInScreenSource, /registrationOpen/);
+  assert.match(checkInScreenSource, /mergeTournamentSettings/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
   assert.match(hostingClientSource, /fetchSignupSummary/);
   assert.match(hostingClientSource, /fetchTournamentPlayerStatus/);
   assert.match(hostingClientSource, /generateTournamentBracket/);
   assert.match(hostingClientSource, /clearTournamentData/);
+  assert.match(hostingClientSource, /fetchTournamentSettings/);
+  assert.match(hostingClientSource, /saveTournamentSettings/);
+  assert.match(hostingClientSource, /resetTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
   assert.match(hostingClientSource, /issueTournamentMatchTicket/);
+  assert.match(tournamentSettingsClientSource, /REGISTRATION_STATUS_OPTIONS/);
+  assert.match(tournamentSettingsClientSource, /zonedDateTimeToIso/);
 });
 
 test('Spades match results can report winners through a narrow callback token', () => {
@@ -185,6 +210,9 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
   assert.match(adminScreenSource, /Clear test data/);
   assert.match(adminScreenSource, /Confirm clear tournament/);
+  assert.match(adminScreenSource, /Schedule and registration/);
+  assert.match(adminScreenSource, /handleSaveScheduleSettings/);
+  assert.match(adminScreenSource, /resetTournamentSettings/);
   assert.match(adminScreenSource, /Host approved/);
   assert.match(adminScreenSource, /hostApproved/);
   assert.match(hostingClientSource, /resetTournamentBracket/);

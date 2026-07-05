@@ -53,16 +53,17 @@ function getToneColor(tone) {
   return theme.colors.accent;
 }
 
-function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false }) {
+function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false, disabled = false }) {
   const linkStyles = ({ pressed }) => [
     styles.button,
     variant === 'secondary' && styles.buttonSecondary,
     variant === 'ghost' && styles.buttonGhost,
-    pressed && styles.buttonPressed,
+    pressed && !disabled && styles.buttonPressed,
+    disabled && styles.buttonDisabled,
     style,
   ];
 
-  if (href && isInternalHref(href) && !external) {
+  if (href && isInternalHref(href) && !external && !disabled) {
     return (
       <Link accessibilityLabel={accessibilityLabel} href={href} asChild>
         <Pressable accessibilityRole="link" style={linkStyles}>
@@ -75,8 +76,13 @@ function LinkShell({ href, children, style, accessibilityLabel, onPress, variant
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="link"
+      accessibilityRole={href ? 'link' : 'button'}
+      disabled={disabled}
       onPress={() => {
+        if (disabled) {
+          return;
+        }
+
         if (onPress) {
           onPress();
           return;
@@ -117,10 +123,11 @@ export function Badge({ children, tone = 'neutral', style }) {
   );
 }
 
-export function ActionButton({ href, onPress, children, variant = 'primary', external = false, style, accessibilityLabel }) {
+export function ActionButton({ href, onPress, children, variant = 'primary', external = false, style, accessibilityLabel, disabled = false }) {
   return (
     <LinkShell
       accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
       external={external}
       href={href}
       onPress={onPress}
@@ -131,12 +138,14 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
           styles.actionButtonInner,
           variant === 'secondary' && styles.actionButtonInnerSecondary,
           variant === 'ghost' && styles.actionButtonInnerGhost,
+          disabled && styles.actionButtonInnerDisabled,
         ]}>
         <Text
           style={[
             styles.actionButtonText,
             variant === 'secondary' && styles.actionButtonTextSecondary,
             variant === 'ghost' && styles.actionButtonTextSecondary,
+            disabled && styles.actionButtonTextDisabled,
           ]}>
           {children}
         </Text>
@@ -896,6 +905,9 @@ const styles = StyleSheet.create({
     opacity: 0.86,
     transform: [{ translateY: 1 }],
   },
+  buttonDisabled: {
+    opacity: 0.55,
+  },
   actionButtonInner: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -912,6 +924,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: theme.colors.lineStrong,
   },
+  actionButtonInnerDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: theme.colors.line,
+  },
   actionButtonText: {
     color: '#101010',
     fontSize: 13,
@@ -921,6 +937,9 @@ const styles = StyleSheet.create({
   },
   actionButtonTextSecondary: {
     color: theme.colors.text,
+  },
+  actionButtonTextDisabled: {
+    color: theme.colors.muted,
   },
   statsRow: {
     flexDirection: 'row',

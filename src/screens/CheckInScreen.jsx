@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -12,6 +12,7 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
+import { getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   createPlayerAccount,
   fetchPlayerAccount,
@@ -89,6 +90,11 @@ export default function CheckInScreen({ slug }) {
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
   const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+  const [tournamentSettings, setTournamentSettings] = useState(null);
+  const liveTournament = useMemo(
+    () => mergeTournamentSettings(tournament, tournamentSettings),
+    [tournament, tournamentSettings],
+  );
 
   useEffect(() => {
     let active = true;
@@ -127,6 +133,7 @@ export default function CheckInScreen({ slug }) {
 
     async function loadSignupSummary() {
       if (!tournamentSlug) {
+        setTournamentSettings(null);
         setSignupSummary({ count: 0, loading: false, error: '' });
         return;
       }
@@ -137,6 +144,7 @@ export default function CheckInScreen({ slug }) {
         const result = await fetchSignupSummary({ slug: tournamentSlug });
 
         if (active) {
+          setTournamentSettings(result.settings || null);
           setSignupSummary({
             count: result.signupCount || 0,
             loading: false,
@@ -145,6 +153,7 @@ export default function CheckInScreen({ slug }) {
         }
       } catch (summaryError) {
         if (active) {
+          setTournamentSettings(null);
           setSignupSummary({
             count: 0,
             loading: false,
@@ -162,8 +171,13 @@ export default function CheckInScreen({ slug }) {
   }, [tournamentSlug]);
 
   async function handleSubmitSignup() {
-    if (!tournament) {
+    if (!liveTournament) {
       setError('Choose a valid tournament before signing up.');
+      return;
+    }
+
+    if (liveTournament.registrationStatus !== 'open') {
+      setError(getRegistrationStatusMeta(liveTournament.registrationStatus).actionCopy);
       return;
     }
 
@@ -178,7 +192,7 @@ export default function CheckInScreen({ slug }) {
 
     try {
       const result = await submitTournamentSignup({
-        tournamentSlug: tournament.slug,
+        tournamentSlug: liveTournament.slug,
         notes,
       });
 
@@ -289,14 +303,17 @@ export default function CheckInScreen({ slug }) {
     );
   }
 
-  const game = getGameBySlug(tournament.gameSlug);
-  const checkIn = tournament.checkIn;
+  const visibleTournament = liveTournament || tournament;
+  const game = getGameBySlug(visibleTournament.gameSlug);
+  const checkIn = visibleTournament.checkIn;
+  const registrationMeta = getRegistrationStatusMeta(visibleTournament.registrationStatus);
+  const registrationOpen = visibleTournament.registrationStatus === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
 
   return (
     <HubScreen
       actions={[
-        { label: 'Tournament page', href: getTournamentPath(tournament.slug) },
+        { label: 'Tournament page', href: getTournamentPath(visibleTournament.slug) },
         { label: 'Rules', href: '/rules', variant: 'secondary' },
         { label: 'Live', href: '/live', variant: 'ghost' },
       ]}
@@ -304,14 +321,14 @@ export default function CheckInScreen({ slug }) {
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
       lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
       stats={[
-        { label: 'Registration', value: checkIn?.status || 'Open', tone: 'green' },
+        { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
         { label: 'Account', value: account ? 'Signed in' : 'Required', tone: account ? 'green' : 'accent' },
         { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
         { label: 'Check-in', value: checkIn?.preview || 'TBD', tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
-      subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}`}
-      title={`Sign up for ${tournament.title}`}>
+      subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
+      title={`Sign up for ${visibleTournament.title}`}>
       <Section description="Create or open your player account, then join the event roster." title="Sign up now">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
@@ -323,7 +340,7 @@ export default function CheckInScreen({ slug }) {
             Your account connects the roster, bracket, and future match-room access.
           </Text>
           <Text style={styles.timelineCopy}>
-            Registration is open now. The host publishes the bracket and match links when the event is ready to run.
+            {registrationMeta.actionCopy} The host publishes the bracket and match links when the event is ready to run.
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
@@ -353,8 +370,10 @@ export default function CheckInScreen({ slug }) {
               </View>
 
               <View style={styles.buttonRow}>
-                <ActionButton onPress={handleSubmitSignup}>{submitting ? 'Saving...' : 'Sign up'}</ActionButton>
-                <ActionButton href={getTournamentPath(tournament.slug)} variant="secondary">
+                <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
+                  {registrationOpen ? (submitting ? 'Saving...' : 'Sign up') : registrationMeta.label}
+                </ActionButton>
+                <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
                   Event details
                 </ActionButton>
                 <ActionButton onPress={handleLogoutAccount} variant="ghost">

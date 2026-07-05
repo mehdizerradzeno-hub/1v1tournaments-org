@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 
 import {
@@ -16,6 +17,7 @@ import {
   EmptyState,
   BulletList,
 } from '../components/hub-ui.jsx';
+import { formatShortDate } from '../lib/format.js';
 import {
   getGameBySlug,
   getGamePath,
@@ -27,11 +29,19 @@ import {
   getUpcomingTournaments,
   siteData,
 } from '../lib/siteData.js';
+import { getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { fetchTournamentSettings } from '../lib/tournamentHostingClient.js';
 
-function getHomeStats(upcomingCount, gameCount, streamCount) {
+function getHomeStats(upcomingCount, gameCount, streamCount, featuredTournament) {
+  const registrationMeta = getRegistrationStatusMeta(featuredTournament?.registrationStatus);
+
   return [
-    { label: 'Next event', value: 'Jul 18', tone: 'accent' },
-    { label: 'Signup', value: 'Open', tone: 'green' },
+    {
+      label: 'Next event',
+      value: featuredTournament ? formatShortDate(featuredTournament.date, featuredTournament.timeZone) : 'TBD',
+      tone: 'accent',
+    },
+    { label: 'Registration', value: registrationMeta.label.replace('Registration ', ''), tone: registrationMeta.tone },
     { label: 'Events', value: String(upcomingCount), tone: 'accent' },
     { label: 'Games', value: String(gameCount), tone: 'blue' },
     { label: 'Streams', value: String(streamCount), tone: 'green' },
@@ -39,18 +49,49 @@ function getHomeStats(upcomingCount, gameCount, streamCount) {
 }
 
 export default function HomeScreen() {
+  const [featuredSettings, setFeaturedSettings] = useState(null);
   const games = getGames();
   const streams = getStreams();
   const upcoming = getUpcomingTournaments();
   const results = getResults();
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
-  const featuredTournament = getUpcomingTournaments().find(
+  const seededFeaturedTournament = getUpcomingTournaments().find(
     (tournament) => tournament.slug === siteData.site.primaryTournamentSlug,
   ) || upcoming[0] || null;
+  const featuredTournament = mergeTournamentSettings(seededFeaturedTournament, featuredSettings);
+  const seededFeaturedSlug = seededFeaturedTournament?.slug || '';
   const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
   const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
+
+  useEffect(() => {
+    if (!seededFeaturedSlug) {
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadFeaturedSettings() {
+      try {
+        const result = await fetchTournamentSettings({ slug: seededFeaturedSlug });
+
+        if (active) {
+          setFeaturedSettings(result.settings || null);
+        }
+      } catch {
+        if (active) {
+          setFeaturedSettings(null);
+        }
+      }
+    }
+
+    loadFeaturedSettings();
+
+    return () => {
+      active = false;
+    };
+  }, [seededFeaturedSlug]);
 
   return (
     <HubScreen
@@ -62,7 +103,7 @@ export default function HomeScreen() {
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
       lead="Create a player account, join the roster, open your match link, and let the hub track the bracket."
-      stats={getHomeStats(upcoming.length, games.length, streams.length)}
+      stats={getHomeStats(upcoming.length, games.length, streams.length, featuredTournament)}
       subtitle="Free-entry Spades tournaments with account-based signup and hosted brackets."
       title={siteData.site.name}>
       <Section
