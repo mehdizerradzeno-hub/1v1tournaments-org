@@ -26,6 +26,7 @@ import {
   getResultsForGame,
   getStreamBySlug,
   getTournamentBySlug,
+  getTournamentPath,
   siteData,
 } from '../lib/siteData.js';
 import {
@@ -154,15 +155,17 @@ export default function TournamentScreen({ slug }) {
     .map((streamSlug) => getStreamBySlug(streamSlug))
     .filter(Boolean);
   const checkInPath = getCheckInPath(tournament.slug);
+  const tournamentPath = getTournamentPath(tournament.slug);
+  const matchStatusPath = `${tournamentPath}#my-match`;
   const result = getResultByTournamentSlug(tournament.slug)
     || (tournament.status === 'complete' ? getResultsForGame(tournament.gameSlug)[0] || null : null);
 
   const heroActions = [
     { label: 'Sign up now', href: checkInPath },
-    isPrimaryGame && gamePath ? { label: 'Open Spades', href: gamePath, variant: 'secondary' } : null,
+    { label: 'My match', href: matchStatusPath, variant: 'secondary' },
     streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
-    { label: 'Host admin', href: '/admin', variant: 'ghost' },
     { label: 'Rules', href: '/rules', variant: 'secondary' },
+    isPrimaryGame && gamePath ? { label: 'Open Spades', href: gamePath, variant: 'secondary' } : null,
   ].filter(Boolean);
 
   const quickLinks = (tournament.links || []).filter((link) => link.href !== `/tournaments/${tournament.slug}`);
@@ -199,6 +202,7 @@ export default function TournamentScreen({ slug }) {
 
       <Section
         description="Sign in once, then use this card to find your current match without reading the whole bracket."
+        nativeID="my-match"
         title="Your tournament status">
         <PlayerTournamentStatus
           checkInPath={checkInPath}
@@ -223,7 +227,7 @@ export default function TournamentScreen({ slug }) {
         )}
       </Section>
 
-      <Section description="Quick paths for players, viewers, and the host." title="Event links">
+      <Section description="Quick paths for players and viewers." title="Event links">
         <View style={styles.quickGrid}>
           <QuickActionCard
             actionLabel="Create account and join"
@@ -242,12 +246,12 @@ export default function TournamentScreen({ slug }) {
             tone="blue"
           />
           <QuickActionCard
-            actionLabel="Open controls"
-            body="Load signups, generate the bracket, and manage winners."
-            href="/admin"
-            meta="Host"
-            title="Admin console"
-            tone="rose"
+            actionLabel="Check status"
+            body="Jump to your account-linked status card and current match once the bracket is live."
+            href={matchStatusPath}
+            meta="Player"
+            title="My match"
+            tone="green"
           />
         </View>
       </Section>

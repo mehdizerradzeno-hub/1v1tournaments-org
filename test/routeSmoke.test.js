@@ -18,8 +18,11 @@ const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
+const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
+const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
+const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/player-account.mjs', import.meta.url));
 const accountUtilsFunctionFile = fileURLToPath(new URL('../netlify/functions/_account-utils.mjs', import.meta.url));
@@ -83,7 +86,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(tournamentBracketFunctionFile));
   assert.ok(existsSync(tournamentMatchAccessFunctionFile));
   assert.ok(existsSync(tournamentPlayerStatusFunctionFile));
+  assert.ok(existsSync(hubUiFile));
+  assert.ok(existsSync(homeScreenFile));
   assert.ok(existsSync(checkInScreenFile));
+  assert.ok(existsSync(tournamentScreenFile));
   assert.ok(existsSync(hostingClientFile));
 
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
@@ -94,7 +100,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
   const tournamentMatchAccessSource = readFileSync(tournamentMatchAccessFunctionFile, 'utf8');
   const tournamentPlayerStatusSource = readFileSync(tournamentPlayerStatusFunctionFile, 'utf8');
+  const hubUiSource = readFileSync(hubUiFile, 'utf8');
+  const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
   const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
+  const tournamentScreenSource = readFileSync(tournamentScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
 
   assert.match(signupFunctionSource, /@netlify\/blobs/);
@@ -123,6 +132,16 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
+  assert.match(hubUiSource, /MOBILE_NAV_ITEMS/);
+  assert.match(hubUiSource, /My match/);
+  assert.match(hubUiSource, /fetchPlayerAccount/);
+  assert.match(hubUiSource, /hostApproved/);
+  assert.match(hubUiSource, /showMobileNav/);
+  assert.match(homeScreenSource, /title="My match"/);
+  assert.doesNotMatch(homeScreenSource, /Host admin/);
+  assert.match(tournamentScreenSource, /nativeID="my-match"/);
+  assert.match(tournamentScreenSource, /title="My match"/);
+  assert.doesNotMatch(tournamentScreenSource, /Host admin/);
   assert.match(checkInScreenSource, /Confirm password/);
   assert.match(checkInScreenSource, /Password requirements/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);

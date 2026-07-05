@@ -50,6 +50,7 @@ export default function HomeScreen() {
   ) || upcoming[0] || null;
   const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
+  const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
 
   return (
     <HubScreen
@@ -57,7 +58,6 @@ export default function HomeScreen() {
         { label: 'Sign up for Spades', href: featuredSignupPath },
         { label: 'View tournament', href: featuredTournamentPath, variant: 'secondary' },
         { label: 'Open Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
-        { label: 'Host admin', href: '/admin', variant: 'ghost' },
       ]}
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
@@ -94,12 +94,12 @@ export default function HomeScreen() {
             tone="blue"
           />
           <QuickActionCard
-            actionLabel="Load roster and bracket"
-            body="Host controls live in the private admin console for roster review and bracket generation."
-            href="/admin"
-            meta="Host"
-            title="Admin console"
-            tone="rose"
+            actionLabel="Find your table"
+            body="After signup, your status card shows whether you are waiting, matched, or ready to play."
+            href={featuredMatchStatusPath}
+            meta="Player"
+            title="My match"
+            tone="green"
           />
         </View>
       </Section>
