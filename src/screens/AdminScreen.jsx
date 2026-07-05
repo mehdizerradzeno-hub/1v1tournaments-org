@@ -1065,6 +1065,9 @@ export default function AdminScreen() {
             <Text style={styles.metaText}>{tournament?.title || rosterSlug}</Text>
           </View>
           <Text style={styles.runTitle}>{nextAction}</Text>
+          <Text style={styles.copy}>
+            Need to remove Codex/test applicants? Use Clear signups + bracket for the selected tournament, then refresh the roster after real players apply.
+          </Text>
 
           <View style={styles.runStatusGrid}>
             {renderRunStatusItem({
@@ -1119,8 +1122,8 @@ export default function AdminScreen() {
             <ActionButton onPress={handleLoadBracket} variant="ghost">
               {bracketLoading ? 'Loading...' : 'Load bracket'}
             </ActionButton>
-            <ActionButton onPress={handleRequestClearTournamentData} variant="ghost">
-              Clear test data
+            <ActionButton onPress={handleRequestClearTournamentData} variant="secondary">
+              Clear signups + bracket
             </ActionButton>
           </View>
 
@@ -1128,14 +1131,14 @@ export default function AdminScreen() {
             <View style={styles.dangerPanel}>
               <View style={styles.metaRow}>
                 <Badge tone="rose">Confirm reset</Badge>
-                <Text style={styles.runStatusLabel}>Clear {tournament?.title || rosterSlug}</Text>
+                <Text style={styles.runStatusLabel}>Reset applicants for {tournament?.title || rosterSlug}</Text>
               </View>
               <Text style={styles.runStatusBody}>
-                This deletes registered players and the published bracket for this tournament only. Player accounts stay intact.
+                This deletes Codex/test applicants, real signups, and the published bracket for this tournament only. Player accounts and the tournament page stay intact.
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton onPress={handleClearTournamentData} variant="secondary">
-                  {clearLoading ? 'Clearing...' : 'Confirm clear tournament'}
+                  {clearLoading ? 'Clearing...' : 'Delete signups + bracket'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel
