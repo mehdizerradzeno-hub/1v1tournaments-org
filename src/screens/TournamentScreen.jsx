@@ -42,11 +42,50 @@ function signupCountLabel(count, loading = false) {
   return `${count} signed up`;
 }
 
+function nextPowerOfTwo(value) {
+  let size = 2;
+  const target = Math.max(Number(value) || 0, 2);
+
+  while (size < target) {
+    size *= 2;
+  }
+
+  return size;
+}
+
+function bracketSizeFromBracket(bracket, fallbackCount = 0) {
+  const firstRoundMatchCount = bracket?.rounds?.[0]?.matches?.length || 0;
+
+  if (firstRoundMatchCount) {
+    return firstRoundMatchCount * 2;
+  }
+
+  return nextPowerOfTwo(fallbackCount);
+}
+
+function bracketSizeLabel(size, liveBracket = null) {
+  return `${size}-player${liveBracket ? ' live' : ''}`;
+}
+
+function playerCapacityLabel(count, size, loading = false) {
+  if (loading) return 'Loading';
+  return `${count}/${size}`;
+}
+
+function openSlotLabel(count, size, loading = false) {
+  if (loading) return 'Checking open seats';
+  const openSlots = Math.max(size - count, 0);
+
+  if (count < 2) return 'Need 2 players to generate a bracket';
+  if (openSlots === 0) return 'Current bracket size is full';
+  return `${openSlots} open bracket seat${openSlots === 1 ? '' : 's'}`;
+}
+
 export default function TournamentScreen({ slug }) {
   const [liveBracket, setLiveBracket] = useState(null);
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
   const [playerStatus, setPlayerStatus] = useState({ loading: true, error: '', data: null });
-  const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+  const [signupSummary, setSignupSummary] = useState({ count: 0, signups: [], loading: true, error: '' });
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const tournament = getTournamentBySlug(slug);
   const liveTournament = useMemo(
@@ -94,6 +133,7 @@ export default function TournamentScreen({ slug }) {
           setTournamentSettings(result.settings || null);
           setSignupSummary({
             count: result.signupCount || 0,
+            signups: result.signups || [],
             loading: false,
             error: '',
           });
@@ -103,6 +143,7 @@ export default function TournamentScreen({ slug }) {
           setTournamentSettings(null);
           setSignupSummary({
             count: 0,
+            signups: [],
             loading: false,
             error: error instanceof Error ? error.message : 'Signup count could not be loaded.',
           });
@@ -178,6 +219,7 @@ export default function TournamentScreen({ slug }) {
   ].filter(Boolean);
 
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
+  const activeBracketSize = bracketSizeFromBracket(liveBracket, signupSummary.count);
 
   return (
     <HubScreen
@@ -188,7 +230,8 @@ export default function TournamentScreen({ slug }) {
       stats={[
         { label: 'Format', value: visibleTournament.format, tone: 'blue' },
         { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
-        { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
+        { label: 'Players', value: playerCapacityLabel(signupSummary.count, activeBracketSize, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
+        { label: 'Bracket', value: bracketSizeLabel(activeBracketSize, liveBracket), tone: liveBracket ? 'green' : 'accent' },
         { label: 'Location', value: visibleTournament.location, tone: 'accent' },
       ]}
       subtitle={
@@ -206,6 +249,16 @@ export default function TournamentScreen({ slug }) {
           signupCount={signupSummary.count}
           signupError={signupSummary.error}
           signupLoading={signupSummary.loading}
+        />
+      </Section>
+
+      <Section
+        description="This is the public roster players and hosts can scan before the bracket is generated."
+        title="Registered players">
+        <RegisteredPlayersPanel
+          bracketSize={activeBracketSize}
+          liveBracket={liveBracket}
+          signupSummary={signupSummary}
         />
       </Section>
 
@@ -436,6 +489,50 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
   );
 }
 
+function RegisteredPlayersPanel({ bracketSize, liveBracket, signupSummary }) {
+  const signups = signupSummary.signups || [];
+
+  return (
+    <Surface style={styles.rosterCard}>
+      <View style={styles.rosterHeader}>
+        <Badge tone={signupSummary.count ? 'green' : 'blue'}>
+          {signupCountLabel(signupSummary.count, signupSummary.loading)}
+        </Badge>
+        <Badge tone={liveBracket ? 'green' : 'accent'}>{bracketSizeLabel(bracketSize, liveBracket)} bracket</Badge>
+        <Text style={styles.rosterCapacity}>
+          {playerCapacityLabel(signupSummary.count, bracketSize, signupSummary.loading)} players • {openSlotLabel(signupSummary.count, bracketSize, signupSummary.loading)}
+        </Text>
+      </View>
+
+      {signupSummary.error ? <Text style={styles.rosterWarning}>{signupSummary.error}</Text> : null}
+
+      {signupSummary.loading ? (
+        <Text style={styles.rosterEmptyText}>Loading registered players...</Text>
+      ) : signups.length ? (
+        <View style={styles.rosterList}>
+          {signups.map((signup, index) => (
+            <View key={signup.id || `${signup.playerName}-${index}`} style={styles.rosterRow}>
+              <View style={styles.rosterRank}>
+                <Text style={styles.rosterRankText}>{index + 1}</Text>
+              </View>
+              <View style={styles.rosterPlayerCopy}>
+                <Text style={styles.rosterPlayerName}>{signup.playerName || 'Unnamed player'}</Text>
+                <Text style={styles.rosterPlayerMeta}>
+                  {signup.playerHandle ? signup.playerHandle : 'No handle added'} • {signup.status || 'registered'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.rosterEmptyText}>
+          No players are registered yet. Send players to signup and this list will update here.
+        </Text>
+      )}
+    </Surface>
+  );
+}
+
 function LiveBracketBoard({ bracket }) {
   const [openingMatchId, setOpeningMatchId] = useState('');
   const [accessError, setAccessError] = useState('');
@@ -567,6 +664,82 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 10,
+  },
+  rosterCard: {
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  rosterHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  rosterCapacity: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    minWidth: 220,
+  },
+  rosterWarning: {
+    color: '#FFB4A8',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  rosterEmptyText: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  rosterList: {
+    gap: 10,
+  },
+  rosterRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 12,
+  },
+  rosterRank: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(97, 210, 145, 0.14)',
+    borderColor: 'rgba(97, 210, 145, 0.42)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 34,
+  },
+  rosterRankText: {
+    color: '#61D291',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  rosterPlayerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rosterPlayerName: {
+    color: '#F4EFE6',
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 23,
+  },
+  rosterPlayerMeta: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 2,
   },
   playerStatusCard: {
     borderColor: 'rgba(214, 162, 78, 0.26)',
