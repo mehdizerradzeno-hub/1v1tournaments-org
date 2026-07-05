@@ -67,6 +67,7 @@ Future edits:
 - Set `TOURNAMENT_HOST_ACCOUNT_EMAILS` to one or more host account emails, separated by commas or spaces.
 - You can also set `TOURNAMENT_HOST_ACCOUNT_IDS` when you want to allowlist immutable account IDs instead of emails.
 - Keep `TOURNAMENT_ADMIN_TOKEN` as a fallback admin token for emergencies and setup.
+- Use the host dashboard `Clear test data` control to wipe one tournament's roster and bracket during smoke tests while keeping player accounts intact.
 - The localhost allowlist server started with `npm run admin:server` and the browser-local passphrase remain fallback paths for draft editing.
 - Put private draft tournament placeholders under `siteData.admin.draftTournaments` until a real remote auth layer exists.
 - The server state file lives at `.data/admin-state.json`, which is ignored by git.

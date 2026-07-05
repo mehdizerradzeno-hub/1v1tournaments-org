@@ -137,6 +137,28 @@ export async function fetchTournamentRoster({ token, slug }) {
   return result;
 }
 
+export async function clearTournamentData({ token, slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${ROSTER_ENDPOINT}${query}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'clear-tournament',
+      tournamentSlug: slug,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament test data could not be cleared.');
+  }
+
+  return result;
+}
+
 export async function fetchTournamentBracket({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`);

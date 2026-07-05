@@ -20,6 +20,7 @@ import {
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import {
+  clearTournamentData,
   fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentRoster,
@@ -105,6 +106,8 @@ export default function AdminScreen() {
   const [bracketError, setBracketError] = useState('');
   const [hostMessage, setHostMessage] = useState('');
   const [hostError, setHostError] = useState('');
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [playerAccountError, setPlayerAccountError] = useState('');
@@ -567,6 +570,55 @@ export default function AdminScreen() {
     }
   }
 
+  function handleRequestClearTournamentData() {
+    if (!hasHostCredential) {
+      setHostFeedback('', 'Sign in with a host-approved account or enter the fallback token before clearing tournament data.');
+      return;
+    }
+
+    setClearConfirmOpen(true);
+    setHostFeedback('', '');
+  }
+
+  function handleCancelClearTournamentData() {
+    setClearConfirmOpen(false);
+    setHostFeedback('', '');
+  }
+
+  async function handleClearTournamentData() {
+    const token = rosterToken.trim();
+
+    if (clearLoading) {
+      return;
+    }
+
+    if (!hasHostCredential) {
+      setHostFeedback('', 'Sign in with a host-approved account or enter the fallback token before clearing tournament data.');
+      return;
+    }
+
+    setClearLoading(true);
+    setHostFeedback('', '');
+
+    try {
+      const result = await clearTournamentData({ token, slug: rosterSlug });
+      const emptyRoster = result.rosters?.[0] || { tournamentSlug: rosterSlug, signups: [] };
+      const deletedSignupCount = result.deletedSignupCount || 0;
+
+      setRosters([emptyRoster]);
+      setBracket(null);
+      setClearConfirmOpen(false);
+      setRosterLastRefreshedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      setRosterFeedback(`Roster cleared: ${deletedSignupCount} registered player${deletedSignupCount === 1 ? '' : 's'} removed.`, '');
+      setBracketFeedback('Bracket cleared for this tournament.', '');
+      setHostFeedback('Tournament test data cleared. Player accounts were kept.', '');
+    } catch (error) {
+      setHostFeedback('', error instanceof Error ? error.message : 'Could not clear tournament test data.');
+    } finally {
+      setClearLoading(false);
+    }
+  }
+
   async function handleReportWinner(match, player) {
     const token = rosterToken.trim();
 
@@ -793,7 +845,30 @@ export default function AdminScreen() {
             <ActionButton onPress={handleLoadBracket} variant="ghost">
               {bracketLoading ? 'Loading...' : 'Load bracket'}
             </ActionButton>
+            <ActionButton onPress={handleRequestClearTournamentData} variant="ghost">
+              Clear test data
+            </ActionButton>
           </View>
+
+          {clearConfirmOpen ? (
+            <View style={styles.dangerPanel}>
+              <View style={styles.metaRow}>
+                <Badge tone="rose">Confirm reset</Badge>
+                <Text style={styles.runStatusLabel}>Clear {tournament?.title || rosterSlug}</Text>
+              </View>
+              <Text style={styles.runStatusBody}>
+                This deletes registered players and the published bracket for this tournament only. Player accounts stay intact.
+              </Text>
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleClearTournamentData} variant="secondary">
+                  {clearLoading ? 'Clearing...' : 'Confirm clear tournament'}
+                </ActionButton>
+                <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
+                  Cancel
+                </ActionButton>
+              </View>
+            </View>
+          ) : null}
         </Surface>
       </Section>
     );
@@ -1767,6 +1842,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 8,
+  },
+  dangerPanel: {
+    backgroundColor: 'rgba(224, 106, 92, 0.08)',
+    borderColor: 'rgba(224, 106, 92, 0.30)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
   },
   bracketRounds: {
     marginTop: 16,

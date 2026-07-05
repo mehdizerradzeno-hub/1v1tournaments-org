@@ -123,6 +123,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(adminRosterSource, /@netlify\/blobs/);
   assert.match(adminRosterSource, /requireTournamentAdmin/);
   assert.match(adminRosterSource, /accountId/);
+  assert.match(adminRosterSource, /clear-tournament/);
+  assert.match(adminRosterSource, /deleteTournamentSignups/);
+  assert.match(adminRosterSource, /tournament-brackets/);
   assert.match(tournamentBracketSource, /tournament-brackets/);
   assert.match(tournamentBracketSource, /accountId/);
   assert.match(tournamentMatchAccessSource, /tournament-match-tickets/);
@@ -149,6 +152,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /fetchSignupSummary/);
   assert.match(hostingClientSource, /fetchTournamentPlayerStatus/);
   assert.match(hostingClientSource, /generateTournamentBracket/);
+  assert.match(hostingClientSource, /clearTournamentData/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
   assert.match(hostingClientSource, /issueTournamentMatchTicket/);
 });
@@ -179,6 +183,8 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /handleCopyMatchCallback/);
   assert.match(adminScreenSource, /Run command center/);
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
+  assert.match(adminScreenSource, /Clear test data/);
+  assert.match(adminScreenSource, /Confirm clear tournament/);
   assert.match(adminScreenSource, /Host approved/);
   assert.match(adminScreenSource, /hostApproved/);
   assert.match(hostingClientSource, /resetTournamentBracket/);
