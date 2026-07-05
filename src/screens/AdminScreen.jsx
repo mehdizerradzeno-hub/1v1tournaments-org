@@ -98,6 +98,7 @@ export default function AdminScreen() {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterMessage, setRosterMessage] = useState('');
   const [rosterError, setRosterError] = useState('');
+  const [rosterLastRefreshedAt, setRosterLastRefreshedAt] = useState('');
   const [bracket, setBracket] = useState(null);
   const [bracketLoading, setBracketLoading] = useState(false);
   const [bracketMessage, setBracketMessage] = useState('');
@@ -128,10 +129,13 @@ export default function AdminScreen() {
     [drafts, serverAllowlistText],
   );
   const selectedRoster = useMemo(
-    () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || rosters[0] || null,
+    () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || null,
     [rosters, rosterSlug],
   );
-  const hasHostCredential = Boolean(playerAccount?.hostApproved || rosterToken.trim());
+  const isHostApproved = Boolean(playerAccount?.hostApproved);
+  const hasPrivateAdminAccess = mode === 'unlocked';
+  const canShowHostConsole = isHostApproved || hasPrivateAdminAccess;
+  const hasHostCredential = Boolean(isHostApproved || rosterToken.trim());
 
   useEffect(() => {
     let active = true;
@@ -431,7 +435,7 @@ export default function AdminScreen() {
     const token = rosterToken.trim();
 
     if (!hasHostCredential) {
-      setRosterFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before loading signups.');
+      setRosterFeedback('', 'Sign in with a host-approved account or enter the fallback token before viewing the private roster.');
       return;
     }
 
@@ -448,13 +452,61 @@ export default function AdminScreen() {
 
       setRosters(nextRosters);
       setBracket(null);
-      setRosterFeedback(`Loaded ${signupCount} signup${signupCount === 1 ? '' : 's'}.`, '');
+      setRosterLastRefreshedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      setRosterFeedback(`Roster refreshed: ${signupCount} registered player${signupCount === 1 ? '' : 's'}.`, '');
     } catch (error) {
-      setRosterFeedback('', error instanceof Error ? error.message : 'Could not load tournament signups.');
+      setRosterFeedback('', error instanceof Error ? error.message : 'Could not refresh the private roster.');
     } finally {
       setRosterLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!isHostApproved) {
+      return undefined;
+    }
+
+    let active = true;
+
+    async function refreshHostRoster() {
+      setRosterLoading(true);
+      setRosterError('');
+      setRosterMessage('Refreshing roster...');
+
+      try {
+        const result = await fetchTournamentRoster({
+          token: '',
+          slug: rosterSlug,
+        });
+        const nextRosters = result.rosters || [];
+        const signupCount = nextRosters.reduce((total, roster) => total + (roster.signups?.length || 0), 0);
+
+        if (!active) {
+          return;
+        }
+
+        setRosters(nextRosters);
+        setBracket(null);
+        setRosterLastRefreshedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+        setRosterMessage(`Roster refreshed automatically: ${signupCount} registered player${signupCount === 1 ? '' : 's'}.`);
+      } catch (error) {
+        if (active) {
+          setRosterError(error instanceof Error ? error.message : 'Could not refresh the private roster.');
+          setRosterMessage('');
+        }
+      } finally {
+        if (active) {
+          setRosterLoading(false);
+        }
+      }
+    }
+
+    refreshHostRoster();
+
+    return () => {
+      active = false;
+    };
+  }, [isHostApproved, rosterSlug]);
 
   async function handleLoadBracket() {
     setBracketLoading(true);
@@ -485,7 +537,7 @@ export default function AdminScreen() {
     try {
       const result = await generateTournamentBracket({ token, slug: rosterSlug });
       setBracket(result.bracket || null);
-      setBracketFeedback('Generated and published the bracket from the live signup roster.', '');
+      setBracketFeedback('Generated and published the bracket from the registered player roster.', '');
     } catch (error) {
       setBracketFeedback('', error instanceof Error ? error.message : 'Could not generate the tournament bracket.');
     } finally {
@@ -661,12 +713,12 @@ export default function AdminScreen() {
     const readyMatches = matches.filter((match) => match.status === 'ready');
     const finalMatches = matches.filter((match) => match.status === 'final');
     const pendingMatches = matches.filter((match) => match.status !== 'final');
-    let nextAction = 'Sign in as an approved host or enter the fallback token, then load signups.';
+    let nextAction = 'Sign in as an approved host or enter the fallback token to view the roster.';
 
     if (hasHostCredential && !selectedRoster) {
-      nextAction = 'Load signups for the selected tournament.';
+      nextAction = rosterLoading ? 'Refreshing the registered player roster.' : 'Refresh the roster for the selected tournament.';
     } else if (signupCount > 0 && signupCount < 2) {
-      nextAction = 'Wait for at least two signups before generating a bracket.';
+      nextAction = 'Wait for at least two registered players before generating a bracket.';
     } else if (signupCount >= 2 && !bracket) {
       nextAction = 'Generate the bracket, then send players the tournament page.';
     } else if (readyMatches.length) {
@@ -695,13 +747,15 @@ export default function AdminScreen() {
               tone: hasHostCredential ? 'green' : 'accent',
               body: playerAccount?.hostApproved
                 ? `Signed in as host ${playerAccount.playerName}.`
-                : 'Paste the token before loading signups or generating brackets.',
+                : 'Paste the fallback token before viewing rosters or generating brackets.',
             })}
             {renderRunStatusItem({
-              label: 'Signups',
-              value: selectedRoster ? String(signupCount) : 'not loaded',
+              label: 'Roster',
+              value: selectedRoster ? String(signupCount) : rosterLoading ? 'refreshing' : 'not refreshed',
               tone: signupCount >= 2 ? 'green' : signupCount ? 'accent' : 'blue',
-              body: selectedRoster ? `${signupCount} player${signupCount === 1 ? '' : 's'} loaded for this event.` : 'Load signups before bracket generation.',
+              body: selectedRoster
+                ? `${signupCount} registered player${signupCount === 1 ? '' : 's'} for this event.`
+                : 'Refresh the roster before bracket generation.',
             })}
             {renderRunStatusItem({
               label: 'Bracket',
@@ -734,7 +788,7 @@ export default function AdminScreen() {
               Copy player instructions
             </ActionButton>
             <ActionButton onPress={handleLoadRoster} variant="secondary">
-              {rosterLoading ? 'Loading...' : 'Load signups'}
+              {rosterLoading ? 'Refreshing...' : 'Refresh roster'}
             </ActionButton>
             <ActionButton onPress={handleLoadBracket} variant="ghost">
               {bracketLoading ? 'Loading...' : 'Load bracket'}
@@ -863,15 +917,23 @@ export default function AdminScreen() {
 
   function renderLiveRosterSection() {
     const signupCount = selectedRoster?.signups?.length || 0;
+    const rosterEmptyTitle = hasHostCredential ? 'No registered players yet' : 'Host access needed';
+    const rosterEmptyBody = hasHostCredential
+      ? 'This tournament roster is refreshed and empty. New player signups will appear here after you refresh.'
+      : 'Sign in with a host-approved account or enter the fallback token to view names, emails, and account IDs.';
 
     return (
       <Section
-        description="Live account-linked signups can be reviewed here before you seed a bracket."
-        title="Live signup roster">
+        description="Private account-linked registrations appear here for the host before a bracket is seeded."
+        title="Registered players">
         <Surface style={styles.rosterPanel}>
           <View style={styles.metaRow}>
-            <Badge tone="green">Live roster</Badge>
-            <Text style={styles.metaText}>Use a host-approved account or the fallback admin token to load player registrations.</Text>
+            <Badge tone={hasHostCredential ? 'green' : 'accent'}>{hasHostCredential ? 'Host roster' : 'Private roster'}</Badge>
+            <Text style={styles.metaText}>
+              {isHostApproved
+                ? 'Your host-approved account can view this roster. It refreshes automatically when you open the page.'
+                : 'Use a host-approved account or the fallback token to view private player registrations.'}
+            </Text>
           </View>
 
           <View style={styles.hostAccountPanel}>
@@ -891,19 +953,26 @@ export default function AdminScreen() {
             {playerAccountError ? <Text style={styles.errorText}>{playerAccountError}</Text> : null}
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Fallback admin token</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setRosterToken}
-              placeholder={playerAccount?.hostApproved ? 'Optional fallback token' : 'Netlify TOURNAMENT_ADMIN_TOKEN'}
-              placeholderTextColor="#6B766F"
-              secureTextEntry
-              style={styles.input}
-              value={rosterToken}
-            />
-          </View>
+          {isHostApproved ? (
+            <View style={styles.hostReadyPanel}>
+              <Badge tone="green">Token not needed</Badge>
+              <Text style={styles.metaText}>Your approved account unlocks roster, bracket, and winner controls.</Text>
+            </View>
+          ) : (
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Fallback admin token</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setRosterToken}
+                placeholder="Netlify TOURNAMENT_ADMIN_TOKEN"
+                placeholderTextColor="#6B766F"
+                secureTextEntry
+                style={styles.input}
+                value={rosterToken}
+              />
+            </View>
+          )}
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Tournament</Text>
@@ -920,7 +989,7 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.buttonRow}>
-            <ActionButton onPress={handleLoadRoster}>{rosterLoading ? 'Loading...' : 'Load signups'}</ActionButton>
+            <ActionButton onPress={handleLoadRoster}>{rosterLoading ? 'Refreshing...' : 'Refresh roster'}</ActionButton>
             <ActionButton onPress={handleCopyRoster} variant="secondary">
               Copy roster JSON
             </ActionButton>
@@ -932,6 +1001,7 @@ export default function AdminScreen() {
           <View style={styles.rosterSummary}>
             <Badge tone={signupCount ? 'green' : 'blue'}>{signupCount} registered</Badge>
             <Text style={styles.metaText}>{selectedRoster?.tournamentSlug || rosterSlug}</Text>
+            {rosterLastRefreshedAt ? <Text style={styles.refreshText}>Refreshed {rosterLastRefreshedAt}</Text> : null}
           </View>
 
           {selectedRoster?.signups?.length ? (
@@ -957,8 +1027,8 @@ export default function AdminScreen() {
             </View>
           ) : (
             <EmptyState
-              body="Load a tournament roster after players submit the public check-in form."
-              title="No signups loaded yet"
+              body={rosterEmptyBody}
+              title={rosterLoading ? 'Refreshing roster' : rosterEmptyTitle}
             />
           )}
         </Surface>
@@ -976,7 +1046,7 @@ export default function AdminScreen() {
 
     return (
       <Section
-        description="Phase 2 creates a public bracket from signups and gives each match a Spades room link."
+        description="Create the public bracket from the registered player roster and give each match a Spades room link."
         title="Bracket manager">
         <Surface style={styles.bracketPanel}>
           <View style={styles.metaRow}>
@@ -990,7 +1060,7 @@ export default function AdminScreen() {
             <ActionButton onPress={handleLoadBracket} variant="secondary">
               {bracketLoading ? 'Loading...' : 'Load bracket'}
             </ActionButton>
-            <ActionButton onPress={handleGenerateBracket}>Generate from signups</ActionButton>
+            <ActionButton onPress={handleGenerateBracket}>Generate from roster</ActionButton>
             <ActionButton onPress={handleResetBracket} variant="secondary">
               Reset bracket
             </ActionButton>
@@ -1067,6 +1137,97 @@ export default function AdminScreen() {
     );
   }
 
+  function renderDraftToolsLockedSection() {
+    if (mode === 'unsupported') {
+      return (
+        <Section
+          description="Tournament hosting works from your approved account. The browser-local draft editor needs local storage."
+          title="Draft tools unavailable">
+          <Surface style={styles.panel}>
+            <View style={styles.metaRow}>
+              <Badge tone="blue">Host controls active</Badge>
+              <Text style={styles.metaText}>Roster, bracket, and winner controls do not need the draft editor.</Text>
+            </View>
+          </Surface>
+        </Section>
+      );
+    }
+
+    const needsSetup = mode === 'setup';
+
+    return (
+      <Section
+        description="Only use this fallback if you need the old local draft JSON tools. Tournament hosting is already unlocked by your approved account."
+        title={needsSetup ? 'Optional draft fallback' : 'Draft tools locked'}>
+        <Surface style={styles.panel}>
+          <View style={styles.metaRow}>
+            <Badge tone="blue">{needsSetup ? 'Optional' : 'Locked'}</Badge>
+            <Text style={styles.metaText}>Roster, bracket, and winner controls do not need this passphrase.</Text>
+          </View>
+          <Text style={styles.copy}>
+            Keep running the tournament from the host controls above. Set or enter this browser-local passphrase only if you need to edit draft tournament JSON on this device.
+          </Text>
+
+          {needsSetup ? (
+            <>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Private passphrase</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setCreatePassphrase}
+                  placeholder="Create a passphrase"
+                  placeholderTextColor="#6B766F"
+                  secureTextEntry
+                  style={styles.input}
+                  value={createPassphrase}
+                />
+              </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Confirm passphrase</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setCreateConfirm}
+                  placeholder="Confirm the passphrase"
+                  placeholderTextColor="#6B766F"
+                  secureTextEntry
+                  style={styles.input}
+                  value={createConfirm}
+                />
+              </View>
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleCreateAccess}>Create draft fallback</ActionButton>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Private passphrase</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setUnlockPassphrase}
+                  placeholder="Enter the private passphrase"
+                  placeholderTextColor="#6B766F"
+                  secureTextEntry
+                  style={styles.input}
+                  value={unlockPassphrase}
+                />
+              </View>
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleUnlock}>Unlock draft tools</ActionButton>
+              </View>
+            </>
+          )}
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {message ? <Text style={styles.successText}>{message}</Text> : null}
+        </Surface>
+      </Section>
+    );
+  }
+
   const actions = [
     { label: 'Home', href: '/' },
     { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
@@ -1075,7 +1236,7 @@ export default function AdminScreen() {
 
   const modeTone = mode === 'unlocked' ? 'green' : mode === 'locked' ? 'rose' : 'blue';
 
-  if (mode === 'unsupported') {
+  if (mode === 'unsupported' && !canShowHostConsole) {
     return (
       <HubScreen
         actions={actions}
@@ -1100,7 +1261,7 @@ export default function AdminScreen() {
     );
   }
 
-  if (mode === 'setup') {
+  if (mode === 'setup' && !canShowHostConsole) {
     return (
       <HubScreen
         actions={actions}
@@ -1161,7 +1322,7 @@ export default function AdminScreen() {
     );
   }
 
-  if (mode !== 'unlocked') {
+  if (mode !== 'unlocked' && !canShowHostConsole) {
     return (
       <HubScreen
         actions={actions}
@@ -1212,42 +1373,70 @@ export default function AdminScreen() {
   return (
     <HubScreen
       actions={actions}
-      eyebrow="Private admin"
-      footerNote="The server allowlist is the preferred path. Browser-local passphrase access stays as the fallback."
-      lead="Draft tournaments can be edited here without changing the public Spades and Euchre gameplay files."
-      stats={[
-        { label: 'Mode', value: getModeLabel(mode), tone: modeTone },
-        { label: 'Drafts', value: String(drafts.length), tone: 'accent' },
-        { label: 'Storage', value: 'Browser local', tone: 'green' },
-      ]}
-      subtitle="Draft tournament editor"
-      title="Private admin console">
+      eyebrow={hasPrivateAdminAccess ? 'Private admin' : 'Host controls'}
+      footerNote={
+        hasPrivateAdminAccess
+          ? 'The server allowlist is the preferred path. Browser-local passphrase access stays as the fallback.'
+          : 'Approved host accounts unlock tournament controls. Browser-local passphrases are only for draft fallback tools.'
+      }
+      lead={
+        hasPrivateAdminAccess
+          ? 'Draft tournaments can be edited here without changing the public Spades and Euchre gameplay files.'
+          : 'View registered players, generate brackets, and run matches from your host-approved account.'
+      }
+      stats={
+        hasPrivateAdminAccess
+          ? [
+              { label: 'Mode', value: getModeLabel(mode), tone: modeTone },
+              { label: 'Drafts', value: String(drafts.length), tone: 'accent' },
+              { label: 'Storage', value: 'Browser local', tone: 'green' },
+            ]
+          : [
+              { label: 'Host', value: isHostApproved ? 'Approved' : 'Token', tone: 'green' },
+              { label: 'Roster', value: selectedRoster ? String(selectedRoster.signups?.length || 0) : rosterLoading ? 'Refreshing' : 'Ready', tone: 'blue' },
+              { label: 'Bracket', value: bracket?.status || 'Not loaded', tone: bracket ? 'green' : 'accent' },
+            ]
+      }
+      subtitle={hasPrivateAdminAccess ? 'Draft tournament editor' : 'Tournament host dashboard'}
+      title={hasPrivateAdminAccess ? 'Private admin console' : 'Host control center'}>
       <Section
         action={
-          <View style={styles.headerActions}>
-            <ActionButton onPress={handleAddDraft} variant="secondary">
-              Add draft
-            </ActionButton>
-            <ActionButton onPress={handleCopyDrafts} variant="secondary">
-              Copy JSON
-            </ActionButton>
-            <ActionButton onPress={handleLock} variant="ghost">
-              Lock
-            </ActionButton>
-          </View>
+          hasPrivateAdminAccess ? (
+            <View style={styles.headerActions}>
+              <ActionButton onPress={handleAddDraft} variant="secondary">
+                Add draft
+              </ActionButton>
+              <ActionButton onPress={handleCopyDrafts} variant="secondary">
+                Copy JSON
+              </ActionButton>
+              <ActionButton onPress={handleLock} variant="ghost">
+                Lock
+              </ActionButton>
+            </View>
+          ) : null
         }
-        description="These drafts stay private on this device until you are ready to publish an event."
-        title="Access and tools">
+        description={
+          hasPrivateAdminAccess
+            ? 'These drafts stay private on this device until you are ready to publish an event.'
+            : 'Your approved account is the main key for tournament operations.'
+        }
+        title={hasPrivateAdminAccess ? 'Access and tools' : 'Host access'}>
         <Surface style={styles.panel}>
           <View style={styles.metaRow}>
-            <Badge tone="green">Unlocked</Badge>
-            <Text style={styles.metaText}>Session stays in browser storage until you lock it or clear site data.</Text>
+            <Badge tone="green">{hasPrivateAdminAccess ? 'Unlocked' : 'Host approved'}</Badge>
+            <Text style={styles.metaText}>
+              {hasPrivateAdminAccess
+                ? 'Session stays in browser storage until you lock it or clear site data.'
+                : `${playerAccount?.email || 'Your host account'} can view private rosters and run brackets.`}
+            </Text>
           </View>
           <Text style={styles.copy}>
-            Use this page to prepare draft tournaments, then keep the local server allowlist updated so the account-ID unlock stays private.
+            {hasPrivateAdminAccess
+              ? 'Use this page to prepare draft tournaments, then keep the local server allowlist updated so the account-ID unlock stays private.'
+              : 'Use the registered players section as your source of truth. Player names, emails, and account IDs stay hidden until host access is confirmed.'}
           </Text>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {message ? <Text style={styles.successText}>{message}</Text> : null}
+          {hasPrivateAdminAccess && error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {hasPrivateAdminAccess && message ? <Text style={styles.successText}>{message}</Text> : null}
         </Surface>
       </Section>
 
@@ -1257,134 +1446,140 @@ export default function AdminScreen() {
 
       {renderBracketManagerSection()}
 
-      {renderServerAllowlistSection()}
+      {hasPrivateAdminAccess ? (
+        <>
+          {renderServerAllowlistSection()}
 
-      <Section description="Pick a draft to preview, then copy the packet you want to hand off later." title="Draft library">
-        {drafts.map((draft) => {
-          const isSelected = draft.slug === selectedDraft?.slug;
+          <Section description="Pick a draft to preview, then copy the packet you want to hand off later." title="Draft library">
+            {drafts.map((draft) => {
+              const isSelected = draft.slug === selectedDraft?.slug;
 
-          return (
-            <View key={draft.slug} style={styles.cardBlock}>
-              <TournamentCard gameName={gameLookup.get(draft.gameSlug)?.name || draft.gameSlug} tournament={draft} />
-              <View style={styles.draftActions}>
-                <ActionButton onPress={() => handleSelectDraft(draft.slug)} variant={isSelected ? 'primary' : 'secondary'}>
-                  {isSelected ? 'Selected' : 'Preview'}
-                </ActionButton>
-                <ActionButton onPress={() => handleCopyDraftPacket(draft)} variant="ghost">
-                  Copy packet
-                </ActionButton>
-              </View>
-            </View>
-          );
-        })}
-        {!drafts.length ? (
-          <EmptyState
-            action={<ActionButton onPress={handleAddDraft}>Create first draft</ActionButton>}
-            body="Add a new draft event and it will appear here immediately."
-            title="No drafts yet"
-          />
-        ) : null}
-      </Section>
+              return (
+                <View key={draft.slug} style={styles.cardBlock}>
+                  <TournamentCard gameName={gameLookup.get(draft.gameSlug)?.name || draft.gameSlug} tournament={draft} />
+                  <View style={styles.draftActions}>
+                    <ActionButton onPress={() => handleSelectDraft(draft.slug)} variant={isSelected ? 'primary' : 'secondary'}>
+                      {isSelected ? 'Selected' : 'Preview'}
+                    </ActionButton>
+                    <ActionButton onPress={() => handleCopyDraftPacket(draft)} variant="ghost">
+                      Copy packet
+                    </ActionButton>
+                  </View>
+                </View>
+              );
+            })}
+            {!drafts.length ? (
+              <EmptyState
+                action={<ActionButton onPress={handleAddDraft}>Create first draft</ActionButton>}
+                body="Add a new draft event and it will appear here immediately."
+                title="No drafts yet"
+              />
+            ) : null}
+          </Section>
 
-      <Section
-        description="This is the current draft snapshot, plus the check-in and bracket preview tied to it."
-        title="Selected draft preview">
-        {selectedDraft ? (
-          <>
-            <Surface style={styles.panel}>
-              <View style={styles.metaRow}>
-                <Badge tone="green">{selectedDraftIndex >= 0 ? `Draft ${selectedDraftIndex + 1}` : 'Selected draft'}</Badge>
-                <Text style={styles.metaText}>
-                  This preview stays in the browser-local admin shell and does not reach a production database.
-                </Text>
-              </View>
-              <Text style={styles.copy}>Use this card to review the handoff packet before you sync the local allowlist server.</Text>
-              <View style={styles.cardBlock}>
-                <TournamentCard gameName={gameLookup.get(selectedDraft.gameSlug)?.name || selectedDraft.gameSlug} tournament={selectedDraft} />
-              </View>
-              <View style={styles.buttonRow}>
-                <ActionButton onPress={handleCopySelectedPacket}>Copy packet</ActionButton>
-                <ActionButton href={getGamePath(selectedDraft.gameSlug)} variant="secondary">
-                  Open game page
-                </ActionButton>
-              </View>
-            </Surface>
+          <Section
+            description="This is the current draft snapshot, plus the check-in and bracket preview tied to it."
+            title="Selected draft preview">
+            {selectedDraft ? (
+              <>
+                <Surface style={styles.panel}>
+                  <View style={styles.metaRow}>
+                    <Badge tone="green">{selectedDraftIndex >= 0 ? `Draft ${selectedDraftIndex + 1}` : 'Selected draft'}</Badge>
+                    <Text style={styles.metaText}>
+                      This preview stays in the browser-local admin shell and does not reach a production database.
+                    </Text>
+                  </View>
+                  <Text style={styles.copy}>Use this card to review the handoff packet before you sync the local allowlist server.</Text>
+                  <View style={styles.cardBlock}>
+                    <TournamentCard gameName={gameLookup.get(selectedDraft.gameSlug)?.name || selectedDraft.gameSlug} tournament={selectedDraft} />
+                  </View>
+                  <View style={styles.buttonRow}>
+                    <ActionButton onPress={handleCopySelectedPacket}>Copy packet</ActionButton>
+                    <ActionButton href={getGamePath(selectedDraft.gameSlug)} variant="secondary">
+                      Open game page
+                    </ActionButton>
+                  </View>
+                </Surface>
 
-            <View style={styles.cardBlock}>
-              <CheckInPanel checkIn={selectedDraft.checkIn} />
-            </View>
+                <View style={styles.cardBlock}>
+                  <CheckInPanel checkIn={selectedDraft.checkIn} />
+                </View>
 
-            <View style={styles.cardBlock}>
-              <BracketBoard bracket={selectedDraft.bracket} />
-            </View>
+                <View style={styles.cardBlock}>
+                  <BracketBoard bracket={selectedDraft.bracket} />
+                </View>
 
+                <Surface style={styles.editorCard}>
+                  <Text style={styles.copy}>Packet preview</Text>
+                  <TextInput
+                    editable={false}
+                    multiline
+                    scrollEnabled
+                    selectTextOnFocus
+                    style={styles.packetBox}
+                    value={selectedDraftPacketText}
+                  />
+                </Surface>
+              </>
+            ) : (
+              <EmptyState
+                action={<ActionButton onPress={handleAddDraft}>Create first draft</ActionButton>}
+                body="Select or create a draft to show the preview packet, check-in block, and bracket placeholder."
+                title="No selected draft"
+              />
+            )}
+          </Section>
+
+          <Section description="Edit the local JSON payload directly if you want a quick placeholder workflow." title="JSON editor">
             <Surface style={styles.editorCard}>
-              <Text style={styles.copy}>Packet preview</Text>
+              <Text style={styles.copy}>
+                The editor keeps draft event data portable while the host workflow grows.
+              </Text>
               <TextInput
-                editable={false}
+                autoCapitalize="none"
+                autoCorrect={false}
                 multiline
+                onChangeText={setEditorValue}
+                placeholder="Paste draft tournament JSON here"
+                placeholderTextColor="#6B766F"
                 scrollEnabled
                 selectTextOnFocus
-                style={styles.packetBox}
-                value={selectedDraftPacketText}
+                spellCheck={false}
+                style={styles.editor}
+                value={editorValue}
               />
+              <View style={styles.buttonRow}>
+                <ActionButton onPress={handleSaveDrafts}>Save drafts</ActionButton>
+                <ActionButton onPress={handleResetDrafts} variant="secondary">
+                  Reset seed
+                </ActionButton>
+              </View>
             </Surface>
-          </>
-        ) : (
-          <EmptyState
-            action={<ActionButton onPress={handleAddDraft}>Create first draft</ActionButton>}
-            body="Select or create a draft to show the preview packet, check-in block, and bracket placeholder."
-            title="No selected draft"
-          />
-        )}
-      </Section>
+          </Section>
 
-      <Section description="Edit the local JSON payload directly if you want a quick placeholder workflow." title="JSON editor">
-        <Surface style={styles.editorCard}>
-          <Text style={styles.copy}>
-            The editor keeps draft event data portable while the host workflow grows.
-          </Text>
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline
-            onChangeText={setEditorValue}
-            placeholder="Paste draft tournament JSON here"
-            placeholderTextColor="#6B766F"
-            scrollEnabled
-            selectTextOnFocus
-            spellCheck={false}
-            style={styles.editor}
-            value={editorValue}
-          />
-          <View style={styles.buttonRow}>
-            <ActionButton onPress={handleSaveDrafts}>Save drafts</ActionButton>
-            <ActionButton onPress={handleResetDrafts} variant="secondary">
-              Reset seed
-            </ActionButton>
-          </View>
-        </Surface>
-      </Section>
-
-      <Section description="The local admin server keeps the allowlist in a JSON file inside this hub folder." title="Server notes">
-        <Surface style={styles.panel}>
-          <Text style={styles.copy}>
-            Run `npm run admin:server` to serve the allowlist JSON from `.data/admin-state.json`. Keep the account-ID unlock as the preferred path and use the browser passphrase only as a fallback.
-          </Text>
-          <View style={styles.metaRow}>
-            <Badge tone="blue">{secretExists ? 'Fallback ready' : 'No fallback yet'}</Badge>
-            <Text style={styles.metaText}>Account IDs live on the local server instead of in the browser secret store.</Text>
-          </View>
-          <View style={styles.buttonRow}>
-            <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
-              Open featured event
-            </ActionButton>
-            <ActionButton href={getGamePath(siteData.site.primaryGameSlug)} variant="ghost">
-              Open /spades
-            </ActionButton>
-          </View>
-        </Surface>
-      </Section>
+          <Section description="The local admin server keeps the allowlist in a JSON file inside this hub folder." title="Server notes">
+            <Surface style={styles.panel}>
+              <Text style={styles.copy}>
+                Run `npm run admin:server` to serve the allowlist JSON from `.data/admin-state.json`. Keep the account-ID unlock as the preferred path and use the browser passphrase only as a fallback.
+              </Text>
+              <View style={styles.metaRow}>
+                <Badge tone="blue">{secretExists ? 'Fallback ready' : 'No fallback yet'}</Badge>
+                <Text style={styles.metaText}>Account IDs live on the local server instead of in the browser secret store.</Text>
+              </View>
+              <View style={styles.buttonRow}>
+                <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
+                  Open featured event
+                </ActionButton>
+                <ActionButton href={getGamePath(siteData.site.primaryGameSlug)} variant="ghost">
+                  Open /spades
+                </ActionButton>
+              </View>
+            </Surface>
+          </Section>
+        </>
+      ) : (
+        renderDraftToolsLockedSection()
+      )}
     </HubScreen>
   );
 }
@@ -1519,6 +1714,18 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 8,
   },
+  hostReadyPanel: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.18)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 14,
+    padding: 12,
+  },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
   },
@@ -1601,6 +1808,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginTop: 18,
+  },
+  refreshText: {
+    color: '#6CC7FF',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
   },
   signupCopy: {
     flex: 1,
