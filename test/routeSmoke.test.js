@@ -122,6 +122,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(signupFunctionSource, /accountId/);
   assert.match(signupFunctionSource, /loadTournamentSettings/);
   assert.match(signupFunctionSource, /registrationStatus/);
+  assert.match(signupFunctionSource, /existingByLegacyEmail/);
+  assert.match(signupFunctionSource, /linkedSignup/);
   assert.match(playerAccountSource, /createPasswordRecord/);
   assert.match(playerAccountSource, /sessionCookie/);
   assert.match(playerAccountSource, /confirmPassword/);
@@ -143,9 +145,14 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentMatchAccessSource, /getAccountFromEvent/);
   assert.match(tournamentMatchAccessSource, /issue-ticket/);
   assert.match(tournamentMatchAccessSource, /verify-ticket/);
+  assert.match(tournamentMatchAccessSource, /findSignupForAccount/);
+  assert.match(tournamentMatchAccessSource, /ticketMatchesPlayer/);
+  assert.match(tournamentMatchAccessSource, /signupId/);
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
+  assert.match(tournamentPlayerStatusSource, /signupMatchesAccount/);
+  assert.match(tournamentPlayerStatusSource, /contactEmail/);
   assert.match(tournamentSettingsSource, /requireTournamentAdmin/);
   assert.match(tournamentSettingsSource, /saveTournamentSettings/);
   assert.match(tournamentSettingsSource, /action === 'reset'/);

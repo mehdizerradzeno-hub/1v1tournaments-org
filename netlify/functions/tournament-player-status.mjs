@@ -1,6 +1,7 @@
 import { connectLambda } from '@netlify/blobs';
 
 import {
+  cleanEmail,
   cleanText,
   getAccountFromEvent,
   getStoreWithFallback,
@@ -77,6 +78,25 @@ async function loadTournamentSignups(tournamentSlug) {
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
   return store.get(`${tournamentSlug}.json`, { type: 'json' });
+}
+
+function signupMatchesAccount(signup, account) {
+  if (!signup || !account) return false;
+
+  const accountId = cleanText(account.id);
+  const accountEmail = cleanEmail(account.email);
+
+  if (accountId && cleanText(signup.accountId) === accountId) {
+    return true;
+  }
+
+  return Boolean(
+    accountEmail
+      && (
+        cleanEmail(signup.accountEmail) === accountEmail
+        || cleanEmail(signup.contactEmail) === accountEmail
+      ),
+  );
 }
 
 function findPlayerMatchStatus(bracket, signup) {
@@ -211,7 +231,7 @@ export async function handler(event) {
       loadTournamentSignups(tournamentSlug),
       loadBracket(tournamentSlug),
     ]);
-    const signup = signups.find((item) => item.accountId === account.id) || null;
+    const signup = signups.find((item) => signupMatchesAccount(item, account)) || null;
     const matchStatus = findPlayerMatchStatus(bracket, signup);
     const nextStep = signup ? matchStatus.nextStep : 'sign-up';
 

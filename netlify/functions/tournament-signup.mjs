@@ -186,10 +186,42 @@ export async function handler(event) {
 
     const key = signupKey(tournamentSlug, account.id);
     const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
-    const existing = await store.get(key, { type: 'json' }) || await store.get(legacyEmailKey, { type: 'json' });
+    const existingByAccount = await store.get(key, { type: 'json' });
+    const existingByLegacyEmail = existingByAccount ? null : await store.get(legacyEmailKey, { type: 'json' });
+    const existing = existingByAccount || existingByLegacyEmail;
 
     if (existing) {
-      return json(409, { error: 'That player account is already signed up for this tournament.' });
+      const now = new Date().toISOString();
+      const linkedSignup = {
+        ...existing,
+        tournamentSlug,
+        accountId: account.id,
+        accountEmail: account.email,
+        playerName: existing.playerName || playerName,
+        contactEmail,
+        playerHandle: existing.playerHandle || playerHandle,
+        status: existing.status || 'registered',
+        createdAt: existing.createdAt || now,
+        updatedAt: now,
+      };
+
+      await store.setJSON(key, linkedSignup, {
+        metadata: {
+          tournamentSlug,
+          status: linkedSignup.status,
+          createdAt: linkedSignup.createdAt,
+        },
+      });
+
+      if (existingByLegacyEmail && legacyEmailKey !== key) {
+        await store.delete(legacyEmailKey).catch(() => {});
+      }
+
+      return json(200, {
+        ok: true,
+        signup: publicSignup(linkedSignup),
+        summary: await publicSignupSummary(store, tournamentSlug),
+      });
     }
 
     const signup = {

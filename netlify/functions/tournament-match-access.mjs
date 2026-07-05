@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { connectLambda } from '@netlify/blobs';
 
 import {
+  cleanEmail,
   cleanText,
   getAccountFromEvent,
   getStoreWithFallback,
@@ -65,9 +66,72 @@ function findMatch(bracket, matchId) {
   return null;
 }
 
-function findPlayerSeat(match, accountId) {
-  const seatIndex = match.players.findIndex((player) => player?.accountId === accountId);
-  return seatIndex === 0 || seatIndex === 1 ? seatIndex : -1;
+function signupMatchesAccount(signup, account) {
+  if (!signup || !account) return false;
+
+  const accountId = cleanText(account.id);
+  const accountEmail = cleanEmail(account.email);
+
+  if (accountId && cleanText(signup.accountId) === accountId) {
+    return true;
+  }
+
+  return Boolean(
+    accountEmail
+      && (
+        cleanEmail(signup.accountEmail) === accountEmail
+        || cleanEmail(signup.contactEmail) === accountEmail
+      ),
+  );
+}
+
+function findPlayerSeat(match, account, signup = null) {
+  const accountId = cleanText(account?.id);
+  const signupId = cleanText(signup?.id);
+  const accountSeatIndex = match.players.findIndex((player) => {
+    return player?.accountId && cleanText(player.accountId) === accountId;
+  });
+
+  if (accountSeatIndex === 0 || accountSeatIndex === 1) {
+    return accountSeatIndex;
+  }
+
+  const signupSeatIndex = match.players.findIndex((player) => {
+    return signupId && cleanText(player?.id) === signupId;
+  });
+
+  if (signupSeatIndex === 0 || signupSeatIndex === 1) {
+    return signupSeatIndex;
+  }
+
+  return -1;
+}
+
+function ticketMatchesPlayer(player, record) {
+  if (!player || cleanText(player.id) !== cleanText(record.playerId)) {
+    return false;
+  }
+
+  return (
+    cleanText(player.accountId) === cleanText(record.accountId)
+    || (
+      cleanText(record.signupId)
+      && cleanText(player.id) === cleanText(record.signupId)
+    )
+  );
+}
+
+async function loadTournamentSignups(tournamentSlug) {
+  const store = getStoreWithFallback('tournament-signups');
+  const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
+  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
+
+  return signups.filter(Boolean);
+}
+
+async function findSignupForAccount(tournamentSlug, account) {
+  const signups = await loadTournamentSignups(tournamentSlug);
+  return signups.find((signup) => signupMatchesAccount(signup, account)) || null;
 }
 
 async function loadBracket(tournamentSlug) {
@@ -161,7 +225,13 @@ async function issueTicket(event, payload) {
     return json(409, { error: 'This match is not ready yet.' });
   }
 
-  const seatIndex = findPlayerSeat(match, account.id);
+  let signup = null;
+  let seatIndex = findPlayerSeat(match, account);
+
+  if (seatIndex === -1) {
+    signup = await findSignupForAccount(tournamentSlug, account);
+    seatIndex = findPlayerSeat(match, account, signup);
+  }
 
   if (seatIndex === -1) {
     return json(403, { error: 'This account is not assigned to that match.' });
@@ -174,6 +244,7 @@ async function issueTicket(event, payload) {
     tournamentSlug,
     accountId: account.id,
     accountEmail: account.email,
+    signupId: signup?.id || '',
     playerId: match.players[seatIndex].id,
     seatIndex,
     issuedAt: new Date(now).toISOString(),
@@ -224,7 +295,7 @@ async function verifyTicket(payload) {
   const seatIndex = Number(record.seatIndex);
   const player = seatIndex === 0 || seatIndex === 1 ? match.players[seatIndex] : null;
 
-  if (!player || player.accountId !== record.accountId || player.id !== record.playerId) {
+  if (!ticketMatchesPlayer(player, record)) {
     return json(403, { error: 'This match ticket no longer matches the bracket assignment.' });
   }
 
