@@ -1449,8 +1449,8 @@ export default function AdminScreen() {
                           {match.winnerName ? <Text style={styles.signupNotes}>Winner: {match.winnerName}</Text> : null}
                           <Text style={styles.callbackText}>{match.id}</Text>
                           <View style={styles.buttonRow}>
-                            <ActionButton external href={match.roomUrl} variant="secondary">
-                              Open match room
+                            <ActionButton href={`${getTournamentPath(rosterSlug)}#my-match`} variant="secondary">
+                              Player match page
                             </ActionButton>
                             <ActionButton onPress={() => handleCopyMatchCallback(match)} variant="secondary">
                               Copy callback

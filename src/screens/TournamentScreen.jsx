@@ -175,7 +175,6 @@ export default function TournamentScreen({ slug }) {
     { label: 'My match', href: matchStatusPath, variant: 'secondary' },
     streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
-    isPrimaryGame && gamePath ? { label: 'Open Spades', href: gamePath, variant: 'secondary' } : null,
   ].filter(Boolean);
 
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
@@ -248,14 +247,6 @@ export default function TournamentScreen({ slug }) {
             tone="green"
           />
           <QuickActionCard
-            actionLabel="Launch gameplay"
-            body="Players use Spades when their match link is ready."
-            href={gamePath || '/spades'}
-            meta="Gameplay"
-            title="Open Spades"
-            tone="blue"
-          />
-          <QuickActionCard
             actionLabel="Check status"
             body="Jump to your account-linked status card and current match once the bracket is live."
             href={matchStatusPath}
@@ -277,19 +268,19 @@ export default function TournamentScreen({ slug }) {
 
       {isPrimaryGame && gamePath ? (
         <Section
-          description="Tournament links open Spades rooms while this page owns the roster, bracket, and winner state."
-          title="Spades launch lane">
+          description="Use the account-linked match card once the bracket is live."
+          title="Match access">
           <Surface style={styles.launchCard}>
             <View style={styles.launchTopRow}>
-              <Badge tone="accent">Launch path</Badge>
-              <Text style={styles.launchPath}>{gamePath}</Text>
+              <Badge tone="accent">Ticket path</Badge>
+              <Text style={styles.launchPath}>My match</Text>
             </View>
-            <Text style={styles.launchTitle}>The featured event for the first live game</Text>
+            <Text style={styles.launchTitle}>Open gameplay from your tournament seat</Text>
             <Text style={styles.launchCopy}>
-              Use the hub for tournament state and use Spades for the actual table. That keeps brackets, match IDs, and results in one place.
+              The hub checks your player account, creates the match ticket, and then sends you to the Spades table.
             </Text>
             <View style={styles.launchActions}>
-              <ActionButton href={gamePath}>Open /spades</ActionButton>
+              <ActionButton href={matchStatusPath}>Go to my match</ActionButton>
               <ActionButton href="/live" variant="secondary">
                 Watch live
               </ActionButton>

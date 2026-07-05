@@ -169,6 +169,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /title="My match"/);
   assert.match(tournamentScreenSource, /mergeTournamentSettings/);
+  assert.match(tournamentScreenSource, /Ticket path/);
+  assert.doesNotMatch(tournamentScreenSource, /Open \/spades/);
+  assert.doesNotMatch(tournamentScreenSource, /Launch gameplay/);
   assert.doesNotMatch(tournamentScreenSource, /Host admin/);
   assert.match(checkInScreenSource, /Confirm password/);
   assert.match(checkInScreenSource, /Password requirements/);
@@ -218,6 +221,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Clear test data/);
   assert.match(adminScreenSource, /Confirm clear tournament/);
   assert.match(adminScreenSource, /Schedule and registration/);
+  assert.match(adminScreenSource, /Player match page/);
   assert.match(adminScreenSource, /handleSaveScheduleSettings/);
   assert.match(adminScreenSource, /resetTournamentSettings/);
   assert.match(adminScreenSource, /Host approved/);
