@@ -19,6 +19,7 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
 import {
+  buildResultFromTournamentBracket,
   getGameBySlug,
   getGamePath,
   getCheckInPath,
@@ -221,6 +222,7 @@ export default function TournamentScreen({ slug }) {
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const matchStatusPath = `${tournamentPath}#my-match`;
   const result = getResultByTournamentSlug(visibleTournament.slug)
+    || buildResultFromTournamentBracket(visibleTournament, liveBracket)
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
   const playerHasReadyMatch = Boolean(playerStatus.data?.currentMatch);
   const isBracketLive = registrationMeta.reason === 'bracket-live' || Boolean(liveBracket);

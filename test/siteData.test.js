@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildResultFromTournamentBracket,
   getAdminDraftTournamentBySlug,
   getAdminDraftTournaments,
   getCheckInPath,
@@ -12,6 +13,7 @@ import {
   getStreams,
   getTournamentBySlug,
   getTournamentsForGame,
+  mergeResults,
   getUpcomingTournaments,
   siteData,
 } from '../src/lib/siteData.js';
@@ -75,6 +77,54 @@ test('public tournaments expose the signup and bracket flow', () => {
   assert.equal(tournament?.checkIn?.window, 'Opens 30 minutes before the start time.');
   assert.match(tournament?.checkIn?.note || '', /match link/i);
   assert.ok((tournament?.bracket?.rounds || []).length > 0);
+});
+
+test('completed live brackets become public result cards', () => {
+  const tournament = getTournamentBySlug('spades-summer-series');
+  const bracket = {
+    tournamentSlug: 'spades-summer-series',
+    status: 'complete',
+    participantCount: 2,
+    updatedAt: '2026-07-06T13:43:10.201Z',
+    winner: {
+      id: 'player-2',
+      name: 'Mehdi Zerrad',
+    },
+    participants: [
+      { id: 'player-1', seed: 1, name: 'OgSoloSpader', handle: '' },
+      { id: 'player-2', seed: 2, name: 'Mehdi Zerrad', handle: '' },
+    ],
+    rounds: [
+      {
+        index: 1,
+        title: 'Final',
+        matches: [
+          {
+            id: 'spades-summer-series-r1-m1',
+            label: 'Match 1',
+            status: 'final',
+            players: [
+              { id: 'player-1', seed: 1, name: 'OgSoloSpader', handle: '' },
+              { id: 'player-2', seed: 2, name: 'Mehdi Zerrad', handle: '' },
+            ],
+            winnerId: 'player-2',
+            winnerName: 'Mehdi Zerrad',
+            nextMatchId: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = buildResultFromTournamentBracket(tournament, bracket);
+  const mergedResults = mergeResults([], result);
+
+  assert.equal(result?.winner, 'Mehdi Zerrad');
+  assert.equal(result?.status, 'complete');
+  assert.equal(result?.score, 'Champion');
+  assert.deepEqual(result?.placements.map((placement) => placement.name), ['Mehdi Zerrad', 'OgSoloSpader']);
+  assert.match(result?.notes.join(' ') || '', /Posted automatically/);
+  assert.equal(mergedResults[0]?.tournamentSlug, 'spades-summer-series');
 });
 
 test('admin drafts stay separated from public tournament pages', () => {

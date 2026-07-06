@@ -277,6 +277,102 @@ const byDateAsc = (left, right) => new Date(left.date).getTime() - new Date(righ
 const byDateDesc = (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime();
 const getDraftTournaments = () => siteData.admin?.draftTournaments || [];
 
+function playerDisplayName(player) {
+  if (!player) return '';
+  return player.handle ? `${player.name} (${player.handle})` : player.name || '';
+}
+
+function finalMatchFromBracket(bracket) {
+  const rounds = bracket?.rounds || [];
+  const matches = rounds.flatMap((round) => round.matches || []);
+
+  return matches.find((match) => !match.nextMatchId && (match.winnerId || match.winnerName))
+    || matches.find((match) => !match.nextMatchId)
+    || matches.at(-1)
+    || null;
+}
+
+function resultPlacementsFromBracket(bracket, finalMatch, winnerName) {
+  const placements = [];
+  const addPlacement = (name) => {
+    if (!name || placements.some((placement) => placement.name === name)) {
+      return;
+    }
+
+    placements.push({ place: placements.length + 1, name });
+  };
+
+  addPlacement(winnerName);
+
+  (finalMatch?.players || [])
+    .map(playerDisplayName)
+    .filter((name) => name && name !== winnerName)
+    .forEach(addPlacement);
+
+  (bracket?.participants || [])
+    .map(playerDisplayName)
+    .filter((name) => name && name !== winnerName)
+    .forEach(addPlacement);
+
+  return placements;
+}
+
+export function buildResultFromTournamentBracket(tournament, bracket) {
+  if (!tournament || !bracket) {
+    return null;
+  }
+
+  const finalMatch = finalMatchFromBracket(bracket);
+  const winnerName = bracket.winner?.name || finalMatch?.winnerName || '';
+  const isComplete = bracket.status === 'complete' || (finalMatch?.status === 'final' && winnerName);
+
+  if (!isComplete || !winnerName) {
+    return null;
+  }
+
+  const finalLabel = finalMatch?.label || 'Final';
+  const roundLabel = bracket.rounds?.find((round) => round.matches?.some((match) => match.id === finalMatch?.id))?.title || 'Final';
+
+  return {
+    slug: `${tournament.slug}-live-result`,
+    tournamentSlug: tournament.slug,
+    gameSlug: tournament.gameSlug,
+    badge: 'Tournament result',
+    status: 'complete',
+    title: `${tournament.title} Results`,
+    winner: winnerName,
+    summary: `${winnerName} won ${tournament.title}.`,
+    score: 'Champion',
+    date: bracket.updatedAt || tournament.date,
+    placements: resultPlacementsFromBracket(bracket, finalMatch, winnerName),
+    notes: [
+      `Final table: ${roundLabel} • ${finalLabel}.`,
+      'Posted automatically from the live tournament bracket.',
+    ],
+  };
+}
+
+function getDerivedTournamentResults() {
+  return siteData.tournaments
+    .map((tournament) => buildResultFromTournamentBracket(tournament, tournament.bracket))
+    .filter(Boolean);
+}
+
+export function mergeResults(baseResults, extraResults = []) {
+  const incoming = Array.isArray(extraResults) ? extraResults : [extraResults].filter(Boolean);
+  const resultsByKey = new Map();
+
+  [...incoming, ...baseResults].filter(Boolean).forEach((result) => {
+    const key = result.tournamentSlug || result.slug;
+
+    if (!resultsByKey.has(key)) {
+      resultsByKey.set(key, result);
+    }
+  });
+
+  return [...resultsByKey.values()].sort(byDateDesc);
+}
+
 export function getGames() {
   return [...siteData.games].sort((left, right) => left.sortOrder - right.sortOrder);
 }
@@ -316,7 +412,7 @@ export function getTournamentsForGame(gameSlug) {
 }
 
 export function getResults() {
-  return [...siteData.results].sort(byDateDesc);
+  return mergeResults(siteData.results, getDerivedTournamentResults());
 }
 
 export function getResultsForGame(gameSlug) {
@@ -324,7 +420,7 @@ export function getResultsForGame(gameSlug) {
 }
 
 export function getResultByTournamentSlug(tournamentSlug) {
-  return siteData.results.find((result) => result.tournamentSlug === tournamentSlug) || null;
+  return getResults().find((result) => result.tournamentSlug === tournamentSlug) || null;
 }
 
 export function getStreams() {

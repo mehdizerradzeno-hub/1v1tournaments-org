@@ -19,6 +19,7 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
 import {
+  buildResultFromTournamentBracket,
   getGameBySlug,
   getGamePath,
   getGames,
@@ -27,6 +28,7 @@ import {
   getCheckInPath,
   getTournamentPath,
   getUpcomingTournaments,
+  mergeResults,
   siteData,
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
@@ -101,7 +103,6 @@ export default function HomeScreen() {
   const games = getGames();
   const streams = getStreams();
   const upcoming = getUpcomingTournaments();
-  const results = getResults();
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
   const seededFeaturedTournament = getUpcomingTournaments().find(
@@ -119,6 +120,8 @@ export default function HomeScreen() {
   const featuredPrimaryAction = featuredBracket
     ? { label: 'Find my match', href: featuredMatchStatusPath }
     : { label: 'Create account and sign up', href: featuredSignupPath };
+  const featuredResult = buildResultFromTournamentBracket(featuredTournament, featuredBracket);
+  const results = mergeResults(getResults(), featuredResult);
 
   useEffect(() => {
     if (!seededFeaturedSlug) {

@@ -19,11 +19,18 @@ import {
   getStreamBySlug,
   getTournamentPath,
   getTournamentsForGame,
+  mergeResults,
   siteData,
 } from '../lib/siteData.js';
+import { useLiveTournamentResult } from '../lib/liveResults.js';
 
 export default function GameScreen({ gameSlug }) {
   const game = getGameBySlug(gameSlug);
+  const tournaments = game ? getTournamentsForGame(game.slug) : [];
+  const featuredTournament = game?.featuredTournamentSlug
+    ? tournaments.find((tournament) => tournament.slug === game.featuredTournamentSlug) || null
+    : tournaments[0] || null;
+  const liveResult = useLiveTournamentResult(featuredTournament?.slug || '');
 
   if (!game) {
     return (
@@ -42,11 +49,10 @@ export default function GameScreen({ gameSlug }) {
     );
   }
 
-  const tournaments = getTournamentsForGame(game.slug);
-  const results = getResultsForGame(game.slug);
-  const featuredTournament = game.featuredTournamentSlug
-    ? tournaments.find((tournament) => tournament.slug === game.featuredTournamentSlug) || null
-    : tournaments[0] || null;
+  const results = mergeResults(
+    getResultsForGame(game.slug),
+    liveResult?.gameSlug === game.slug ? liveResult : null,
+  );
   const featuredStreams = featuredTournament?.streamSlugs
     ? featuredTournament.streamSlugs
         .map((streamSlug) => getStreamBySlug(streamSlug))

@@ -9,11 +9,12 @@ import {
   Section,
   Surface,
 } from '../components/hub-ui.jsx';
-import { getGames, getGamePath, getResults, getResultsForGame, siteData } from '../lib/siteData.js';
+import { getGames, getGamePath, getResults, siteData } from '../lib/siteData.js';
+import { useMergedLiveResults } from '../lib/liveResults.js';
 
 export default function ResultsScreen() {
   const games = getGames();
-  const results = getResults();
+  const results = useMergedLiveResults(getResults(), siteData.site.primaryTournamentSlug);
   const latestResult = results[0] || null;
 
   return (
@@ -50,7 +51,7 @@ export default function ResultsScreen() {
 
       <Section description="Each game gets a slot even before its first result exists." title="Game archive">
         {games.map((game) => {
-          const gameResults = getResultsForGame(game.slug);
+          const gameResults = results.filter((result) => result.gameSlug === game.slug);
           const latestGameResult = gameResults[0] || null;
 
           return (
