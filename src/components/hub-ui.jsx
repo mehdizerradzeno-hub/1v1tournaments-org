@@ -518,6 +518,7 @@ export function HubScreen({
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const showMobileNav = Platform.OS === 'web' && width > 0 && width < 720;
+  const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
   const accountHref = playerAccount?.hostApproved ? '/admin' : PRIMARY_CHECK_IN_PATH;
   const accountLabel = playerAccountLoading
     ? 'Sign in'
@@ -566,8 +567,8 @@ export function HubScreen({
         <ScrollView
           contentContainerStyle={[styles.scrollContent, showMobileNav && styles.scrollContentWithMobileNav]}
           showsVerticalScrollIndicator={false}>
-          <View style={styles.page}>
-            <View style={styles.brandRow}>
+          <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
+            <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop]}>
               <Link href="/" asChild>
                 <Pressable accessibilityRole="link" style={styles.brandLink}>
                   <View style={styles.brandMark}>
@@ -587,7 +588,7 @@ export function HubScreen({
             </View>
 
             {!showMobileNav ? (
-              <View style={styles.navRow}>
+              <View style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
                 {NAV_ITEMS.map((item) => {
                   const active = isNavItemActive(pathname, item);
                   return (
@@ -601,17 +602,17 @@ export function HubScreen({
               </View>
             ) : null}
 
-            <Surface style={styles.heroSurface}>
+            <Surface style={[styles.heroSurface, showLaptopLayout && styles.heroSurfaceLaptop]}>
               <View style={styles.heroTopRow}>
                 {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
                 <Text style={styles.heroDomain}>Tournament hub</Text>
               </View>
-              <Text accessibilityRole="header" style={styles.heroTitle}>{title}</Text>
-              {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
-              {lead ? <Text style={styles.heroLead}>{lead}</Text> : null}
+              <Text accessibilityRole="header" style={[styles.heroTitle, showLaptopLayout && styles.heroTitleLaptop]}>{title}</Text>
+              {subtitle ? <Text style={[styles.heroSubtitle, showLaptopLayout && styles.heroSubtitleLaptop]}>{subtitle}</Text> : null}
+              {lead ? <Text style={[styles.heroLead, showLaptopLayout && styles.heroLeadLaptop]}>{lead}</Text> : null}
 
               {actions.length ? (
-                <View style={styles.actionRow}>
+                <View style={[styles.actionRow, showLaptopLayout && styles.actionRowLaptop]}>
                   {actions.map((action) => (
                     <ActionButton
                       key={`${action.label}-${action.href || action.variant}`}
@@ -626,7 +627,7 @@ export function HubScreen({
               ) : null}
 
               {stats.length ? (
-                <View style={styles.statsRow}>
+                <View style={[styles.statsRow, showLaptopLayout && styles.statsRowLaptop]}>
                   {stats.map((stat) => (
                     <StatPill key={stat.label} label={stat.label} value={stat.value} tone={stat.tone || 'neutral'} />
                   ))}
@@ -722,6 +723,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+  pageLaptop: {
+    maxWidth: 1280,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -729,6 +735,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 14,
+  },
+  brandRowLaptop: {
+    marginBottom: 12,
   },
   brandLink: {
     flexDirection: 'row',
@@ -787,6 +796,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 18,
+  },
+  navRowLaptop: {
+    marginBottom: 14,
   },
   navWrap: {
     marginRight: 10,
@@ -864,6 +876,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accentSoft,
     overflow: 'hidden',
   },
+  heroSurfaceLaptop: {
+    paddingHorizontal: 28,
+    paddingVertical: 20,
+    marginBottom: 20,
+  },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -889,6 +906,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     maxWidth: 720,
   },
+  heroTitleLaptop: {
+    maxWidth: 980,
+  },
   heroSubtitle: {
     color: theme.colors.accent,
     fontSize: 15,
@@ -897,6 +917,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textTransform: 'uppercase',
   },
+  heroSubtitleLaptop: {
+    marginTop: 10,
+  },
   heroLead: {
     color: theme.colors.text,
     fontSize: 18,
@@ -904,10 +927,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     maxWidth: 760,
   },
+  heroLeadLaptop: {
+    maxWidth: 1040,
+  },
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 20,
+  },
+  actionRowLaptop: {
+    marginTop: 18,
   },
   actionButtonWrap: {
     marginRight: 10,
@@ -960,6 +989,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 18,
+  },
+  statsRowLaptop: {
+    marginTop: 16,
   },
   statPill: {
     minWidth: 112,
