@@ -22,9 +22,9 @@ test('draft templates stay on the primary game with safe placeholder wording', (
 
 test('draft packets wrap the normalized draft with export metadata', () => {
   const packet = buildAdminDraftPacket({
-    slug: 'euchre-launch-night',
-    gameSlug: 'euchre',
-    title: 'Euchre Launch Night',
+    slug: 'spades-private-draft',
+    gameSlug: 'spades',
+    title: 'Spades Private Draft',
     entryLine: 'Free entry, no buy-in, no wagering.',
     checkIn: {
       title: 'Signup and check-in',
@@ -43,7 +43,7 @@ test('draft packets wrap the normalized draft with export metadata', () => {
           matches: [
             {
               label: 'Match 1',
-              teams: ['North Table', 'South Table'],
+              teams: ['Seed 1', 'Seed 2'],
               note: 'Winner advances.',
             },
           ],
@@ -54,8 +54,8 @@ test('draft packets wrap the normalized draft with export metadata', () => {
 
   assert.ok(packet);
   assert.equal(packet.source, '1v1 Tournaments private admin');
-  assert.equal(packet.draft.slug, 'euchre-launch-night');
-  assert.equal(packet.draft.gameSlug, 'euchre');
+  assert.equal(packet.draft.slug, 'spades-private-draft');
+  assert.equal(packet.draft.gameSlug, 'spades');
   assert.equal(packet.draft.checkIn.preview, '30 min early');
   assert.equal(packet.draft.bracket.rounds.length, 1);
   assert.match(packet.exportedAt, /^\d{4}-\d{2}-\d{2}T/);

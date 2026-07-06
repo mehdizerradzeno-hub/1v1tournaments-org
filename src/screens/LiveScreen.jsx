@@ -22,15 +22,15 @@ export default function LiveScreen() {
       ]}
       eyebrow="Watch"
       footerNote={siteData.site.adminNote}
-      lead="Use this page for the current live table, YouTube channel, and replay archive."
+      lead="Use this page to watch the current Spades spectator table first. YouTube stays here for the channel and replay archive."
       stats={[
         { label: 'Links', value: String(streams.length), tone: 'accent' },
-        { label: 'Channel', value: 'YouTube', tone: 'blue' },
-        { label: 'Replays', value: 'Yes', tone: 'green' },
+        { label: 'Live', value: 'Spectator', tone: 'green' },
+        { label: 'YouTube', value: 'Archive', tone: 'blue' },
       ]}
-      subtitle="Stream and YouTube links"
+      subtitle="Spectator table and YouTube links"
       title="Live coverage">
-      <Section description="Use this page for the primary live table, the channel page, and the replay archive." title="Current links">
+      <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
         {streams.map((stream) => (
           <View key={stream.slug} style={styles.block}>
             <StreamCard stream={stream} />
@@ -45,10 +45,10 @@ export default function LiveScreen() {
         ) : null}
       </Section>
 
-      <Section description="The official stream path for tournament day." title="Coverage note">
+      <Section description="The official watch path for tournament day." title="Coverage note">
         <Surface style={styles.noteCard}>
           <Text style={styles.noteCopy}>
-            Keep this page open during events when players or viewers need the broadcast link.
+            Keep this page open during events when viewers need the spectator table or replay links.
           </Text>
           <ActionButton href="/rules" variant="secondary">
             Keep the rules and live links aligned

@@ -21,13 +21,12 @@ test('server allowlist state keeps account IDs normalized and deduped', () => {
   assert.equal(isAccountIdAllowed('missing', state), false);
 });
 
-test('server state defaults to the seeded draft placeholders', () => {
+test('server state defaults to no private draft placeholders', () => {
   const state = createDefaultAdminServerState();
 
   assert.equal(state.version, 1);
   assert.ok(state.updatedAt);
-  assert.ok(state.draftTournaments.length > 0);
-  assert.equal(state.draftTournaments[0].entryLine, 'Free entry, no buy-in, no wagering.');
+  assert.deepEqual(state.draftTournaments, []);
 });
 
 test('server packets stay copyable as JSON for the local admin server', () => {

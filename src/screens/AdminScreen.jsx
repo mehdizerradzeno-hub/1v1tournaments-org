@@ -170,6 +170,7 @@ export default function AdminScreen() {
   const liveRegistrationMeta = getRegistrationStatusMeta(liveTournament?.registrationStatus);
   const isHostApproved = Boolean(playerAccount?.hostApproved);
   const hasPrivateAdminAccess = mode === 'unlocked';
+  const showDraftTools = hasPrivateAdminAccess && !isHostApproved;
   const canShowHostConsole = isHostApproved || hasPrivateAdminAccess;
   const hasHostCredential = Boolean(isHostApproved || rosterToken.trim());
 
@@ -1058,7 +1059,7 @@ export default function AdminScreen() {
     return (
       <Section
         description="Use this during a live tournament so the host flow is obvious at a glance."
-        title="Run command center">
+        title="Host checklist">
         <Surface style={styles.runPanel}>
           <View style={styles.metaRow}>
             <Badge tone="accent">Host flow</Badge>
@@ -1066,7 +1067,7 @@ export default function AdminScreen() {
           </View>
           <Text style={styles.runTitle}>{nextAction}</Text>
           <Text style={styles.copy}>
-            Need to remove Codex/test applicants? Use Clear signups + bracket for the selected tournament, then refresh the roster after real players apply.
+            Use this top to bottom: check access, refresh the roster, generate or refresh the bracket, then send players to their tournament page.
           </Text>
 
           <View style={styles.runStatusGrid}>
@@ -1112,7 +1113,7 @@ export default function AdminScreen() {
           {hostMessage ? <Text style={styles.successText}>{hostMessage}</Text> : null}
 
           <View style={styles.buttonRow}>
-            <ActionButton href={tournamentPath}>Open player page</ActionButton>
+            <ActionButton href={tournamentPath}>Open tournament page</ActionButton>
             <ActionButton onPress={handleCopyPlayerInstructions} variant="secondary">
               Copy player instructions
             </ActionButton>
@@ -1120,10 +1121,10 @@ export default function AdminScreen() {
               {rosterLoading ? 'Refreshing...' : 'Refresh roster'}
             </ActionButton>
             <ActionButton onPress={handleLoadBracket} variant="ghost">
-              {bracketLoading ? 'Loading...' : 'Load bracket'}
+              {bracketLoading ? 'Loading...' : 'Refresh bracket'}
             </ActionButton>
             <ActionButton onPress={handleRequestClearTournamentData} variant="secondary">
-              Clear signups + bracket
+              Clear selected tournament
             </ActionButton>
           </View>
 
@@ -1134,11 +1135,11 @@ export default function AdminScreen() {
                 <Text style={styles.runStatusLabel}>Reset applicants for {tournament?.title || rosterSlug}</Text>
               </View>
               <Text style={styles.runStatusBody}>
-                This deletes Codex/test applicants, real signups, and the published bracket for this tournament only. Player accounts and the tournament page stay intact.
+                This deletes all signups and the published bracket for this tournament only. Player accounts and the tournament page stay intact.
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton onPress={handleClearTournamentData} variant="secondary">
-                  {clearLoading ? 'Clearing...' : 'Delete signups + bracket'}
+                  {clearLoading ? 'Clearing...' : 'Delete tournament signups + bracket'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel
@@ -1410,11 +1411,11 @@ export default function AdminScreen() {
 
           <View style={styles.buttonRow}>
             <ActionButton onPress={handleLoadBracket} variant="secondary">
-              {bracketLoading ? 'Loading...' : 'Load bracket'}
+              {bracketLoading ? 'Loading...' : 'Refresh bracket'}
             </ActionButton>
-            <ActionButton onPress={handleGenerateBracket}>Generate from roster</ActionButton>
+            <ActionButton onPress={handleGenerateBracket}>Generate bracket from roster</ActionButton>
             <ActionButton onPress={handleResetBracket} variant="secondary">
-              Reset bracket
+              Reset bracket only
             </ActionButton>
             <ActionButton onPress={handleCopyBracket} variant="ghost">
               Copy bracket JSON
@@ -1484,97 +1485,6 @@ export default function AdminScreen() {
               title="No bracket loaded yet"
             />
           )}
-        </Surface>
-      </Section>
-    );
-  }
-
-  function renderDraftToolsLockedSection() {
-    if (mode === 'unsupported') {
-      return (
-        <Section
-          description="Tournament hosting works from your approved account. The browser-local draft editor needs local storage."
-          title="Draft tools unavailable">
-          <Surface style={styles.panel}>
-            <View style={styles.metaRow}>
-              <Badge tone="blue">Host controls active</Badge>
-              <Text style={styles.metaText}>Roster, bracket, and winner controls do not need the draft editor.</Text>
-            </View>
-          </Surface>
-        </Section>
-      );
-    }
-
-    const needsSetup = mode === 'setup';
-
-    return (
-      <Section
-        description="Only use this fallback if you need the old local draft JSON tools. Tournament hosting is already unlocked by your approved account."
-        title={needsSetup ? 'Optional draft fallback' : 'Draft tools locked'}>
-        <Surface style={styles.panel}>
-          <View style={styles.metaRow}>
-            <Badge tone="blue">{needsSetup ? 'Optional' : 'Locked'}</Badge>
-            <Text style={styles.metaText}>Roster, bracket, and winner controls do not need this passphrase.</Text>
-          </View>
-          <Text style={styles.copy}>
-            Keep running the tournament from the host controls above. Set or enter this browser-local passphrase only if you need to edit draft tournament JSON on this device.
-          </Text>
-
-          {needsSetup ? (
-            <>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Private passphrase</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setCreatePassphrase}
-                  placeholder="Create a passphrase"
-                  placeholderTextColor="#6B766F"
-                  secureTextEntry
-                  style={styles.input}
-                  value={createPassphrase}
-                />
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Confirm passphrase</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setCreateConfirm}
-                  placeholder="Confirm the passphrase"
-                  placeholderTextColor="#6B766F"
-                  secureTextEntry
-                  style={styles.input}
-                  value={createConfirm}
-                />
-              </View>
-              <View style={styles.buttonRow}>
-                <ActionButton onPress={handleCreateAccess}>Create draft fallback</ActionButton>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Private passphrase</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setUnlockPassphrase}
-                  placeholder="Enter the private passphrase"
-                  placeholderTextColor="#6B766F"
-                  secureTextEntry
-                  style={styles.input}
-                  value={unlockPassphrase}
-                />
-              </View>
-              <View style={styles.buttonRow}>
-                <ActionButton onPress={handleUnlock}>Unlock draft tools</ActionButton>
-              </View>
-            </>
-          )}
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {message ? <Text style={styles.successText}>{message}</Text> : null}
         </Surface>
       </Section>
     );
@@ -1725,19 +1635,19 @@ export default function AdminScreen() {
   return (
     <HubScreen
       actions={actions}
-      eyebrow={hasPrivateAdminAccess ? 'Private admin' : 'Host controls'}
+      eyebrow={showDraftTools ? 'Private admin' : 'Host controls'}
       footerNote={
-        hasPrivateAdminAccess
+        showDraftTools
           ? 'The server allowlist is the preferred path. Browser-local passphrase access stays as the fallback.'
           : 'Approved host accounts unlock tournament controls. Browser-local passphrases are only for draft fallback tools.'
       }
       lead={
-        hasPrivateAdminAccess
+        showDraftTools
           ? 'Draft tournaments can be edited here without changing the public Spades and Euchre gameplay files.'
           : 'View registered players, generate brackets, and run matches from your host-approved account.'
       }
       stats={
-        hasPrivateAdminAccess
+        showDraftTools
           ? [
               { label: 'Mode', value: getModeLabel(mode), tone: modeTone },
               { label: 'Drafts', value: String(drafts.length), tone: 'accent' },
@@ -1749,11 +1659,11 @@ export default function AdminScreen() {
               { label: 'Bracket', value: bracket?.status || 'Not loaded', tone: bracket ? 'green' : 'accent' },
             ]
       }
-      subtitle={hasPrivateAdminAccess ? 'Draft tournament editor' : 'Tournament host dashboard'}
-      title={hasPrivateAdminAccess ? 'Private admin console' : 'Host control center'}>
+      subtitle={showDraftTools ? 'Draft tournament editor' : 'Tournament host dashboard'}
+      title={showDraftTools ? 'Private admin console' : 'Host control center'}>
       <Section
         action={
-          hasPrivateAdminAccess ? (
+          showDraftTools ? (
             <View style={styles.headerActions}>
               <ActionButton onPress={handleAddDraft} variant="secondary">
                 Add draft
@@ -1768,27 +1678,27 @@ export default function AdminScreen() {
           ) : null
         }
         description={
-          hasPrivateAdminAccess
+          showDraftTools
             ? 'These drafts stay private on this device until you are ready to publish an event.'
             : 'Your approved account is the main key for tournament operations.'
         }
-        title={hasPrivateAdminAccess ? 'Access and tools' : 'Host access'}>
+        title={showDraftTools ? 'Access and tools' : 'Host access'}>
         <Surface style={styles.panel}>
           <View style={styles.metaRow}>
-            <Badge tone="green">{hasPrivateAdminAccess ? 'Unlocked' : 'Host approved'}</Badge>
+            <Badge tone="green">{showDraftTools ? 'Unlocked' : 'Host approved'}</Badge>
             <Text style={styles.metaText}>
-              {hasPrivateAdminAccess
+              {showDraftTools
                 ? 'Session stays in browser storage until you lock it or clear site data.'
                 : `${playerAccount?.email || 'Your host account'} can view private rosters and run brackets.`}
             </Text>
           </View>
           <Text style={styles.copy}>
-            {hasPrivateAdminAccess
+            {showDraftTools
               ? 'Use this page to prepare draft tournaments, then keep the local server allowlist updated so the account-ID unlock stays private.'
               : 'Use the registered players section as your source of truth. Player names, emails, and account IDs stay hidden until host access is confirmed.'}
           </Text>
-          {hasPrivateAdminAccess && error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {hasPrivateAdminAccess && message ? <Text style={styles.successText}>{message}</Text> : null}
+          {showDraftTools && error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {showDraftTools && message ? <Text style={styles.successText}>{message}</Text> : null}
         </Surface>
       </Section>
 
@@ -1800,7 +1710,7 @@ export default function AdminScreen() {
 
       {renderBracketManagerSection()}
 
-      {hasPrivateAdminAccess ? (
+      {showDraftTools ? (
         <>
           {renderServerAllowlistSection()}
 
@@ -1931,9 +1841,7 @@ export default function AdminScreen() {
             </Surface>
           </Section>
         </>
-      ) : (
-        renderDraftToolsLockedSection()
-      )}
+      ) : null}
     </HubScreen>
   );
 }

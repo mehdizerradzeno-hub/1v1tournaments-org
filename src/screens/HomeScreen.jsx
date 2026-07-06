@@ -64,6 +64,7 @@ export default function HomeScreen() {
   const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
   const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
+  const remainingUpcoming = upcoming.filter((tournament) => tournament.slug !== featuredTournament?.slug);
 
   useEffect(() => {
     if (!seededFeaturedSlug) {
@@ -197,9 +198,9 @@ export default function HomeScreen() {
       ) : null}
 
       <Section
-        description="All public events are listed here after the featured event."
-        title="Upcoming events">
-        {upcoming.filter((tournament) => tournament.slug !== featuredTournament?.slug).map((tournament) => (
+        description="Only real public events appear here. Drafts and future placeholders stay out of the player path."
+        title="Other public events">
+        {remainingUpcoming.map((tournament) => (
           <View key={tournament.slug} style={styles.block}>
             <TournamentCard
               gameName={gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug}
@@ -208,10 +209,10 @@ export default function HomeScreen() {
             />
           </View>
         ))}
-        {!upcoming.length ? (
+        {!remainingUpcoming.length ? (
           <EmptyState
-            body="New public events will appear here when they are scheduled."
-            title="No upcoming tournaments yet"
+            body="The Spades Summer Series is the only active public event right now."
+            title="No extra events posted"
           />
         ) : null}
       </Section>
@@ -221,7 +222,7 @@ export default function HomeScreen() {
         title="Games on deck">
         {games.map((game) => (
           <View key={game.slug} style={styles.block}>
-            <GameCard game={game} href={getGamePath(game.slug)} />
+            <GameCard game={game} href={game.status === 'active' ? getGamePath(game.slug) : null} />
           </View>
         ))}
       </Section>

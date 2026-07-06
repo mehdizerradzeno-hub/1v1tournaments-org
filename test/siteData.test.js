@@ -40,11 +40,7 @@ test('games are sorted for the lineup page and only include Spades and Euchre', 
 test('the upcoming tournament list only includes the public Spades events', () => {
   assert.deepEqual(
     getUpcomingTournaments().map((tournament) => tournament.slug),
-    [
-      'spades-summer-series',
-      'spades-friday-night-cup',
-      'spades-community-showcase',
-    ],
+    ['spades-summer-series'],
   );
 });
 
@@ -57,8 +53,10 @@ test('the Euchre lane stays public-but-coming-soon', () => {
 
 test('the YouTube channel link points at the new channel URL', () => {
   const channel = getStreams().find((stream) => stream.slug === 'youtube-channel');
+  const live = getStreams().find((stream) => stream.slug === 'main-live');
 
   assert.equal(channel?.href, 'https://m.youtube.com/channel/UCkqnaYQ2I47O8e20sIsHpfQ?ra=m');
+  assert.equal(live?.href, 'https://1v1spades.com/room/spades-summer-series-r1-m1?spectator=1');
 });
 
 test('general rules keep the no-buy-in wording visible in one place', () => {
@@ -85,6 +83,6 @@ test('admin drafts stay separated from public tournament pages', () => {
   assert.equal(siteData.admin.serverUrl, 'http://127.0.0.1:8787');
   assert.equal(siteData.admin.serverStateFile, '.data/admin-state.json');
   assert.equal(getTournamentBySlug('euchre-launch-night'), null);
-  assert.deepEqual(getAdminDraftTournaments().map((tournament) => tournament.slug), ['euchre-launch-night']);
-  assert.equal(getAdminDraftTournamentBySlug('euchre-launch-night')?.gameSlug, 'euchre');
+  assert.deepEqual(getAdminDraftTournaments().map((tournament) => tournament.slug), []);
+  assert.equal(getAdminDraftTournamentBySlug('euchre-launch-night'), null);
 });
