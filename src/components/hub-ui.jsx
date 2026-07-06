@@ -409,7 +409,15 @@ function signupCountLabel(count = 0, loading = false) {
   return `${count} signed up`;
 }
 
-export function CheckInPanel({ checkIn, checkInPath, signupCount = 0, signupError = '', signupLoading = false }) {
+export function CheckInPanel({
+  checkIn,
+  checkInPath,
+  registrationMeta = null,
+  signupCount = 0,
+  signupEnabled = true,
+  signupError = '',
+  signupLoading = false,
+}) {
   if (!checkIn) {
     return (
       <EmptyState
@@ -427,10 +435,17 @@ export function CheckInPanel({ checkIn, checkInPath, signupCount = 0, signupErro
       </View>
       <Text style={styles.checkInTitle}>{checkIn.title || 'Signup and check-in'}</Text>
       {checkIn.note ? <Text style={styles.checkInCopy}>{checkIn.note}</Text> : null}
+      {!signupEnabled && registrationMeta?.actionCopy ? (
+        <Text style={styles.checkInWarning}>{registrationMeta.actionCopy}</Text>
+      ) : null}
       {signupError ? <Text style={styles.checkInWarning}>{signupError}</Text> : null}
       <BulletList items={checkIn.steps} tone="blue" />
       <View style={styles.checkInActions}>
-        {checkInPath ? <ActionButton href={checkInPath}>Sign up now</ActionButton> : null}
+        {checkInPath ? (
+          <ActionButton disabled={!signupEnabled} href={checkInPath}>
+            {signupEnabled ? 'Sign up now' : registrationMeta?.label || 'Registration closed'}
+          </ActionButton>
+        ) : null}
         <ActionButton href="/rules" variant="secondary">
           Review rules
         </ActionButton>

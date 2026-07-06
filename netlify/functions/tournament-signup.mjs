@@ -4,6 +4,7 @@ import { connectLambda, getStore } from '@netlify/blobs';
 
 import { getAccountFromEvent } from './_account-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
+import { siteData } from '../../src/lib/siteData.js';
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -30,6 +31,10 @@ function cleanEmail(value) {
   return cleanText(value).toLowerCase();
 }
 
+function publicTournamentDate(tournamentSlug) {
+  return siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug)?.date || '';
+}
+
 function isEmailLike(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -47,6 +52,21 @@ function getSignupStore() {
   }
 
   return getStore('tournament-signups');
+}
+
+function getBracketStore() {
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+
+  if (siteID && token) {
+    return getStore({
+      name: 'tournament-brackets',
+      siteID,
+      token,
+    });
+  }
+
+  return getStore('tournament-brackets');
 }
 
 function emailKey(value) {
@@ -89,6 +109,11 @@ async function publicSignupSummary(store, tournamentSlug) {
   };
 }
 
+async function loadTournamentBracket(tournamentSlug) {
+  const store = getBracketStore();
+  return store.get(`${tournamentSlug}.json`, { type: 'json' });
+}
+
 function registrationClosedMessage(status) {
   if (status === 'closed') {
     return 'Registration is closed for this tournament.';
@@ -99,6 +124,18 @@ function registrationClosedMessage(status) {
   }
 
   return '';
+}
+
+function tournamentStartedMessage(dateValue) {
+  const startDate = new Date(cleanText(dateValue));
+
+  if (Number.isNaN(startDate.getTime())) {
+    return '';
+  }
+
+  return startDate.getTime() <= Date.now()
+    ? 'This event has already started. Registration is closed.'
+    : '';
 }
 
 export async function handler(event) {
@@ -177,13 +214,6 @@ export async function handler(event) {
   try {
     const store = getSignupStore();
     const settings = await loadTournamentSettings(tournamentSlug);
-    const registrationStatus = normalizeRegistrationStatus(settings?.registrationStatus);
-    const blockedMessage = registrationClosedMessage(registrationStatus);
-
-    if (blockedMessage) {
-      return json(403, { error: blockedMessage, settings });
-    }
-
     const key = signupKey(tournamentSlug, account.id);
     const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
     const existingByAccount = await store.get(key, { type: 'json' });
@@ -221,6 +251,28 @@ export async function handler(event) {
         ok: true,
         signup: publicSignup(linkedSignup),
         summary: await publicSignupSummary(store, tournamentSlug),
+      });
+    }
+
+    const registrationStatus = normalizeRegistrationStatus(settings?.registrationStatus);
+    const blockedMessage = registrationClosedMessage(registrationStatus);
+
+    if (blockedMessage) {
+      return json(403, { error: blockedMessage, settings });
+    }
+
+    const startedMessage = tournamentStartedMessage(settings?.date || publicTournamentDate(tournamentSlug) || payload.tournamentDate || payload.date);
+
+    if (startedMessage) {
+      return json(403, { error: startedMessage, settings });
+    }
+
+    const liveBracket = await loadTournamentBracket(tournamentSlug);
+
+    if (liveBracket) {
+      return json(403, {
+        error: 'The bracket is already live. Ask the host to reset or clear this tournament before new players join.',
+        settings,
       });
     }
 

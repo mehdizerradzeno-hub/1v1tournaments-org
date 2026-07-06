@@ -40,6 +40,47 @@ export function getRegistrationStatusMeta(value) {
   return REGISTRATION_STATUS_OPTIONS.find((option) => option.value === status) || REGISTRATION_STATUS_OPTIONS[0];
 }
 
+export function eventHasStarted(tournament, now = new Date()) {
+  const startDate = new Date(tournament?.date);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return false;
+  }
+
+  return startDate.getTime() <= now.getTime();
+}
+
+export function getEffectiveRegistrationStatus(tournament, options = {}) {
+  const { hasLiveBracket = false, now = new Date() } = options;
+
+  if (hasLiveBracket) {
+    return {
+      value: 'closed',
+      label: 'Bracket live',
+      tone: 'green',
+      reason: 'bracket-live',
+      actionCopy: 'The bracket is already live. New signups are closed unless the host resets the tournament.',
+    };
+  }
+
+  if (eventHasStarted(tournament, now)) {
+    return {
+      value: 'closed',
+      label: 'Event started',
+      tone: 'rose',
+      reason: 'event-started',
+      actionCopy: 'This event has already started. Registration is closed.',
+    };
+  }
+
+  const meta = getRegistrationStatusMeta(tournament?.registrationStatus);
+
+  return {
+    ...meta,
+    reason: meta.value,
+  };
+}
+
 export function normalizeCheckInLeadMinutes(value) {
   const parsed = Number.parseInt(value, 10);
 
@@ -226,4 +267,3 @@ export function getScheduleFieldDefaults(tournament) {
     checkInLeadMinutes: String(merged?.checkInLeadMinutes ?? DEFAULT_CHECK_IN_LEAD_MINUTES),
   };
 }
-

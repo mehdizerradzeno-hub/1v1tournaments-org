@@ -12,11 +12,12 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
-import { getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   createPlayerAccount,
   fetchPlayerAccount,
   fetchSignupSummary,
+  fetchTournamentBracket,
   loginPlayerAccount,
   logoutPlayerAccount,
   submitTournamentSignup,
@@ -90,6 +91,7 @@ export default function CheckInScreen({ slug }) {
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
   const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+  const [liveBracket, setLiveBracket] = useState(null);
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const liveTournament = useMemo(
     () => mergeTournamentSettings(tournament, tournamentSettings),
@@ -165,6 +167,27 @@ export default function CheckInScreen({ slug }) {
 
     loadSignupSummary();
 
+    async function loadBracket() {
+      if (!tournamentSlug) {
+        setLiveBracket(null);
+        return;
+      }
+
+      try {
+        const result = await fetchTournamentBracket({ slug: tournamentSlug });
+
+        if (active) {
+          setLiveBracket(result.bracket || null);
+        }
+      } catch {
+        if (active) {
+          setLiveBracket(null);
+        }
+      }
+    }
+
+    loadBracket();
+
     return () => {
       active = false;
     };
@@ -176,8 +199,10 @@ export default function CheckInScreen({ slug }) {
       return;
     }
 
-    if (liveTournament.registrationStatus !== 'open') {
-      setError(getRegistrationStatusMeta(liveTournament.registrationStatus).actionCopy);
+    const effectiveRegistrationMeta = getEffectiveRegistrationStatus(liveTournament, { hasLiveBracket: Boolean(liveBracket) });
+
+    if (effectiveRegistrationMeta.value !== 'open') {
+      setError(effectiveRegistrationMeta.actionCopy);
       return;
     }
 
@@ -193,6 +218,7 @@ export default function CheckInScreen({ slug }) {
     try {
       const result = await submitTournamentSignup({
         tournamentSlug: liveTournament.slug,
+        tournamentDate: liveTournament.date,
         notes,
       });
 
@@ -306,8 +332,8 @@ export default function CheckInScreen({ slug }) {
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
   const checkIn = visibleTournament.checkIn;
-  const registrationMeta = getRegistrationStatusMeta(visibleTournament.registrationStatus);
-  const registrationOpen = visibleTournament.registrationStatus === 'open';
+  const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
+  const registrationOpen = registrationMeta.value === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
 
   return (

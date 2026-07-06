@@ -29,7 +29,7 @@ import {
   getTournamentPath,
   siteData,
 } from '../lib/siteData.js';
-import { getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchTournamentPlayerStatus,
   fetchSignupSummary,
@@ -63,8 +63,8 @@ function bracketSizeFromBracket(bracket, fallbackCount = 0) {
   return nextPowerOfTwo(fallbackCount);
 }
 
-function bracketSizeLabel(size, liveBracket = null) {
-  return `${size}-player${liveBracket ? ' live' : ''}`;
+function bracketSizeLabel(size) {
+  return `${size}-player`;
 }
 
 function playerCapacityLabel(count, size, loading = false) {
@@ -79,6 +79,18 @@ function openSlotLabel(count, size, loading = false) {
   if (count < 2) return 'Need 2 players to generate a bracket';
   if (openSlots === 0) return 'Current bracket size is full';
   return `${openSlots} open bracket seat${openSlots === 1 ? '' : 's'}`;
+}
+
+function heroSignupAction(status, checkInPath, tournamentPath) {
+  if (status.reason === 'bracket-live') {
+    return { label: 'View bracket', href: `${tournamentPath}#live-bracket` };
+  }
+
+  if (status.value === 'open') {
+    return { label: 'Sign up now', href: checkInPath };
+  }
+
+  return { label: 'View roster', href: `${tournamentPath}#registered-players` };
 }
 
 export default function TournamentScreen({ slug }) {
@@ -198,7 +210,6 @@ export default function TournamentScreen({ slug }) {
   }
 
   const visibleTournament = liveTournament || tournament;
-  const registrationMeta = getRegistrationStatusMeta(visibleTournament.registrationStatus);
   const game = getGameBySlug(visibleTournament.gameSlug);
   const isPrimaryGame = game?.slug === siteData.site.primaryGameSlug;
   const gamePath = game ? getGamePath(game.slug) : null;
@@ -207,19 +218,22 @@ export default function TournamentScreen({ slug }) {
     .filter(Boolean);
   const checkInPath = getCheckInPath(visibleTournament.slug);
   const tournamentPath = getTournamentPath(visibleTournament.slug);
+  const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const matchStatusPath = `${tournamentPath}#my-match`;
   const result = getResultByTournamentSlug(visibleTournament.slug)
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
 
   const heroActions = [
-    { label: visibleTournament.registrationStatus === 'open' ? 'Sign up now' : registrationMeta.label, href: checkInPath },
+    heroSignupAction(registrationMeta, checkInPath, tournamentPath),
     { label: 'My match', href: matchStatusPath, variant: 'secondary' },
     streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
   ].filter(Boolean);
 
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
-  const activeBracketSize = bracketSizeFromBracket(liveBracket, signupSummary.count);
+  const liveBracketSize = bracketSizeFromBracket(liveBracket, liveBracket?.participantCount || 0);
+  const rosterBracketSize = nextPowerOfTwo(signupSummary.count);
+  const activeBracketSize = liveBracket ? liveBracketSize : rosterBracketSize;
 
   return (
     <HubScreen
@@ -230,8 +244,8 @@ export default function TournamentScreen({ slug }) {
       stats={[
         { label: 'Format', value: visibleTournament.format, tone: 'blue' },
         { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
-        { label: 'Players', value: playerCapacityLabel(signupSummary.count, activeBracketSize, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
-        { label: 'Bracket', value: bracketSizeLabel(activeBracketSize, liveBracket), tone: liveBracket ? 'green' : 'accent' },
+        { label: 'Registered', value: signupSummary.loading ? 'Loading' : String(signupSummary.count), tone: signupSummary.count ? 'green' : 'blue' },
+        { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(activeBracketSize), tone: liveBracket ? 'green' : 'accent' },
         { label: 'Location', value: visibleTournament.location, tone: 'accent' },
       ]}
       subtitle={
@@ -241,23 +255,27 @@ export default function TournamentScreen({ slug }) {
       }
       title={visibleTournament.title}>
       <Section
-        description="Players start here. The count updates from the live account-based signup store."
+        description={registrationMeta.actionCopy}
         title="Sign up">
         <CheckInPanel
           checkIn={visibleTournament.checkIn}
           checkInPath={checkInPath}
+          registrationMeta={registrationMeta}
           signupCount={signupSummary.count}
+          signupEnabled={registrationMeta.value === 'open'}
           signupError={signupSummary.error}
           signupLoading={signupSummary.loading}
         />
       </Section>
 
       <Section
-        description="This is the public roster players and hosts can scan before the bracket is generated."
-        title="Registered players">
+        description="Public-safe roster count, bracket size, and seeded-player status in one place."
+        nativeID="registered-players"
+        title="Registered players and bracket size">
         <RegisteredPlayersPanel
-          bracketSize={activeBracketSize}
           liveBracket={liveBracket}
+          liveBracketSize={liveBracketSize}
+          rosterBracketSize={rosterBracketSize}
           signupSummary={signupSummary}
         />
       </Section>
@@ -275,6 +293,7 @@ export default function TournamentScreen({ slug }) {
 
       <Section
         description="After the host generates a bracket, match cards show the assigned players and Spades room links."
+        nativeID="live-bracket"
         title={liveBracket ? 'Live bracket' : 'Bracket preview'}>
         {liveBracket ? (
           <LiveBracketBoard bracket={liveBracket} />
@@ -489,8 +508,16 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
   );
 }
 
-function RegisteredPlayersPanel({ bracketSize, liveBracket, signupSummary }) {
+function RegisteredPlayersPanel({ liveBracket, liveBracketSize, rosterBracketSize, signupSummary }) {
   const signups = signupSummary.signups || [];
+  const seededCount = liveBracket?.participantCount || 0;
+  const extraSignupCount = liveBracket ? Math.max(signupSummary.count - seededCount, 0) : 0;
+  const rosterCapacityCopy = liveBracket
+    ? `${seededCount}/${liveBracketSize} seeded in the live bracket`
+    : `${playerCapacityLabel(signupSummary.count, rosterBracketSize, signupSummary.loading)} players • ${openSlotLabel(signupSummary.count, rosterBracketSize, signupSummary.loading)}`;
+  const bracketCopy = liveBracket
+    ? `Live bracket: ${bracketSizeLabel(liveBracketSize)} with ${seededCount} seeded player${seededCount === 1 ? '' : 's'}.`
+    : `If generated now: ${bracketSizeLabel(rosterBracketSize)} bracket.`;
 
   return (
     <Surface style={styles.rosterCard}>
@@ -498,13 +525,19 @@ function RegisteredPlayersPanel({ bracketSize, liveBracket, signupSummary }) {
         <Badge tone={signupSummary.count ? 'green' : 'blue'}>
           {signupCountLabel(signupSummary.count, signupSummary.loading)}
         </Badge>
-        <Badge tone={liveBracket ? 'green' : 'accent'}>{bracketSizeLabel(bracketSize, liveBracket)} bracket</Badge>
-        <Text style={styles.rosterCapacity}>
-          {playerCapacityLabel(signupSummary.count, bracketSize, signupSummary.loading)} players • {openSlotLabel(signupSummary.count, bracketSize, signupSummary.loading)}
-        </Text>
+        <Badge tone={liveBracket ? 'green' : 'accent'}>
+          {liveBracket ? `${seededCount} seeded` : `${bracketSizeLabel(rosterBracketSize)} bracket`}
+        </Badge>
+        <Text style={styles.rosterCapacity}>{rosterCapacityCopy}</Text>
       </View>
 
       {signupSummary.error ? <Text style={styles.rosterWarning}>{signupSummary.error}</Text> : null}
+      <Text style={styles.rosterNote}>{bracketCopy}</Text>
+      {extraSignupCount ? (
+        <Text style={styles.rosterWarning}>
+          {extraSignupCount} registered player{extraSignupCount === 1 ? '' : 's'} are not in the live bracket. The host should reset/reseed or clear signups before running a new bracket.
+        </Text>
+      ) : null}
 
       {signupSummary.loading ? (
         <Text style={styles.rosterEmptyText}>Loading registered players...</Text>
@@ -694,6 +727,13 @@ const styles = StyleSheet.create({
     color: '#AAB4AE',
     fontSize: 15,
     lineHeight: 22,
+  },
+  rosterNote: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginBottom: 12,
   },
   rosterList: {
     gap: 10,

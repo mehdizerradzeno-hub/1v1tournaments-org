@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   dateToScheduleFields,
+  getEffectiveRegistrationStatus,
   getRegistrationStatusMeta,
   mergeTournamentSettings,
   zonedDateTimeToIso,
@@ -52,3 +53,21 @@ test('unknown registration states fall back to open', () => {
   assert.equal(getRegistrationStatusMeta('surprise').value, 'open');
 });
 
+test('effective registration closes after the event start time', () => {
+  const status = getEffectiveRegistrationStatus(tournament, {
+    now: new Date('2026-07-18T22:01:00.000Z'),
+  });
+
+  assert.equal(status.value, 'closed');
+  assert.equal(status.reason, 'event-started');
+});
+
+test('effective registration closes when a live bracket exists', () => {
+  const status = getEffectiveRegistrationStatus(tournament, {
+    hasLiveBracket: true,
+    now: new Date('2026-07-18T20:00:00.000Z'),
+  });
+
+  assert.equal(status.value, 'closed');
+  assert.equal(status.reason, 'bracket-live');
+});

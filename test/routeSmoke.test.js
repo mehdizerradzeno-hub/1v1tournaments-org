@@ -122,6 +122,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(signupFunctionSource, /accountId/);
   assert.match(signupFunctionSource, /loadTournamentSettings/);
   assert.match(signupFunctionSource, /registrationStatus/);
+  assert.match(signupFunctionSource, /loadTournamentBracket/);
+  assert.match(signupFunctionSource, /tournamentStartedMessage/);
+  assert.match(signupFunctionSource, /publicTournamentDate/);
   assert.match(signupFunctionSource, /existingByLegacyEmail/);
   assert.match(signupFunctionSource, /linkedSignup/);
   assert.match(playerAccountSource, /createPasswordRecord/);
@@ -167,8 +170,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(homeScreenSource, /mergeTournamentSettings/);
   assert.doesNotMatch(homeScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
+  assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /title="My match"/);
   assert.match(tournamentScreenSource, /mergeTournamentSettings/);
+  assert.match(tournamentScreenSource, /getEffectiveRegistrationStatus/);
   assert.match(tournamentScreenSource, /Ticket path/);
   assert.doesNotMatch(tournamentScreenSource, /Open \/spades/);
   assert.doesNotMatch(tournamentScreenSource, /Launch gameplay/);
@@ -177,6 +182,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(checkInScreenSource, /Password requirements/);
   assert.match(checkInScreenSource, /registrationOpen/);
   assert.match(checkInScreenSource, /mergeTournamentSettings/);
+  assert.match(checkInScreenSource, /fetchTournamentBracket/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
   assert.match(hostingClientSource, /fetchSignupSummary/);
@@ -189,6 +195,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /fetchTournamentMatch/);
   assert.match(hostingClientSource, /issueTournamentMatchTicket/);
   assert.match(tournamentSettingsClientSource, /REGISTRATION_STATUS_OPTIONS/);
+  assert.match(tournamentSettingsClientSource, /getEffectiveRegistrationStatus/);
   assert.match(tournamentSettingsClientSource, /zonedDateTimeToIso/);
 });
 
