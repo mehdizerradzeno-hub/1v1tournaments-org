@@ -224,6 +224,12 @@ export default function TournamentScreen({ slug }) {
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
   const playerHasReadyMatch = Boolean(playerStatus.data?.currentMatch);
   const isBracketLive = registrationMeta.reason === 'bracket-live' || Boolean(liveBracket);
+  const showSignupSection = !isBracketLive;
+  const bracketSectionTitle = liveBracket
+    ? liveBracket.status === 'complete'
+      ? 'Final bracket'
+      : 'Live bracket'
+    : 'Bracket preview';
 
   const playerMatchAction = {
     label: playerHasReadyMatch ? 'Play my match' : 'My match',
@@ -266,9 +272,13 @@ export default function TournamentScreen({ slug }) {
       }
       title={visibleTournament.title}>
       <Section
-        description="Tournament day starts here. This card tells each signed-in player whether they need to sign up, wait, or open their assigned Spades table."
+        description={
+          isBracketLive
+            ? 'Start here once the bracket is live. Signed-in players can open their assigned table without reading the whole bracket.'
+            : 'Start here before the bracket is live. This card tells each signed-in player whether they need to sign up or wait.'
+        }
         nativeID="my-match"
-        title="Find your match">
+        title={isBracketLive ? 'My match' : 'Find your match'}>
         <PlayerTournamentStatus
           checkInPath={checkInPath}
           playerStatus={playerStatus}
@@ -276,24 +286,39 @@ export default function TournamentScreen({ slug }) {
         />
       </Section>
 
-      <Section
-        description={registrationMeta.actionCopy}
-        title="Sign up">
-        <CheckInPanel
-          checkIn={visibleTournament.checkIn}
-          checkInPath={checkInPath}
-          registrationMeta={registrationMeta}
-          signupCount={signupSummary.count}
-          signupEnabled={registrationMeta.value === 'open'}
-          signupError={signupSummary.error}
-          signupLoading={signupSummary.loading}
-        />
-      </Section>
+      {liveBracket ? (
+        <Section
+          description="Match cards show assigned players, winners, and Spades room links."
+          nativeID="live-bracket"
+          title={bracketSectionTitle}>
+          <LiveBracketBoard bracket={liveBracket} />
+        </Section>
+      ) : null}
+
+      {showSignupSection ? (
+        <Section
+          description={registrationMeta.actionCopy}
+          title="Sign up">
+          <CheckInPanel
+            checkIn={visibleTournament.checkIn}
+            checkInPath={checkInPath}
+            registrationMeta={registrationMeta}
+            signupCount={signupSummary.count}
+            signupEnabled={registrationMeta.value === 'open'}
+            signupError={signupSummary.error}
+            signupLoading={signupSummary.loading}
+          />
+        </Section>
+      ) : null}
 
       <Section
-        description="Public-safe roster count, bracket size, and seeded-player status in one place."
+        description={
+          isBracketLive
+            ? 'Public roster count and seeded-player status for the current live bracket.'
+            : 'Public-safe roster count, bracket size, and seeded-player status in one place.'
+        }
         nativeID="registered-players"
-        title="Registered players and bracket size">
+        title={isBracketLive ? 'Players in this bracket' : 'Registered players and bracket size'}>
         <RegisteredPlayersPanel
           liveBracket={liveBracket}
           liveBracketSize={liveBracketSize}
@@ -302,41 +327,53 @@ export default function TournamentScreen({ slug }) {
         />
       </Section>
 
-      <Section
-        description="After the host generates a bracket, match cards show the assigned players and Spades room links."
-        nativeID="live-bracket"
-        title={liveBracket ? 'Live bracket' : 'Bracket preview'}>
-        {liveBracket ? (
-          <LiveBracketBoard bracket={liveBracket} />
-        ) : (
-          <>
-            <BracketBoard bracket={visibleTournament.bracket} />
-            {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
-            {!bracketState.loading && !bracketState.error ? (
-              <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
-            ) : null}
-          </>
-        )}
-      </Section>
+      {!liveBracket ? (
+        <Section
+          description="After the host generates a bracket, match cards show the assigned players and Spades room links."
+          nativeID="live-bracket"
+          title={bracketSectionTitle}>
+          <BracketBoard bracket={visibleTournament.bracket} />
+          {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
+          {!bracketState.loading && !bracketState.error ? (
+            <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
+          ) : null}
+        </Section>
+      ) : null}
 
       <Section description="Quick paths for players and viewers." title="Event links">
         <View style={styles.quickGrid}>
+          {!isBracketLive ? (
+            <QuickActionCard
+              actionLabel="Create account and join"
+              body="Use this before the bracket is seeded."
+              href={checkInPath}
+              meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
+              title="Player signup"
+              tone="green"
+            />
+          ) : null}
           <QuickActionCard
-            actionLabel="Create account and join"
-            body="Use this before the bracket is seeded."
-            href={checkInPath}
-            meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
-            title="Player signup"
-            tone="green"
-          />
-          <QuickActionCard
-            actionLabel="Check status"
-            body="Jump to your account-linked status card and current match once the bracket is live."
+            actionLabel={playerHasReadyMatch ? 'Play my match' : 'Check status'}
+            body={
+              isBracketLive
+                ? 'Open your assigned table from your signed-in tournament account.'
+                : 'Jump to your account-linked status card and current match once the bracket is live.'
+            }
             href={matchStatusPath}
             meta="Player"
             title="My match"
             tone="green"
           />
+          {streams.length ? (
+            <QuickActionCard
+              actionLabel="Watch table"
+              body="Open the spectator table for the current match."
+              href="/live"
+              meta="Spectator"
+              title="Watch live"
+              tone="blue"
+            />
+          ) : null}
         </View>
       </Section>
 
