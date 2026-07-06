@@ -222,10 +222,21 @@ export default function TournamentScreen({ slug }) {
   const matchStatusPath = `${tournamentPath}#my-match`;
   const result = getResultByTournamentSlug(visibleTournament.slug)
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
+  const playerHasReadyMatch = Boolean(playerStatus.data?.currentMatch);
+  const isBracketLive = registrationMeta.reason === 'bracket-live' || Boolean(liveBracket);
+
+  const playerMatchAction = {
+    label: playerHasReadyMatch ? 'Play my match' : 'My match',
+    href: matchStatusPath,
+    variant: isBracketLive ? 'primary' : 'secondary',
+  };
+  const tournamentAction = isBracketLive
+    ? { label: 'Live bracket', href: `${tournamentPath}#live-bracket`, variant: 'secondary' }
+    : heroSignupAction(registrationMeta, checkInPath, tournamentPath);
 
   const heroActions = [
-    heroSignupAction(registrationMeta, checkInPath, tournamentPath),
-    { label: 'My match', href: matchStatusPath, variant: 'secondary' },
+    isBracketLive ? playerMatchAction : tournamentAction,
+    isBracketLive ? tournamentAction : playerMatchAction,
     streams.length ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
   ].filter(Boolean);
@@ -255,6 +266,17 @@ export default function TournamentScreen({ slug }) {
       }
       title={visibleTournament.title}>
       <Section
+        description="Tournament day starts here. This card tells each signed-in player whether they need to sign up, wait, or open their assigned Spades table."
+        nativeID="my-match"
+        title="Find your match">
+        <PlayerTournamentStatus
+          checkInPath={checkInPath}
+          playerStatus={playerStatus}
+          slug={visibleTournament.slug}
+        />
+      </Section>
+
+      <Section
         description={registrationMeta.actionCopy}
         title="Sign up">
         <CheckInPanel
@@ -277,17 +299,6 @@ export default function TournamentScreen({ slug }) {
           liveBracketSize={liveBracketSize}
           rosterBracketSize={rosterBracketSize}
           signupSummary={signupSummary}
-        />
-      </Section>
-
-      <Section
-        description="Sign in once, then use this card to find your current match without reading the whole bracket."
-        nativeID="my-match"
-        title="Your tournament status">
-        <PlayerTournamentStatus
-          checkInPath={checkInPath}
-          playerStatus={playerStatus}
-          slug={visibleTournament.slug}
         />
       </Section>
 

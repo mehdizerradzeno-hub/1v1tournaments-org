@@ -14,16 +14,16 @@ const PRIMARY_MATCH_PATH = `${PRIMARY_TOURNAMENT_PATH}#my-match`;
 
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
+  { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
   { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
   { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
-  { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
   { label: 'Rules', href: '/rules' },
 ];
 
 const MOBILE_NAV_ITEMS = [
-  { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
-  { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
   { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
+  { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
+  { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
 ];
 
 const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
