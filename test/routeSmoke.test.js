@@ -15,12 +15,14 @@ const spadesRouteFile = fileURLToPath(new URL('../app/spades.jsx', import.meta.u
 const euchreRouteFile = fileURLToPath(new URL('../app/euchre.jsx', import.meta.url));
 const aboutRouteFile = fileURLToPath(new URL('../app/about.jsx', import.meta.url));
 const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta.url));
+const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', import.meta.url));
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
 const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
+const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
 const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
@@ -52,6 +54,16 @@ test('/about stays wired to the public organization page', () => {
 
 test('/contact stays wired to the public contact page', () => {
   assert.ok(existsSync(contactRouteFile));
+});
+
+test('/leaderboard stays wired to tournament-only rankings', () => {
+  assert.ok(existsSync(leaderboardRouteFile));
+  assert.ok(existsSync(leaderboardScreenFile));
+  const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
+
+  assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
+  assert.match(leaderboardScreenSource, /Tournament rankings/);
+  assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
 });
 
 test('the featured tournament route stays wired to the Spades launch event', () => {
@@ -93,6 +105,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(tournamentSettingsUtilsFile));
   assert.ok(existsSync(hubUiFile));
   assert.ok(existsSync(homeScreenFile));
+  assert.ok(existsSync(leaderboardScreenFile));
   assert.ok(existsSync(checkInScreenFile));
   assert.ok(existsSync(tournamentScreenFile));
   assert.ok(existsSync(hostingClientFile));
@@ -110,6 +123,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const tournamentSettingsUtilsSource = readFileSync(tournamentSettingsUtilsFile, 'utf8');
   const hubUiSource = readFileSync(hubUiFile, 'utf8');
   const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
+  const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
   const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
   const tournamentScreenSource = readFileSync(tournamentScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
@@ -163,11 +177,16 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentSettingsUtilsSource, /registrationStatus/);
   assert.match(hubUiSource, /MOBILE_NAV_ITEMS/);
   assert.match(hubUiSource, /My match/);
+  assert.match(hubUiSource, /Leaderboard/);
+  assert.match(hubUiSource, /Ranks/);
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
   assert.match(homeScreenSource, /title="My match"/);
+  assert.match(homeScreenSource, /Tournament leaderboard/);
   assert.match(homeScreenSource, /mergeTournamentSettings/);
+  assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
+  assert.match(leaderboardScreenSource, /Overall standings/);
   assert.doesNotMatch(homeScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);

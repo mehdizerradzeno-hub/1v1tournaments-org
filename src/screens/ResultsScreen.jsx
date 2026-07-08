@@ -21,6 +21,7 @@ export default function ResultsScreen() {
   return (
     <HubScreen
       actions={[
+        { label: 'Leaderboard', href: '/leaderboard' },
         { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug) },
         { label: 'Rules', href: '/rules', variant: 'secondary' },
         { label: 'Live', href: '/live', variant: 'ghost' },

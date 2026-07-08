@@ -320,6 +320,49 @@ function resultPlacementsFromBracket(bracket, finalMatch, winnerName) {
   return placements;
 }
 
+function resultMatchRecordsFromBracket(bracket) {
+  const recordsByName = new Map();
+  const ensureRecord = (name) => {
+    if (!name) {
+      return null;
+    }
+
+    if (!recordsByName.has(name)) {
+      recordsByName.set(name, { name, wins: 0, losses: 0 });
+    }
+
+    return recordsByName.get(name);
+  };
+
+  (bracket?.rounds || []).forEach((round) => {
+    (round.matches || []).forEach((match) => {
+      const players = (match.players || []).filter(Boolean);
+      const winnerName = match.winnerName || '';
+
+      if (match.status !== 'final' || players.length < 2 || !winnerName) {
+        return;
+      }
+
+      players.forEach((player) => {
+        const name = playerDisplayName(player);
+        const record = ensureRecord(name);
+
+        if (!record) {
+          return;
+        }
+
+        if (name === winnerName) {
+          record.wins += 1;
+        } else {
+          record.losses += 1;
+        }
+      });
+    });
+  });
+
+  return [...recordsByName.values()];
+}
+
 export function buildResultFromTournamentBracket(tournament, bracket) {
   if (!tournament || !bracket) {
     return null;
@@ -348,6 +391,7 @@ export function buildResultFromTournamentBracket(tournament, bracket) {
     score: 'Champion',
     date: bracket.updatedAt || tournament.date,
     placements: resultPlacementsFromBracket(bracket, finalMatch, winnerName),
+    matchRecords: resultMatchRecordsFromBracket(bracket),
     notes: [
       `Final table: ${roundLabel} • ${finalLabel}.`,
       'Posted automatically from the live tournament bracket.',

@@ -336,6 +336,14 @@ export default function HomeScreen() {
             tone="accent"
           />
           <QuickActionCard
+            actionLabel="View ranks"
+            body="See tournament-only standings for hosted events, separate from the Spades in-game leaderboard."
+            href="/leaderboard"
+            meta="Rankings"
+            title="Tournament leaderboard"
+            tone="accent"
+          />
+          <QuickActionCard
             actionLabel="Watch table"
             body="Open the spectator table for the current Spades match."
             href="/live"
