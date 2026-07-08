@@ -5,6 +5,7 @@ const BRACKET_ENDPOINT = '/.netlify/functions/tournament-bracket';
 const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
+const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -132,6 +133,48 @@ export async function fetchTournamentSettings({ slug }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Tournament schedule settings could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchTournamentEvents({ slug } = {}) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${EVENTS_ENDPOINT}${query}`);
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament events could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchTournamentEvent({ slug }) {
+  const result = await fetchTournamentEvents({ slug });
+
+  return {
+    ...result,
+    tournament: result.tournament || result.tournaments?.[0] || null,
+  };
+}
+
+export async function saveTournamentEvent({ token, tournament }) {
+  const response = await fetch(EVENTS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'save',
+      tournament,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament event could not be saved.');
   }
 
   return result;

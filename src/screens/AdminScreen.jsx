@@ -19,6 +19,7 @@ import {
 } from '../lib/adminServerClient.js';
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
+import { createTournamentRecord, mergeTournamentLists, slugifyTournamentTitle } from '../lib/tournamentCatalog.js';
 import {
   dateToScheduleFields,
   getRegistrationStatusMeta,
@@ -31,12 +32,14 @@ import {
   clearTournamentData,
   fetchPlayerAccount,
   fetchTournamentBracket,
+  fetchTournamentEvents,
   fetchTournamentRoster,
   fetchTournamentSettings,
   generateTournamentBracket,
   reportTournamentMatchWinner,
   resetTournamentSettings,
   resetTournamentBracket,
+  saveTournamentEvent,
   saveTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
 import {
@@ -122,6 +125,12 @@ function getBracketPreviewLabel(signupCount, tournament) {
   return `${signupCount} signed up, over target`;
 }
 
+function numberField(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export default function AdminScreen() {
   const games = getGames();
   const gameLookup = useMemo(() => new Map(games.map((game) => [game.slug, game])), [games]);
@@ -171,6 +180,15 @@ export default function AdminScreen() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleMessage, setScheduleMessage] = useState('');
   const [scheduleError, setScheduleError] = useState('');
+  const [hostedTournaments, setHostedTournaments] = useState([]);
+  const [eventTitle, setEventTitle] = useState(() => initialScheduleDefaults.title || siteData.tournaments[0]?.title || '');
+  const [eventSlug, setEventSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const [eventSummary, setEventSummary] = useState(() => siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
+  const [eventRosterCap, setEventRosterCap] = useState(() => String(siteData.tournaments[0]?.rosterCap || 8));
+  const [eventMinimumPlayers, setEventMinimumPlayers] = useState(() => String(siteData.tournaments[0]?.minimumPlayers || 2));
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventMessage, setEventMessage] = useState('');
+  const [eventError, setEventError] = useState('');
   const [rosters, setRosters] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterMessage, setRosterMessage] = useState('');
@@ -211,9 +229,13 @@ export default function AdminScreen() {
     () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || null,
     [rosters, rosterSlug],
   );
+  const adminTournaments = useMemo(
+    () => mergeTournamentLists(siteData.tournaments, hostedTournaments),
+    [hostedTournaments],
+  );
   const selectedTournament = useMemo(
-    () => siteData.tournaments.find((tournament) => tournament.slug === rosterSlug) || siteData.tournaments[0] || null,
-    [rosterSlug],
+    () => adminTournaments.find((tournament) => tournament.slug === rosterSlug) || adminTournaments[0] || null,
+    [adminTournaments, rosterSlug],
   );
   const liveTournament = useMemo(
     () => mergeTournamentSettings(selectedTournament, scheduleSettings),
@@ -259,6 +281,30 @@ export default function AdminScreen() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadHostedTournaments() {
+      try {
+        const result = await fetchTournamentEvents();
+
+        if (active) {
+          setHostedTournaments(result.tournaments || []);
+        }
+      } catch {
+        if (active) {
+          setHostedTournaments([]);
+        }
+      }
+    }
+
+    loadHostedTournaments();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedTournament) {
       return undefined;
     }
@@ -267,9 +313,11 @@ export default function AdminScreen() {
 
     async function loadScheduleSettings() {
       setScheduleSettings(null);
+      applyEventFields(selectedTournament);
       applyScheduleFields(selectedTournament, null);
       setScheduleLoading(true);
       setScheduleFeedback('', '');
+      setEventFeedback('', '');
 
       try {
         const result = await fetchTournamentSettings({ slug: selectedTournament.slug });
@@ -316,6 +364,11 @@ export default function AdminScreen() {
     setScheduleError(nextError);
   }
 
+  function setEventFeedback(nextMessage = '', nextError = '') {
+    setEventMessage(nextMessage);
+    setEventError(nextError);
+  }
+
   function setRosterFeedback(nextMessage = '', nextError = '') {
     setRosterMessage(nextMessage);
     setRosterError(nextError);
@@ -341,6 +394,41 @@ export default function AdminScreen() {
     setScheduleTimeZoneLabel(mergedTournament?.timeZoneLabel || 'ET');
     setScheduleRegistrationStatus(mergedTournament?.registrationStatus || 'open');
     setScheduleCheckInLeadMinutes(String(mergedTournament?.checkInLeadMinutes ?? 30));
+  }
+
+  function applyEventFields(tournament) {
+    if (!tournament) {
+      return;
+    }
+
+    setEventTitle(tournament.title || '');
+    setEventSlug(tournament.slug || '');
+    setEventSummary(tournament.detail || tournament.summary || '');
+    setEventRosterCap(String(tournament.rosterCap || 8));
+    setEventMinimumPlayers(String(tournament.minimumPlayers || 2));
+  }
+
+  function handleChangeEventTitle(value) {
+    setEventTitle(value);
+    setEventSlug(slugifyTournamentTitle(value));
+  }
+
+  function handleNewTournamentDraft() {
+    const draftTitle = `Spades tournament ${adminTournaments.length + 1}`;
+
+    setEventTitle(draftTitle);
+    setEventSlug(slugifyTournamentTitle(draftTitle));
+    setEventSummary('A free-entry Spades bracket with account signup, hosted match links, and posted results.');
+    setEventRosterCap('8');
+    setEventMinimumPlayers('2');
+    setScheduleDate('');
+    setScheduleTime('20:00');
+    setScheduleTimeZone('America/New_York');
+    setScheduleTimeZoneLabel('ET');
+    setScheduleRegistrationStatus('open');
+    setScheduleCheckInLeadMinutes('30');
+    setEventFeedback('Fill in the event title, date, and start time, then save the tournament.', '');
+    setScheduleFeedback('', '');
   }
 
   function handleCreateAccess() {
@@ -580,6 +668,93 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleSaveTournamentEvent() {
+    const token = rosterToken.trim();
+    const title = eventTitle.trim();
+    const slug = slugifyTournamentTitle(eventSlug || title);
+
+    if (!hasHostCredential) {
+      setEventFeedback('', 'Sign in with a host-approved account or enter the fallback token before saving a tournament.');
+      return;
+    }
+
+    if (!title) {
+      setEventFeedback('', 'Enter a tournament title before saving.');
+      return;
+    }
+
+    if (!slug) {
+      setEventFeedback('', 'Enter a URL slug before saving.');
+      return;
+    }
+
+    let date;
+
+    try {
+      date = zonedDateTimeToIso(scheduleDate, scheduleTime, scheduleTimeZone.trim() || 'America/New_York');
+    } catch (saveError) {
+      setEventFeedback('', saveError instanceof Error ? saveError.message : 'Enter a valid schedule date and time.');
+      return;
+    }
+
+    setEventSaving(true);
+    setEventFeedback('', '');
+    setScheduleFeedback('', '');
+
+    const rosterCap = numberField(eventRosterCap, selectedTournament?.rosterCap || 8);
+    const minimumPlayers = Math.min(numberField(eventMinimumPlayers, selectedTournament?.minimumPlayers || 2), rosterCap);
+    const tournamentPayload = createTournamentRecord({
+      ...(selectedTournament || {}),
+      slug,
+      title,
+      date,
+      timeZone: scheduleTimeZone.trim() || 'America/New_York',
+      timeZoneLabel: scheduleTimeZoneLabel.trim() || 'ET',
+      registrationStatus: scheduleRegistrationStatus,
+      checkInLeadMinutes: scheduleCheckInLeadMinutes,
+      detail: eventSummary,
+      summary: eventSummary,
+      rosterCap,
+      minimumPlayers,
+      badge: selectedTournament?.badge || 'Host event',
+      status: 'upcoming',
+      links: [],
+    });
+
+    try {
+      const eventResult = await saveTournamentEvent({
+        token,
+        tournament: tournamentPayload,
+      });
+      const settingsResult = await saveTournamentSettings({
+        token,
+        slug: tournamentPayload.slug,
+        settings: {
+          tournamentSlug: tournamentPayload.slug,
+          date,
+          timeZone: tournamentPayload.timeZone,
+          timeZoneLabel: tournamentPayload.timeZoneLabel,
+          registrationStatus: scheduleRegistrationStatus,
+          checkInLeadMinutes: scheduleCheckInLeadMinutes,
+        },
+      });
+      const savedTournament = eventResult.tournament || tournamentPayload;
+
+      setHostedTournaments(eventResult.tournaments || [savedTournament]);
+      setRosterSlug(savedTournament.slug);
+      setEventSlug(savedTournament.slug);
+      setScheduleSettings(settingsResult.settings || null);
+      applyEventFields(savedTournament);
+      applyScheduleFields(savedTournament, settingsResult.settings || null);
+      setEventFeedback(`${savedTournament.title} is saved and public.`, '');
+      setScheduleFeedback('Schedule and registration settings saved for this event.', '');
+    } catch (saveError) {
+      setEventFeedback('', saveError instanceof Error ? saveError.message : 'Could not save the tournament event.');
+    } finally {
+      setEventSaving(false);
+    }
+  }
+
   async function handleSaveScheduleSettings() {
     const token = rosterToken.trim();
 
@@ -704,7 +879,7 @@ export default function AdminScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Tournament to manage</Text>
             <View style={styles.tournamentPicker}>
-              {siteData.tournaments.map((tournamentOption) => (
+              {adminTournaments.map((tournamentOption) => (
                 <ActionButton
                   key={tournamentOption.slug}
                   onPress={() => setRosterSlug(tournamentOption.slug)}
@@ -712,6 +887,81 @@ export default function AdminScreen() {
                   {tournamentOption.title}
                 </ActionButton>
               ))}
+              <ActionButton onPress={handleNewTournamentDraft} variant="secondary">
+                New tournament
+              </ActionButton>
+            </View>
+          </View>
+
+          <View style={styles.eventEditorPanel}>
+            <View style={styles.metaRow}>
+              <Badge tone="accent">Event details</Badge>
+              <Text style={styles.metaText}>These fields control what players see on the homepage, signup page, and tournament page.</Text>
+            </View>
+
+            <View style={styles.scheduleGrid}>
+              <View style={styles.scheduleField}>
+                <Text style={styles.fieldLabel}>Tournament title</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  autoCorrect
+                  onChangeText={handleChangeEventTitle}
+                  placeholder="Spades Friday Night Cup"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={eventTitle}
+                />
+              </View>
+              <View style={styles.scheduleField}>
+                <Text style={styles.fieldLabel}>Public URL slug</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setEventSlug}
+                  placeholder="spades-friday-night-cup"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={eventSlug}
+                />
+              </View>
+              <View style={styles.scheduleField}>
+                <Text style={styles.fieldLabel}>Advertised seats</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  inputMode="numeric"
+                  onChangeText={setEventRosterCap}
+                  placeholder="8"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={eventRosterCap}
+                />
+              </View>
+              <View style={styles.scheduleField}>
+                <Text style={styles.fieldLabel}>Minimum to run</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  inputMode="numeric"
+                  onChangeText={setEventMinimumPlayers}
+                  placeholder="2"
+                  placeholderTextColor="#6B766F"
+                  style={styles.input}
+                  value={eventMinimumPlayers}
+                />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Public event summary</Text>
+              <TextInput
+                multiline
+                onChangeText={setEventSummary}
+                placeholder="What players should know before they sign up"
+                placeholderTextColor="#6B766F"
+                style={styles.notesInput}
+                value={eventSummary}
+              />
             </View>
           </View>
 
@@ -817,10 +1067,15 @@ export default function AdminScreen() {
 
           {scheduleError ? <Text style={styles.errorText}>{scheduleError}</Text> : null}
           {scheduleMessage ? <Text style={styles.successText}>{scheduleMessage}</Text> : null}
+          {eventError ? <Text style={styles.errorText}>{eventError}</Text> : null}
+          {eventMessage ? <Text style={styles.successText}>{eventMessage}</Text> : null}
 
           <View style={styles.buttonRow}>
-            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleSaveScheduleSettings}>
-              {scheduleLoading ? 'Saving...' : 'Save schedule'}
+            <ActionButton disabled={!hasHostCredential || eventSaving} onPress={handleSaveTournamentEvent}>
+              {eventSaving ? 'Saving...' : 'Save event'}
+            </ActionButton>
+            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleSaveScheduleSettings} variant="secondary">
+              {scheduleLoading ? 'Saving...' : 'Save schedule only'}
             </ActionButton>
             <ActionButton href={signupPath} variant="secondary">
               Open signup page
@@ -1155,7 +1410,7 @@ export default function AdminScreen() {
 
   async function handleCopyPlayerInstructions() {
     const tournamentPath = getTournamentPath(rosterSlug);
-    const tournament = siteData.tournaments.find((item) => item.slug === rosterSlug);
+    const tournament = liveTournament || selectedTournament;
     const text = [
       `${tournament?.title || '1v1 tournament'} player link:`,
       `https://1v1tournaments.org${tournamentPath}`,
@@ -2036,6 +2291,14 @@ const styles = StyleSheet.create({
   editorCard: {
     borderColor: 'rgba(108, 199, 255, 0.24)',
   },
+  eventEditorPanel: {
+    backgroundColor: 'rgba(214, 162, 78, 0.06)',
+    borderColor: 'rgba(214, 162, 78, 0.20)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
   packetBox: {
     color: '#F4EFE6',
     minHeight: 220,
@@ -2081,6 +2344,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  notesInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 18,
+    borderWidth: 1,
+    color: '#F4EFE6',
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 96,
+    padding: 14,
+    textAlignVertical: 'top',
   },
   metaRow: {
     flexDirection: 'row',

@@ -35,6 +35,7 @@ import {
   fetchTournamentPlayerStatus,
   fetchSignupSummary,
   fetchTournamentBracket,
+  fetchTournamentEvent,
   issueTournamentMatchTicket,
 } from '../lib/tournamentHostingClient.js';
 
@@ -137,7 +138,13 @@ export default function TournamentScreen({ slug }) {
   const [playerStatus, setPlayerStatus] = useState({ loading: true, error: '', data: null });
   const [signupSummary, setSignupSummary] = useState({ count: 0, signups: [], loading: true, error: '' });
   const [tournamentSettings, setTournamentSettings] = useState(null);
-  const tournament = getTournamentBySlug(slug);
+  const [hostedTournament, setHostedTournament] = useState(null);
+  const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '' });
+  const seededTournament = getTournamentBySlug(slug);
+  const tournament = useMemo(
+    () => (hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament),
+    [hostedTournament, seededTournament],
+  );
   const liveTournament = useMemo(
     () => mergeTournamentSettings(tournament, tournamentSettings),
     [tournament, tournamentSettings],
@@ -145,6 +152,35 @@ export default function TournamentScreen({ slug }) {
 
   useEffect(() => {
     let active = true;
+
+    async function loadTournamentRecord() {
+      if (!slug) {
+        setTournamentLookup({ loading: false, error: '' });
+        setHostedTournament(null);
+        return;
+      }
+
+      setTournamentLookup({ loading: !seededTournament, error: '' });
+
+      try {
+        const result = await fetchTournamentEvent({ slug });
+
+        if (active) {
+          setHostedTournament(result.tournament || null);
+          setTournamentLookup({ loading: false, error: '' });
+        }
+      } catch (error) {
+        if (active) {
+          setHostedTournament(null);
+          setTournamentLookup({
+            loading: false,
+            error: error instanceof Error ? error.message : 'Tournament record could not be loaded.',
+          });
+        }
+      }
+    }
+
+    loadTournamentRecord();
 
     async function loadBracket() {
       if (!slug) {
@@ -228,9 +264,25 @@ export default function TournamentScreen({ slug }) {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, seededTournament]);
 
   if (!tournament) {
+    if (tournamentLookup.loading) {
+      return (
+        <HubScreen
+          actions={[{ label: 'Home', href: '/' }]}
+          eyebrow="Loading tournament"
+          lead="Looking up this hosted tournament."
+          subtitle="Host-posted events load from the tournament catalog."
+          title="Loading event">
+          <EmptyState
+            body="One moment while the event details load."
+            title="Checking tournament"
+          />
+        </HubScreen>
+      );
+    }
+
     return (
       <HubScreen
         actions={[{ label: 'Home', href: '/' }]}
@@ -240,7 +292,7 @@ export default function TournamentScreen({ slug }) {
         title="Unknown tournament">
         <EmptyState
           action={<ActionButton href="/">Back home</ActionButton>}
-          body="The detail route is ready, but the matching tournament record still needs to be added."
+          body={tournamentLookup.error || 'The detail route is ready, but the matching tournament record still needs to be added.'}
           title="Nothing to display"
         />
       </HubScreen>

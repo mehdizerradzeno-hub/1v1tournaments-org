@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { connectLambda, getStore } from '@netlify/blobs';
 
 import { getAccountFromEvent } from './_account-utils.mjs';
+import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 
@@ -33,6 +34,16 @@ function cleanEmail(value) {
 
 function publicTournamentDate(tournamentSlug) {
   return siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug)?.date || '';
+}
+
+async function getTournamentDate(tournamentSlug) {
+  const settings = await loadTournamentSettings(tournamentSlug);
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+
+  return {
+    settings,
+    date: settings?.date || hostedTournament?.date || publicTournamentDate(tournamentSlug),
+  };
 }
 
 function isEmailLike(value) {
@@ -107,7 +118,7 @@ async function loadTournamentSignups(store, tournamentSlug) {
 
 async function publicSignupSummary(store, tournamentSlug, currentAccount = null) {
   const signups = await loadTournamentSignups(store, tournamentSlug);
-  const settings = await loadTournamentSettings(tournamentSlug);
+  const { settings } = await getTournamentDate(tournamentSlug);
 
   return {
     tournamentSlug,
@@ -229,7 +240,7 @@ export async function handler(event) {
 
   try {
     const store = getSignupStore();
-    const settings = await loadTournamentSettings(tournamentSlug);
+    const { settings, date: tournamentDate } = await getTournamentDate(tournamentSlug);
     const key = signupKey(tournamentSlug, account.id);
     const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
     const existingByAccount = await store.get(key, { type: 'json' });
@@ -277,7 +288,7 @@ export async function handler(event) {
       return json(403, { error: blockedMessage, settings });
     }
 
-    const startedMessage = tournamentStartedMessage(settings?.date || publicTournamentDate(tournamentSlug) || payload.tournamentDate || payload.date);
+    const startedMessage = tournamentStartedMessage(tournamentDate || payload.tournamentDate || payload.date);
 
     if (startedMessage) {
       return json(403, { error: startedMessage, settings });

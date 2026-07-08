@@ -31,8 +31,14 @@ import {
   mergeResults,
   siteData,
 } from '../lib/siteData.js';
+import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
-import { fetchSignupSummary, fetchTournamentBracket, fetchTournamentSettings } from '../lib/tournamentHostingClient.js';
+import {
+  fetchSignupSummary,
+  fetchTournamentBracket,
+  fetchTournamentEvents,
+  fetchTournamentSettings,
+} from '../lib/tournamentHostingClient.js';
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
@@ -159,10 +165,14 @@ function getNextUpcomingTournament(tournaments, nowMs) {
 
 export default function HomeScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
+  const [hostedTournaments, setHostedTournaments] = useState([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const games = useMemo(() => getGames(), []);
   const streams = useMemo(() => getStreams(), []);
-  const upcoming = useMemo(() => getUpcomingTournaments(), []);
+  const upcoming = useMemo(
+    () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
+    [hostedTournaments],
+  );
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
   const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
@@ -183,6 +193,30 @@ export default function HomeScreen() {
   const featuredResult = buildResultFromTournamentBracket(featuredTournament, featuredBracket);
   const results = mergeResults(getResults(), featuredResult);
   const featuredCountdown = getCountdownState(featuredTournament, nowMs);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHostedTournaments() {
+      try {
+        const result = await fetchTournamentEvents();
+
+        if (active) {
+          setHostedTournaments(result.tournaments || []);
+        }
+      } catch {
+        if (active) {
+          setHostedTournaments([]);
+        }
+      }
+    }
+
+    loadHostedTournaments();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!upcoming.length) {

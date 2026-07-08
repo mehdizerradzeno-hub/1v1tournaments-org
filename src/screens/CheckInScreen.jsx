@@ -18,6 +18,7 @@ import {
   fetchPlayerAccount,
   fetchSignupSummary,
   fetchTournamentBracket,
+  fetchTournamentEvent,
   loginPlayerAccount,
   logoutPlayerAccount,
   submitTournamentSignup,
@@ -77,7 +78,13 @@ function normalizeAccountMode(value) {
 }
 
 export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
-  const tournament = getTournamentBySlug(slug);
+  const seededTournament = getTournamentBySlug(slug);
+  const [hostedTournament, setHostedTournament] = useState(null);
+  const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '' });
+  const tournament = useMemo(
+    () => (hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament),
+    [hostedTournament, seededTournament],
+  );
   const tournamentSlug = tournament?.slug || '';
   const accountLoadIdRef = useRef(0);
   const [playerName, setPlayerName] = useState('');
@@ -102,6 +109,43 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     () => mergeTournamentSettings(tournament, tournamentSettings),
     [tournament, tournamentSettings],
   );
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTournamentRecord() {
+      if (!slug) {
+        setTournamentLookup({ loading: false, error: '' });
+        setHostedTournament(null);
+        return;
+      }
+
+      setTournamentLookup({ loading: !seededTournament, error: '' });
+
+      try {
+        const result = await fetchTournamentEvent({ slug });
+
+        if (active) {
+          setHostedTournament(result.tournament || null);
+          setTournamentLookup({ loading: false, error: '' });
+        }
+      } catch (loadError) {
+        if (active) {
+          setHostedTournament(null);
+          setTournamentLookup({
+            loading: false,
+            error: loadError instanceof Error ? loadError.message : 'Tournament record could not be loaded.',
+          });
+        }
+      }
+    }
+
+    loadTournamentRecord();
+
+    return () => {
+      active = false;
+    };
+  }, [slug, seededTournament]);
 
   useEffect(() => {
     let active = true;
@@ -377,6 +421,22 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   }
 
   if (!tournament) {
+    if (tournamentLookup.loading) {
+      return (
+        <HubScreen
+          actions={[{ label: 'Home', href: '/' }]}
+          eyebrow="Loading check-in"
+          lead="Looking up this hosted tournament signup page."
+          subtitle="Host-posted events load from the tournament catalog."
+          title="Loading signup">
+          <EmptyState
+            body="One moment while the event details load."
+            title="Checking tournament"
+          />
+        </HubScreen>
+      );
+    }
+
     return (
       <HubScreen
         actions={[{ label: 'Home', href: '/' }]}
@@ -386,7 +446,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         title="Unknown check-in page">
         <EmptyState
           action={<ActionButton href="/">Back home</ActionButton>}
-          body="The signup route is ready, but the matching public tournament record still needs to be added."
+          body={tournamentLookup.error || 'The signup route is ready, but the matching public tournament record still needs to be added.'}
           title="Nothing to display"
         />
       </HubScreen>
