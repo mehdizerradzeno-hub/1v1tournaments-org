@@ -460,13 +460,18 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const registrationOpen = registrationMeta.value === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
   const hasSignupConfirmation = Boolean(signup);
+  const wantsAccountSwitch = Boolean(account && accountMode === 'login');
   const mainTitle = hasSignupConfirmation
     ? 'You are on the roster'
+    : wantsAccountSwitch
+      ? 'This browser is already signed in.'
     : account
       ? 'Account ready. Join this event.'
       : 'Create account and join in one step';
   const mainCopy = hasSignupConfirmation
     ? 'You are signed up. Come back here or use My Match when the bracket is published.'
+    : wantsAccountSwitch
+      ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
       ? 'Your account is signed in. One more tap reserves your tournament spot.'
       : 'New players create an account once. If registration is open, this also reserves the tournament spot.';
@@ -548,6 +553,24 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
           {account ? (
             <>
+              {wantsAccountSwitch ? (
+                <View style={styles.switchAccountPanel}>
+                  <Badge tone="accent">Signed in</Badge>
+                  <Text style={styles.switchAccountTitle}>{account.playerName}</Text>
+                  <Text style={styles.switchAccountCopy}>
+                    This is the active account in this browser. Sign out before another player signs in on this device.
+                  </Text>
+                  <View style={styles.buttonRow}>
+                    <ActionButton onPress={handleLogoutAccount}>
+                      {accountSubmitting ? 'Signing out...' : 'Sign out to switch'}
+                    </ActionButton>
+                    <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
+                      Continue as {account.playerName}
+                    </ActionButton>
+                  </View>
+                </View>
+              ) : null}
+
               <View style={[styles.accountPanel, hasSignupConfirmation && styles.accountPanelComplete]}>
                 <View style={styles.summaryTopRow}>
                   <Badge tone="green">{hasSignupConfirmation ? 'Roster confirmed' : 'Account linked'}</Badge>
@@ -577,7 +600,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               )}
 
               <View style={styles.buttonRow}>
-                {hasSignupConfirmation ? (
+                {wantsAccountSwitch ? null : hasSignupConfirmation ? (
                   <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
                     Find my match
                   </ActionButton>
@@ -586,12 +609,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     {registrationOpen ? (submitting ? 'Saving...' : 'Join tournament roster') : registrationMeta.label}
                   </ActionButton>
                 )}
-                <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
-                  Tournament page
-                </ActionButton>
-                <ActionButton onPress={handleLogoutAccount} variant="ghost">
-                  {accountSubmitting ? 'Signing out...' : 'Sign out'}
-                </ActionButton>
+                {wantsAccountSwitch ? null : (
+                  <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
+                    Tournament page
+                  </ActionButton>
+                )}
+                {wantsAccountSwitch ? null : (
+                  <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                    {accountSubmitting ? 'Signing out...' : 'Sign out'}
+                  </ActionButton>
+                )}
               </View>
             </>
           ) : (
@@ -965,6 +992,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
+  },
+  switchAccountPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(214, 162, 78, 0.38)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(214, 162, 78, 0.09)',
+    marginTop: 16,
+    padding: 14,
+  },
+  switchAccountTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+    marginTop: 10,
+  },
+  switchAccountCopy: {
+    color: '#D4DDD7',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6,
   },
   accountPanel: {
     borderWidth: 1,

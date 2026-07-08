@@ -528,17 +528,13 @@ export function HubScreen({
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
-  const accountHref = playerAccount?.hostApproved
-    ? '/admin'
-    : playerAccount
-      ? PRIMARY_CHECK_IN_PATH
-      : PRIMARY_SIGN_IN_PATH;
+  const accountHref = PRIMARY_SIGN_IN_PATH;
   const accountLabel = playerAccountLoading
     ? 'Sign in'
     : playerAccount?.hostApproved
-      ? 'Host approved'
+      ? 'Switch account'
       : playerAccount
-        ? 'Signed in'
+        ? 'Switch account'
         : 'Sign in';
   const accountVariant = playerAccount ? 'secondary' : 'primary';
 
@@ -594,6 +590,11 @@ export function HubScreen({
                 </Pressable>
               </Link>
               <View style={styles.brandUtility}>
+                {playerAccount?.hostApproved ? (
+                  <ActionButton href="/admin" variant="secondary" style={styles.brandButton}>
+                    Admin
+                  </ActionButton>
+                ) : null}
                 <ActionButton href={accountHref} variant={accountVariant} style={styles.brandButton}>
                   {accountLabel}
                 </ActionButton>
