@@ -22,6 +22,7 @@ const NAV_ITEMS = [
 ];
 
 const MOBILE_NAV_ITEMS = [
+  { label: 'Home', href: '/' },
   { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
   { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
   { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
