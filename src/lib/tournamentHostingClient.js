@@ -6,6 +6,21 @@ const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
+const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
+
+function isLocalStaticPreview() {
+  const hostname = globalThis.location?.hostname;
+
+  return hostname === '127.0.0.1' || hostname === 'localhost';
+}
+
+function readEndpoint(endpoint) {
+  return isLocalStaticPreview() ? `${PRODUCTION_API_ORIGIN}${endpoint}` : endpoint;
+}
+
+function readCredentials(endpoint) {
+  return endpoint.startsWith('http') ? 'omit' : 'include';
+}
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -114,8 +129,9 @@ export async function logoutPlayerAccount() {
 
 export async function fetchSignupSummary({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${SIGNUP_ENDPOINT}${query}`, {
-    credentials: 'include',
+  const endpoint = `${readEndpoint(SIGNUP_ENDPOINT)}${query}`;
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
   });
   const result = await readJsonResponse(response);
 
@@ -128,7 +144,7 @@ export async function fetchSignupSummary({ slug }) {
 
 export async function fetchTournamentSettings({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${SETTINGS_ENDPOINT}${query}`);
+  const response = await fetch(`${readEndpoint(SETTINGS_ENDPOINT)}${query}`);
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -140,7 +156,7 @@ export async function fetchTournamentSettings({ slug }) {
 
 export async function fetchTournamentEvents({ slug } = {}) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${EVENTS_ENDPOINT}${query}`);
+  const response = await fetch(`${readEndpoint(EVENTS_ENDPOINT)}${query}`);
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -264,7 +280,7 @@ export async function clearTournamentData({ token, slug }) {
 
 export async function fetchTournamentBracket({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${BRACKET_ENDPOINT}${query}`);
+  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`);
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -286,7 +302,7 @@ export async function fetchTournamentMatch({ slug, matchId }) {
   }
 
   const query = params.toString() ? `?${params.toString()}` : '';
-  const response = await fetch(`${BRACKET_ENDPOINT}${query}`);
+  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`);
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
