@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -79,6 +79,7 @@ function normalizeAccountMode(value) {
 export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const tournament = getTournamentBySlug(slug);
   const tournamentSlug = tournament?.slug || '';
+  const accountLoadIdRef = useRef(0);
   const [playerName, setPlayerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
@@ -106,22 +107,24 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     let active = true;
 
     async function loadPlayerAccount() {
+      const loadId = accountLoadIdRef.current + 1;
+      accountLoadIdRef.current = loadId;
       setAccountLoading(true);
       setAccountError('');
 
       try {
         const result = await fetchPlayerAccount();
 
-        if (active) {
+        if (active && loadId === accountLoadIdRef.current) {
           setAccount(result.account || null);
         }
       } catch (loadError) {
-        if (active) {
+        if (active && loadId === accountLoadIdRef.current) {
           setAccount(null);
           setAccountError(loadError instanceof Error ? loadError.message : 'Player account could not be loaded.');
         }
       } finally {
-        if (active) {
+        if (active && loadId === accountLoadIdRef.current) {
           setAccountLoading(false);
         }
       }
@@ -197,19 +200,38 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     };
   }, [tournamentSlug]);
 
-  async function handleSubmitSignup() {
+  function applySignupResult(result) {
+    setSignup(result.signup);
+    setSignupSummary((current) => ({
+      count: result.summary?.signupCount || current.count + 1,
+      loading: false,
+      error: '',
+    }));
+    setNotes('');
+  }
+
+  async function saveSignupWithCurrentSession() {
     if (!liveTournament) {
-      setError('Choose a valid tournament before signing up.');
-      return;
+      throw new Error('Choose a valid tournament before signing up.');
     }
 
     const effectiveRegistrationMeta = getEffectiveRegistrationStatus(liveTournament, { hasLiveBracket: Boolean(liveBracket) });
 
     if (effectiveRegistrationMeta.value !== 'open') {
-      setError(effectiveRegistrationMeta.actionCopy);
-      return;
+      throw new Error(effectiveRegistrationMeta.actionCopy);
     }
 
+    const result = await submitTournamentSignup({
+      tournamentSlug: liveTournament.slug,
+      tournamentDate: liveTournament.date,
+      notes,
+    });
+
+    applySignupResult(result);
+    return result.signup;
+  }
+
+  async function handleSubmitSignup() {
     if (!account) {
       setError('Create or sign in to a player account before signing up.');
       return;
@@ -220,26 +242,20 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     setSignup(null);
 
     try {
-      const result = await submitTournamentSignup({
-        tournamentSlug: liveTournament.slug,
-        tournamentDate: liveTournament.date,
-        notes,
-      });
-
-      setSignup(result.signup);
-      setSignupSummary((current) => ({
-        count: result.summary?.signupCount || current.count + 1,
-        loading: false,
-        error: '',
-      }));
-      setPlayerName('');
-      setContactEmail('');
-      setPlayerHandle('');
-      setNotes('');
+      await saveSignupWithCurrentSession();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Signup could not be saved.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function loadConfirmedAccount(fallbackAccount) {
+    try {
+      const refreshed = await fetchPlayerAccount();
+      return refreshed.account || fallbackAccount;
+    } catch {
+      return fallbackAccount;
     }
   }
 
@@ -252,9 +268,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       return;
     }
 
+    accountLoadIdRef.current += 1;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
+    setError('');
+    setSignup(null);
 
     try {
       const result = await createPlayerAccount({
@@ -264,46 +283,83 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         password,
         confirmPassword,
       });
+      const nextAccount = await loadConfirmedAccount(result.account);
+      const accountDisplayName = nextAccount?.playerName || result.account?.playerName || playerName || 'your account';
 
-      setAccount(result.account);
+      setAccount(nextAccount);
+      setPlayerName(nextAccount?.playerName || playerName);
+      setContactEmail(nextAccount?.email || contactEmail);
+      setPlayerHandle(nextAccount?.playerHandle || playerHandle);
       setPassword('');
       setConfirmPassword('');
-      setAccountMessage(`Signed in as ${result.account.playerName}.`);
+
+      if (registrationOpen) {
+        try {
+          const savedSignup = await saveSignupWithCurrentSession();
+          setAccountMessage(`Account created. ${savedSignup.playerName} is signed up for this tournament.`);
+        } catch (signupError) {
+          setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
+          setError(signupError instanceof Error ? signupError.message : 'Tap Sign up to reserve your spot.');
+        }
+      } else {
+        setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
+      }
     } catch (createError) {
       setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
     } finally {
       setAccountSubmitting(false);
+      setAccountLoading(false);
     }
   }
 
   async function handleLoginAccount() {
+    accountLoadIdRef.current += 1;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
+    setError('');
+    setSignup(null);
 
     try {
       const result = await loginPlayerAccount({
         contactEmail,
         password,
       });
+      const nextAccount = await loadConfirmedAccount(result.account);
+      const accountDisplayName = nextAccount?.playerName || result.account?.playerName || contactEmail || 'your account';
 
-      setAccount(result.account);
-      setPlayerName(result.account.playerName || '');
-      setPlayerHandle(result.account.playerHandle || '');
+      setAccount(nextAccount);
+      setPlayerName(nextAccount?.playerName || '');
+      setContactEmail(nextAccount?.email || contactEmail);
+      setPlayerHandle(nextAccount?.playerHandle || '');
       setPassword('');
       setConfirmPassword('');
-      setAccountMessage(`Signed in as ${result.account.playerName}.`);
+
+      if (registrationOpen) {
+        try {
+          const savedSignup = await saveSignupWithCurrentSession();
+          setAccountMessage(`Signed in. ${savedSignup.playerName} is on the tournament roster.`);
+        } catch (signupError) {
+          setAccountMessage(`Signed in as ${accountDisplayName}.`);
+          setError(signupError instanceof Error ? signupError.message : 'Tap Sign up to reserve your spot.');
+        }
+      } else {
+        setAccountMessage(`Signed in as ${accountDisplayName}.`);
+      }
     } catch (loginError) {
       setAccountError(loginError instanceof Error ? loginError.message : 'Player account could not be opened.');
     } finally {
       setAccountSubmitting(false);
+      setAccountLoading(false);
     }
   }
 
   async function handleLogoutAccount() {
+    accountLoadIdRef.current += 1;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
+    setSignup(null);
 
     try {
       await logoutPlayerAccount();
@@ -313,6 +369,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setAccountError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');
     } finally {
       setAccountSubmitting(false);
+      setAccountLoading(false);
     }
   }
 
@@ -339,6 +396,24 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
+  const hasSignupConfirmation = Boolean(signup);
+  const mainTitle = hasSignupConfirmation
+    ? 'You are on the roster'
+    : account
+      ? 'Account ready. Join this event.'
+      : 'Create account and join in one step';
+  const mainCopy = hasSignupConfirmation
+    ? 'You are signed up. Come back here or use My Match when the bracket is published.'
+    : account
+      ? 'Your account is signed in. One more tap reserves your tournament spot.'
+      : 'New players create an account once. If registration is open, this also reserves the tournament spot.';
+  const authActionLabel = accountMode === 'create'
+    ? registrationOpen
+      ? 'Create account + join tournament'
+      : 'Create account'
+    : registrationOpen
+      ? 'Sign in + join tournament'
+      : 'Sign in';
 
   return (
     <HubScreen
@@ -359,52 +434,87 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
       title={`Sign up for ${visibleTournament.title}`}>
-      <Section description="Create or open your player account, then join the event roster." title="Sign up now">
+      <Section description="One clear path: account first, roster second, match link after the bracket goes live." title="Join this tournament">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
-            <Text style={styles.summaryWindow}>{checkIn?.window || 'Registration open'}</Text>
+            <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
           </View>
-          <Text style={styles.summaryTitle}>{account ? 'Reserve your spot' : 'Start with a player account'}</Text>
-          <Text style={styles.summaryCopy}>
-            Your account connects the roster, bracket, and future match-room access.
-          </Text>
+          <Text style={styles.summaryTitle}>{mainTitle}</Text>
+          <Text style={styles.summaryCopy}>{mainCopy}</Text>
           <Text style={styles.timelineCopy}>
-            {registrationMeta.actionCopy} The host publishes the bracket and match links when the event is ready to run.
+            {registrationMeta.actionCopy} {checkIn?.window || 'The host publishes the bracket and match links when the event is ready.'}
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
+
+          <View style={styles.flowSteps}>
+            <View style={[styles.flowStep, (account || hasSignupConfirmation) && styles.flowStepComplete]}>
+              <Badge tone={account || hasSignupConfirmation ? 'green' : 'accent'}>1</Badge>
+              <View style={styles.flowStepCopy}>
+                <Text style={styles.flowStepTitle}>Account</Text>
+                <Text style={styles.flowStepText}>{account ? account.playerName : 'Create or sign in'}</Text>
+              </View>
+            </View>
+            <View style={[styles.flowStep, hasSignupConfirmation && styles.flowStepComplete]}>
+              <Badge tone={hasSignupConfirmation ? 'green' : account ? 'accent' : 'blue'}>2</Badge>
+              <View style={styles.flowStepCopy}>
+                <Text style={styles.flowStepTitle}>Roster</Text>
+                <Text style={styles.flowStepText}>{hasSignupConfirmation ? 'Spot reserved' : 'Join tournament'}</Text>
+              </View>
+            </View>
+            <View style={styles.flowStep}>
+              <Badge tone="blue">3</Badge>
+              <View style={styles.flowStepCopy}>
+                <Text style={styles.flowStepTitle}>Match</Text>
+                <Text style={styles.flowStepText}>Open when bracket is live</Text>
+              </View>
+            </View>
+          </View>
 
           {accountLoading ? <Text style={styles.summaryCopy}>Checking account status...</Text> : null}
 
           {account ? (
             <>
-              <View style={styles.accountPanel}>
+              <View style={[styles.accountPanel, hasSignupConfirmation && styles.accountPanelComplete]}>
                 <View style={styles.summaryTopRow}>
-                  <Badge tone="green">Account linked</Badge>
+                  <Badge tone="green">{hasSignupConfirmation ? 'Roster confirmed' : 'Account linked'}</Badge>
                   <Text style={styles.accountEmail}>{account.email}</Text>
                 </View>
                 <Text style={styles.accountName}>{account.playerName}</Text>
                 {account.playerHandle ? <Text style={styles.summaryCopy}>{account.playerHandle}</Text> : null}
+                <Text style={styles.accountStatusCopy}>
+                  {hasSignupConfirmation
+                    ? `Signed up for ${visibleTournament.title}.`
+                    : 'Your account is ready for this tournament roster.'}
+                </Text>
               </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Notes</Text>
-                <TextInput
-                  multiline
-                  onChangeText={setNotes}
-                  placeholder="Optional availability note"
-                  placeholderTextColor="#6B766F"
-                  style={styles.notesInput}
-                  value={notes}
-                />
-              </View>
+              {hasSignupConfirmation ? null : (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Notes</Text>
+                  <TextInput
+                    multiline
+                    onChangeText={setNotes}
+                    placeholder="Optional availability note"
+                    placeholderTextColor="#6B766F"
+                    style={styles.notesInput}
+                    value={notes}
+                  />
+                </View>
+              )}
 
               <View style={styles.buttonRow}>
-                <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                  {registrationOpen ? (submitting ? 'Saving...' : 'Sign up') : registrationMeta.label}
-                </ActionButton>
+                {hasSignupConfirmation ? (
+                  <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
+                    Find my match
+                  </ActionButton>
+                ) : (
+                  <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
+                    {registrationOpen ? (submitting ? 'Saving...' : 'Join tournament roster') : registrationMeta.label}
+                  </ActionButton>
+                )}
                 <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
-                  Event details
+                  Tournament page
                 </ActionButton>
                 <ActionButton onPress={handleLogoutAccount} variant="ghost">
                   {accountSubmitting ? 'Signing out...' : 'Sign out'}
@@ -415,15 +525,17 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             <>
               <View style={styles.modeRow}>
                 <ActionButton
+                  disabled={accountSubmitting}
                   onPress={() => {
                     setAccountMode('create');
                     setAccountError('');
                     setAccountMessage('');
                   }}
                   variant={accountMode === 'create' ? 'primary' : 'secondary'}>
-                  Create account
+                  New player
                 </ActionButton>
                 <ActionButton
+                  disabled={accountSubmitting}
                   onPress={() => {
                     setAccountMode('login');
                     setConfirmPassword('');
@@ -431,9 +543,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     setAccountMessage('');
                   }}
                   variant={accountMode === 'login' ? 'primary' : 'secondary'}>
-                  Sign in
+                  Already have account
                 </ActionButton>
               </View>
+              <Text style={styles.modeHint}>
+                {accountMode === 'create'
+                  ? 'Create the player account once. The same button will try to reserve the tournament spot.'
+                  : 'Sign in with the account email and password, then we will try to reserve the spot.'}
+              </Text>
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>
@@ -524,12 +641,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               <View style={styles.buttonRow}>
                 {accountMode === 'create' ? (
-                  <ActionButton onPress={handleCreateAccount}>
-                    {accountSubmitting ? 'Saving...' : 'Create account and continue'}
+                  <ActionButton disabled={accountSubmitting || accountLoading} onPress={handleCreateAccount}>
+                    {accountSubmitting ? 'Creating...' : authActionLabel}
                   </ActionButton>
                 ) : (
-                  <ActionButton onPress={handleLoginAccount}>
-                    {accountSubmitting ? 'Opening...' : 'Sign in and continue'}
+                  <ActionButton disabled={accountSubmitting || accountLoading} onPress={handleLoginAccount}>
+                    {accountSubmitting ? 'Opening...' : authActionLabel}
                   </ActionButton>
                 )}
               </View>
@@ -539,9 +656,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
           {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
           {signup ? (
-            <Text style={styles.successText}>
-              Signup saved for {signup.playerName}. Confirmation ID: {signup.id}
-            </Text>
+            <View style={styles.confirmationPanel}>
+              <Badge tone="green">Signup saved</Badge>
+              <Text style={styles.confirmationTitle}>{signup.playerName} is registered.</Text>
+              <Text style={styles.confirmationCopy}>Confirmation ID: {signup.id}</Text>
+            </View>
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </Surface>
@@ -573,6 +692,45 @@ const styles = StyleSheet.create({
   signupCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
   },
+  flowSteps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  flowStep: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexGrow: 1,
+    flexBasis: 220,
+    gap: 10,
+    padding: 12,
+  },
+  flowStepComplete: {
+    backgroundColor: 'rgba(97, 210, 145, 0.09)',
+    borderColor: 'rgba(97, 210, 145, 0.34)',
+  },
+  flowStepCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  flowStepTitle: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
+  },
+  flowStepText: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 2,
+  },
   buttonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -586,6 +744,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 14,
   },
+  accountPanelComplete: {
+    borderColor: 'rgba(214, 162, 78, 0.44)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+  },
   accountEmail: {
     color: '#6CC7FF',
     fontSize: 12,
@@ -598,6 +760,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '800',
+  },
+  accountStatusCopy: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
   },
   errorText: {
     color: '#E06A5C',
@@ -621,6 +790,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
+  },
+  modeHint: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 12,
   },
   input: {
     color: '#F4EFE6',
@@ -727,5 +903,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 12,
     fontWeight: '700',
+  },
+  confirmationPanel: {
+    backgroundColor: 'rgba(97, 210, 145, 0.10)',
+    borderColor: 'rgba(97, 210, 145, 0.36)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 14,
+  },
+  confirmationTitle: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+    marginTop: 10,
+  },
+  confirmationCopy: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 4,
   },
 });
