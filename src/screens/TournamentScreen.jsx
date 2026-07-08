@@ -365,9 +365,39 @@ export default function TournamentScreen({ slug }) {
       }
       title={visibleTournament.title}>
       <Section
-        description="Start here. This dashboard shows the next action, roster size, and bracket state without making players hunt."
+        description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
+        nativeID="my-match"
+        title="Your tournament status">
+        <PlayerTournamentStatus
+          checkInPath={checkInPath}
+          playerStatus={playerStatus}
+          slug={visibleTournament.slug}
+        />
+      </Section>
+
+      <Section
+        description={
+          isBracketLive
+            ? 'Players can confirm they are in the published bracket before opening the table.'
+            : 'Players can confirm their name is on the signup roster before the host seeds the bracket.'
+        }
+        nativeID="registered-players"
+        title="Current roster">
+        <RegisteredPlayersPanel
+          advertisedRosterCap={advertisedRosterCap}
+          liveBracket={liveBracket}
+          liveBracketSize={liveBracketSize}
+          minimumPlayers={minimumPlayers}
+          rosterBracketSize={rosterBracketSize}
+          signupSummary={signupSummary}
+          tournament={visibleTournament}
+        />
+      </Section>
+
+      <Section
+        description="Roster size, bracket state, and the main action in one compact control center."
         nativeID="tournament-dashboard"
-        title="Tournament dashboard">
+        title="Tournament control center">
         <TournamentDashboard
           advertisedRosterCap={advertisedRosterCap}
           checkInPath={checkInPath}
@@ -380,21 +410,6 @@ export default function TournamentScreen({ slug }) {
           signupSummary={signupSummary}
           streams={streams}
           tournament={visibleTournament}
-        />
-      </Section>
-
-      <Section
-        description={
-          isBracketLive
-            ? 'Start here once the bracket is live. Signed-in players can open their assigned table without reading the whole bracket.'
-            : 'Start here before the bracket is live. This card tells each signed-in player whether they need to sign up or wait.'
-        }
-        nativeID="my-match"
-        title={isBracketLive ? 'My match' : 'Find your match'}>
-        <PlayerTournamentStatus
-          checkInPath={checkInPath}
-          playerStatus={playerStatus}
-          slug={visibleTournament.slug}
         />
       </Section>
 
@@ -422,25 +437,6 @@ export default function TournamentScreen({ slug }) {
           />
         </Section>
       ) : null}
-
-      <Section
-        description={
-          isBracketLive
-            ? 'Public roster count and seeded-player status for the current live bracket.'
-            : 'Public-safe roster count, bracket size, and seeded-player status in one place.'
-        }
-        nativeID="registered-players"
-        title={isBracketLive ? 'Players in this bracket' : 'Registered players and bracket size'}>
-        <RegisteredPlayersPanel
-          advertisedRosterCap={advertisedRosterCap}
-          liveBracket={liveBracket}
-          liveBracketSize={liveBracketSize}
-          minimumPlayers={minimumPlayers}
-          rosterBracketSize={rosterBracketSize}
-          signupSummary={signupSummary}
-          tournament={visibleTournament}
-        />
-      </Section>
 
       {!liveBracket ? (
         <Section
@@ -699,11 +695,41 @@ function statusTone(nextStep) {
   return 'blue';
 }
 
+function statusBadgeLabel(nextStep) {
+  switch (nextStep) {
+    case 'sign-in':
+      return 'Sign in needed';
+    case 'sign-up':
+      return 'Not registered';
+    case 'ready-match':
+      return 'Match ready';
+    case 'wait-opponent':
+      return 'Waiting';
+    case 'eliminated':
+      return 'Finished';
+    case 'champion':
+      return 'Champion';
+    case 'complete':
+      return 'Complete';
+    default:
+      return 'Checking';
+  }
+}
+
+function playerStatusActionLabel(data, currentMatch) {
+  if (currentMatch) return 'Play my match';
+  if (!data?.account) return 'Sign in';
+  if (!data?.signup) return 'Sign up';
+  return 'Open signup';
+}
+
 function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState('');
   const data = playerStatus.data;
   const currentMatch = data?.currentMatch || null;
+  const signedInName = data?.account?.playerName || '';
+  const signupName = data?.signup?.playerName || '';
 
   async function handlePlayMyMatch() {
     if (!currentMatch) return;
@@ -727,11 +753,15 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
   }
 
   return (
-    <Surface style={styles.playerStatusCard}>
+    <Surface style={[styles.playerStatusCard, currentMatch && styles.playerStatusCardReady]}>
       <View style={styles.playerStatusTopRow}>
-        <Badge tone={statusTone(data?.nextStep)}>{data?.nextStep || 'checking'}</Badge>
+        <Badge tone={statusTone(data?.nextStep)}>{statusBadgeLabel(data?.nextStep)}</Badge>
         <Text style={styles.playerStatusMeta}>
-          {playerStatus.loading ? 'Checking account' : data?.account?.playerName || 'No player account open'}
+          {playerStatus.loading
+            ? 'Checking account'
+            : signedInName
+              ? `Signed in as ${signedInName}`
+              : 'No player account signed in'}
         </Text>
       </View>
 
@@ -744,9 +774,28 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
 
       {data?.signup ? (
         <Text style={styles.playerStatusCopy}>
-          Signed up as {playerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
+          Roster seat confirmed for {playerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
+        </Text>
+      ) : signedInName ? (
+        <Text style={styles.playerStatusCopy}>
+          {signedInName} is signed in, but not on this tournament roster yet.
         </Text>
       ) : null}
+
+      <View style={styles.playerStatusSteps}>
+        <View style={[styles.playerStatusStep, signedInName && styles.playerStatusStepDone]}>
+          <Text style={[styles.playerStatusStepLabel, signedInName && styles.playerStatusStepLabelDone]}>Account</Text>
+          <Text style={styles.playerStatusStepValue}>{signedInName || 'Needed'}</Text>
+        </View>
+        <View style={[styles.playerStatusStep, signupName && styles.playerStatusStepDone]}>
+          <Text style={[styles.playerStatusStepLabel, signupName && styles.playerStatusStepLabelDone]}>Roster</Text>
+          <Text style={styles.playerStatusStepValue}>{signupName ? 'Registered' : 'Not yet'}</Text>
+        </View>
+        <View style={[styles.playerStatusStep, currentMatch && styles.playerStatusStepReady]}>
+          <Text style={[styles.playerStatusStepLabel, currentMatch && styles.playerStatusStepLabelReady]}>Match</Text>
+          <Text style={styles.playerStatusStepValue}>{currentMatch ? 'Ready' : 'Waiting'}</Text>
+        </View>
+      </View>
 
       {currentMatch ? (
         <View style={styles.playerMatchBox}>
@@ -770,7 +819,7 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
         {currentMatch ? (
           <ActionButton onPress={handlePlayMyMatch}>{opening ? 'Opening...' : 'Play my match'}</ActionButton>
         ) : (
-          <ActionButton href={checkInPath}>{data?.account ? 'Open signup' : 'Create or sign in'}</ActionButton>
+          <ActionButton href={checkInPath}>{playerStatusActionLabel(data, currentMatch)}</ActionButton>
         )}
         <ActionButton href="/rules" variant="secondary">
           Rules
@@ -798,9 +847,27 @@ function RegisteredPlayersPanel({
   const bracketCopy = liveBracket
     ? `Live bracket: ${bracketSizeLabel(liveBracketSize)} with ${seededCount} seeded player${seededCount === 1 ? '' : 's'}.`
     : `Actual bracket if seeded now: ${bracketSizeLabel(rosterBracketSize)}. ${rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}`;
+  const rosterCountValue = signupSummary.loading ? '--' : String(signupSummary.count);
+  const bracketValue = liveBracket ? `${seededCount} seeded` : bracketSizeLabel(rosterBracketSize);
 
   return (
     <Surface style={styles.rosterCard}>
+      <View style={styles.rosterHeroRow}>
+        <View style={styles.rosterHeroTile}>
+          <Text style={styles.rosterHeroLabel}>Registered</Text>
+          <Text style={styles.rosterHeroValue}>
+            {rosterCountValue}
+            <Text style={styles.rosterHeroSubValue}> / {advertisedRosterCap}</Text>
+          </Text>
+          <Text style={styles.rosterHeroMeta}>advertised seats</Text>
+        </View>
+        <View style={styles.rosterHeroTile}>
+          <Text style={styles.rosterHeroLabel}>Bracket</Text>
+          <Text style={styles.rosterHeroValue}>{bracketValue}</Text>
+          <Text style={styles.rosterHeroMeta}>{liveBracket ? 'published now' : 'flexible actual size'}</Text>
+        </View>
+      </View>
+
       <View style={styles.rosterHeader}>
         <Badge tone={signupSummary.count ? 'green' : 'blue'}>
           {signupCountLabel(signupSummary.count, signupSummary.loading)}
@@ -1072,6 +1139,46 @@ const styles = StyleSheet.create({
   rosterCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
   },
+  rosterHeroRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  rosterHeroTile: {
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexBasis: 180,
+    padding: 14,
+  },
+  rosterHeroLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  rosterHeroValue: {
+    color: '#F4EFE6',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
+    marginTop: 3,
+  },
+  rosterHeroSubValue: {
+    color: '#AAB4AE',
+    fontSize: 18,
+  },
+  rosterHeroMeta: {
+    color: '#61D291',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 2,
+  },
   rosterHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1173,6 +1280,10 @@ const styles = StyleSheet.create({
   playerStatusCard: {
     borderColor: 'rgba(214, 162, 78, 0.26)',
   },
+  playerStatusCardReady: {
+    backgroundColor: 'rgba(12, 36, 28, 0.96)',
+    borderColor: 'rgba(97, 210, 145, 0.58)',
+  },
   playerStatusTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1198,6 +1309,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
+  },
+  playerStatusSteps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  playerStatusStep: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexBasis: 145,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  playerStatusStepDone: {
+    backgroundColor: 'rgba(97, 210, 145, 0.10)',
+    borderColor: 'rgba(97, 210, 145, 0.38)',
+  },
+  playerStatusStepReady: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.52)',
+  },
+  playerStatusStepLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  playerStatusStepLabelDone: {
+    color: '#61D291',
+  },
+  playerStatusStepLabelReady: {
+    color: '#D6A24E',
+  },
+  playerStatusStepValue: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+    marginTop: 3,
   },
   playerStatusWarning: {
     color: '#FFB4A8',

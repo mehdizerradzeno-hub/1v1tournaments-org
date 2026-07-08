@@ -28,7 +28,6 @@ const MOBILE_NAV_ITEMS = [
   { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
   { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
   { label: 'Ranks', href: '/leaderboard' },
-  { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
 ];
 
 const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
@@ -56,6 +55,16 @@ function getToneColor(tone) {
   if (tone === 'rose') return theme.colors.rose;
   if (tone === 'neutral') return theme.colors.lineStrong;
   return theme.colors.accent;
+}
+
+function shortAccountName(account) {
+  const name = String(account?.playerName || account?.email || '').trim();
+
+  if (!name) {
+    return 'Player';
+  }
+
+  return name.length > 18 ? `${name.slice(0, 17)}...` : name;
 }
 
 function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false, disabled = false }) {
@@ -155,6 +164,30 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
             disabled && styles.actionButtonTextDisabled,
           ]}>
           {children}
+        </Text>
+      </View>
+    </LinkShell>
+  );
+}
+
+function HeaderAccountChip({ account, loading }) {
+  const signedIn = Boolean(account);
+  const accountName = shortAccountName(account);
+  const label = loading ? 'Checking' : signedIn ? 'Signed in' : 'Account';
+  const value = loading ? 'One sec...' : signedIn ? accountName : 'Sign in';
+
+  return (
+    <LinkShell
+      accessibilityLabel={signedIn ? `Signed in as ${accountName}. Switch account.` : 'Sign in to your tournament account'}
+      href={PRIMARY_SIGN_IN_PATH}
+      style={styles.accountChipShell}
+      variant={signedIn ? 'secondary' : 'primary'}>
+      <View style={[styles.accountChip, signedIn ? styles.accountChipSignedIn : styles.accountChipSignedOut]}>
+        <Text style={[styles.accountChipLabel, !signedIn && styles.accountChipLabelSignedOut]}>{label}</Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.accountChipValue, !signedIn && styles.accountChipValueSignedOut]}>
+          {value}
         </Text>
       </View>
     </LinkShell>
@@ -529,15 +562,6 @@ export function HubScreen({
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
-  const accountHref = PRIMARY_SIGN_IN_PATH;
-  const accountLabel = playerAccountLoading
-    ? 'Sign in'
-    : playerAccount?.hostApproved
-      ? 'Switch account'
-      : playerAccount
-        ? 'Switch account'
-        : 'Sign in';
-  const accountVariant = playerAccount ? 'secondary' : 'primary';
 
   useEffect(() => {
     let active = true;
@@ -612,9 +636,7 @@ export function HubScreen({
                     Admin
                   </ActionButton>
                 ) : null}
-                <ActionButton href={accountHref} variant={accountVariant} style={styles.brandButton}>
-                  {accountLabel}
-                </ActionButton>
+                <HeaderAccountChip account={playerAccount} loading={playerAccountLoading} />
               </View>
             </View>
 
@@ -781,7 +803,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    minWidth: 220,
+    flexShrink: 1,
+    minWidth: 0,
   },
   brandMark: {
     width: 52,
@@ -821,6 +844,7 @@ const styles = StyleSheet.create({
   },
   brandUtility: {
     alignItems: 'center',
+    flexShrink: 0,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
@@ -829,6 +853,49 @@ const styles = StyleSheet.create({
     marginRight: 0,
     marginLeft: 8,
     marginBottom: 8,
+  },
+  accountChipShell: {
+    marginBottom: 8,
+    marginLeft: 8,
+    maxWidth: 178,
+  },
+  accountChip: {
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    minHeight: 50,
+    minWidth: 116,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  accountChipSignedIn: {
+    backgroundColor: 'rgba(97, 210, 145, 0.12)',
+    borderColor: 'rgba(97, 210, 145, 0.62)',
+  },
+  accountChipSignedOut: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  accountChipLabel: {
+    color: theme.colors.green,
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 13,
+    textTransform: 'uppercase',
+  },
+  accountChipLabelSignedOut: {
+    color: '#101010',
+  },
+  accountChipValue: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+    marginTop: 1,
+  },
+  accountChipValueSignedOut: {
+    color: '#101010',
+    fontSize: 15,
+    textTransform: 'uppercase',
   },
   navRow: {
     flexDirection: 'row',

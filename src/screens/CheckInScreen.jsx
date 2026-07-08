@@ -809,9 +809,23 @@ function isOwnSignup(signup, account, latestSignup) {
 
 function SignupRosterPanel({ account, latestSignup, signupSummary }) {
   const signups = signupSummary.signups || [];
+  const ownSignup = signups.find((signupItem) => isOwnSignup(signupItem, account, latestSignup)) || latestSignup || null;
 
   return (
     <Surface style={styles.rosterCard}>
+      <View style={styles.rosterHeroRow}>
+        <View style={styles.rosterHeroTile}>
+          <Text style={styles.rosterHeroLabel}>Registered</Text>
+          <Text style={styles.rosterHeroValue}>{signupSummary.loading ? '--' : signupSummary.count}</Text>
+          <Text style={styles.rosterHeroMeta}>public roster</Text>
+        </View>
+        <View style={[styles.rosterHeroTile, ownSignup && styles.rosterHeroTileCurrent]}>
+          <Text style={styles.rosterHeroLabel}>Your status</Text>
+          <Text style={styles.rosterHeroValueSmall}>{ownSignup ? 'You are in' : account ? 'Not joined' : 'Sign in'}</Text>
+          <Text style={styles.rosterHeroMeta}>{ownSignup?.playerName || account?.playerName || 'Open your account'}</Text>
+        </View>
+      </View>
+
       <View style={styles.rosterHeader}>
         <Badge tone={signupSummary.count ? 'green' : 'blue'}>
           {signupCountLabel(signupSummary.count, signupSummary.loading)}
@@ -874,6 +888,53 @@ const styles = StyleSheet.create({
   },
   rosterCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  rosterHeroRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  rosterHeroTile: {
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexBasis: 170,
+    padding: 14,
+  },
+  rosterHeroTileCurrent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.50)',
+  },
+  rosterHeroLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  rosterHeroValue: {
+    color: '#F4EFE6',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
+    marginTop: 3,
+  },
+  rosterHeroValueSmall: {
+    color: '#F4EFE6',
+    fontSize: 21,
+    fontWeight: '900',
+    lineHeight: 27,
+    marginTop: 5,
+  },
+  rosterHeroMeta: {
+    color: '#61D291',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 2,
   },
   rosterHeader: {
     alignItems: 'center',
