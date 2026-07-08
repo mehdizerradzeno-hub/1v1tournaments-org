@@ -43,6 +43,22 @@ function signupCountLabel(count, loading = false) {
   return `${count} signed up`;
 }
 
+const DEFAULT_ROSTER_CAP = 8;
+const DEFAULT_MINIMUM_PLAYERS = 2;
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function getAdvertisedRosterCap(tournament) {
+  return positiveInteger(tournament?.rosterCap, DEFAULT_ROSTER_CAP);
+}
+
+function getMinimumPlayers(tournament) {
+  return positiveInteger(tournament?.minimumPlayers, DEFAULT_MINIMUM_PLAYERS);
+}
+
 function nextPowerOfTwo(value) {
   let size = 2;
   const target = Math.max(Number(value) || 0, 2);
@@ -68,18 +84,39 @@ function bracketSizeLabel(size) {
   return `${size}-player`;
 }
 
+function actualBracketSizeFromSignups(count, minimumPlayers = DEFAULT_MINIMUM_PLAYERS) {
+  return nextPowerOfTwo(Math.max(count, minimumPlayers));
+}
+
 function playerCapacityLabel(count, size, loading = false) {
   if (loading) return 'Loading';
   return `${count}/${size}`;
 }
 
-function openSlotLabel(count, size, loading = false) {
+function openSlotLabel(count, size, minimumPlayers = DEFAULT_MINIMUM_PLAYERS, loading = false) {
   if (loading) return 'Checking open seats';
   const openSlots = Math.max(size - count, 0);
 
-  if (count < 2) return 'Need 2 players to generate a bracket';
+  if (count < minimumPlayers) return `Need ${minimumPlayers} players to generate a bracket`;
+  if (count > size) return `${count - size} over advertised size; actual bracket can expand`;
   if (openSlots === 0) return 'Current bracket size is full';
   return `${openSlots} open bracket seat${openSlots === 1 ? '' : 's'}`;
+}
+
+function rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers) {
+  return tournament?.bracketFlexPolicy
+    || `Advertised ${advertisedRosterCap}-player bracket. Runs with ${minimumPlayers}+ players and fills open seats with byes.`;
+}
+
+function seatLabel(count, advertisedRosterCap, loading = false) {
+  if (loading) return `Loading / ${advertisedRosterCap}`;
+  return `${count} / ${advertisedRosterCap}`;
+}
+
+function actualBracketPreviewLabel(count, minimumPlayers, loading = false) {
+  if (loading) return 'Checking';
+  if (count < minimumPlayers) return `${minimumPlayers}-player minimum`;
+  return `${bracketSizeLabel(actualBracketSizeFromSignups(count, minimumPlayers))} actual`;
 }
 
 function heroSignupAction(status, checkInPath, tournamentPath) {
@@ -250,8 +287,10 @@ export default function TournamentScreen({ slug }) {
   ].filter(Boolean);
 
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
+  const advertisedRosterCap = getAdvertisedRosterCap(visibleTournament);
+  const minimumPlayers = getMinimumPlayers(visibleTournament);
   const liveBracketSize = bracketSizeFromBracket(liveBracket, liveBracket?.participantCount || 0);
-  const rosterBracketSize = nextPowerOfTwo(signupSummary.count);
+  const rosterBracketSize = actualBracketSizeFromSignups(signupSummary.count, minimumPlayers);
   const activeBracketSize = liveBracket ? liveBracketSize : rosterBracketSize;
 
   return (
@@ -263,7 +302,7 @@ export default function TournamentScreen({ slug }) {
       stats={[
         { label: 'Format', value: visibleTournament.format, tone: 'blue' },
         { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
-        { label: 'Registered', value: signupSummary.loading ? 'Loading' : String(signupSummary.count), tone: signupSummary.count ? 'green' : 'blue' },
+        { label: 'Seats', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
         { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(activeBracketSize), tone: liveBracket ? 'green' : 'accent' },
         { label: 'Location', value: visibleTournament.location, tone: 'accent' },
       ]}
@@ -273,6 +312,25 @@ export default function TournamentScreen({ slug }) {
           : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
       }
       title={visibleTournament.title}>
+      <Section
+        description="Start here. This dashboard shows the next action, roster size, and bracket state without making players hunt."
+        nativeID="tournament-dashboard"
+        title="Tournament dashboard">
+        <TournamentDashboard
+          advertisedRosterCap={advertisedRosterCap}
+          checkInPath={checkInPath}
+          isBracketLive={isBracketLive}
+          liveBracket={liveBracket}
+          matchStatusPath={matchStatusPath}
+          minimumPlayers={minimumPlayers}
+          playerStatus={playerStatus}
+          registrationMeta={registrationMeta}
+          signupSummary={signupSummary}
+          streams={streams}
+          tournament={visibleTournament}
+        />
+      </Section>
+
       <Section
         description={
           isBracketLive
@@ -322,10 +380,13 @@ export default function TournamentScreen({ slug }) {
         nativeID="registered-players"
         title={isBracketLive ? 'Players in this bracket' : 'Registered players and bracket size'}>
         <RegisteredPlayersPanel
+          advertisedRosterCap={advertisedRosterCap}
           liveBracket={liveBracket}
           liveBracketSize={liveBracketSize}
+          minimumPlayers={minimumPlayers}
           rosterBracketSize={rosterBracketSize}
           signupSummary={signupSummary}
+          tournament={visibleTournament}
         />
       </Section>
 
@@ -465,6 +526,115 @@ export default function TournamentScreen({ slug }) {
   );
 }
 
+function dashboardStatusCopy({ isBracketLive, playerStatus, registrationMeta }) {
+  const data = playerStatus.data;
+
+  if (playerStatus.loading) {
+    return 'Checking your player account and current match...';
+  }
+
+  if (data?.currentMatch) {
+    return 'Your match is ready. Open it from this page, then return here for bracket and result status.';
+  }
+
+  if (isBracketLive) {
+    return data?.signup
+      ? 'You are in the tournament. Watch this page for your assigned table.'
+      : 'The bracket is live. Sign in with the account used for signup to find your match.';
+  }
+
+  if (registrationMeta.value === 'open') {
+    return data?.signup
+      ? 'You are already on the roster. The host will publish match links when the bracket is ready.'
+      : 'Create or sign in to an account, then join the roster before the bracket is seeded.';
+  }
+
+  return registrationMeta.actionCopy;
+}
+
+function TournamentDashboard({
+  advertisedRosterCap,
+  checkInPath,
+  isBracketLive,
+  liveBracket,
+  matchStatusPath,
+  minimumPlayers,
+  playerStatus,
+  registrationMeta,
+  signupSummary,
+  streams,
+  tournament,
+}) {
+  const data = playerStatus.data;
+  const currentMatch = data?.currentMatch || null;
+  const tournamentPath = getTournamentPath(tournament.slug);
+  const registeredLabel = seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading);
+  const bracketLabel = liveBracket
+    ? `${liveBracket.participantCount || 0} seeded`
+    : actualBracketPreviewLabel(signupSummary.count, minimumPlayers, signupSummary.loading);
+  const primaryAction = currentMatch
+    ? { label: 'Play my match', href: matchStatusPath }
+    : isBracketLive
+      ? { label: 'Find my match', href: matchStatusPath }
+      : registrationMeta.value === 'open'
+        ? { label: data?.signup ? 'View my status' : 'Create account + join', href: data?.signup ? matchStatusPath : checkInPath }
+        : { label: 'View roster', href: `${tournamentPath}#registered-players` };
+
+  return (
+    <Surface style={styles.dashboardCard}>
+      <View style={styles.dashboardTopRow}>
+        <View style={styles.dashboardCopy}>
+          <Badge tone={currentMatch ? 'green' : isBracketLive ? 'accent' : registrationMeta.tone}>
+            {currentMatch ? 'Match ready' : isBracketLive ? 'Bracket live' : registrationMeta.label}
+          </Badge>
+          <Text style={styles.dashboardTitle}>
+            {currentMatch ? 'Your table is ready.' : isBracketLive ? 'Find your assigned match.' : 'Join before the bracket is seeded.'}
+          </Text>
+          <Text style={styles.dashboardText}>
+            {dashboardStatusCopy({ isBracketLive, playerStatus, registrationMeta })}
+          </Text>
+        </View>
+
+        <View style={styles.dashboardActions}>
+          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
+          <ActionButton href={`${tournamentPath}${isBracketLive ? '#live-bracket' : '#registered-players'}`} variant="secondary">
+            {isBracketLive ? 'View bracket' : 'View roster'}
+          </ActionButton>
+          {streams.length ? (
+            <ActionButton href="/live" variant="secondary">
+              Watch live
+            </ActionButton>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.dashboardGrid}>
+        <View style={styles.dashboardTile}>
+          <Text style={styles.dashboardTileLabel}>Registered</Text>
+          <Text style={styles.dashboardTileValue}>{registeredLabel}</Text>
+          <Text style={styles.dashboardTileMeta}>advertised seats</Text>
+        </View>
+        <View style={styles.dashboardTile}>
+          <Text style={styles.dashboardTileLabel}>Bracket</Text>
+          <Text style={styles.dashboardTileValue}>{bracketLabel}</Text>
+          <Text style={styles.dashboardTileMeta}>{liveBracket ? 'live bracket' : 'actual if seeded now'}</Text>
+        </View>
+        <View style={styles.dashboardTile}>
+          <Text style={styles.dashboardTileLabel}>Minimum</Text>
+          <Text style={styles.dashboardTileValue}>{minimumPlayers}</Text>
+          <Text style={styles.dashboardTileMeta}>players to run</Text>
+        </View>
+      </View>
+
+      <View style={styles.dashboardPolicy}>
+        <Text style={styles.dashboardPolicyText}>
+          {rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}
+        </Text>
+      </View>
+    </Surface>
+  );
+}
+
 function playerLabel(player) {
   if (!player) return 'TBD';
   return player.handle ? `${player.name} (${player.handle})` : player.name;
@@ -558,16 +728,24 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
   );
 }
 
-function RegisteredPlayersPanel({ liveBracket, liveBracketSize, rosterBracketSize, signupSummary }) {
+function RegisteredPlayersPanel({
+  advertisedRosterCap,
+  liveBracket,
+  liveBracketSize,
+  minimumPlayers,
+  rosterBracketSize,
+  signupSummary,
+  tournament,
+}) {
   const signups = signupSummary.signups || [];
   const seededCount = liveBracket?.participantCount || 0;
   const extraSignupCount = liveBracket ? Math.max(signupSummary.count - seededCount, 0) : 0;
   const rosterCapacityCopy = liveBracket
-    ? `${seededCount}/${liveBracketSize} seeded in the live bracket`
-    : `${playerCapacityLabel(signupSummary.count, rosterBracketSize, signupSummary.loading)} players • ${openSlotLabel(signupSummary.count, rosterBracketSize, signupSummary.loading)}`;
+    ? `${seededCount}/${liveBracketSize} seeded in the live bracket • advertised ${advertisedRosterCap} seats`
+    : `${playerCapacityLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading)} advertised seats • ${openSlotLabel(signupSummary.count, advertisedRosterCap, minimumPlayers, signupSummary.loading)}`;
   const bracketCopy = liveBracket
     ? `Live bracket: ${bracketSizeLabel(liveBracketSize)} with ${seededCount} seeded player${seededCount === 1 ? '' : 's'}.`
-    : `If generated now: ${bracketSizeLabel(rosterBracketSize)} bracket.`;
+    : `Actual bracket if seeded now: ${bracketSizeLabel(rosterBracketSize)}. ${rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}`;
 
   return (
     <Surface style={styles.rosterCard}>
@@ -575,8 +753,9 @@ function RegisteredPlayersPanel({ liveBracket, liveBracketSize, rosterBracketSiz
         <Badge tone={signupSummary.count ? 'green' : 'blue'}>
           {signupCountLabel(signupSummary.count, signupSummary.loading)}
         </Badge>
+        <Badge tone="blue">{advertisedRosterCap} advertised seats</Badge>
         <Badge tone={liveBracket ? 'green' : 'accent'}>
-          {liveBracket ? `${seededCount} seeded` : `${bracketSizeLabel(rosterBracketSize)} bracket`}
+          {liveBracket ? `${seededCount} seeded` : `${bracketSizeLabel(rosterBracketSize)} actual`}
         </Badge>
         <Text style={styles.rosterCapacity}>{rosterCapacityCopy}</Text>
       </View>
@@ -693,6 +872,91 @@ function LiveBracketBoard({ bracket }) {
 }
 
 const styles = StyleSheet.create({
+  dashboardCard: {
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: 'rgba(8, 25, 21, 0.92)',
+  },
+  dashboardTopRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+  },
+  dashboardCopy: {
+    flex: 1.3,
+    minWidth: 260,
+  },
+  dashboardTitle: {
+    color: '#F4EFE6',
+    fontSize: 26,
+    fontWeight: '900',
+    lineHeight: 32,
+    marginTop: 12,
+  },
+  dashboardText: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
+    marginTop: 8,
+  },
+  dashboardActions: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignContent: 'flex-start',
+    minWidth: 240,
+  },
+  dashboardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  dashboardTile: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexBasis: 170,
+    padding: 14,
+  },
+  dashboardTileLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  dashboardTileValue: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 5,
+  },
+  dashboardTileMeta: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  dashboardPolicy: {
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  dashboardPolicyText: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
   block: {
     marginBottom: 14,
   },

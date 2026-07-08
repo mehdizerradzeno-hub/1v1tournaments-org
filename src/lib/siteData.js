@@ -186,7 +186,7 @@ export const siteData = {
       format: 'Single-elimination bracket',
       rosterCap: 8,
       minimumPlayers: 2,
-      bracketFlexPolicy: 'Advertised 8-player bracket. Runs with 2+ players and fills open seats with byes.',
+      bracketFlexPolicy: 'Advertised 8-player bracket. Actual bracket flexes to the checked-in roster: runs with 2+ players and fills open seats with byes.',
       entryLine: 'Free entry, no buy-in, no wagering.',
       summary: 'The launch event for the hub with live coverage and posted results.',
       detail: 'A focused launch bracket with live account signup, hosted match links, automatic result reporting, and a post-match summary.',
