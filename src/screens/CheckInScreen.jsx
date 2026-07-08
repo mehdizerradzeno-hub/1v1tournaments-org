@@ -95,7 +95,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
-  const [signupSummary, setSignupSummary] = useState({ count: 0, loading: true, error: '' });
+  const [signupSummary, setSignupSummary] = useState({ count: 0, signups: [], loading: true, error: '' });
   const [liveBracket, setLiveBracket] = useState(null);
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const liveTournament = useMemo(
@@ -143,7 +143,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     async function loadSignupSummary() {
       if (!tournamentSlug) {
         setTournamentSettings(null);
-        setSignupSummary({ count: 0, loading: false, error: '' });
+        setSignupSummary({ count: 0, signups: [], loading: false, error: '' });
         return;
       }
 
@@ -156,6 +156,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setTournamentSettings(result.settings || null);
           setSignupSummary({
             count: result.signupCount || 0,
+            signups: result.signups || [],
             loading: false,
             error: '',
           });
@@ -165,6 +166,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setTournamentSettings(null);
           setSignupSummary({
             count: 0,
+            signups: [],
             loading: false,
             error: summaryError instanceof Error ? summaryError.message : 'Signup count could not be loaded.',
           });
@@ -198,12 +200,13 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     return () => {
       active = false;
     };
-  }, [tournamentSlug]);
+  }, [tournamentSlug, account?.id]);
 
   function applySignupResult(result) {
     setSignup(result.signup);
     setSignupSummary((current) => ({
       count: result.summary?.signupCount || current.count + 1,
+      signups: result.summary?.signups || current.signups || [],
       loading: false,
       error: '',
     }));
@@ -434,6 +437,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
       title={`Sign up for ${visibleTournament.title}`}>
+      <Section
+        description="Public roster names appear here as soon as signups are saved. Signed-in players see themselves marked."
+        title="Current roster">
+        <SignupRosterPanel
+          account={account}
+          latestSignup={signup}
+          signupSummary={signupSummary}
+        />
+      </Section>
+
       <Section description="One clear path: account first, roster second, match link after the bracket goes live." title="Join this tournament">
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
@@ -679,6 +692,68 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   );
 }
 
+function isOwnSignup(signup, account, latestSignup) {
+  if (!signup) return false;
+  if (signup.currentPlayer) return true;
+  if (latestSignup?.id && signup.id === latestSignup.id) return true;
+
+  const accountName = String(account?.playerName || '').trim().toLowerCase();
+  const signupName = String(signup.playerName || '').trim().toLowerCase();
+  return Boolean(accountName && signupName && accountName === signupName);
+}
+
+function SignupRosterPanel({ account, latestSignup, signupSummary }) {
+  const signups = signupSummary.signups || [];
+
+  return (
+    <Surface style={styles.rosterCard}>
+      <View style={styles.rosterHeader}>
+        <Badge tone={signupSummary.count ? 'green' : 'blue'}>
+          {signupCountLabel(signupSummary.count, signupSummary.loading)}
+        </Badge>
+        <Text style={styles.rosterHeaderText}>
+          {account ? `Signed in as ${account.playerName}` : 'Sign in to mark your own roster row.'}
+        </Text>
+      </View>
+
+      {signupSummary.error ? <Text style={styles.rosterWarning}>{signupSummary.error}</Text> : null}
+
+      {signupSummary.loading ? (
+        <Text style={styles.rosterEmptyText}>Loading registered players...</Text>
+      ) : signups.length ? (
+        <View style={styles.rosterList}>
+          {signups.map((signupItem, index) => {
+            const ownRow = isOwnSignup(signupItem, account, latestSignup);
+
+            return (
+              <View
+                key={signupItem.id || `${signupItem.playerName}-${index}`}
+                style={[styles.rosterRow, ownRow && styles.rosterRowCurrent]}>
+                <View style={[styles.rosterRank, ownRow && styles.rosterRankCurrent]}>
+                  <Text style={[styles.rosterRankText, ownRow && styles.rosterRankTextCurrent]}>{index + 1}</Text>
+                </View>
+                <View style={styles.rosterPlayerCopy}>
+                  <View style={styles.rosterNameRow}>
+                    <Text style={styles.rosterPlayerName}>{signupItem.playerName || 'Unnamed player'}</Text>
+                    {ownRow ? <Badge tone="green">You</Badge> : null}
+                  </View>
+                  <Text style={styles.rosterPlayerMeta}>
+                    {signupItem.playerHandle ? signupItem.playerHandle : 'No handle added'} • {signupItem.status || 'registered'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.rosterEmptyText}>
+          No players are registered yet. Create an account and join to become the first name on the roster.
+        </Text>
+      )}
+    </Surface>
+  );
+}
+
 const styles = StyleSheet.create({
   backCard: {
     borderColor: 'rgba(214, 162, 78, 0.24)',
@@ -691,6 +766,101 @@ const styles = StyleSheet.create({
   },
   signupCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  rosterCard: {
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  rosterHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 14,
+  },
+  rosterHeaderText: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    minWidth: 220,
+  },
+  rosterWarning: {
+    color: '#FFB4A8',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  rosterEmptyText: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  rosterList: {
+    gap: 10,
+  },
+  rosterRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 12,
+  },
+  rosterRowCurrent: {
+    backgroundColor: 'rgba(97, 210, 145, 0.11)',
+    borderColor: 'rgba(97, 210, 145, 0.44)',
+  },
+  rosterRank: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(97, 210, 145, 0.14)',
+    borderColor: 'rgba(97, 210, 145, 0.42)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 36,
+  },
+  rosterRankCurrent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.18)',
+    borderColor: 'rgba(214, 162, 78, 0.60)',
+  },
+  rosterRankText: {
+    color: '#61D291',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  rosterRankTextCurrent: {
+    color: '#D6A24E',
+  },
+  rosterPlayerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rosterNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rosterPlayerName: {
+    color: '#F4EFE6',
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 23,
+  },
+  rosterPlayerMeta: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 2,
   },
   flowSteps: {
     flexDirection: 'row',

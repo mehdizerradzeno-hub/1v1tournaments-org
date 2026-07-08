@@ -113,7 +113,9 @@ export async function logoutPlayerAccount() {
 
 export async function fetchSignupSummary({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${SIGNUP_ENDPOINT}${query}`);
+  const response = await fetch(`${SIGNUP_ENDPOINT}${query}`, {
+    credentials: 'include',
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {

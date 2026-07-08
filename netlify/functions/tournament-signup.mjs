@@ -77,7 +77,7 @@ function signupKey(tournamentSlug, contactEmail) {
   return `${tournamentSlug}/${emailKey(contactEmail)}.json`;
 }
 
-function publicSignup(signup) {
+function publicSignup(signup, currentAccount = null) {
   return {
     id: signup.id,
     tournamentSlug: signup.tournamentSlug,
@@ -85,6 +85,14 @@ function publicSignup(signup) {
     playerHandle: signup.playerHandle,
     status: signup.status,
     createdAt: signup.createdAt,
+    currentPlayer: Boolean(
+      currentAccount?.id
+        && (
+          signup.accountId === currentAccount.id
+          || signup.accountEmail === currentAccount.email
+          || signup.contactEmail === currentAccount.email
+        ),
+    ),
   };
 }
 
@@ -97,14 +105,14 @@ async function loadTournamentSignups(store, tournamentSlug) {
   });
 }
 
-async function publicSignupSummary(store, tournamentSlug) {
+async function publicSignupSummary(store, tournamentSlug, currentAccount = null) {
   const signups = await loadTournamentSignups(store, tournamentSlug);
   const settings = await loadTournamentSettings(tournamentSlug);
 
   return {
     tournamentSlug,
     signupCount: signups.length,
-    signups: signups.map(publicSignup),
+    signups: signups.map((signup) => publicSignup(signup, currentAccount)),
     settings,
   };
 }
@@ -156,7 +164,15 @@ export async function handler(event) {
 
     try {
       const store = getSignupStore();
-      const summary = await publicSignupSummary(store, tournamentSlug);
+      let account = null;
+
+      try {
+        account = await getAccountFromEvent(event);
+      } catch (accountError) {
+        console.error('Account lookup failed during signup summary', accountError);
+      }
+
+      const summary = await publicSignupSummary(store, tournamentSlug, account);
 
       return json(200, {
         ok: true,
@@ -249,8 +265,8 @@ export async function handler(event) {
 
       return json(200, {
         ok: true,
-        signup: publicSignup(linkedSignup),
-        summary: await publicSignupSummary(store, tournamentSlug),
+        signup: publicSignup(linkedSignup, account),
+        summary: await publicSignupSummary(store, tournamentSlug, account),
       });
     }
 
@@ -301,8 +317,8 @@ export async function handler(event) {
 
     return json(201, {
       ok: true,
-      signup: publicSignup(signup),
-      summary: await publicSignupSummary(store, tournamentSlug),
+      signup: publicSignup(signup, account),
+      summary: await publicSignupSummary(store, tournamentSlug, account),
     });
   } catch (error) {
     console.error('Tournament signup failed', error);

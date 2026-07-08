@@ -773,12 +773,17 @@ function RegisteredPlayersPanel({
       ) : signups.length ? (
         <View style={styles.rosterList}>
           {signups.map((signup, index) => (
-            <View key={signup.id || `${signup.playerName}-${index}`} style={styles.rosterRow}>
-              <View style={styles.rosterRank}>
-                <Text style={styles.rosterRankText}>{index + 1}</Text>
+            <View
+              key={signup.id || `${signup.playerName}-${index}`}
+              style={[styles.rosterRow, signup.currentPlayer && styles.rosterRowCurrent]}>
+              <View style={[styles.rosterRank, signup.currentPlayer && styles.rosterRankCurrent]}>
+                <Text style={[styles.rosterRankText, signup.currentPlayer && styles.rosterRankTextCurrent]}>{index + 1}</Text>
               </View>
               <View style={styles.rosterPlayerCopy}>
-                <Text style={styles.rosterPlayerName}>{signup.playerName || 'Unnamed player'}</Text>
+                <View style={styles.rosterNameRow}>
+                  <Text style={styles.rosterPlayerName}>{signup.playerName || 'Unnamed player'}</Text>
+                  {signup.currentPlayer ? <Badge tone="green">You</Badge> : null}
+                </View>
                 <Text style={styles.rosterPlayerMeta}>
                   {signup.playerHandle ? signup.playerHandle : 'No handle added'} • {signup.status || 'registered'}
                 </Text>
@@ -1061,6 +1066,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 12,
   },
+  rosterRowCurrent: {
+    backgroundColor: 'rgba(97, 210, 145, 0.11)',
+    borderColor: 'rgba(97, 210, 145, 0.44)',
+  },
   rosterRank: {
     alignItems: 'center',
     backgroundColor: 'rgba(97, 210, 145, 0.14)',
@@ -1072,18 +1081,32 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 34,
   },
+  rosterRankCurrent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.18)',
+    borderColor: 'rgba(214, 162, 78, 0.60)',
+  },
   rosterRankText: {
     color: '#61D291',
     fontFamily: 'monospace',
     fontSize: 13,
     fontWeight: '900',
   },
+  rosterRankTextCurrent: {
+    color: '#D6A24E',
+  },
   rosterPlayerCopy: {
     flex: 1,
     minWidth: 0,
   },
+  rosterNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   rosterPlayerName: {
     color: '#F4EFE6',
+    flexShrink: 1,
     fontSize: 17,
     fontWeight: '900',
     lineHeight: 23,
