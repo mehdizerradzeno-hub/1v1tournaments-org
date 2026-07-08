@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import {
@@ -34,7 +34,8 @@ import {
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { fetchSignupSummary, fetchTournamentBracket, fetchTournamentSettings } from '../lib/tournamentHostingClient.js';
 
-const MAX_VISIBLE_UPCOMING = 4;
+const DEFAULT_ROSTER_CAP = 8;
+const DEFAULT_MINIMUM_PLAYERS = 2;
 
 const PLAYER_FLOW_STEPS = [
   { title: 'Create account', body: 'One player account keeps your signup and match seat tied to you.' },
@@ -44,6 +45,69 @@ const PLAYER_FLOW_STEPS = [
   { title: 'Play game', body: 'Finish the match in Spades while the hub keeps the bracket.' },
   { title: 'See results', body: 'Return to the hub for the updated bracket and winner status.' },
 ];
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getRosterCap(tournament) {
+  return parsePositiveInt(tournament?.rosterCap, DEFAULT_ROSTER_CAP);
+}
+
+function getMinimumPlayers(tournament) {
+  return parsePositiveInt(tournament?.minimumPlayers, DEFAULT_MINIMUM_PLAYERS);
+}
+
+function registeredCountLabel(signupSummary, tournament) {
+  const cap = getRosterCap(tournament);
+
+  if (signupSummary?.loading) {
+    return `Loading / ${cap}`;
+  }
+
+  if (signupSummary?.unavailable) {
+    return `Open / ${cap}`;
+  }
+
+  return `${signupSummary?.count || 0} / ${cap}`;
+}
+
+function bracketTargetLabel(tournament) {
+  return `${getRosterCap(tournament)} target`;
+}
+
+function flexibleBracketCopy(tournament) {
+  return tournament?.bracketFlexPolicy
+    || `Advertised ${getRosterCap(tournament)}-player bracket. Runs with ${getMinimumPlayers(tournament)}+ players and fills byes automatically.`;
+}
+
+function sortTournamentsByDate(tournaments) {
+  return [...tournaments].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+}
+
+function dateKey(value, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timeZone || 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${lookup.year}-${lookup.month}-${lookup.day}`;
+}
+
+function isTournamentToday(tournament, nowMs) {
+  const startMs = new Date(tournament?.date).getTime();
+
+  if (!Number.isFinite(startMs)) {
+    return false;
+  }
+
+  return dateKey(startMs, tournament.timeZone) === dateKey(nowMs, tournament.timeZone);
+}
 
 function getCountdownState(tournament, nowMs) {
   const startMs = new Date(tournament?.date).getTime();
@@ -93,35 +157,23 @@ function getNextUpcomingTournament(tournaments, nowMs) {
   return futureTournament?.tournament || datedTournaments[0]?.tournament || tournaments[0] || null;
 }
 
-function signupSummaryForTournament(tournament, featuredTournament, featuredSignupSummary) {
-  if (tournament?.slug === featuredTournament?.slug) {
-    return featuredSignupSummary;
-  }
-
-  return { count: 0, loading: false, unavailable: true };
-}
-
-function bracketLabelForTournament(tournament, featuredTournament, featuredBracket) {
-  if (tournament?.slug !== featuredTournament?.slug) {
-    return 'Not seeded';
-  }
-
-  return featuredBracket ? `${featuredBracket.participantCount || 0} seeded` : 'Not seeded';
-}
-
 export default function HomeScreen() {
-  const [featuredSettings, setFeaturedSettings] = useState(null);
-  const [featuredBracket, setFeaturedBracket] = useState(null);
-  const [featuredSignupSummary, setFeaturedSignupSummary] = useState({ count: 0, loading: true });
+  const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const games = getGames();
-  const streams = getStreams();
-  const upcoming = getUpcomingTournaments();
+  const games = useMemo(() => getGames(), []);
+  const streams = useMemo(() => getStreams(), []);
+  const upcoming = useMemo(() => getUpcomingTournaments(), []);
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
-  const seededFeaturedTournament = getNextUpcomingTournament(upcoming, nowMs);
-  const featuredTournament = mergeTournamentSettings(seededFeaturedTournament, featuredSettings);
-  const seededFeaturedSlug = seededFeaturedTournament?.slug || '';
+  const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
+  const hydratedUpcoming = sortTournamentsByDate(
+    upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
+  );
+  const featuredTournament = getNextUpcomingTournament(hydratedUpcoming, nowMs);
+  const seededFeaturedSlug = featuredTournament?.slug || '';
+  const featuredEventData = eventDataBySlug[seededFeaturedSlug] || {};
+  const featuredBracket = featuredEventData.bracket || null;
+  const featuredSignupSummary = featuredEventData.signupSummary || { count: 0, loading: Boolean(featuredTournament) };
   const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
   const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
@@ -131,42 +183,55 @@ export default function HomeScreen() {
   const featuredResult = buildResultFromTournamentBracket(featuredTournament, featuredBracket);
   const results = mergeResults(getResults(), featuredResult);
   const featuredCountdown = getCountdownState(featuredTournament, nowMs);
-  const visibleUpcoming = upcoming
-    .map((tournament) => (tournament.slug === featuredTournament?.slug ? featuredTournament : tournament))
-    .slice(0, MAX_VISIBLE_UPCOMING);
 
   useEffect(() => {
-    if (!seededFeaturedSlug) {
+    if (!upcoming.length) {
       return undefined;
     }
 
     let active = true;
 
-    async function loadFeaturedData() {
-      const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
-        fetchTournamentSettings({ slug: seededFeaturedSlug }),
-        fetchTournamentBracket({ slug: seededFeaturedSlug }),
-        fetchSignupSummary({ slug: seededFeaturedSlug }),
-      ]);
+    async function loadScheduleData() {
+      const settled = await Promise.allSettled(
+        upcoming.map(async (tournament) => {
+          const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
+            fetchTournamentSettings({ slug: tournament.slug }),
+            fetchTournamentBracket({ slug: tournament.slug }),
+            fetchSignupSummary({ slug: tournament.slug }),
+          ]);
+
+          return {
+            slug: tournament.slug,
+            settings: settingsResult.status === 'fulfilled' ? settingsResult.value.settings || null : null,
+            bracket: bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null,
+            signupSummary: {
+              count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
+              loading: false,
+              unavailable: signupResult.status !== 'fulfilled',
+            },
+          };
+        }),
+      );
 
       if (!active) {
         return;
       }
 
-      setFeaturedSettings(settingsResult.status === 'fulfilled' ? settingsResult.value.settings || null : null);
-      setFeaturedBracket(bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null);
-      setFeaturedSignupSummary({
-        count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
-        loading: false,
-      });
+      setEventDataBySlug(
+        Object.fromEntries(
+          settled
+            .filter((result) => result.status === 'fulfilled')
+            .map((result) => [result.value.slug, result.value]),
+        ),
+      );
     }
 
-    loadFeaturedData();
+    loadScheduleData();
 
     return () => {
       active = false;
     };
-  }, [seededFeaturedSlug]);
+  }, [upcoming, upcomingSlugs]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -201,14 +266,20 @@ export default function HomeScreen() {
 
       <Section
         action={<ActionButton href={featuredTournamentPath}>Open next event</ActionButton>}
-        description="All public tournaments appear here, soonest first."
-        title="Next tournaments">
+        description="Live, tonight, and upcoming public tournaments appear here, soonest first."
+        nativeID="next-tournaments"
+        title="All upcoming tournaments">
+        <ScheduleSummaryBar
+          eventDataBySlug={eventDataBySlug}
+          nowMs={nowMs}
+          tournaments={hydratedUpcoming}
+        />
         <UpcomingTournamentList
-          featuredBracket={featuredBracket}
-          featuredSignupSummary={featuredSignupSummary}
           featuredTournament={featuredTournament}
+          eventDataBySlug={eventDataBySlug}
           gameLookup={gameLookup}
-          tournaments={visibleUpcoming}
+          nowMs={nowMs}
+          tournaments={hydratedUpcoming}
         />
       </Section>
 
@@ -364,12 +435,12 @@ function PremiumCountdownHero({
         },
         {
           label: 'Registered',
-          value: signupSummary.loading ? 'Loading' : String(signupSummary.count),
+          value: registeredCountLabel(signupSummary, tournament),
           tone: signupSummary.count ? 'green' : 'blue',
         },
         {
           label: 'Bracket',
-          value: bracket ? `${bracket.participantCount || 0} seeded` : 'Open',
+          value: bracket ? `${bracket.participantCount || 0} seeded` : bracketTargetLabel(tournament),
           tone: bracket ? 'green' : 'accent',
         },
         { label: 'Games', value: String(gameCount || 0), tone: 'blue' },
@@ -448,6 +519,10 @@ function PremiumCountdownHero({
         </ActionButton>
       </View>
 
+      <View style={styles.rosterPolicyBar}>
+        <Text style={styles.rosterPolicyText}>{flexibleBracketCopy(tournament)}</Text>
+      </View>
+
       <View style={styles.heroInfoGrid}>
         {heroStats.map((stat) => (
           <View key={stat.label} style={[styles.heroInfoTile, styles[`heroInfo${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
@@ -460,11 +535,49 @@ function PremiumCountdownHero({
   );
 }
 
+function ScheduleSummaryBar({ eventDataBySlug, nowMs, tournaments }) {
+  const openCount = tournaments.filter((tournament) => {
+    const data = eventDataBySlug[tournament.slug] || {};
+    const meta = getEffectiveRegistrationStatus(tournament, { hasLiveBracket: Boolean(data.bracket) });
+
+    return meta.value === 'open';
+  }).length;
+  const liveBracketCount = tournaments.filter((tournament) => eventDataBySlug[tournament.slug]?.bracket).length;
+  const tonightCount = tournaments.filter((tournament) => isTournamentToday(tournament, nowMs)).length;
+
+  return (
+    <View style={styles.scheduleSummaryGrid}>
+      <View style={[styles.scheduleSummaryTile, styles.scheduleSummaryTileAccent]}>
+        <Text style={styles.scheduleSummaryLabel}>Next event</Text>
+        <Text style={styles.scheduleSummaryValue}>
+          {tournaments[0] ? formatShortDate(tournaments[0].date, tournaments[0].timeZone) : 'TBD'}
+        </Text>
+      </View>
+      <View style={styles.scheduleSummaryTile}>
+        <Text style={styles.scheduleSummaryLabel}>Tonight</Text>
+        <Text style={styles.scheduleSummaryValue}>{tonightCount}</Text>
+      </View>
+      <View style={styles.scheduleSummaryTile}>
+        <Text style={styles.scheduleSummaryLabel}>Open signups</Text>
+        <Text style={styles.scheduleSummaryValue}>{openCount}</Text>
+      </View>
+      <View style={styles.scheduleSummaryTile}>
+        <Text style={styles.scheduleSummaryLabel}>Live brackets</Text>
+        <Text style={styles.scheduleSummaryValue}>{liveBracketCount}</Text>
+      </View>
+      <View style={styles.scheduleSummaryTile}>
+        <Text style={styles.scheduleSummaryLabel}>Upcoming</Text>
+        <Text style={styles.scheduleSummaryValue}>{tournaments.length}</Text>
+      </View>
+    </View>
+  );
+}
+
 function UpcomingTournamentList({
-  featuredBracket,
-  featuredSignupSummary,
   featuredTournament,
+  eventDataBySlug,
   gameLookup,
+  nowMs,
   tournaments,
 }) {
   if (!tournaments.length) {
@@ -480,15 +593,18 @@ function UpcomingTournamentList({
     <View style={styles.upcomingList}>
       {tournaments.map((tournament, index) => {
         const isNext = tournament.slug === featuredTournament?.slug;
+        const eventData = eventDataBySlug[tournament.slug] || {};
+        const bracket = eventData.bracket || null;
         const registrationMeta = getEffectiveRegistrationStatus(tournament, {
-          hasLiveBracket: isNext && Boolean(featuredBracket),
+          hasLiveBracket: Boolean(bracket),
         });
-        const signupSummary = signupSummaryForTournament(tournament, featuredTournament, featuredSignupSummary);
+        const signupSummary = eventData.signupSummary || { count: 0, loading: true };
         const tournamentPath = getTournamentPath(tournament.slug);
         const signupPath = getCheckInPath(tournament.slug);
         const matchPath = `${tournamentPath}#my-match`;
         const gameName = gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug;
         const registrationIsOpen = registrationMeta.value === 'open';
+        const isToday = isTournamentToday(tournament, nowMs);
 
         return (
           <Surface key={tournament.slug} style={[styles.upcomingRow, isNext && styles.upcomingRowNext]}>
@@ -500,28 +616,24 @@ function UpcomingTournamentList({
                 <Badge tone={isNext ? 'green' : registrationMeta.tone}>
                   {isNext ? 'Next tournament' : registrationMeta.label}
                 </Badge>
+                {isToday ? <Badge tone="accent">Tonight</Badge> : null}
                 <Text style={styles.upcomingGame}>{gameName}</Text>
               </View>
               <Text style={styles.upcomingTitle}>{tournament.title}</Text>
               <Text style={styles.upcomingDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
-              <Text style={styles.upcomingSummary}>{tournament.detail || tournament.summary}</Text>
+              <Text style={styles.upcomingSummary}>{flexibleBracketCopy(tournament)}</Text>
               <View style={styles.upcomingStats}>
                 <StatPill
                   label="Registered"
-                  value={
-                    signupSummary.loading
-                      ? 'Loading'
-                      : signupSummary.unavailable
-                        ? 'Open'
-                        : String(signupSummary.count)
-                  }
+                  value={registeredCountLabel(signupSummary, tournament)}
                   tone={signupSummary.count ? 'green' : 'blue'}
                 />
                 <StatPill
                   label="Bracket"
-                  value={bracketLabelForTournament(tournament, featuredTournament, featuredBracket)}
-                  tone={isNext && featuredBracket ? 'green' : 'accent'}
+                  value={bracket ? `${bracket.participantCount || 0} seeded` : bracketTargetLabel(tournament)}
+                  tone={bracket ? 'green' : 'accent'}
                 />
+                <StatPill label="Minimum" value={`${getMinimumPlayers(tournament)} players`} tone="blue" />
                 <StatPill label="Entry" value="Free" tone="green" />
               </View>
             </View>
@@ -546,24 +658,24 @@ function TournamentCapacityPanel() {
       <View style={styles.capacityTopRow}>
         <View style={styles.capacityCopy}>
           <Badge tone="green">Recommended setup</Badge>
-          <Text style={styles.capacityTitle}>Start with 4 or 8 players.</Text>
+          <Text style={styles.capacityTitle}>Advertise a fixed size. Run the real bracket flexibly.</Text>
           <Text style={styles.capacityBody}>
-            The bracket engine can generate from any 2+ signups and rounds up to the next power of two with automatic byes.
-            For launch, 4-8 players is the smoothest size; 16 is realistic once match reporting feels routine.
+            Show a clear target like 8-player bracket so players know what they are joining.
+            The host can still run with 2+ players, and the bracket fills open seats with automatic byes.
           </Text>
         </View>
         <View style={styles.capacityStats}>
-          <StatPill label="Best first event" value="4-8" tone="green" />
-          <StatPill label="Comfortable next" value="16" tone="accent" />
-          <StatPill label="Code minimum" value="2" tone="blue" />
+          <StatPill label="Default cap" value="8" tone="green" />
+          <StatPill label="Quick cup" value="4" tone="accent" />
+          <StatPill label="Minimum" value="2" tone="blue" />
           <StatPill label="Byes" value="Auto" tone="green" />
         </View>
       </View>
       <BulletList
         items={[
-          '2 players works for smoke tests and show matches.',
-          '3, 5, 6, 7, or 9 players still work because the bracket fills byes automatically.',
-          '32+ should wait until reminders, result reporting, and host operations are boringly reliable.',
+          'Recommended launch default: advertise 8 seats and show registered players as 2 / 8, 5 / 8, and so on.',
+          'If the event underfills, run the actual bracket with the players who joined and use byes.',
+          'If the event overfills, close signups, waitlist extras, or spin up another bracket.',
         ]}
         tone="green"
       />
@@ -813,6 +925,25 @@ const styles = StyleSheet.create({
   heroActionButton: {
     minWidth: 190,
   },
+  rosterPolicyBar: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 6,
+    maxWidth: 780,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  rosterPolicyText: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    textAlign: 'center',
+  },
   heroInfoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -862,6 +993,42 @@ const styles = StyleSheet.create({
   },
   hubTournamentCard: {
     marginTop: 14,
+  },
+  scheduleSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  scheduleSummaryTile: {
+    backgroundColor: 'rgba(23, 38, 34, 0.76)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 150,
+    flexGrow: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  scheduleSummaryTileAccent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
+  scheduleSummaryLabel: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  scheduleSummaryValue: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+    marginTop: 2,
   },
   upcomingList: {
     gap: 12,
