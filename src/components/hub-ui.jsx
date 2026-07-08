@@ -139,6 +139,7 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
           styles.actionButtonInner,
           variant === 'secondary' && styles.actionButtonInnerSecondary,
           variant === 'ghost' && styles.actionButtonInnerGhost,
+          variant === 'danger' && styles.actionButtonInnerDanger,
           disabled && styles.actionButtonInnerDisabled,
         ]}>
         <Text
@@ -146,6 +147,7 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
             styles.actionButtonText,
             variant === 'secondary' && styles.actionButtonTextSecondary,
             variant === 'ghost' && styles.actionButtonTextSecondary,
+            variant === 'danger' && styles.actionButtonTextDanger,
             disabled && styles.actionButtonTextDisabled,
           ]}>
           {children}
@@ -989,6 +991,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: theme.colors.lineStrong,
   },
+  actionButtonInnerDanger: {
+    backgroundColor: 'rgba(224, 106, 92, 0.16)',
+    borderColor: 'rgba(224, 106, 92, 0.72)',
+  },
   actionButtonInnerDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderColor: theme.colors.line,
@@ -1002,6 +1008,9 @@ const styles = StyleSheet.create({
   },
   actionButtonTextSecondary: {
     color: theme.colors.text,
+  },
+  actionButtonTextDanger: {
+    color: '#FFE5E0',
   },
   actionButtonTextDisabled: {
     color: theme.colors.muted,

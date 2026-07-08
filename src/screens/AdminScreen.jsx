@@ -835,6 +835,40 @@ export default function AdminScreen() {
               Reset schedule
             </ActionButton>
           </View>
+
+          <View style={styles.resetDangerPanel}>
+            <View style={styles.resetDangerHeader}>
+              <Badge tone="rose">Reset tournament</Badge>
+              <View style={styles.resetDangerCopy}>
+                <Text style={styles.resetDangerTitle}>Clear signups + bracket for this event</Text>
+                <Text style={styles.resetDangerBody}>
+                  Use this when you want a clean roster for new applicants. It keeps player accounts and the public tournament page.
+                </Text>
+              </View>
+            </View>
+
+            {clearConfirmOpen ? (
+              <View style={styles.resetConfirmPanel}>
+                <Text style={styles.resetDangerBody}>
+                  Confirm reset for {tournament?.title || rosterSlug}. This deletes registered players from this tournament roster and removes the published bracket.
+                </Text>
+                <View style={styles.buttonRow}>
+                  <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
+                    {clearLoading ? 'Clearing...' : 'Yes, clear signups + bracket'}
+                  </ActionButton>
+                  <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
+                    Cancel
+                  </ActionButton>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={!hasHostCredential || clearLoading} onPress={handleRequestClearTournamentData} variant="danger">
+                  Clear signups + bracket
+                </ActionButton>
+              </View>
+            )}
+          </View>
         </Surface>
       </Section>
     );
@@ -1254,30 +1288,7 @@ export default function AdminScreen() {
             <ActionButton onPress={handleLoadBracket} variant="ghost">
               {bracketLoading ? 'Loading...' : 'Refresh bracket'}
             </ActionButton>
-            <ActionButton onPress={handleRequestClearTournamentData} variant="secondary">
-              Clear selected tournament
-            </ActionButton>
           </View>
-
-          {clearConfirmOpen ? (
-            <View style={styles.dangerPanel}>
-              <View style={styles.metaRow}>
-                <Badge tone="rose">Confirm reset</Badge>
-                <Text style={styles.runStatusLabel}>Reset applicants for {tournament?.title || rosterSlug}</Text>
-              </View>
-              <Text style={styles.runStatusBody}>
-                This deletes all signups and the published bracket for this tournament only. Player accounts and the tournament page stay intact.
-              </Text>
-              <View style={styles.buttonRow}>
-                <ActionButton onPress={handleClearTournamentData} variant="secondary">
-                  {clearLoading ? 'Clearing...' : 'Delete tournament signups + bracket'}
-                </ActionButton>
-                <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
-                  Cancel
-                </ActionButton>
-              </View>
-            </View>
-          ) : null}
         </Surface>
       </Section>
     );
@@ -2292,12 +2303,43 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 8,
   },
-  dangerPanel: {
+  resetDangerPanel: {
     backgroundColor: 'rgba(224, 106, 92, 0.08)',
     borderColor: 'rgba(224, 106, 92, 0.30)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 14,
+  },
+  resetDangerHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  resetDangerCopy: {
+    flex: 1,
+    minWidth: 240,
+  },
+  resetDangerTitle: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  resetDangerBody: {
+    color: '#E3B2A9',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  resetConfirmPanel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    borderColor: 'rgba(224, 106, 92, 0.26)',
     borderRadius: 14,
     borderWidth: 1,
-    marginTop: 14,
+    marginTop: 12,
     padding: 12,
   },
   bracketRounds: {

@@ -225,9 +225,10 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /handleCopyMatchCallback/);
   assert.match(adminScreenSource, /Host checklist/);
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
-  assert.match(adminScreenSource, /Clear selected tournament/);
-  assert.match(adminScreenSource, /Delete tournament signups \+ bracket/);
-  assert.match(adminScreenSource, /Schedule and registration/);
+  assert.match(adminScreenSource, /Reset tournament/);
+  assert.match(adminScreenSource, /Clear signups \+ bracket/);
+  assert.match(adminScreenSource, /Yes, clear signups \+ bracket/);
+  assert.match(adminScreenSource, /Post tournament/);
   assert.match(adminScreenSource, /Player match page/);
   assert.match(adminScreenSource, /handleSaveScheduleSettings/);
   assert.match(adminScreenSource, /resetTournamentSettings/);
