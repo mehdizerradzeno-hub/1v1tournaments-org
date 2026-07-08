@@ -77,6 +77,16 @@ function normalizeAccountMode(value) {
   return value === 'signin' || value === 'login' ? 'login' : 'create';
 }
 
+const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
+
+function notifyPlayerAccountChanged() {
+  if (typeof globalThis.dispatchEvent !== 'function' || typeof globalThis.Event !== 'function') {
+    return;
+  }
+
+  globalThis.dispatchEvent(new Event(PLAYER_ACCOUNT_CHANGED_EVENT));
+}
+
 export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const seededTournament = getTournamentBySlug(slug);
   const [hostedTournament, setHostedTournament] = useState(null);
@@ -160,7 +170,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         const result = await fetchPlayerAccount();
 
         if (active && loadId === accountLoadIdRef.current) {
-          setAccount(result.account || null);
+          const nextAccount = result.account || null;
+          setAccount(nextAccount);
+
+          if (nextAccount) {
+            notifyPlayerAccountChanged();
+          }
         }
       } catch (loadError) {
         if (active && loadId === accountLoadIdRef.current) {
@@ -334,6 +349,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       const accountDisplayName = nextAccount?.playerName || result.account?.playerName || playerName || 'your account';
 
       setAccount(nextAccount);
+      notifyPlayerAccountChanged();
       setPlayerName(nextAccount?.playerName || playerName);
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || playerHandle);
@@ -376,6 +392,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       const accountDisplayName = nextAccount?.playerName || result.account?.playerName || contactEmail || 'your account';
 
       setAccount(nextAccount);
+      notifyPlayerAccountChanged();
       setPlayerName(nextAccount?.playerName || '');
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || '');
@@ -411,6 +428,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     try {
       await logoutPlayerAccount();
       setAccount(null);
+      notifyPlayerAccountChanged();
       setAccountMessage('Signed out. Sign back in before joining another tournament.');
     } catch (logoutError) {
       setAccountError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');

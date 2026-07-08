@@ -12,6 +12,7 @@ const PRIMARY_TOURNAMENT_PATH = getTournamentPath(siteData.site.primaryTournamen
 const PRIMARY_CHECK_IN_PATH = getCheckInPath(siteData.site.primaryTournamentSlug);
 const PRIMARY_SIGN_IN_PATH = `${PRIMARY_CHECK_IN_PATH}?mode=signin`;
 const PRIMARY_MATCH_PATH = `${PRIMARY_TOURNAMENT_PATH}#my-match`;
+const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
@@ -559,10 +560,26 @@ export function HubScreen({
       }
     }
 
+    function refreshPlayerAccount() {
+      if (active) {
+        setPlayerAccountLoading(true);
+      }
+
+      loadPlayerAccount();
+    }
+
     loadPlayerAccount();
+
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener(PLAYER_ACCOUNT_CHANGED_EVENT, refreshPlayerAccount);
+    }
 
     return () => {
       active = false;
+
+      if (typeof globalThis.removeEventListener === 'function') {
+        globalThis.removeEventListener(PLAYER_ACCOUNT_CHANGED_EVENT, refreshPlayerAccount);
+      }
     };
   }, []);
 
