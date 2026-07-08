@@ -9,6 +9,7 @@ import {
   Section,
   Surface,
 } from '../components/hub-ui.jsx';
+import { formatResultDate } from '../lib/format.js';
 import { getGames, getGamePath, getResults, siteData } from '../lib/siteData.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
 
@@ -34,7 +35,11 @@ export default function ResultsScreen() {
       ]}
       subtitle="Recent scoreboards and final tables for the public organization site"
       title="Results archive">
-      <Section description="The latest results appear first." title="Recent results">
+      <Section
+        action={<ActionButton href="/tournaments/spades-summer-series">Open tournament</ActionButton>}
+        description="Completed finals, placements, and posting notes appear here in newest-first order."
+        nativeID="recent-results"
+        title="Recent results">
         {results.map((result) => (
           <View key={result.slug} style={styles.block}>
             <ResultCard result={result} />
@@ -49,44 +54,73 @@ export default function ResultsScreen() {
         ) : null}
       </Section>
 
-      <Section description="Each game gets a slot even before its first result exists." title="Game archive">
+      <Section
+        description="A compact per-game status view so players can quickly see what has posted."
+        title="Game archive">
         {games.map((game) => {
           const gameResults = results.filter((result) => result.gameSlug === game.slug);
           const latestGameResult = gameResults[0] || null;
 
           return (
             <View key={game.slug} style={styles.gameGroup}>
-              <Surface style={[styles.gameHeader, { borderColor: game.accent }]}>
-                <View style={styles.gameHeaderTop}>
-                  <Badge tone={game.status === 'active' ? 'green' : 'blue'}>
-                    {game.badge}
-                  </Badge>
-                  <ActionButton href={getGamePath(game.slug)} variant="ghost">
-                    Open game
-                  </ActionButton>
-                </View>
-                <Text style={styles.gameTitle}>{game.name}</Text>
-                <Text style={styles.gameSummary}>{game.summary}</Text>
-              </Surface>
-
-              {latestGameResult ? (
-                <ResultCard result={latestGameResult} />
-              ) : (
-                <EmptyState
-                  action={<ActionButton href={getGamePath(game.slug)}>Open game page</ActionButton>}
-                  body={
-                    game.status === 'active'
-                      ? 'Add a completed result record and it will show up here.'
-                      : 'This game does not have any posted results yet.'
-                  }
-                  title={`${game.name} results will appear here`}
-                />
-              )}
+              <GameArchiveCard
+                game={game}
+                resultCount={gameResults.length}
+                latestResult={latestGameResult}
+              />
             </View>
           );
         })}
       </Section>
     </HubScreen>
+  );
+}
+
+function GameArchiveCard({ game, latestResult, resultCount }) {
+  return (
+    <Surface style={[styles.archiveCard, { borderColor: game.accent }]}>
+      <View style={styles.archiveTopRow}>
+        <View style={styles.archiveTitleGroup}>
+          <Text style={styles.archiveTitle}>{game.name}</Text>
+          <Badge tone={game.status === 'active' ? 'green' : 'blue'}>
+            {game.badge}
+          </Badge>
+        </View>
+        <Text style={styles.archiveCount}>{resultCount} posted</Text>
+      </View>
+
+      <Text style={styles.archiveSummary}>{game.summary}</Text>
+
+      <View style={styles.archiveResultBox}>
+        {latestResult ? (
+          <>
+            <Text style={styles.archiveMeta}>Latest result</Text>
+            <Text style={styles.archiveWinner}>{latestResult.winner}</Text>
+            <Text style={styles.archiveDetail}>
+              {latestResult.title} • {formatResultDate(latestResult.date)}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.archiveMeta}>No posted results yet</Text>
+            <Text style={styles.archiveDetail}>
+              {game.status === 'active'
+                ? 'Completed event results will land here after the bracket closes.'
+                : 'Coming soon. No public events are active for this game yet.'}
+            </Text>
+          </>
+        )}
+      </View>
+
+      <View style={styles.archiveActions}>
+        <ActionButton href={getGamePath(game.slug)}>
+          Open game
+        </ActionButton>
+        <ActionButton href="/results#recent-results" variant="secondary">
+          Recent results
+        </ActionButton>
+      </View>
+    </Surface>
   );
 }
 
@@ -97,26 +131,76 @@ const styles = StyleSheet.create({
   gameGroup: {
     marginBottom: 12,
   },
-  gameHeader: {
+  archiveCard: {
     borderColor: 'rgba(214, 162, 78, 0.24)',
-    marginBottom: 14,
   },
-  gameHeaderTop: {
+  archiveTopRow: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
   },
-  gameTitle: {
-    color: '#F4EFE6',
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: '800',
+  archiveTitleGroup: {
+    flex: 1,
+    minWidth: 190,
   },
-  gameSummary: {
+  archiveTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 29,
+    marginBottom: 10,
+  },
+  archiveCount: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  archiveSummary: {
     color: '#AAB4AE',
     fontSize: 14,
     lineHeight: 21,
-    marginTop: 8,
+  },
+  archiveResultBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  archiveMeta: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  archiveWinner: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+    marginTop: 4,
+  },
+  archiveDetail: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  archiveActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
   },
 });

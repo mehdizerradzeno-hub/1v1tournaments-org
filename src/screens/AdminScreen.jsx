@@ -1663,8 +1663,12 @@ export default function AdminScreen() {
       title={showDraftTools ? 'Private admin console' : 'Host control center'}>
       <Section
         action={
-          showDraftTools ? (
-            <View style={styles.headerActions}>
+          <View style={styles.headerActions}>
+            <ActionButton href="/" variant="secondary">
+              Home
+            </ActionButton>
+            {showDraftTools ? (
+              <>
               <ActionButton onPress={handleAddDraft} variant="secondary">
                 Add draft
               </ActionButton>
@@ -1674,8 +1678,9 @@ export default function AdminScreen() {
               <ActionButton onPress={handleLock} variant="ghost">
                 Lock
               </ActionButton>
-            </View>
-          ) : null
+              </>
+            ) : null}
+          </View>
         }
         description={
           showDraftTools

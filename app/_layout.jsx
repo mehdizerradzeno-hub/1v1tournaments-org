@@ -13,6 +13,14 @@ export default function RootLayout() {
           name="description"
           content="Free-entry 1v1 card-game tournaments for Spades, with Euchre coming soon."
         />
+        <style>{`
+          html,
+          body,
+          #root {
+            background: ${theme.colors.background};
+            min-height: 100%;
+          }
+        `}</style>
       </Head>
       <Stack
         screenOptions={{

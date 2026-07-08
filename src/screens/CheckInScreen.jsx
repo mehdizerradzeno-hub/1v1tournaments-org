@@ -72,7 +72,11 @@ function getPasswordError(password, confirmPassword) {
   return '';
 }
 
-export default function CheckInScreen({ slug }) {
+function normalizeAccountMode(value) {
+  return value === 'signin' || value === 'login' ? 'login' : 'create';
+}
+
+export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const tournament = getTournamentBySlug(slug);
   const tournamentSlug = tournament?.slug || '';
   const [playerName, setPlayerName] = useState('');
@@ -85,7 +89,7 @@ export default function CheckInScreen({ slug }) {
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
   const [account, setAccount] = useState(null);
-  const [accountMode, setAccountMode] = useState('create');
+  const [accountMode, setAccountMode] = useState(() => normalizeAccountMode(initialAccountMode));
   const [accountLoading, setAccountLoading] = useState(true);
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');

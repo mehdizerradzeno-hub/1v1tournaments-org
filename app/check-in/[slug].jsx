@@ -18,7 +18,15 @@ function normalizeParam(value) {
 }
 
 export default function CheckInRoute() {
-  const { slug } = useLocalSearchParams();
+  const { mode, slug } = useLocalSearchParams();
+  const normalizedMode = normalizeParam(mode);
+  const normalizedSlug = normalizeParam(slug);
 
-  return <CheckInScreen slug={normalizeParam(slug)} />;
+  return (
+    <CheckInScreen
+      key={`${normalizedSlug || ''}-${normalizedMode || ''}`}
+      initialAccountMode={normalizedMode}
+      slug={normalizedSlug}
+    />
+  );
 }

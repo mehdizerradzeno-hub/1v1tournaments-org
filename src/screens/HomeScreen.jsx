@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import {
   ActionButton,
@@ -34,6 +34,8 @@ import {
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { fetchSignupSummary, fetchTournamentBracket, fetchTournamentSettings } from '../lib/tournamentHostingClient.js';
 
+const MAX_VISIBLE_UPCOMING = 4;
+
 const PLAYER_FLOW_STEPS = [
   { title: 'Create account', body: 'One player account keeps your signup and match seat tied to you.' },
   { title: 'Sign up', body: 'Join the tournament roster before the host seeds the bracket.' },
@@ -42,23 +44,6 @@ const PLAYER_FLOW_STEPS = [
   { title: 'Play game', body: 'Finish the match in Spades while the hub keeps the bracket.' },
   { title: 'See results', body: 'Return to the hub for the updated bracket and winner status.' },
 ];
-
-function getHomeStats(upcomingCount, gameCount, featuredTournament, registrationMeta, signupSummary, liveBracket) {
-  const registeredValue = signupSummary.loading ? 'Loading' : String(signupSummary.count);
-
-  return [
-    {
-      label: 'Next event',
-      value: featuredTournament ? formatShortDate(featuredTournament.date, featuredTournament.timeZone) : 'TBD',
-      tone: 'accent',
-    },
-    { label: 'Status', value: registrationMeta.label.replace('Registration ', ''), tone: registrationMeta.tone },
-    { label: 'Registered', value: registeredValue, tone: signupSummary.count ? 'green' : 'blue' },
-    { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : 'Not seeded', tone: liveBracket ? 'green' : 'accent' },
-    { label: 'Games', value: String(gameCount), tone: 'blue' },
-    { label: 'Events', value: String(upcomingCount), tone: 'accent' },
-  ];
-}
 
 function getCountdownState(tournament, nowMs) {
   const startMs = new Date(tournament?.date).getTime();
@@ -95,6 +80,35 @@ function getCountdownState(tournament, nowMs) {
   };
 }
 
+function getNextUpcomingTournament(tournaments, nowMs) {
+  const datedTournaments = tournaments
+    .map((tournament) => ({
+      tournament,
+      startMs: new Date(tournament?.date).getTime(),
+    }))
+    .filter((item) => Number.isFinite(item.startMs))
+    .sort((left, right) => left.startMs - right.startMs);
+  const futureTournament = datedTournaments.find((item) => item.startMs > nowMs);
+
+  return futureTournament?.tournament || datedTournaments[0]?.tournament || tournaments[0] || null;
+}
+
+function signupSummaryForTournament(tournament, featuredTournament, featuredSignupSummary) {
+  if (tournament?.slug === featuredTournament?.slug) {
+    return featuredSignupSummary;
+  }
+
+  return { count: 0, loading: false, unavailable: true };
+}
+
+function bracketLabelForTournament(tournament, featuredTournament, featuredBracket) {
+  if (tournament?.slug !== featuredTournament?.slug) {
+    return 'Not seeded';
+  }
+
+  return featuredBracket ? `${featuredBracket.participantCount || 0} seeded` : 'Not seeded';
+}
+
 export default function HomeScreen() {
   const [featuredSettings, setFeaturedSettings] = useState(null);
   const [featuredBracket, setFeaturedBracket] = useState(null);
@@ -105,23 +119,21 @@ export default function HomeScreen() {
   const upcoming = getUpcomingTournaments();
   const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
-  const seededFeaturedTournament = getUpcomingTournaments().find(
-    (tournament) => tournament.slug === siteData.site.primaryTournamentSlug,
-  ) || upcoming[0] || null;
+  const seededFeaturedTournament = getNextUpcomingTournament(upcoming, nowMs);
   const featuredTournament = mergeTournamentSettings(seededFeaturedTournament, featuredSettings);
   const seededFeaturedSlug = seededFeaturedTournament?.slug || '';
   const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
   const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
-  const remainingUpcoming = upcoming.filter((tournament) => tournament.slug !== featuredTournament?.slug);
   const featuredRegistrationMeta = featuredTournament
     ? getEffectiveRegistrationStatus(featuredTournament, { hasLiveBracket: Boolean(featuredBracket) })
     : getRegistrationStatusMeta('coming-soon');
-  const featuredPrimaryAction = featuredBracket
-    ? { label: 'Find my match', href: featuredMatchStatusPath }
-    : { label: 'Create account and sign up', href: featuredSignupPath };
   const featuredResult = buildResultFromTournamentBracket(featuredTournament, featuredBracket);
   const results = mergeResults(getResults(), featuredResult);
+  const featuredCountdown = getCountdownState(featuredTournament, nowMs);
+  const visibleUpcoming = upcoming
+    .map((tournament) => (tournament.slug === featuredTournament?.slug ? featuredTournament : tournament))
+    .slice(0, MAX_VISIBLE_UPCOMING);
 
   useEffect(() => {
     if (!seededFeaturedSlug) {
@@ -168,48 +180,61 @@ export default function HomeScreen() {
 
   return (
     <HubScreen
-      actions={[
-        featuredPrimaryAction,
-        { label: 'View bracket', href: `${featuredTournamentPath}#live-bracket`, variant: 'secondary' },
-        { label: 'Watch live', href: '/live', variant: 'secondary' },
-      ]}
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
+      forceTopNav
       lead="Create an account, sign up for the next Spades tournament, open your match when the bracket is live, play, then come back for results."
-      stats={getHomeStats(upcoming.length, games.length, featuredTournament, featuredRegistrationMeta, featuredSignupSummary, featuredBracket)}
+      showHero={false}
       subtitle="Free-entry Spades tournaments with account-based signup, hosted brackets, and clear match links."
       title={siteData.site.name}>
+      <PremiumCountdownHero
+        bracket={featuredBracket}
+        countdown={featuredCountdown}
+        eventCount={upcoming.length}
+        gameCount={games.length}
+        matchStatusPath={featuredMatchStatusPath}
+        registrationMeta={featuredRegistrationMeta}
+        signupSummary={featuredSignupSummary}
+        tournament={featuredTournament}
+        tournamentPath={featuredTournamentPath}
+      />
+
       <Section
-        description="Everything a player needs before the next Spades bracket."
-        title="Next tournament">
-        <NextTournamentPanel
-          bracket={featuredBracket}
-          countdown={getCountdownState(featuredTournament, nowMs)}
-          matchStatusPath={featuredMatchStatusPath}
-          registrationMeta={featuredRegistrationMeta}
-          signupPath={featuredSignupPath}
-          signupSummary={featuredSignupSummary}
-          tournament={featuredTournament}
-          tournamentPath={featuredTournamentPath}
+        action={<ActionButton href={featuredTournamentPath}>Open next event</ActionButton>}
+        description="All public tournaments appear here, soonest first."
+        title="Next tournaments">
+        <UpcomingTournamentList
+          featuredBracket={featuredBracket}
+          featuredSignupSummary={featuredSignupSummary}
+          featuredTournament={featuredTournament}
+          gameLookup={gameLookup}
+          tournaments={visibleUpcoming}
         />
+      </Section>
+
+      <Section
+        description="The event page holds roster, bracket, match status, live table, rules, and results."
+        title="Tournament hub">
+        {featuredTournament ? (
+          <View style={styles.hubTournamentCard}>
+            <TournamentCard
+              gameName={gameLookup.get(featuredTournament.gameSlug)?.name || featuredTournament.gameSlug}
+              href={featuredTournamentPath}
+              tournament={featuredTournament}
+            />
+          </View>
+        ) : null}
+      </Section>
+
+      <Section
+        description="What the current bracket system can handle, and what I recommend for launch."
+        title="Tournament sizes">
+        <TournamentCapacityPanel />
       </Section>
 
       <Section description="The whole player path, in order." title="How to play">
         <StepStrip steps={PLAYER_FLOW_STEPS} />
       </Section>
-
-      {featuredTournament ? (
-        <Section
-          action={<ActionButton href={featuredTournamentPath}>Open tournament</ActionButton>}
-          description="Roster, bracket, match status, live table, rules, and results stay on this event page."
-          title="Tournament control center">
-          <TournamentCard
-            gameName={gameLookup.get(featuredTournament.gameSlug)?.name || featuredTournament.gameSlug}
-            href={featuredTournamentPath}
-            tournament={featuredTournament}
-          />
-        </Section>
-      ) : null}
 
       <Section
         description="The main player links stay here if someone scrolls past the countdown."
@@ -277,22 +302,6 @@ export default function HomeScreen() {
         </Section>
       ) : null}
 
-      {remainingUpcoming.length ? (
-        <Section
-          description="Only real public events appear here. Drafts and future placeholders stay out of the player path."
-          title="Other public events">
-          {remainingUpcoming.map((tournament) => (
-            <View key={tournament.slug} style={styles.block}>
-              <TournamentCard
-                gameName={gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug}
-                href={getTournamentPath(tournament.slug)}
-                tournament={tournament}
-              />
-            </View>
-          ))}
-        </Section>
-      ) : null}
-
       <Section
         description="Spades is active now. Euchre stays as a coming-soon lane until it is ready."
         title="Game lineup">
@@ -331,25 +340,42 @@ export default function HomeScreen() {
   );
 }
 
-function NextTournamentPanel({
+function PremiumCountdownHero({
   bracket,
   countdown,
+  eventCount,
+  gameCount,
   matchStatusPath,
   registrationMeta,
-  signupPath,
   signupSummary,
   tournament,
   tournamentPath,
 }) {
   const isBracketLive = Boolean(bracket);
-  const headline = isBracketLive
-    ? 'Bracket is live'
-    : countdown.hasStarted
-      ? 'Tournament time'
-      : 'Starts in';
-  const primaryHref = isBracketLive ? matchStatusPath : signupPath;
-  const primaryLabel = isBracketLive ? 'Find my match' : 'Create account and sign up';
-  const secondaryLabel = isBracketLive ? 'View bracket' : 'Tournament details';
+  const { width } = useWindowDimensions();
+  const isCompact = width > 0 && width < 760;
+  const isTight = width > 0 && width < 440;
+  const heroStats = tournament
+    ? [
+        {
+          label: 'Next event',
+          value: countdown.hasDate ? formatShortDate(tournament.date, tournament.timeZone) : 'TBD',
+          tone: 'accent',
+        },
+        {
+          label: 'Registered',
+          value: signupSummary.loading ? 'Loading' : String(signupSummary.count),
+          tone: signupSummary.count ? 'green' : 'blue',
+        },
+        {
+          label: 'Bracket',
+          value: bracket ? `${bracket.participantCount || 0} seeded` : 'Open',
+          tone: bracket ? 'green' : 'accent',
+        },
+        { label: 'Games', value: String(gameCount || 0), tone: 'blue' },
+        { label: 'Events', value: String(eventCount || 0), tone: 'green' },
+      ]
+    : [];
 
   if (!tournament) {
     return (
@@ -361,50 +387,186 @@ function NextTournamentPanel({
   }
 
   return (
-    <Surface style={styles.countdownPanel}>
-      <View style={styles.countdownTopRow}>
-        <Badge tone={registrationMeta.tone}>{registrationMeta.label}</Badge>
-        <Text style={styles.countdownDate}>
+    <Surface style={[styles.premiumHero, isTight && styles.premiumHeroTight]}>
+      <View pointerEvents="none" style={styles.premiumHeroBackdrop}>
+        <Text style={[styles.heroSpade, styles.heroSpadeLeft]}>♠</Text>
+        <Text style={[styles.heroSpade, styles.heroSpadeRight]}>♠</Text>
+        <View style={styles.heroGoldGlow} />
+        <View style={styles.heroGreenGlow} />
+      </View>
+      <View style={styles.premiumHeroTopRow}>
+        <Badge tone={isBracketLive ? 'green' : registrationMeta.tone}>
+          {isBracketLive ? 'Bracket is live' : registrationMeta.label}
+        </Badge>
+        <Text style={styles.premiumHeroDomain}>Tournament hub</Text>
+      </View>
+
+      <View style={styles.premiumHeroCopy}>
+        <Text accessibilityRole="header" style={[styles.premiumHeroTitle, isCompact && styles.premiumHeroTitleCompact]}>
+          {tournament.title}
+        </Text>
+        <Text style={styles.premiumHeroSubtitle}>Free-entry. Account-based. Head-to-head Spades.</Text>
+        <Text style={styles.premiumHeroDate}>
           {countdown.hasDate ? formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel) : 'Date pending'}
         </Text>
       </View>
-      <View style={styles.countdownBody}>
-        <View style={styles.countdownCopy}>
-          <Text style={styles.countdownKicker}>{headline}</Text>
-          <Text style={styles.countdownTitle}>{tournament.title}</Text>
-          <Text style={styles.countdownSummary}>{tournament.detail || tournament.summary}</Text>
+
+      <View style={[styles.countdownFrame, isTight && styles.countdownFrameTight]}>
+        <View style={styles.countdownRailRow}>
+          <View style={styles.countdownRail} />
+          <Text style={styles.countdownFrameLabel}>Tournament starts in</Text>
+          <View style={styles.countdownRail} />
         </View>
-        <View style={styles.countdownGrid}>
+        <View style={[styles.countdownGrid, isCompact && styles.countdownGridCompact]}>
           {countdown.parts.map((part) => (
-            <View key={part.label} style={styles.countdownUnit}>
-              <Text style={styles.countdownValue}>{part.value}</Text>
+            <View key={part.label} style={[styles.countdownUnit, isTight && styles.countdownUnitTight]}>
+              <Text
+                adjustsFontSizeToFit
+                numberOfLines={1}
+                style={[
+                  styles.countdownValue,
+                  isCompact && styles.countdownValueCompact,
+                  isTight && styles.countdownValueTight,
+                ]}>
+                {part.value}
+              </Text>
               <Text style={styles.countdownLabel}>{part.label}</Text>
             </View>
           ))}
         </View>
       </View>
-      <View style={styles.countdownStatusRow}>
-        <StatPill
-          label="Registered"
-          value={signupSummary.loading ? 'Loading' : String(signupSummary.count)}
-          tone={signupSummary.count ? 'green' : 'blue'}
-        />
-        <StatPill
-          label="Bracket"
-          value={bracket ? `${bracket.participantCount || 0} seeded` : 'Not seeded'}
-          tone={bracket ? 'green' : 'accent'}
-        />
-        <StatPill label="Entry" value="Free" tone="green" />
-      </View>
-      <View style={styles.countdownActions}>
-        <ActionButton href={primaryHref}>{primaryLabel}</ActionButton>
-        <ActionButton href={tournamentPath} variant="secondary">
-          {secondaryLabel}
+
+      <View style={styles.heroActionRow}>
+        <ActionButton href={matchStatusPath} style={styles.heroActionButton}>
+          Find my match
+        </ActionButton>
+        <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
+          View bracket
         </ActionButton>
         <ActionButton href="/live" variant="secondary">
           Watch live
         </ActionButton>
       </View>
+
+      <View style={styles.heroInfoGrid}>
+        {heroStats.map((stat) => (
+          <View key={stat.label} style={[styles.heroInfoTile, styles[`heroInfo${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
+            <Text style={styles.heroInfoLabel}>{stat.label}</Text>
+            <Text numberOfLines={1} style={styles.heroInfoValue}>{stat.value}</Text>
+          </View>
+        ))}
+      </View>
+    </Surface>
+  );
+}
+
+function UpcomingTournamentList({
+  featuredBracket,
+  featuredSignupSummary,
+  featuredTournament,
+  gameLookup,
+  tournaments,
+}) {
+  if (!tournaments.length) {
+    return (
+      <EmptyState
+        body="When the next public Spades event is scheduled, it will appear here with a signup button and start time."
+        title="No public tournaments scheduled"
+      />
+    );
+  }
+
+  return (
+    <View style={styles.upcomingList}>
+      {tournaments.map((tournament, index) => {
+        const isNext = tournament.slug === featuredTournament?.slug;
+        const registrationMeta = getEffectiveRegistrationStatus(tournament, {
+          hasLiveBracket: isNext && Boolean(featuredBracket),
+        });
+        const signupSummary = signupSummaryForTournament(tournament, featuredTournament, featuredSignupSummary);
+        const tournamentPath = getTournamentPath(tournament.slug);
+        const signupPath = getCheckInPath(tournament.slug);
+        const matchPath = `${tournamentPath}#my-match`;
+        const gameName = gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug;
+        const registrationIsOpen = registrationMeta.value === 'open';
+
+        return (
+          <Surface key={tournament.slug} style={[styles.upcomingRow, isNext && styles.upcomingRowNext]}>
+            <View style={styles.upcomingRank}>
+              <Text style={styles.upcomingRankText}>{index + 1}</Text>
+            </View>
+            <View style={styles.upcomingCopy}>
+              <View style={styles.upcomingTopLine}>
+                <Badge tone={isNext ? 'green' : registrationMeta.tone}>
+                  {isNext ? 'Next tournament' : registrationMeta.label}
+                </Badge>
+                <Text style={styles.upcomingGame}>{gameName}</Text>
+              </View>
+              <Text style={styles.upcomingTitle}>{tournament.title}</Text>
+              <Text style={styles.upcomingDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
+              <Text style={styles.upcomingSummary}>{tournament.detail || tournament.summary}</Text>
+              <View style={styles.upcomingStats}>
+                <StatPill
+                  label="Registered"
+                  value={
+                    signupSummary.loading
+                      ? 'Loading'
+                      : signupSummary.unavailable
+                        ? 'Open'
+                        : String(signupSummary.count)
+                  }
+                  tone={signupSummary.count ? 'green' : 'blue'}
+                />
+                <StatPill
+                  label="Bracket"
+                  value={bracketLabelForTournament(tournament, featuredTournament, featuredBracket)}
+                  tone={isNext && featuredBracket ? 'green' : 'accent'}
+                />
+                <StatPill label="Entry" value="Free" tone="green" />
+              </View>
+            </View>
+            <View style={styles.upcomingActions}>
+              <ActionButton href={registrationIsOpen ? signupPath : tournamentPath}>
+                {registrationIsOpen ? 'Sign up' : 'Details'}
+              </ActionButton>
+              <ActionButton href={matchPath} variant="secondary">
+                My match
+              </ActionButton>
+            </View>
+          </Surface>
+        );
+      })}
+    </View>
+  );
+}
+
+function TournamentCapacityPanel() {
+  return (
+    <Surface style={styles.capacityPanel}>
+      <View style={styles.capacityTopRow}>
+        <View style={styles.capacityCopy}>
+          <Badge tone="green">Recommended setup</Badge>
+          <Text style={styles.capacityTitle}>Start with 4 or 8 players.</Text>
+          <Text style={styles.capacityBody}>
+            The bracket engine can generate from any 2+ signups and rounds up to the next power of two with automatic byes.
+            For launch, 4-8 players is the smoothest size; 16 is realistic once match reporting feels routine.
+          </Text>
+        </View>
+        <View style={styles.capacityStats}>
+          <StatPill label="Best first event" value="4-8" tone="green" />
+          <StatPill label="Comfortable next" value="16" tone="accent" />
+          <StatPill label="Code minimum" value="2" tone="blue" />
+          <StatPill label="Byes" value="Auto" tone="green" />
+        </View>
+      </View>
+      <BulletList
+        items={[
+          '2 players works for smoke tests and show matches.',
+          '3, 5, 6, 7, or 9 players still work because the bracket fills byes automatically.',
+          '32+ should wait until reminders, result reporting, and host operations are boringly reliable.',
+        ]}
+        tone="green"
+      />
     </Surface>
   );
 }
@@ -418,10 +580,66 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginRight: -12,
   },
-  countdownPanel: {
-    borderColor: 'rgba(97, 210, 145, 0.28)',
+  premiumHero: {
+    backgroundColor: '#07110F',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    borderRadius: 24,
+    marginBottom: 22,
+    overflow: 'hidden',
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 20,
+    shadowColor: '#D6A24E',
+    shadowOpacity: 0.18,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
   },
-  countdownTopRow: {
+  premiumHeroTight: {
+    paddingHorizontal: 12,
+    paddingTop: 18,
+  },
+  premiumHeroBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  heroSpade: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontWeight: '800',
+    opacity: 0.035,
+    position: 'absolute',
+  },
+  heroSpadeLeft: {
+    fontSize: 180,
+    left: 28,
+    top: 36,
+    transform: [{ rotate: '-8deg' }],
+  },
+  heroSpadeRight: {
+    bottom: 12,
+    fontSize: 220,
+    right: 34,
+    transform: [{ rotate: '10deg' }],
+  },
+  heroGoldGlow: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: 132,
+    width: 620,
+    height: 160,
+    borderRadius: 999,
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+  },
+  heroGreenGlow: {
+    position: 'absolute',
+    left: -120,
+    top: -80,
+    width: 320,
+    height: 260,
+    borderRadius: 999,
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+  },
+  premiumHeroTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -429,75 +647,151 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
-  countdownDate: {
+  premiumHeroDomain: {
     color: '#AAB4AE',
     flexShrink: 1,
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     lineHeight: 18,
     textTransform: 'uppercase',
   },
-  countdownBody: {
-    alignItems: 'stretch',
+  premiumHeroCopy: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    maxWidth: 820,
+    width: '100%',
+  },
+  premiumHeroTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 42,
+    fontWeight: '800',
+    letterSpacing: 0,
+    lineHeight: 48,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 14,
+  },
+  premiumHeroTitleCompact: {
+    fontSize: 32,
+    lineHeight: 38,
+  },
+  premiumHeroSubtitle: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  premiumHeroDate: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 19,
+    marginTop: 10,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  countdownFrame: {
+    borderColor: 'rgba(214, 162, 78, 0.58)',
+    borderRadius: 24,
+    borderWidth: 1,
+    marginTop: 24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    shadowColor: '#D6A24E',
+    shadowOpacity: 0.26,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  countdownFrameTight: {
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  countdownRailRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
+    gap: 12,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
-  countdownCopy: {
+  countdownRail: {
+    backgroundColor: 'rgba(214, 162, 78, 0.48)',
     flex: 1,
-    minWidth: 260,
+    height: 1,
+    maxWidth: 160,
   },
-  countdownKicker: {
-    color: '#61D291',
+  countdownFrameLabel: {
+    color: '#D6A24E',
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
     lineHeight: 18,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
-  countdownTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 36,
-    marginTop: 6,
-  },
-  countdownSummary: {
-    color: '#F4EFE6',
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 8,
-  },
   countdownGrid: {
-    flexBasis: 430,
     flexDirection: 'row',
-    flexGrow: 1,
     flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  countdownGridCompact: {
     gap: 10,
   },
   countdownUnit: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(97, 210, 145, 0.28)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(7, 17, 15, 0.78)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: 18,
     borderWidth: 1,
-    flexBasis: 92,
+    flexBasis: 132,
     flexGrow: 1,
     justifyContent: 'center',
-    minHeight: 92,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    maxWidth: 190,
+    minHeight: 116,
+    minWidth: 118,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+  },
+  countdownUnitTight: {
+    flexBasis: 92,
+    maxWidth: '48%',
+    minHeight: 88,
+    minWidth: 88,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
   },
   countdownValue: {
-    color: '#F4EFE6',
+    color: '#FFD66B',
     fontFamily: 'monospace',
-    fontSize: 28,
+    fontSize: 56,
     fontWeight: '900',
-    lineHeight: 34,
+    letterSpacing: 0,
+    lineHeight: 62,
+    textAlign: 'center',
+    textShadowColor: 'rgba(214, 162, 78, 0.92)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
+  },
+  countdownValueCompact: {
+    fontSize: 42,
+    lineHeight: 48,
+  },
+  countdownValueTight: {
+    fontSize: 34,
+    lineHeight: 39,
   },
   countdownLabel: {
     color: '#AAB4AE',
@@ -506,18 +800,184 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
     lineHeight: 16,
-    marginTop: 4,
+    marginTop: 6,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
-  countdownStatusRow: {
+  heroActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 16,
+    justifyContent: 'center',
+    marginTop: 18,
   },
-  countdownActions: {
+  heroActionButton: {
+    minWidth: 190,
+  },
+  heroInfoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 16,
+    gap: 10,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  heroInfoTile: {
+    backgroundColor: 'rgba(23, 38, 34, 0.72)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexBasis: 152,
+    flexGrow: 1,
+    maxWidth: 210,
+    minHeight: 70,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+  },
+  heroInfoAccent: {
+    borderColor: 'rgba(214, 162, 78, 0.45)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+  },
+  heroInfoBlue: {
+    borderColor: 'rgba(108, 199, 255, 0.38)',
+    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+  },
+  heroInfoGreen: {
+    borderColor: 'rgba(97, 210, 145, 0.42)',
+    backgroundColor: 'rgba(97, 210, 145, 0.11)',
+  },
+  heroInfoLabel: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  heroInfoValue: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 3,
+  },
+  hubTournamentCard: {
+    marginTop: 14,
+  },
+  upcomingList: {
+    gap: 12,
+  },
+  upcomingRow: {
+    alignItems: 'stretch',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  upcomingRowNext: {
+    borderColor: 'rgba(97, 210, 145, 0.34)',
+    backgroundColor: 'rgba(97, 210, 145, 0.06)',
+  },
+  upcomingRank: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(97, 210, 145, 0.12)',
+    borderColor: 'rgba(97, 210, 145, 0.34)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  upcomingRankText: {
+    color: '#61D291',
+    fontFamily: 'monospace',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  upcomingCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  upcomingTopLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  upcomingGame: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  upcomingTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  upcomingDate: {
+    color: '#D6A24E',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  upcomingSummary: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  upcomingStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  upcomingActions: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    minWidth: 220,
+  },
+  capacityPanel: {
+    borderColor: 'rgba(97, 210, 145, 0.28)',
+  },
+  capacityTopRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  capacityCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  capacityTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 31,
+    marginTop: 10,
+  },
+  capacityBody: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 8,
+  },
+  capacityStats: {
+    flexBasis: 340,
+    flexDirection: 'row',
+    flexGrow: 1,
+    flexWrap: 'wrap',
   },
   spadesSpotlight: {
     borderColor: 'rgba(214, 162, 78, 0.28)',

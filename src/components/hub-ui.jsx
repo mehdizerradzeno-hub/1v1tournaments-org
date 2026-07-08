@@ -10,6 +10,7 @@ import { getCheckInPath, getTournamentPath, siteData } from '../lib/siteData.js'
 
 const PRIMARY_TOURNAMENT_PATH = getTournamentPath(siteData.site.primaryTournamentSlug);
 const PRIMARY_CHECK_IN_PATH = getCheckInPath(siteData.site.primaryTournamentSlug);
+const PRIMARY_SIGN_IN_PATH = `${PRIMARY_CHECK_IN_PATH}?mode=signin`;
 const PRIMARY_MATCH_PATH = `${PRIMARY_TOURNAMENT_PATH}#my-match`;
 
 const NAV_ITEMS = [
@@ -354,7 +355,7 @@ export function ResultCard({ result, href }) {
       </View>
       <Text style={styles.cardTitle}>{result.title}</Text>
       <View style={styles.resultScoreRow}>
-        <View>
+        <View style={styles.resultSummaryBlock}>
           <Text style={styles.resultWinner}>{result.winner}</Text>
           <Text style={styles.cardSubtitle}>{result.summary}</Text>
         </View>
@@ -376,7 +377,7 @@ export function ResultCard({ result, href }) {
   );
 
   if (!href) {
-    return <Surface style={styles.cardSurface}>{card}</Surface>;
+    return <Surface style={[styles.cardSurface, styles.resultSurface]}>{card}</Surface>;
   }
 
   return (
@@ -512,14 +513,21 @@ export function HubScreen({
   stats = [],
   children,
   footerNote,
+  forceTopNav = false,
+  showHero = true,
 }) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
-  const showMobileNav = Platform.OS === 'web' && width > 0 && width < 720;
+  const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
+  const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
-  const accountHref = playerAccount?.hostApproved ? '/admin' : PRIMARY_CHECK_IN_PATH;
+  const accountHref = playerAccount?.hostApproved
+    ? '/admin'
+    : playerAccount
+      ? PRIMARY_CHECK_IN_PATH
+      : PRIMARY_SIGN_IN_PATH;
   const accountLabel = playerAccountLoading
     ? 'Sign in'
     : playerAccount?.hostApproved
@@ -587,7 +595,7 @@ export function HubScreen({
               </View>
             </View>
 
-            {!showMobileNav ? (
+            {showTopNav ? (
               <View style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
                 {NAV_ITEMS.map((item) => {
                   const active = isNavItemActive(pathname, item);
@@ -602,38 +610,40 @@ export function HubScreen({
               </View>
             ) : null}
 
-            <Surface style={[styles.heroSurface, showLaptopLayout && styles.heroSurfaceLaptop]}>
-              <View style={styles.heroTopRow}>
-                {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
-                <Text style={styles.heroDomain}>Tournament hub</Text>
-              </View>
-              <Text accessibilityRole="header" style={[styles.heroTitle, showLaptopLayout && styles.heroTitleLaptop]}>{title}</Text>
-              {subtitle ? <Text style={[styles.heroSubtitle, showLaptopLayout && styles.heroSubtitleLaptop]}>{subtitle}</Text> : null}
-              {lead ? <Text style={[styles.heroLead, showLaptopLayout && styles.heroLeadLaptop]}>{lead}</Text> : null}
-
-              {actions.length ? (
-                <View style={[styles.actionRow, showLaptopLayout && styles.actionRowLaptop]}>
-                  {actions.map((action) => (
-                    <ActionButton
-                      key={`${action.label}-${action.href || action.variant}`}
-                      external={action.external}
-                      href={action.href}
-                      onPress={action.onPress}
-                      variant={action.variant || 'primary'}>
-                      {action.label}
-                    </ActionButton>
-                  ))}
+            {showHero ? (
+              <Surface style={[styles.heroSurface, showLaptopLayout && styles.heroSurfaceLaptop]}>
+                <View style={styles.heroTopRow}>
+                  {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
+                  <Text style={styles.heroDomain}>Tournament hub</Text>
                 </View>
-              ) : null}
+                <Text accessibilityRole="header" style={[styles.heroTitle, showLaptopLayout && styles.heroTitleLaptop]}>{title}</Text>
+                {subtitle ? <Text style={[styles.heroSubtitle, showLaptopLayout && styles.heroSubtitleLaptop]}>{subtitle}</Text> : null}
+                {lead ? <Text style={[styles.heroLead, showLaptopLayout && styles.heroLeadLaptop]}>{lead}</Text> : null}
 
-              {stats.length ? (
-                <View style={[styles.statsRow, showLaptopLayout && styles.statsRowLaptop]}>
-                  {stats.map((stat) => (
-                    <StatPill key={stat.label} label={stat.label} value={stat.value} tone={stat.tone || 'neutral'} />
-                  ))}
-                </View>
-              ) : null}
-            </Surface>
+                {actions.length ? (
+                  <View style={[styles.actionRow, showLaptopLayout && styles.actionRowLaptop]}>
+                    {actions.map((action) => (
+                      <ActionButton
+                        key={`${action.label}-${action.href || action.variant}`}
+                        external={action.external}
+                        href={action.href}
+                        onPress={action.onPress}
+                        variant={action.variant || 'primary'}>
+                        {action.label}
+                      </ActionButton>
+                    ))}
+                  </View>
+                ) : null}
+
+                {stats.length ? (
+                  <View style={[styles.statsRow, showLaptopLayout && styles.statsRowLaptop]}>
+                    {stats.map((stat) => (
+                      <StatPill key={stat.label} label={stat.label} value={stat.value} tone={stat.tone || 'neutral'} />
+                    ))}
+                  </View>
+                ) : null}
+              </Surface>
+            ) : null}
 
             {children}
 
@@ -734,10 +744,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 18,
+    backgroundColor: 'rgba(9, 19, 17, 0.82)',
+    borderWidth: 1,
+    borderColor: theme.colors.line,
   },
   brandRowLaptop: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   brandLink: {
     flexDirection: 'row',
@@ -796,21 +811,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 18,
+    padding: 5,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(17, 29, 26, 0.72)',
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    alignSelf: 'flex-start',
   },
   navRowLaptop: {
     marginBottom: 14,
   },
   navWrap: {
-    marginRight: 10,
-    marginBottom: 10,
+    marginRight: 4,
+    marginBottom: 0,
   },
   navChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: theme.colors.line,
+    borderColor: 'transparent',
   },
   navChipActive: {
     backgroundColor: theme.colors.accentSoft,
@@ -1091,10 +1112,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
     marginBottom: 12,
   },
   cardStatus: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '800',
@@ -1373,10 +1397,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   resultScoreRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
     marginTop: 12,
+  },
+  resultSummaryBlock: {
+    flex: 1,
+    minWidth: 210,
   },
   resultWinner: {
     color: theme.colors.text,
@@ -1385,21 +1415,25 @@ const styles = StyleSheet.create({
     fontFamily: DISPLAY_FONT,
   },
   scoreBadge: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     minWidth: 92,
+    maxWidth: '100%',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
     backgroundColor: theme.colors.accentSoft,
     borderWidth: 1,
     borderColor: theme.colors.accent,
-    alignItems: 'center',
   },
   scoreValue: {
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.4,
     fontFamily: MONO_FONT,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   resultDate: {
     color: theme.colors.muted,
@@ -1427,7 +1461,13 @@ const styles = StyleSheet.create({
   },
   placementName: {
     color: theme.colors.text,
+    flex: 1,
     fontSize: 14,
+    marginLeft: 12,
+    textAlign: 'right',
+  },
+  resultSurface: {
+    overflow: 'hidden',
   },
   streamCard: {
     marginBottom: 14,
