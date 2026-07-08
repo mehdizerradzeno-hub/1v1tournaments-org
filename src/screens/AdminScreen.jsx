@@ -18,7 +18,7 @@ import {
   verifyAdminServerAccountId,
 } from '../lib/adminServerClient.js';
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
-import { getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
+import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import {
   dateToScheduleFields,
   getRegistrationStatusMeta,
@@ -68,6 +68,58 @@ function getModeLabel(mode) {
   if (mode === 'locked') return 'Locked';
   if (mode === 'unlocked') return 'Unlocked';
   return 'Unsupported';
+}
+
+function formatHostDateTime(tournament) {
+  const startDate = new Date(tournament?.date);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return 'Start time needs to be set';
+  }
+
+  return startDate.toLocaleString([], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: tournament?.timeZone || 'America/New_York',
+    timeZoneName: 'short',
+  });
+}
+
+function getStartTimingLabel(tournament) {
+  const startDate = new Date(tournament?.date);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return 'No start time';
+  }
+
+  const diffMs = startDate.getTime() - Date.now();
+  const absMinutes = Math.max(1, Math.round(Math.abs(diffMs) / 60000));
+
+  if (diffMs < 0) {
+    if (absMinutes < 60) return `Started ${absMinutes} min ago`;
+    return `Started ${Math.round(absMinutes / 60)} hr ago`;
+  }
+
+  if (absMinutes < 60) return `Starts in ${absMinutes} min`;
+  if (absMinutes < 1440) return `Starts in ${Math.round(absMinutes / 60)} hr`;
+  return `Starts in ${Math.round(absMinutes / 1440)} days`;
+}
+
+function getBracketPreviewLabel(signupCount, tournament) {
+  const minimumPlayers = tournament?.minimumPlayers || 2;
+  const rosterCap = tournament?.rosterCap || 0;
+
+  if (signupCount < minimumPlayers) {
+    return `Needs ${minimumPlayers} players`;
+  }
+
+  if (signupCount <= 2) return '2-player final';
+  if (signupCount <= 4) return '4-player bracket';
+  if (!rosterCap || signupCount <= rosterCap) return `${rosterCap || signupCount}-player bracket`;
+  return `${signupCount} signed up, over target`;
 }
 
 export default function AdminScreen() {
@@ -596,16 +648,71 @@ export default function AdminScreen() {
   }
 
   function renderScheduleSection() {
+    const tournament = liveTournament || selectedTournament;
+    const signupCount = selectedRoster?.signups?.length || 0;
+    const rosterCap = tournament?.rosterCap || 0;
+    const minimumPlayers = tournament?.minimumPlayers || 2;
+    const tournamentPath = getTournamentPath(rosterSlug);
+    const signupPath = getCheckInPath(rosterSlug);
+    const bracketLabel = bracket?.participantCount
+      ? `${bracket.participantCount} seeded`
+      : getBracketPreviewLabel(signupCount, tournament);
+    const nextHostAction = !hasHostCredential
+      ? 'Confirm host access first.'
+      : signupCount < minimumPlayers
+        ? 'Post the event, then share the signup link.'
+        : bracket
+          ? 'Send players to My Match and monitor results.'
+          : 'Generate the bracket when the roster is ready.';
+    const publisherStats = [
+      { label: 'Start', value: getStartTimingLabel(tournament), tone: 'accent' },
+      { label: 'Registered', value: `${signupCount}${rosterCap ? ` / ${rosterCap}` : ''}`, tone: signupCount >= minimumPlayers ? 'green' : 'blue' },
+      { label: 'Bracket', value: bracketLabel, tone: bracket ? 'green' : 'accent' },
+      { label: 'Status', value: liveRegistrationMeta.label, tone: liveRegistrationMeta.tone },
+      { label: 'Check-in', value: `${scheduleCheckInLeadMinutes || 30} min`, tone: 'blue' },
+    ];
+
     return (
       <Section
-        description="This controls what players see on the tournament and signup pages."
-        title="Schedule and registration">
-        <Surface style={styles.schedulePanel}>
-          <View style={styles.metaRow}>
-            <Badge tone={liveRegistrationMeta.tone}>{liveRegistrationMeta.label}</Badge>
-            <Text style={styles.metaText}>
-              {liveTournament?.title || rosterSlug} starts {scheduleDate || 'TBD'} at {scheduleTime || 'TBD'} {scheduleTimeZoneLabel || ''}
-            </Text>
+        action={<ActionButton href="/" variant="secondary">Home</ActionButton>}
+        description="Pick the event, set the start time, open or close registration, then run the roster from the same screen."
+        title="Post tournament">
+        <Surface style={styles.publisherPanel}>
+          <View style={styles.publisherHero}>
+            <View style={styles.publisherCopy}>
+              <View style={styles.metaRow}>
+                <Badge tone="accent">Host command center</Badge>
+                <Text style={styles.publisherKicker}>{nextHostAction}</Text>
+              </View>
+              <Text style={styles.publisherTitle}>{tournament?.title || rosterSlug}</Text>
+              <Text style={styles.publisherDate}>{formatHostDateTime(tournament)}</Text>
+              <Text style={styles.copy}>
+                Advertise {rosterCap || 'an open'}-player seats, run with {minimumPlayers}+ players, and let the actual bracket flex to the roster that shows up.
+              </Text>
+            </View>
+
+            <View style={styles.publisherStatGrid}>
+              {publisherStats.map((stat) => (
+                <View key={stat.label} style={[styles.publisherStat, styles[`publisherStat${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
+                  <Text style={styles.publisherStatLabel}>{stat.label}</Text>
+                  <Text style={styles.publisherStatValue}>{stat.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Tournament to manage</Text>
+            <View style={styles.tournamentPicker}>
+              {siteData.tournaments.map((tournamentOption) => (
+                <ActionButton
+                  key={tournamentOption.slug}
+                  onPress={() => setRosterSlug(tournamentOption.slug)}
+                  variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
+                  {tournamentOption.title}
+                </ActionButton>
+              ))}
+            </View>
           </View>
 
           <View style={styles.scheduleGrid}>
@@ -673,7 +780,7 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Registration</Text>
+            <Text style={styles.fieldLabel}>Registration state</Text>
             <View style={styles.tournamentPicker}>
               {REGISTRATION_STATUS_OPTIONS.map((option) => (
                 <ActionButton
@@ -683,6 +790,21 @@ export default function AdminScreen() {
                   {option.label}
                 </ActionButton>
               ))}
+            </View>
+          </View>
+
+          <View style={styles.publisherWorkflow}>
+            <View style={styles.workflowStep}>
+              <Badge tone="accent">1</Badge>
+              <Text style={styles.workflowText}>Save the event date and registration state.</Text>
+            </View>
+            <View style={styles.workflowStep}>
+              <Badge tone="blue">2</Badge>
+              <Text style={styles.workflowText}>Share the signup page until enough players are registered.</Text>
+            </View>
+            <View style={styles.workflowStep}>
+              <Badge tone="green">3</Badge>
+              <Text style={styles.workflowText}>Generate the bracket, then players use My Match.</Text>
             </View>
           </View>
 
@@ -697,10 +819,19 @@ export default function AdminScreen() {
           {scheduleMessage ? <Text style={styles.successText}>{scheduleMessage}</Text> : null}
 
           <View style={styles.buttonRow}>
-            <ActionButton onPress={handleSaveScheduleSettings}>
+            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleSaveScheduleSettings}>
               {scheduleLoading ? 'Saving...' : 'Save schedule'}
             </ActionButton>
-            <ActionButton onPress={handleResetScheduleSettings} variant="secondary">
+            <ActionButton href={signupPath} variant="secondary">
+              Open signup page
+            </ActionButton>
+            <ActionButton href={tournamentPath} variant="secondary">
+              Open tournament page
+            </ActionButton>
+            <ActionButton disabled={!hasHostCredential || signupCount < minimumPlayers || bracketLoading} onPress={handleGenerateBracket} variant="secondary">
+              {bracketLoading ? 'Generating...' : 'Generate bracket'}
+            </ActionButton>
+            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleResetScheduleSettings} variant="ghost">
               Reset schedule
             </ActionButton>
           </View>
@@ -1327,18 +1458,11 @@ export default function AdminScreen() {
             </View>
           )}
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Tournament</Text>
-            <View style={styles.tournamentPicker}>
-              {siteData.tournaments.map((tournament) => (
-                <ActionButton
-                  key={tournament.slug}
-                  onPress={() => setRosterSlug(tournament.slug)}
-                  variant={rosterSlug === tournament.slug ? 'primary' : 'secondary'}>
-                  {tournament.title}
-                </ActionButton>
-              ))}
-            </View>
+          <View style={styles.selectedTournamentNotice}>
+            <Badge tone="accent">Selected event</Badge>
+            <Text style={styles.metaText}>
+              {liveTournament?.title || rosterSlug}. Change the selected event in Post tournament at the top.
+            </Text>
           </View>
 
           <View style={styles.buttonRow}>
@@ -1993,8 +2117,126 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 12,
   },
+  selectedTournamentNotice: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.20)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 14,
+    padding: 12,
+  },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  publisherPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    shadowColor: '#D6A24E',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 26,
+  },
+  publisherHero: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+  },
+  publisherCopy: {
+    flex: 1.4,
+    minWidth: 280,
+  },
+  publisherKicker: {
+    color: '#D6A24E',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  publisherTitle: {
+    color: '#F4EFE6',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 36,
+    marginTop: 12,
+  },
+  publisherDate: {
+    color: '#D6A24E',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginBottom: 10,
+    marginTop: 6,
+    textTransform: 'uppercase',
+  },
+  publisherStatGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 260,
+  },
+  publisherStat: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 132,
+    flexGrow: 1,
+    padding: 12,
+  },
+  publisherStatAccent: {
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
+  publisherStatBlue: {
+    borderColor: 'rgba(108, 199, 255, 0.32)',
+  },
+  publisherStatGreen: {
+    borderColor: 'rgba(97, 210, 145, 0.38)',
+  },
+  publisherStatRose: {
+    borderColor: 'rgba(224, 106, 92, 0.36)',
+  },
+  publisherStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  publisherStatValue: {
+    color: '#F4EFE6',
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginTop: 4,
+  },
+  publisherWorkflow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+  },
+  workflowStep: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 250,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    padding: 12,
+  },
+  workflowText: {
+    color: '#D4DDD7',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
   },
   schedulePanel: {
     borderColor: 'rgba(108, 199, 255, 0.26)',
