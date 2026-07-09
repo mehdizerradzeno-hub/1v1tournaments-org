@@ -13,6 +13,7 @@ import {
 import { downloadLinks } from '../lib/downloadLinks.js';
 import { formatDateLine } from '../lib/format.js';
 import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
+import { sendDiscordAlert } from '../lib/tournamentHostingClient.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -92,6 +93,8 @@ export default function LiveScreen() {
   const upcoming = getUpcomingTournaments();
   const nextTournament = upcoming[0] || null;
   const nextTournamentPath = nextTournament ? getTournamentPath(nextTournament.slug) : '/next';
+  const announcementItems = buildAnnouncementCopy(nextTournament, nextTournamentPath);
+  const discordAnnouncement = announcementItems.find((item) => item.label === 'Discord live post')?.text || '';
 
   return (
     <HubScreen
@@ -187,11 +190,11 @@ export default function LiveScreen() {
       </Section>
 
       <Section description="Clear stream-day notification status for the community layer." title="Discord alerts">
-        <DiscordAlertPanel hasDiscord={hasDiscord} />
+        <DiscordAlertPanel hasDiscord={hasDiscord} message={discordAnnouncement} />
       </Section>
 
       <Section description="Copy-ready text for Twitch, Discord, and social posts." title="Announcement kit">
-        <AnnouncementKit items={buildAnnouncementCopy(nextTournament, nextTournamentPath)} />
+        <AnnouncementKit items={announcementItems} />
       </Section>
 
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
@@ -300,7 +303,24 @@ function CommandCard({ actionLabel, body, external = false, href, meta, title, t
   );
 }
 
-function DiscordAlertPanel({ hasDiscord }) {
+function DiscordAlertPanel({ hasDiscord, message }) {
+  const [sendState, setSendState] = useState({ sending: false, feedback: '', error: '' });
+
+  async function handleSendDiscordAlert() {
+    setSendState({ sending: true, feedback: '', error: '' });
+
+    try {
+      await sendDiscordAlert({ message });
+      setSendState({ sending: false, feedback: 'Discord alert sent.', error: '' });
+    } catch (error) {
+      setSendState({
+        sending: false,
+        feedback: '',
+        error: error instanceof Error ? error.message : 'Discord alert could not be sent.',
+      });
+    }
+  }
+
   return (
     <Surface style={styles.discordPanel}>
       <View style={styles.discordTopRow}>
@@ -326,6 +346,9 @@ function DiscordAlertPanel({ hasDiscord }) {
         </View>
       </View>
       <View style={styles.discordActions}>
+        <ActionButton onPress={handleSendDiscordAlert}>
+          {sendState.sending ? 'Sending...' : 'Send live alert'}
+        </ActionButton>
         {hasDiscord ? (
           <ActionButton external href={downloadLinks.discord} variant="secondary">
             Open Discord
@@ -339,6 +362,8 @@ function DiscordAlertPanel({ hasDiscord }) {
           Live hub
         </ActionButton>
       </View>
+      {sendState.feedback ? <Text style={styles.discordFeedback}>{sendState.feedback}</Text> : null}
+      {sendState.error ? <Text style={styles.discordError}>{sendState.error}</Text> : null}
     </Surface>
   );
 }
@@ -627,6 +652,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
     marginTop: 8,
+  },
+  discordError: {
+    color: '#FFB4A8',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 10,
+  },
+  discordFeedback: {
+    color: '#61D291',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 19,
+    marginTop: 10,
   },
   discordMeta: {
     color: '#6CC7FF',

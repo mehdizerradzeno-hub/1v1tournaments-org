@@ -6,6 +6,7 @@ const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
+const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 
 function isLocalStaticPreview() {
@@ -422,6 +423,26 @@ export async function reportTournamentMatchWinner({ token, slug, matchId, winner
 
   if (!response.ok) {
     throw new Error(result?.error || 'Winner could not be saved.');
+  }
+
+  return result;
+}
+
+export async function sendDiscordAlert({ token, message }) {
+  const response = await fetch(DISCORD_ALERT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      message,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Discord alert could not be sent.');
   }
 
   return result;

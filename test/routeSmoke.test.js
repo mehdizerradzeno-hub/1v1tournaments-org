@@ -45,6 +45,7 @@ const tournamentSettingsFunctionFile = fileURLToPath(new URL('../netlify/functio
 const tournamentSettingsUtilsFile = fileURLToPath(new URL('../netlify/functions/_tournament-settings-utils.mjs', import.meta.url));
 const tournamentEventsFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-events.mjs', import.meta.url));
 const tournamentEventsUtilsFile = fileURLToPath(new URL('../netlify/functions/_tournament-events-utils.mjs', import.meta.url));
+const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/discord-alert.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const tournamentCatalogFile = fileURLToPath(new URL('../src/lib/tournamentCatalog.js', import.meta.url));
 const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
@@ -93,14 +94,24 @@ test('/next stays wired to the public next-event lobby', () => {
 test('/live stays wired to stream-day command tools', () => {
   assert.ok(existsSync(liveRouteFile));
   assert.ok(existsSync(liveScreenFile));
+  assert.ok(existsSync(discordAlertFunctionFile));
 
   const liveScreenSource = readFileSync(liveScreenFile, 'utf8');
+  const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
+  const discordAlertSource = readFileSync(discordAlertFunctionFile, 'utf8');
 
   assert.match(liveScreenSource, /Go-live checklist/);
   assert.match(liveScreenSource, /Announcement kit/);
   assert.match(liveScreenSource, /Run of show/);
   assert.match(liveScreenSource, /OBS scene map/);
   assert.match(liveScreenSource, /navigator\.clipboard\.writeText/);
+  assert.match(liveScreenSource, /Send live alert/);
+  assert.match(liveScreenSource, /sendDiscordAlert/);
+  assert.match(hostingClientSource, /DISCORD_ALERT_ENDPOINT/);
+  assert.match(hostingClientSource, /sendDiscordAlert/);
+  assert.match(discordAlertSource, /DISCORD_WEBHOOK_URL/);
+  assert.match(discordAlertSource, /requireTournamentAdmin/);
+  assert.match(discordAlertSource, /allowed_mentions/);
 });
 
 test('overlay routes stay wired to OBS browser sources', () => {
