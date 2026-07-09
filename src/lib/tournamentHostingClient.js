@@ -8,6 +8,7 @@ const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
 const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
 const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
+const HEALTH_ENDPOINT = '/.netlify/functions/health';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 
 function isLocalStaticPreview() {
@@ -457,6 +458,20 @@ export async function fetchStreamCommands() {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Stream commands could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchRuntimeHealth() {
+  const endpoint = readEndpoint(HEALTH_ENDPOINT);
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok && response.status !== 503) {
+    throw new Error(result?.error || 'Runtime health could not be loaded.');
   }
 
   return result;

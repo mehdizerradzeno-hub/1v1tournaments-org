@@ -180,9 +180,15 @@ The blueprint sets these non-secret values automatically:
 ```bash
 TWITCH_CHANNEL=1v1compspades
 STREAM_COMMAND_ENDPOINT=https://1v1tournaments.org/.netlify/functions/stream-commands
+HEALTH_ENDPOINT=https://1v1tournaments.org/.netlify/functions/health
 TWITCH_COMMAND_REFRESH_MS=60000
 TWITCH_COMMAND_COOLDOWN_MS=4000
+TWITCH_BOT_HEARTBEAT_MS=30000
 ```
+
+Set `HEALTH_MONITOR_TOKEN` to the same private value in both Netlify and Render.
+The bot posts a heartbeat to `/.netlify/functions/health`, and `/live` displays
+whether the hosted Twitch bot is online.
 
 After the worker deploys, check the Render logs for:
 

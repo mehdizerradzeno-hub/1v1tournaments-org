@@ -49,6 +49,7 @@ const tournamentEventsFunctionFile = fileURLToPath(new URL('../netlify/functions
 const tournamentEventsUtilsFile = fileURLToPath(new URL('../netlify/functions/_tournament-events-utils.mjs', import.meta.url));
 const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/discord-alert.mjs', import.meta.url));
 const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
+const healthFunctionFile = fileURLToPath(new URL('../netlify/functions/health.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
@@ -153,11 +154,13 @@ test('/live stays wired to stream-day command tools', () => {
   assert.ok(existsSync(liveScreenFile));
   assert.ok(existsSync(discordAlertFunctionFile));
   assert.ok(existsSync(streamCommandsFunctionFile));
+  assert.ok(existsSync(healthFunctionFile));
 
   const liveScreenSource = readFileSync(liveScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
   const discordAlertSource = readFileSync(discordAlertFunctionFile, 'utf8');
   const streamCommandsSource = readFileSync(streamCommandsFunctionFile, 'utf8');
+  const healthSource = readFileSync(healthFunctionFile, 'utf8');
   const streamCommandsClientSource = readFileSync(streamCommandsClientFile, 'utf8');
 
   assert.match(liveScreenSource, /Go-live checklist/);
@@ -182,10 +185,15 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /Fallback admin token/);
   assert.match(liveScreenSource, /TOURNAMENT_ADMIN_TOKEN/);
   assert.match(liveScreenSource, /sendDiscordAlert/);
+  assert.match(liveScreenSource, /fetchRuntimeHealth/);
+  assert.match(liveScreenSource, /Render bot online/);
+  assert.match(liveScreenSource, /Last heartbeat/);
   assert.match(hostingClientSource, /DISCORD_ALERT_ENDPOINT/);
   assert.match(hostingClientSource, /sendDiscordAlert/);
   assert.match(hostingClientSource, /STREAM_COMMANDS_ENDPOINT/);
   assert.match(hostingClientSource, /fetchStreamCommands/);
+  assert.match(hostingClientSource, /HEALTH_ENDPOINT/);
+  assert.match(hostingClientSource, /fetchRuntimeHealth/);
   assert.match(streamCommandsSource, /stream-commands/);
   assert.match(streamCommandsSource, /requireTournamentAdmin/);
   assert.match(streamCommandsSource, /normalizeStreamCommands/);
@@ -198,6 +206,10 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(discordAlertSource, /DISCORD_WEBHOOK_URL/);
   assert.match(discordAlertSource, /requireTournamentAdmin/);
   assert.match(discordAlertSource, /allowed_mentions/);
+  assert.match(healthSource, /HEALTH_MONITOR_TOKEN/);
+  assert.match(healthSource, /runtime-health/);
+  assert.match(healthSource, /twitch-bot\.json/);
+  assert.match(healthSource, /Heartbeat stale/);
 });
 
 test('overlay routes stay wired to OBS browser sources', () => {
@@ -452,9 +464,15 @@ test('Twitch chat bot runner reads editable stream commands', () => {
   assert.match(botSource, /\.env\.twitch-bot/);
   assert.match(botSource, /TWITCH_BOT_DRY_RUN/);
   assert.match(botSource, /STREAM_COMMAND_ENDPOINT/);
+  assert.match(botSource, /HEALTH_ENDPOINT/);
+  assert.match(botSource, /HEALTH_MONITOR_TOKEN/);
+  assert.match(botSource, /sendHeartbeat/);
   assert.match(botSource, /stream-commands/);
+  assert.match(botSource, /health/);
   assert.match(botSource, /PRIVMSG/);
   assert.match(readmeSource, /Twitch Chat Bot/);
+  assert.match(readmeSource, /Production Twitch Bot Worker/);
+  assert.match(readmeSource, /HEALTH_MONITOR_TOKEN/);
   assert.match(readmeSource, /\.env\.twitch-bot/);
   assert.match(readmeSource, /npm run bot:twitch:check/);
   assert.match(readmeSource, /npm run bot:twitch/);

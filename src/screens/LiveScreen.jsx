@@ -14,7 +14,7 @@ import { downloadLinks } from '../lib/downloadLinks.js';
 import { formatDateLine } from '../lib/format.js';
 import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 import { buildDefaultStreamCommands } from '../lib/streamCommands.js';
-import { fetchStreamCommands, sendDiscordAlert } from '../lib/tournamentHostingClient.js';
+import { fetchRuntimeHealth, fetchStreamCommands, sendDiscordAlert } from '../lib/tournamentHostingClient.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -59,6 +59,47 @@ function buildGoLiveChecklist({ hasDiscord, hasTwitch }) {
     { label: 'Overlay URLs', ready: true, value: 'Ready' },
     { label: 'Announcement copy', ready: true, value: 'Ready' },
   ];
+}
+
+function formatHealthAge(seconds) {
+  if (!Number.isFinite(Number(seconds))) return 'No heartbeat';
+  if (seconds < 5) return 'Just now';
+  if (seconds < 60) return `${seconds}s ago`;
+
+  const minutes = Math.round(seconds / 60);
+  return `${minutes}m ago`;
+}
+
+function getBotHealthMeta(runtimeHealth) {
+  if (runtimeHealth.loading) {
+    return {
+      tone: 'neutral',
+      title: 'Checking bot health',
+      body: 'Loading the latest Twitch command heartbeat.',
+      label: 'Checking',
+    };
+  }
+
+  if (runtimeHealth.error) {
+    return {
+      tone: 'neutral',
+      title: 'Health check unavailable',
+      body: runtimeHealth.error,
+      label: 'Unknown',
+    };
+  }
+
+  const bot = runtimeHealth.bot || {};
+  const healthy = Boolean(bot.ok);
+
+  return {
+    tone: healthy ? 'green' : 'rose',
+    title: healthy ? 'Render bot online' : bot.label || 'Bot needs attention',
+    body: healthy
+      ? `${bot.commandCount || 0} commands online. Last heartbeat ${formatHealthAge(bot.ageSeconds)}.`
+      : `Last heartbeat ${formatHealthAge(bot.ageSeconds)}. Check Render if commands stop responding.`,
+    label: healthy ? 'Online' : 'Check bot',
+  };
 }
 
 const RUN_OF_SHOW = [
@@ -115,6 +156,7 @@ const PRESENTATION_PLAN = [
 export default function LiveScreen() {
   const [activeTab, setActiveTab] = useState('control');
   const [streamCommands, setStreamCommands] = useState({ commands: [], loading: true, error: '', source: 'default' });
+  const [runtimeHealth, setRuntimeHealth] = useState({ loading: true, error: '', bot: null, site: null });
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
   const hasDiscord = isConfiguredUrl(downloadLinks.discord);
@@ -158,6 +200,51 @@ export default function LiveScreen() {
     };
   }, [hasDiscord, nextTournamentPath]);
 
+  useEffect(() => {
+    let active = true;
+    let refreshing = false;
+
+    async function loadRuntimeHealth() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
+      try {
+        const result = await fetchRuntimeHealth();
+
+        if (active) {
+          setRuntimeHealth({
+            loading: false,
+            error: '',
+            bot: result.bot || null,
+            site: result.site || null,
+          });
+        }
+      } catch (error) {
+        if (active) {
+          setRuntimeHealth({
+            loading: false,
+            error: error instanceof Error ? error.message : 'Runtime health could not be loaded.',
+            bot: null,
+            site: null,
+          });
+        }
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    loadRuntimeHealth();
+    const timer = setInterval(loadRuntimeHealth, 30_000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   return (
     <HubScreen
       actions={[
@@ -179,6 +266,7 @@ export default function LiveScreen() {
         hasTwitch={hasTwitch}
         nextTournament={nextTournament}
         nextTournamentPath={nextTournamentPath}
+        runtimeHealth={runtimeHealth}
         streamCommands={streamCommands}
         streams={streams}
       />
@@ -218,8 +306,9 @@ export default function LiveScreen() {
   );
 }
 
-function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath, streamCommands, streams }) {
+function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath, runtimeHealth, streamCommands, streams }) {
   const commandCount = streamCommands.loading ? '...' : String(streamCommands.commands.length || buildDefaultStreamCommands({ hasDiscord, nextTournamentPath }).length);
+  const botHealth = getBotHealthMeta(runtimeHealth);
 
   return (
     <Surface style={styles.cockpit}>
@@ -261,14 +350,18 @@ function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath
           </View>
         </View>
 
-        <View style={[styles.cockpitCard, styles.cockpitCardGreen]}>
+        <View style={[styles.cockpitCard, botHealth.tone === 'green' && styles.cockpitCardGreen, botHealth.tone === 'rose' && styles.cockpitCardRose]}>
           <Text style={styles.cockpitLabel}>Twitch bot</Text>
-          <Text style={styles.cockpitTitle}>{streamCommands.error ? 'Commands fallback' : 'Commands loaded'}</Text>
+          <Text style={styles.cockpitTitle}>{botHealth.title}</Text>
           <Text style={styles.cockpitBody}>
             {streamCommands.error
               ? 'Using default command text until the command endpoint is reachable.'
-              : `${commandCount} chat commands are available for viewers.`}
+              : botHealth.body}
           </Text>
+          <View style={styles.healthMiniRow}>
+            <Badge tone={botHealth.tone}>{botHealth.label}</Badge>
+            <Text style={styles.healthMiniText}>{commandCount} command{commandCount === '1' ? '' : 's'}</Text>
+          </View>
           <View style={styles.commandPreviewRow}>
             {['!join', '!next', '!rules', '!discord'].map((command) => (
               <Text key={command} style={styles.commandPreviewChip}>{command}</Text>
@@ -1023,6 +1116,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 14,
+  },
+  healthMiniRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  healthMiniText: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+    textTransform: 'uppercase',
   },
   commandAction: {
     flexDirection: 'row',

@@ -6,21 +6,26 @@ const TWITCH_IRC_HOST = 'irc.chat.twitch.tv';
 const TWITCH_IRC_TLS_PORT = 6697;
 const TWITCH_IRC_PLAIN_PORT = 6667;
 const DEFAULT_COMMAND_ENDPOINT = 'https://1v1tournaments.org/.netlify/functions/stream-commands';
+const DEFAULT_HEALTH_ENDPOINT = 'https://1v1tournaments.org/.netlify/functions/health';
 const ENV_FILE = '.env.twitch-bot';
 
 loadEnvFile(ENV_FILE);
 
 const COMMAND_REFRESH_MS = positiveInteger(process.env.TWITCH_COMMAND_REFRESH_MS, 60_000);
 const RESPONSE_COOLDOWN_MS = positiveInteger(process.env.TWITCH_COMMAND_COOLDOWN_MS, 4_000);
+const HEARTBEAT_MS = positiveInteger(process.env.TWITCH_BOT_HEARTBEAT_MS, 30_000);
 const DRY_RUN = cleanEnv(process.env.TWITCH_BOT_DRY_RUN) === '1';
 
 const botUsername = cleanEnv(process.env.TWITCH_BOT_USERNAME).toLowerCase();
 const oauthToken = cleanEnv(process.env.TWITCH_OAUTH_TOKEN);
 const channel = cleanEnv(process.env.TWITCH_CHANNEL || '1v1compspades').replace(/^#/, '').toLowerCase();
 const commandEndpoint = cleanEnv(process.env.STREAM_COMMAND_ENDPOINT || DEFAULT_COMMAND_ENDPOINT);
+const healthEndpoint = cleanEnv(process.env.HEALTH_ENDPOINT || DEFAULT_HEALTH_ENDPOINT);
+const healthToken = cleanEnv(process.env.HEALTH_MONITOR_TOKEN);
 
 let commands = new Map();
 let lastCommandLoadAt = 0;
+let lastHeartbeatAt = 0;
 const cooldowns = new Map();
 
 function cleanEnv(value) {
@@ -179,6 +184,44 @@ async function loadCommands({ force = false } = {}) {
   console.log(`Loaded ${commands.size} stream command${commands.size === 1 ? '' : 's'} from ${commandEndpoint}`);
 }
 
+async function sendHeartbeat({ force = false, status = 'online' } = {}) {
+  if (!healthToken || !healthEndpoint) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (!force && now - lastHeartbeatAt < HEARTBEAT_MS) {
+    return;
+  }
+
+  lastHeartbeatAt = now;
+
+  try {
+    const response = await fetch(healthEndpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${healthToken}`,
+        'content-type': 'application/json',
+        'user-agent': '1v1tournaments-twitch-chat-bot/1.0',
+      },
+      body: JSON.stringify({
+        status,
+        channel,
+        username: botUsername,
+        commandCount: commands.size,
+        uptimeSeconds: Math.round(process.uptime()),
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Health heartbeat returned ${response.status}`);
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? `Health heartbeat failed: ${error.message}` : 'Health heartbeat failed.');
+  }
+}
+
 function writeLogin(socket) {
   socket.write(`PASS ${oauthToken}\r\n`);
   socket.write(`NICK ${botUsername}\r\n`);
@@ -200,11 +243,13 @@ function connect({ secure = true } = {}) {
         () => {
           writeLogin(socket);
           console.log(`Connected to Twitch chat over TLS as ${botUsername}, joining #${channel}`);
+          sendHeartbeat({ force: true }).catch(() => {});
         },
       )
     : net.connect(TWITCH_IRC_PLAIN_PORT, TWITCH_IRC_HOST, () => {
         writeLogin(socket);
         console.log(`Connected to Twitch chat as ${botUsername}, joining #${channel}`);
+        sendHeartbeat({ force: true }).catch(() => {});
       });
 
   socket.setEncoding('utf8');
@@ -221,6 +266,7 @@ function connect({ secure = true } = {}) {
 
       if (line.startsWith('PING ')) {
         socket.write(`PONG ${line.slice(5)}\r\n`);
+        sendHeartbeat().catch(() => {});
         continue;
       }
 
@@ -268,6 +314,7 @@ function connect({ secure = true } = {}) {
     }
 
     console.error('Twitch chat connection closed. Reconnecting in 10 seconds...');
+    sendHeartbeat({ force: true, status: 'reconnecting' }).catch(() => {});
     setTimeout(() => connect({ secure }), 10_000);
   });
 }

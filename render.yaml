@@ -15,7 +15,13 @@ services:
         value: 1v1compspades
       - key: STREAM_COMMAND_ENDPOINT
         value: https://1v1tournaments.org/.netlify/functions/stream-commands
+      - key: HEALTH_ENDPOINT
+        value: https://1v1tournaments.org/.netlify/functions/health
+      - key: HEALTH_MONITOR_TOKEN
+        sync: false
       - key: TWITCH_COMMAND_REFRESH_MS
         value: 60000
       - key: TWITCH_COMMAND_COOLDOWN_MS
         value: 4000
+      - key: TWITCH_BOT_HEARTBEAT_MS
+        value: 30000
