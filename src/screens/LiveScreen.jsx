@@ -23,6 +23,28 @@ function absoluteSiteUrl(path) {
   return `${origin.replace(/\/$/, '')}${path}`;
 }
 
+function buildAnnouncementCopy(nextTournament, nextTournamentPath) {
+  const eventTitle = nextTournament?.title || '1v1 Spades tournament';
+  const eventUrl = absoluteSiteUrl(nextTournamentPath);
+  const liveUrl = absoluteSiteUrl('/live');
+  const twitchUrl = downloadLinks.twitch || liveUrl;
+
+  return [
+    {
+      label: 'Twitch title',
+      text: `${eventTitle} | 1v1 Spades Tournament | Free-entry bracket`,
+    },
+    {
+      label: 'Discord live post',
+      text: `We are live for ${eventTitle}.\n\nWatch: ${twitchUrl}\nTournament lobby: ${eventUrl}\nLive hub: ${liveUrl}`,
+    },
+    {
+      label: 'Short social post',
+      text: `${eventTitle} is coming up. Join the bracket, watch live, and follow results here: ${eventUrl}`,
+    },
+  ];
+}
+
 export default function LiveScreen() {
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
@@ -114,6 +136,10 @@ export default function LiveScreen() {
 
       <Section description="Clear stream-day notification status for the community layer." title="Discord alerts">
         <DiscordAlertPanel hasDiscord={hasDiscord} />
+      </Section>
+
+      <Section description="Copy-ready text for Twitch, Discord, and social posts." title="Announcement kit">
+        <AnnouncementKit items={buildAnnouncementCopy(nextTournament, nextTournamentPath)} />
       </Section>
 
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
@@ -265,6 +291,19 @@ function DiscordAlertPanel({ hasDiscord }) {
   );
 }
 
+function AnnouncementKit({ items }) {
+  return (
+    <View style={styles.announcementGrid}>
+      {items.map((item) => (
+        <Surface key={item.label} style={styles.announcementCard}>
+          <Text style={styles.announcementLabel}>{item.label}</Text>
+          <Text selectable style={styles.announcementText}>{item.text}</Text>
+        </Surface>
+      ))}
+    </View>
+  );
+}
+
 function OverlayLinkCard({ body, href, recommendedSize, title }) {
   const url = absoluteSiteUrl(href);
 
@@ -288,6 +327,30 @@ function OverlayLinkCard({ body, href, recommendedSize, title }) {
 }
 
 const styles = StyleSheet.create({
+  announcementCard: {
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    flexBasis: 265,
+    flexGrow: 1,
+  },
+  announcementGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  announcementLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  announcementText: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 21,
+    marginTop: 10,
+  },
   block: {
     marginBottom: 14,
   },
