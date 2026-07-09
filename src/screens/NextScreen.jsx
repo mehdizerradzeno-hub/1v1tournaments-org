@@ -6,7 +6,6 @@ import {
   Badge,
   EmptyState,
   HubScreen,
-  Section,
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
@@ -274,76 +273,6 @@ export default function NextScreen() {
         tournament={tournament}
         tournamentPath={tournamentPath}
       />
-
-      <Section description="The important guest actions stay above the fold on mobile." title="Guest actions">
-        <View style={styles.actionGrid}>
-          <NextActionCard
-            actionLabel="Join event"
-            body="Create or use your tournament account, then reserve your roster seat."
-            href={checkInPath}
-            meta={registrationMeta.label}
-            title="Player signup"
-            tone="green"
-          />
-          <NextActionCard
-            actionLabel="Watch live"
-            body="Open the Twitch command center, stream links, and overlay sources."
-            href="/live"
-            meta="Twitch"
-            title="Live coverage"
-            tone="rose"
-          />
-          <NextActionCard
-            actionLabel="View bracket"
-            body={bracket ? 'The bracket is published. View matches, winners, and table links.' : 'The bracket appears after the host seeds the roster.'}
-            href={`${tournamentPath}#live-bracket`}
-            meta={bracket ? 'Live' : 'Pending'}
-            title="Bracket status"
-            tone="accent"
-          />
-        </View>
-      </Section>
-
-      <Section description="Viewer-friendly snapshot for stream day." title="Event snapshot">
-        <Surface style={styles.snapshotCard}>
-          <View style={styles.snapshotGrid}>
-            <View style={styles.snapshotTile}>
-              <Text style={styles.snapshotLabel}>Next match</Text>
-              <Text style={styles.snapshotValue}>{getNextMatchLabel(bracket)}</Text>
-            </View>
-            <View style={styles.snapshotTile}>
-              <Text style={styles.snapshotLabel}>Roster</Text>
-              <Text style={styles.snapshotValue}>{signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`}</Text>
-            </View>
-            <View style={styles.snapshotTile}>
-              <Text style={styles.snapshotLabel}>Entry</Text>
-              <Text style={styles.snapshotValue}>{tournament.entryLine}</Text>
-            </View>
-          </View>
-        </Surface>
-      </Section>
-
-      <Section description="A quick join block for phones, stream descriptions, and QR scans." title="Join link">
-        <Surface style={styles.joinCard}>
-          <View style={styles.joinCopy}>
-            <Badge tone={registrationMeta.tone}>{registrationMeta.label}</Badge>
-            <Text style={styles.joinTitle}>Send players here first</Text>
-            <Text style={styles.joinUrl}>{joinUrl.replace(/^https?:\/\//, '')}</Text>
-            <View style={styles.joinActions}>
-              <ActionButton href={checkInPath}>Open signup</ActionButton>
-              <ActionButton href={tournamentPath} variant="secondary">Event details</ActionButton>
-            </View>
-          </View>
-          <View style={styles.qrWrap}>
-            <Image
-              accessibilityLabel="QR code for the next tournament signup"
-              resizeMode="contain"
-              source={{ uri: getQrUrl(joinUrl) }}
-              style={styles.qr}
-            />
-          </View>
-        </Surface>
-      </Section>
     </HubScreen>
   );
 }
@@ -360,6 +289,8 @@ function NextLobbyHero({
   tournament,
   tournamentPath,
 }) {
+  const signups = signupSummary.signups || [];
+
   return (
     <Surface style={styles.lobbyHero}>
       <View pointerEvents="none" style={styles.heroGlow} />
@@ -376,6 +307,7 @@ function NextLobbyHero({
         </View>
         <View style={styles.heroActions}>
           <ActionButton href={checkInPath}>{registrationMeta.value === 'open' ? 'Join now' : 'Open signup'}</ActionButton>
+          <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">My match</ActionButton>
           <ActionButton href={tournamentPath} variant="secondary">Tournament page</ActionButton>
           <ActionButton href="/live" variant="secondary">Watch live</ActionButton>
         </View>
@@ -391,73 +323,46 @@ function NextLobbyHero({
           <Text style={styles.metricValue}>{signupSummary.loading ? '--' : openSeats}</Text>
         </View>
         <View style={[styles.metricTile, styles.metricWide]}>
-          <Text style={styles.metricLabel}>Public link</Text>
-          <Text numberOfLines={1} style={styles.metricLink}>{joinUrl.replace(/^https?:\/\//, '')}</Text>
+          <Text style={styles.metricLabel}>Next match</Text>
+          <Text numberOfLines={1} style={styles.metricLink}>{getNextMatchLabel(bracket)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.lobbyBottom}>
+        <View style={styles.rosterPreview}>
+          <View style={styles.rosterPreviewHead}>
+            <Text style={styles.rosterPreviewTitle}>Signed up players</Text>
+            <Text style={styles.rosterPreviewMeta}>{signupSummary.loading ? 'Loading' : `${signups.length} visible`}</Text>
+          </View>
+          <View style={styles.playerChips}>
+            {signupSummary.loading ? (
+              <Text style={styles.playerEmpty}>Loading roster...</Text>
+            ) : signups.length ? (
+              signups.slice(0, 10).map((signup, index) => (
+                <View key={signup.id || `${signup.playerName}-${index}`} style={styles.playerChip}>
+                  <Text numberOfLines={1} style={styles.playerChipText}>{signup.playerName || 'Player'}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.playerEmpty}>No public signups yet.</Text>
+            )}
+            {signups.length > 10 ? <Text style={styles.playerMore}>+{signups.length - 10} more</Text> : null}
+          </View>
+        </View>
+        <View style={styles.qrWrap}>
+          <Image
+            accessibilityLabel="QR code for the next tournament signup"
+            resizeMode="contain"
+            source={{ uri: getQrUrl(joinUrl) }}
+            style={styles.qr}
+          />
         </View>
       </View>
     </Surface>
   );
 }
 
-function NextActionCard({ actionLabel, body, href, meta, title, tone }) {
-  return (
-    <Surface style={[styles.actionCard, tone === 'green' && styles.actionCardGreen, tone === 'rose' && styles.actionCardRose]}>
-      <Text style={styles.actionMeta}>{meta}</Text>
-      <Text style={styles.actionTitle}>{title}</Text>
-      <Text style={styles.actionBody}>{body}</Text>
-      <View style={styles.cardAction}>
-        <ActionButton href={href} variant={tone === 'green' ? 'primary' : 'secondary'}>
-          {actionLabel}
-        </ActionButton>
-      </View>
-    </Surface>
-  );
-}
-
 const styles = StyleSheet.create({
-  actionBody: {
-    color: '#AAB4AE',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    marginTop: 8,
-  },
-  actionCard: {
-    borderColor: 'rgba(214, 162, 78, 0.28)',
-    flexBasis: 245,
-    flexGrow: 1,
-  },
-  actionCardGreen: {
-    borderColor: 'rgba(97, 210, 145, 0.34)',
-  },
-  actionCardRose: {
-    backgroundColor: 'rgba(23, 11, 12, 0.78)',
-    borderColor: 'rgba(224, 106, 92, 0.40)',
-  },
-  actionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionMeta: {
-    color: '#D6A24E',
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 15,
-    textTransform: 'uppercase',
-  },
-  actionTitle: {
-    color: '#F4EFE6',
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 28,
-    marginTop: 6,
-  },
-  cardAction: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 14,
-  },
   heroActions: {
     alignContent: 'flex-start',
     flex: 1,
@@ -508,46 +413,22 @@ const styles = StyleSheet.create({
     lineHeight: 39,
   },
   heroTop: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 18,
-  },
-  joinActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 14,
-  },
-  joinCard: {
-    alignItems: 'center',
-    borderColor: 'rgba(97, 210, 145, 0.30)',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    justifyContent: 'space-between',
-  },
-  joinCopy: {
-    flex: 1,
-    minWidth: 240,
-  },
-  joinTitle: {
-    color: '#F4EFE6',
-    fontSize: 24,
-    fontWeight: '900',
-    lineHeight: 30,
-    marginTop: 12,
-  },
-  joinUrl: {
-    color: '#D6A24E',
-    fontSize: 15,
-    fontWeight: '900',
-    lineHeight: 21,
-    marginTop: 6,
   },
   lobbyHero: {
     borderColor: 'rgba(214, 162, 78, 0.42)',
     marginBottom: 24,
     overflow: 'hidden',
+  },
+  lobbyBottom: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: 14,
   },
   metricGrid: {
     flexDirection: 'row',
@@ -589,44 +470,73 @@ const styles = StyleSheet.create({
   metricWide: {
     flexBasis: 260,
   },
+  playerChip: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 180,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  playerChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  playerChipText: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  playerEmpty: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  playerMore: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '900',
+    paddingVertical: 8,
+  },
   qr: {
-    height: 132,
-    width: 132,
+    height: 118,
+    width: 118,
   },
   qrWrap: {
+    alignSelf: 'flex-start',
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 8,
   },
-  snapshotCard: {
-    borderColor: 'rgba(214, 162, 78, 0.24)',
-  },
-  snapshotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  snapshotLabel: {
-    color: '#AAB4AE',
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 15,
-    textTransform: 'uppercase',
-  },
-  snapshotTile: {
+  rosterPreview: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
-    flexBasis: 190,
+    flexBasis: 285,
     flexGrow: 1,
     padding: 14,
   },
-  snapshotValue: {
+  rosterPreviewHead: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  rosterPreviewMeta: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  rosterPreviewTitle: {
     color: '#F4EFE6',
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 22,
-    marginTop: 6,
   },
 });

@@ -47,6 +47,12 @@ function signupCountLabel(count, loading = false) {
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
+const TOURNAMENT_TABS = [
+  { id: 'play', label: 'Play' },
+  { id: 'roster', label: 'Roster' },
+  { id: 'bracket', label: 'Bracket' },
+  { id: 'info', label: 'Info' },
+];
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -268,6 +274,7 @@ function matchPlayersLabel(match) {
 }
 
 export default function TournamentScreen({ slug }) {
+  const [activeTab, setActiveTab] = useState('play');
   const [liveBracket, setLiveBracket] = useState(null);
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
   const [playerStatus, setPlayerStatus] = useState({ loading: true, error: '', data: null });
@@ -525,228 +532,246 @@ export default function TournamentScreen({ slug }) {
         tournamentPath={tournamentPath}
       />
 
-      <LiveBroadcastStrip
-        isBracketLive={isBracketLive}
-        nextMatch={getNextPublicMatch(liveBracket)}
-        streams={streams}
-      />
+      <TournamentTabs activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <TournamentTimeline
-        steps={buildTournamentTimeline({
-          isBracketLive,
-          liveBracket,
-          playerHasReadyMatch,
-          registrationMeta,
-          result,
-        })}
-      />
-
-      <Section
-        description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
-        nativeID="my-match"
-        title="Your tournament status">
-        <PlayerTournamentStatus
-          checkInPath={checkInPath}
-          playerStatus={playerStatus}
-          slug={visibleTournament.slug}
-        />
-      </Section>
-
-      <Section
-        description={
-          isBracketLive
-            ? 'Players can confirm they are in the published bracket before opening the table.'
-            : 'Players can confirm their name is on the signup roster before the host seeds the bracket.'
-        }
-        nativeID="registered-players"
-        title="Current roster">
-        <RegisteredPlayersPanel
-          advertisedRosterCap={advertisedRosterCap}
-          liveBracket={liveBracket}
-          liveBracketSize={liveBracketSize}
-          minimumPlayers={minimumPlayers}
-          rosterBracketSize={rosterBracketSize}
-          signupSummary={signupSummary}
-          tournament={visibleTournament}
-        />
-      </Section>
-
-      <Section
-        description="Roster size, bracket state, and the main action in one compact control center."
-        nativeID="tournament-dashboard"
-        title="Tournament control center">
-        <TournamentDashboard
-          advertisedRosterCap={advertisedRosterCap}
-          checkInPath={checkInPath}
-          isBracketLive={isBracketLive}
-          liveBracket={liveBracket}
-          matchStatusPath={matchStatusPath}
-          minimumPlayers={minimumPlayers}
-          playerStatus={playerStatus}
-          registrationMeta={registrationMeta}
-          signupSummary={signupSummary}
-          streams={streams}
-          tournament={visibleTournament}
-        />
-      </Section>
-
-      {liveBracket ? (
-        <Section
-          description="Match cards show assigned players, winners, and Spades room links."
-          nativeID="live-bracket"
-          title={bracketSectionTitle}>
-          <LiveBracketBoard bracket={liveBracket} />
-        </Section>
-      ) : null}
-
-      {showSignupSection ? (
-        <Section
-          description={registrationMeta.actionCopy}
-          title="Sign up">
-          <CheckInPanel
-            checkIn={visibleTournament.checkIn}
-            checkInPath={checkInPath}
-            registrationMeta={registrationMeta}
-            signupCount={signupSummary.count}
-            signupEnabled={registrationMeta.value === 'open'}
-            signupError={signupSummary.error}
-            signupLoading={signupSummary.loading}
+      {activeTab === 'play' ? (
+        <>
+          <LiveBroadcastStrip
+            isBracketLive={isBracketLive}
+            nextMatch={getNextPublicMatch(liveBracket)}
+            streams={streams}
           />
-        </Section>
-      ) : null}
 
-      {!liveBracket ? (
-        <Section
-          description="After the host generates a bracket, match cards show the assigned players and Spades room links."
-          nativeID="live-bracket"
-          title={bracketSectionTitle}>
-          <BracketBoard bracket={visibleTournament.bracket} />
-          {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
-          {!bracketState.loading && !bracketState.error ? (
-            <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
-          ) : null}
-        </Section>
-      ) : null}
+          <TournamentTimeline
+            steps={buildTournamentTimeline({
+              isBracketLive,
+              liveBracket,
+              playerHasReadyMatch,
+              registrationMeta,
+              result,
+            })}
+          />
 
-      <Section description="Quick paths for players and viewers." title="Event links">
-        <View style={styles.quickGrid}>
-          {!isBracketLive ? (
-            <QuickActionCard
-              actionLabel="Create account and join"
-              body="Use this before the bracket is seeded."
-              href={checkInPath}
-              meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
-              title="Player signup"
-              tone="green"
+          <Section
+            description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
+            nativeID="my-match"
+            title="Your tournament status">
+            <PlayerTournamentStatus
+              checkInPath={checkInPath}
+              playerStatus={playerStatus}
+              slug={visibleTournament.slug}
             />
-          ) : null}
-          <QuickActionCard
-            actionLabel={playerHasReadyMatch ? 'Play my match' : 'Check status'}
-            body={
+          </Section>
+
+          <Section
+            description="Roster size, bracket state, and the main action in one compact control center."
+            nativeID="tournament-dashboard"
+            title="Tournament control center">
+            <TournamentDashboard
+              advertisedRosterCap={advertisedRosterCap}
+              checkInPath={checkInPath}
+              isBracketLive={isBracketLive}
+              liveBracket={liveBracket}
+              matchStatusPath={matchStatusPath}
+              minimumPlayers={minimumPlayers}
+              playerStatus={playerStatus}
+              registrationMeta={registrationMeta}
+              signupSummary={signupSummary}
+              streams={streams}
+              tournament={visibleTournament}
+            />
+          </Section>
+        </>
+      ) : null}
+
+      {activeTab === 'roster' ? (
+        <>
+          <Section
+            description={
               isBracketLive
-                ? 'Open your assigned table from your signed-in tournament account.'
-                : 'Jump to your account-linked status card and current match once the bracket is live.'
+                ? 'Players can confirm they are in the published bracket before opening the table.'
+                : 'Players can confirm their name is on the signup roster before the host seeds the bracket.'
             }
-            href={matchStatusPath}
-            meta="Player"
-            title="My match"
-            tone="green"
-          />
-          {streams.length ? (
-            <QuickActionCard
-              actionLabel="Watch table"
-              body="Open the spectator table for the current match."
-              href="/live"
-              meta="Spectator"
-              title="Watch live"
-              tone="blue"
+            nativeID="registered-players"
+            title="Current roster">
+            <RegisteredPlayersPanel
+              advertisedRosterCap={advertisedRosterCap}
+              liveBracket={liveBracket}
+              liveBracketSize={liveBracketSize}
+              minimumPlayers={minimumPlayers}
+              rosterBracketSize={rosterBracketSize}
+              signupSummary={signupSummary}
+              tournament={visibleTournament}
             />
+          </Section>
+
+          {showSignupSection ? (
+            <Section
+              description={registrationMeta.actionCopy}
+              title="Sign up">
+              <CheckInPanel
+                checkIn={visibleTournament.checkIn}
+                checkInPath={checkInPath}
+                registrationMeta={registrationMeta}
+                signupCount={signupSummary.count}
+                signupEnabled={registrationMeta.value === 'open'}
+                signupError={signupSummary.error}
+                signupLoading={signupSummary.loading}
+              />
+            </Section>
           ) : null}
-        </View>
-      </Section>
-
-      <Section description="Format, entry rules, and event notes." title="Event snapshot">
-        <Surface style={styles.snapshotCard}>
-          <Text style={styles.snapshotLabel}>{visibleTournament.summary}</Text>
-          <Text style={styles.snapshotCopy}>{visibleTournament.entryLine}</Text>
-          {visibleTournament.callout ? <Text style={styles.snapshotCallout}>{visibleTournament.callout}</Text> : null}
-          <BulletList items={visibleTournament.highlights} />
-        </Surface>
-      </Section>
-
-      {isPrimaryGame && gamePath ? (
-        <Section
-          description="Use the account-linked match card once the bracket is live."
-          title="Match access">
-          <Surface style={styles.launchCard}>
-            <View style={styles.launchTopRow}>
-              <Badge tone="accent">Ticket path</Badge>
-              <Text style={styles.launchPath}>My match</Text>
-            </View>
-            <Text style={styles.launchTitle}>Open gameplay from your tournament seat</Text>
-            <Text style={styles.launchCopy}>
-              The hub checks your player account, creates the match ticket, and then sends you to the Spades table.
-            </Text>
-            <View style={styles.launchActions}>
-              <ActionButton href={matchStatusPath}>Go to my match</ActionButton>
-              <ActionButton href="/live" variant="secondary">
-                Watch live
-              </ActionButton>
-            </View>
-          </Surface>
-        </Section>
+        </>
       ) : null}
 
-      {quickLinks.length ? (
-        <Section description="Useful tournament paths in one place." title="Quick links">
-          <View style={styles.linkRow}>
-            {quickLinks.map((link) => (
-              <View key={link.href} style={styles.linkButton}>
-                <ActionButton href={link.href} variant="secondary">
-                  {link.label}
-                </ActionButton>
+      {activeTab === 'bracket' ? (
+        <>
+          {liveBracket ? (
+            <Section
+              description="Match cards show assigned players, winners, and Spades room links."
+              nativeID="live-bracket"
+              title={bracketSectionTitle}>
+              <LiveBracketBoard bracket={liveBracket} />
+            </Section>
+          ) : null}
+
+          {!liveBracket ? (
+            <Section
+              description="After the host generates a bracket, match cards show the assigned players and Spades room links."
+              nativeID="live-bracket"
+              title={bracketSectionTitle}>
+              <BracketBoard bracket={visibleTournament.bracket} />
+              {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
+              {!bracketState.loading && !bracketState.error ? (
+                <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
+              ) : null}
+            </Section>
+          ) : null}
+
+          <Section description="Quick paths for players and viewers." title="Event links">
+            <View style={styles.quickGrid}>
+              {!isBracketLive ? (
+                <QuickActionCard
+                  actionLabel="Create account and join"
+                  body="Use this before the bracket is seeded."
+                  href={checkInPath}
+                  meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
+                  title="Player signup"
+                  tone="green"
+                />
+              ) : null}
+              <QuickActionCard
+                actionLabel={playerHasReadyMatch ? 'Play my match' : 'Check status'}
+                body={
+                  isBracketLive
+                    ? 'Open your assigned table from your signed-in tournament account.'
+                    : 'Jump to your account-linked status card and current match once the bracket is live.'
+                }
+                href={matchStatusPath}
+                meta="Player"
+                title="My match"
+                tone="green"
+              />
+              {streams.length ? (
+                <QuickActionCard
+                  actionLabel="Watch table"
+                  body="Open the spectator table for the current match."
+                  href="/live"
+                  meta="Spectator"
+                  title="Watch live"
+                  tone="blue"
+                />
+              ) : null}
+            </View>
+          </Section>
+        </>
+      ) : null}
+
+      {activeTab === 'info' ? (
+        <>
+          <Section description="Format, entry rules, and event notes." title="Event snapshot">
+            <Surface style={styles.snapshotCard}>
+              <Text style={styles.snapshotLabel}>{visibleTournament.summary}</Text>
+              <Text style={styles.snapshotCopy}>{visibleTournament.entryLine}</Text>
+              {visibleTournament.callout ? <Text style={styles.snapshotCallout}>{visibleTournament.callout}</Text> : null}
+              <BulletList items={visibleTournament.highlights} />
+            </Surface>
+          </Section>
+
+          {isPrimaryGame && gamePath ? (
+            <Section
+              description="Use the account-linked match card once the bracket is live."
+              title="Match access">
+              <Surface style={styles.launchCard}>
+                <View style={styles.launchTopRow}>
+                  <Badge tone="accent">Ticket path</Badge>
+                  <Text style={styles.launchPath}>My match</Text>
+                </View>
+                <Text style={styles.launchTitle}>Open gameplay from your tournament seat</Text>
+                <Text style={styles.launchCopy}>
+                  The hub checks your player account, creates the match ticket, and then sends you to the Spades table.
+                </Text>
+                <View style={styles.launchActions}>
+                  <ActionButton href={matchStatusPath}>Go to my match</ActionButton>
+                  <ActionButton href="/live" variant="secondary">
+                    Watch live
+                  </ActionButton>
+                </View>
+              </Surface>
+            </Section>
+          ) : null}
+
+          {quickLinks.length ? (
+            <Section description="Useful tournament paths in one place." title="Quick links">
+              <View style={styles.linkRow}>
+                {quickLinks.map((link) => (
+                  <View key={link.href} style={styles.linkButton}>
+                    <ActionButton href={link.href} variant="secondary">
+                      {link.label}
+                    </ActionButton>
+                  </View>
+                ))}
+              </View>
+            </Section>
+          ) : null}
+
+          <Section description="Agenda items are shown in order so check-in and start times are easy to scan." title="Agenda">
+            <AgendaList items={visibleTournament.agenda} />
+          </Section>
+
+          <Section description="Use this section for the active live table and the replay archive." title="Watch and replay">
+            {streams.map((stream) => (
+              <StreamCard key={stream.slug} stream={stream} />
+            ))}
+            {!streams.length ? (
+              <EmptyState
+                action={<ActionButton href="/live">Open live page</ActionButton>}
+                body="Add a stream slug to the tournament record and the cards will appear here."
+                title="No live links are assigned yet"
+              />
+            ) : null}
+          </Section>
+
+          <Section description="Rules stay close to the event so admins can update one record at a time." title="Game rules">
+            {game?.ruleSections?.map((section) => (
+              <View key={section.title} style={styles.block}>
+                <RuleBlock section={section} />
               </View>
             ))}
-          </View>
-        </Section>
+          </Section>
+
+          <Section description="Completed events show final standings here." title="Results">
+            {result ? (
+              <ResultCard result={result} />
+            ) : (
+              <EmptyState
+                action={<ActionButton href="/results">Open results page</ActionButton>}
+                body="Results will appear here once the tournament closes and the result record is added."
+                title="Results are not posted yet"
+              />
+            )}
+          </Section>
+        </>
       ) : null}
-
-      <Section description="Agenda items are shown in order so check-in and start times are easy to scan." title="Agenda">
-        <AgendaList items={visibleTournament.agenda} />
-      </Section>
-
-      <Section description="Use this section for the active live table and the replay archive." title="Watch and replay">
-        {streams.map((stream) => (
-          <StreamCard key={stream.slug} stream={stream} />
-        ))}
-        {!streams.length ? (
-          <EmptyState
-            action={<ActionButton href="/live">Open live page</ActionButton>}
-            body="Add a stream slug to the tournament record and the cards will appear here."
-            title="No live links are assigned yet"
-          />
-        ) : null}
-      </Section>
-
-      <Section description="Rules stay close to the event so admins can update one record at a time." title="Game rules">
-        {game?.ruleSections?.map((section) => (
-          <View key={section.title} style={styles.block}>
-            <RuleBlock section={section} />
-          </View>
-        ))}
-      </Section>
-
-      <Section description="Completed events show final standings here." title="Results">
-        {result ? (
-          <ResultCard result={result} />
-        ) : (
-          <EmptyState
-            action={<ActionButton href="/results">Open results page</ActionButton>}
-            body="Results will appear here once the tournament closes and the result record is added."
-            title="Results are not posted yet"
-          />
-        )}
-      </Section>
     </HubScreen>
   );
 }
@@ -775,6 +800,25 @@ function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
         <ActionButton href="/live">Live page</ActionButton>
       </View>
     </Surface>
+  );
+}
+
+function TournamentTabs({ activeTab, onSelectTab }) {
+  return (
+    <View style={styles.tournamentTabBar}>
+      {TOURNAMENT_TABS.map((tab) => {
+        const selected = activeTab === tab.id;
+
+        return (
+          <ActionButton
+            key={tab.id}
+            onPress={() => onSelectTab(tab.id)}
+            variant={selected ? 'primary' : 'secondary'}>
+            {tab.label}
+          </ActionButton>
+        );
+      })}
+    </View>
   );
 }
 
@@ -1672,6 +1716,12 @@ const styles = StyleSheet.create({
   },
   timelineValueDone: {
     color: '#61D291',
+  },
+  tournamentTabBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 18,
   },
   dashboardCard: {
     borderColor: 'rgba(214, 162, 78, 0.34)',

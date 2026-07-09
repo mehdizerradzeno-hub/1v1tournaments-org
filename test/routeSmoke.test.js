@@ -91,6 +91,7 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextRouteSource, /NextScreen/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
   assert.match(nextScreenSource, /Next tournament lobby/);
+  assert.match(nextScreenSource, /Signed up players/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
 });
@@ -273,6 +274,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.doesNotMatch(homeScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
+  assert.match(tournamentScreenSource, /TOURNAMENT_TABS/);
+  assert.match(tournamentScreenSource, /TournamentTabs/);
   assert.match(tournamentScreenSource, /title="My match"/);
   assert.match(tournamentScreenSource, /fetchTournamentEvent/);
   assert.match(tournamentScreenSource, /mergeTournamentSettings/);
