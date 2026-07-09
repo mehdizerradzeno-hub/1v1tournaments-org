@@ -31,6 +31,7 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   fetchTournamentPlayerStatus,
   fetchSignupSummary,
@@ -114,6 +115,48 @@ function openSlotLabel(count, size, minimumPlayers = DEFAULT_MINIMUM_PLAYERS, lo
 function rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers) {
   return tournament?.bracketFlexPolicy
     || `Advertised ${advertisedRosterCap}-player bracket. Runs with ${minimumPlayers}+ players and fills open seats with byes.`;
+}
+
+function getTournamentFormatDetails(tournament) {
+  const mode = getTournamentMode(tournament?.mode);
+
+  if (mode.value === 'four-player-double-elimination') {
+    return {
+      mode,
+      bullets: [
+        'Exactly 4 players enter the bracket.',
+        'Lose once and move to the losers bracket.',
+        'Lose twice and you are eliminated.',
+        'Grand final can create a reset final if the losers-side finalist wins.',
+      ],
+      requirement: 'Exactly 4 players',
+      rhythm: 'Second-chance bracket',
+    };
+  }
+
+  if (mode.value === 'single-elimination') {
+    return {
+      mode,
+      bullets: [
+        'One loss knocks a player out.',
+        'Open seats become byes when the bracket is seeded.',
+        'Winners advance until one champion remains.',
+      ],
+      requirement: `${mode.minimumPlayers}+ players`,
+      rhythm: 'Fast bracket',
+    };
+  }
+
+  return {
+    mode,
+    bullets: [
+      mode.summary,
+      'The host will announce this format before the bracket is published.',
+      'Registered players should watch the tournament page for match status.',
+    ],
+    requirement: `${mode.minimumPlayers}+ players`,
+    rhythm: mode.generation === 'live' ? 'Live format' : 'Planned format',
+  };
 }
 
 function seatLabel(count, advertisedRosterCap, loading = false) {
@@ -495,6 +538,7 @@ export default function TournamentScreen({ slug }) {
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
   const advertisedRosterCap = getAdvertisedRosterCap(visibleTournament);
   const minimumPlayers = getMinimumPlayers(visibleTournament);
+  const formatDetails = getTournamentFormatDetails(visibleTournament);
   const liveBracketSize = bracketSizeFromBracket(liveBracket, liveBracket?.participantCount || 0);
   const rosterBracketSize = actualBracketSizeFromSignups(signupSummary.count, minimumPlayers);
 
@@ -584,6 +628,20 @@ export default function TournamentScreen({ slug }) {
                 />
               </View>
             </View>
+          </Section>
+
+          <Section
+            description="Format, player requirement, and bracket expectations before you join."
+            title="Tournament format">
+            <TournamentFormatCard
+              advertisedRosterCap={advertisedRosterCap}
+              formatDetails={formatDetails}
+              isBracketLive={isBracketLive}
+              liveBracket={liveBracket}
+              minimumPlayers={minimumPlayers}
+              signupSummary={signupSummary}
+              tournament={visibleTournament}
+            />
           </Section>
         </>
       ) : null}
@@ -731,6 +789,18 @@ export default function TournamentScreen({ slug }) {
               {visibleTournament.callout ? <Text style={styles.snapshotCallout}>{visibleTournament.callout}</Text> : null}
               <BulletList items={visibleTournament.highlights} />
             </Surface>
+          </Section>
+
+          <Section description="How this event will be seeded and played." title="Tournament format">
+            <TournamentFormatCard
+              advertisedRosterCap={advertisedRosterCap}
+              formatDetails={formatDetails}
+              isBracketLive={isBracketLive}
+              liveBracket={liveBracket}
+              minimumPlayers={minimumPlayers}
+              signupSummary={signupSummary}
+              tournament={visibleTournament}
+            />
           </Section>
 
           {isPrimaryGame && gamePath ? (
@@ -1146,6 +1216,64 @@ function TournamentDashboard({
 
       <View style={styles.dashboardPolicy}>
         <Text style={styles.dashboardPolicyText}>
+          {rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}
+        </Text>
+      </View>
+    </Surface>
+  );
+}
+
+function TournamentFormatCard({
+  advertisedRosterCap,
+  formatDetails,
+  isBracketLive,
+  liveBracket,
+  minimumPlayers,
+  signupSummary,
+  tournament,
+}) {
+  const signupValue = signupSummary.loading ? 'Loading' : `${signupSummary.count}/${advertisedRosterCap}`;
+  const bracketValue = liveBracket
+    ? `${liveBracket.participantCount || 0} seeded`
+    : actualBracketPreviewLabel(signupSummary.count, minimumPlayers, signupSummary.loading);
+  const statusLabel = isBracketLive ? 'Bracket live' : 'Before seeding';
+
+  return (
+    <Surface style={styles.formatCard}>
+      <View style={styles.formatTopRow}>
+        <View style={styles.formatCopy}>
+          <Badge tone={isBracketLive ? 'green' : 'accent'}>{formatDetails.rhythm}</Badge>
+          <Text style={styles.formatTitle}>{formatDetails.mode.label}</Text>
+          <Text style={styles.formatBody}>{formatDetails.mode.summary}</Text>
+        </View>
+        <View style={styles.formatStats}>
+          <View style={styles.formatStat}>
+            <Text style={styles.formatStatLabel}>Requirement</Text>
+            <Text style={styles.formatStatValue}>{formatDetails.requirement}</Text>
+          </View>
+          <View style={styles.formatStat}>
+            <Text style={styles.formatStatLabel}>Signed up</Text>
+            <Text style={styles.formatStatValue}>{signupValue}</Text>
+          </View>
+          <View style={styles.formatStat}>
+            <Text style={styles.formatStatLabel}>Bracket</Text>
+            <Text style={styles.formatStatValue}>{bracketValue}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.formatRules}>
+        {formatDetails.bullets.map((item) => (
+          <View key={item} style={styles.formatRule}>
+            <Text style={styles.formatRuleMarker}>•</Text>
+            <Text style={styles.formatRuleText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.formatFooter}>
+        <Badge tone={isBracketLive ? 'green' : 'blue'}>{statusLabel}</Badge>
+        <Text style={styles.formatFooterText}>
           {rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}
         </Text>
       </View>
@@ -2026,6 +2154,105 @@ const styles = StyleSheet.create({
   playerCommandStatus: {
     flex: 1,
     minWidth: 280,
+  },
+  formatCard: {
+    backgroundColor: 'rgba(8, 25, 21, 0.90)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  formatTopRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  formatCopy: {
+    flex: 1.3,
+    minWidth: 260,
+  },
+  formatTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 10,
+  },
+  formatBody: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 6,
+  },
+  formatStats: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 250,
+  },
+  formatStat: {
+    backgroundColor: 'rgba(244, 239, 230, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 132,
+    flexGrow: 1,
+    padding: 12,
+  },
+  formatStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  formatStatValue: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+    marginTop: 5,
+  },
+  formatRules: {
+    gap: 8,
+    marginTop: 16,
+  },
+  formatRule: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  formatRuleMarker: {
+    color: '#D6A24E',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  formatRuleText: {
+    color: '#E4DED4',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  formatFooter: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+    padding: 12,
+  },
+  formatFooterText: {
+    color: '#D6A24E',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    minWidth: 220,
   },
   tabCommandActions: {
     alignContent: 'flex-start',

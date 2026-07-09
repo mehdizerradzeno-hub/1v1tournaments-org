@@ -341,6 +341,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /TournamentEventConsole/);
   assert.match(tournamentScreenSource, /Event console/);
   assert.match(tournamentScreenSource, /Player command center/);
+  assert.match(tournamentScreenSource, /Tournament format/);
+  assert.match(tournamentScreenSource, /TournamentFormatCard/);
+  assert.match(tournamentScreenSource, /getTournamentFormatDetails/);
+  assert.match(tournamentScreenSource, /Exactly 4 players/);
   assert.match(tournamentScreenSource, /TournamentTabCommandCard/);
   assert.match(tournamentScreenSource, /Roster control/);
   assert.match(tournamentScreenSource, /Bracket control/);
