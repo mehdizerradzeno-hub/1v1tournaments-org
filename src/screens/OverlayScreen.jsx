@@ -88,7 +88,33 @@ function getNextMatch(bracket) {
   const rounds = bracket?.rounds || [];
   const matches = rounds.flatMap((round) => round.matches || []);
 
-  return matches.find((match) => !match.winner) || matches[0] || null;
+  return matches.find((match) => match.status === 'ready' || match.status === 'active')
+    || matches.find((match) => match.status !== 'final' && !match.winnerName)
+    || matches[0]
+    || null;
+}
+
+function getMatchPlayerLabel(match) {
+  const players = match?.players || [];
+
+  if (players.length) {
+    return players
+      .map((player) => player?.handle ? `${player.name} (${player.handle})` : player?.name)
+      .filter(Boolean)
+      .join(' vs ');
+  }
+
+  if (Array.isArray(match?.teams) && match.teams.length) {
+    return match.teams.join(' vs ');
+  }
+
+  return 'Players appear after seeding';
+}
+
+function getOverlayStatusLabel(bracket, registrationMeta) {
+  if (bracket?.status === 'complete') return 'FINAL';
+  if (bracket) return 'LIVE';
+  return registrationMeta.label.toUpperCase();
 }
 
 export default function OverlayScreen() {
@@ -118,6 +144,8 @@ export default function OverlayScreen() {
   const cap = getRosterCap(featuredTournament);
   const nextMatch = getNextMatch(bracket);
   const signups = signupSummary.signups || [];
+  const liveCount = hydratedUpcoming.filter((tournament) => eventDataBySlug[tournament.slug]?.bracket).length;
+  const eventCount = hydratedUpcoming.length;
 
   useEffect(() => {
     let active = true;
@@ -227,7 +255,8 @@ export default function OverlayScreen() {
             </Text>
           </View>
           <View style={styles.statusPill}>
-            <Text style={styles.statusText}>{bracket ? 'BRACKET LIVE' : registrationMeta.label.toUpperCase()}</Text>
+            <View style={[styles.statusDot, bracket && styles.statusDotLive]} />
+            <Text style={styles.statusText}>{getOverlayStatusLabel(bracket, registrationMeta)}</Text>
           </View>
         </View>
 
@@ -243,8 +272,15 @@ export default function OverlayScreen() {
           <View style={styles.matchCard}>
             <Text style={styles.metricLabel}>{nextMatch ? nextMatch.label || 'Up next' : 'Match focus'}</Text>
             <Text numberOfLines={1} style={styles.matchText}>
-              {nextMatch?.teams?.join(' vs ') || 'Players appear after seeding'}
+              {getMatchPlayerLabel(nextMatch)}
             </Text>
+            <Text numberOfLines={1} style={styles.matchMeta}>
+              {nextMatch?.status === 'final' ? 'Match complete' : bracket ? 'Open the live page for table links' : 'Seeded near start time'}
+            </Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Tourneys</Text>
+            <Text style={styles.metricValue}>{liveCount}/{eventCount}</Text>
           </View>
         </View>
 
@@ -326,12 +362,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statusPill: {
+    alignItems: 'center',
     backgroundColor: theme.colors.accentSoft,
     borderColor: 'rgba(214, 162, 78, 0.42)',
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 9,
+  },
+  statusDot: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 999,
+    height: 8,
+    opacity: 0.75,
+    width: 8,
+  },
+  statusDotLive: {
+    backgroundColor: '#F05252',
+    opacity: 1,
   },
   statusText: {
     color: theme.colors.accent,
@@ -379,6 +429,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 28,
+  },
+  matchMeta: {
+    color: theme.colors.green,
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 4,
+    textTransform: 'uppercase',
   },
   bottomRow: {
     alignItems: 'center',

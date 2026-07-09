@@ -38,6 +38,7 @@ import {
   fetchTournamentEvent,
   issueTournamentMatchTicket,
 } from '../lib/tournamentHostingClient.js';
+import { downloadLinks } from '../lib/downloadLinks.js';
 
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
@@ -180,6 +181,78 @@ function getMatchPlayerRows(match) {
     { key: `${match?.id || 'match'}-slot-1`, label: 'TBD', isWinner: false, seed: 1 },
     { key: `${match?.id || 'match'}-slot-2`, label: 'TBD', isWinner: false, seed: 2 },
   ];
+}
+
+function buildTournamentTimeline({ isBracketLive, liveBracket, registrationMeta, playerHasReadyMatch, result }) {
+  return [
+    {
+      key: 'signup',
+      label: 'Signups',
+      value: registrationMeta.value === 'open' ? 'Open' : registrationMeta.label,
+      state: registrationMeta.value === 'open' && !isBracketLive ? 'active' : 'done',
+    },
+    {
+      key: 'check-in',
+      label: 'Check-in',
+      value: isBracketLive || liveBracket ? 'Locked' : 'Roster building',
+      state: isBracketLive || liveBracket ? 'done' : 'active',
+    },
+    {
+      key: 'bracket',
+      label: 'Bracket',
+      value: liveBracket ? 'Live' : 'Pending',
+      state: liveBracket ? 'active' : 'waiting',
+    },
+    {
+      key: 'match',
+      label: 'Match links',
+      value: playerHasReadyMatch ? 'Ready' : liveBracket ? 'Watch page' : 'After seed',
+      state: playerHasReadyMatch ? 'active' : liveBracket ? 'done' : 'waiting',
+    },
+    {
+      key: 'results',
+      label: 'Results',
+      value: result ? 'Posted' : 'After final',
+      state: result ? 'done' : 'waiting',
+    },
+  ];
+}
+
+function normalizeSignupStatus(status) {
+  return String(status || 'registered').trim().toLowerCase();
+}
+
+function getRosterGroups(signups, liveBracket) {
+  const seededNames = new Set(
+    getBracketMatches(liveBracket)
+      .flatMap((match) => match.players || [])
+      .map((player) => String(player?.name || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const groups = [
+    { key: 'checked-in', title: 'Checked in', tone: 'green', players: [] },
+    { key: 'registered', title: 'Registered', tone: 'blue', players: [] },
+    { key: 'waiting', title: 'Waiting', tone: 'accent', players: [] },
+  ];
+
+  signups.forEach((signup) => {
+    const status = normalizeSignupStatus(signup.status);
+    const playerName = String(signup.playerName || '').trim().toLowerCase();
+
+    if (signup.currentPlayer || status.includes('checked') || seededNames.has(playerName)) {
+      groups[0].players.push(signup);
+      return;
+    }
+
+    if (status.includes('wait') || status.includes('pending')) {
+      groups[2].players.push(signup);
+      return;
+    }
+
+    groups[1].players.push(signup);
+  });
+
+  return groups.filter((group) => group.players.length);
 }
 
 function matchPlayersLabel(match) {
@@ -440,6 +513,22 @@ export default function TournamentScreen({ slug }) {
         tournamentPath={tournamentPath}
       />
 
+      <LiveBroadcastStrip
+        isBracketLive={isBracketLive}
+        nextMatch={getNextPublicMatch(liveBracket)}
+        streams={streams}
+      />
+
+      <TournamentTimeline
+        steps={buildTournamentTimeline({
+          isBracketLive,
+          liveBracket,
+          playerHasReadyMatch,
+          registrationMeta,
+          result,
+        })}
+      />
+
       <Section
         description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
         nativeID="my-match"
@@ -647,6 +736,68 @@ export default function TournamentScreen({ slug }) {
         )}
       </Section>
     </HubScreen>
+  );
+}
+
+function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
+  const liveStream = streams.find((stream) => stream.kind === 'live') || streams[0];
+  const twitchHref = liveStream?.href || downloadLinks.twitch || '/live';
+  const discordHref = downloadLinks.discord || '/live';
+
+  return (
+    <Surface style={styles.broadcastStrip}>
+      <View style={styles.broadcastStatus}>
+        <View style={[styles.broadcastDot, isBracketLive && styles.broadcastDotLive]} />
+        <View style={styles.broadcastCopy}>
+          <Text style={styles.broadcastEyebrow}>{isBracketLive ? 'Live tournament hub' : 'Stream-day hub'}</Text>
+          <Text style={styles.broadcastTitle}>
+            {nextMatch ? `Next: ${matchPlayersLabel(nextMatch)}` : 'Twitch, Discord, bracket, and signups stay one tap away.'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.broadcastActions}>
+        <ActionButton external href={twitchHref} variant="secondary">Twitch</ActionButton>
+        <ActionButton external={Boolean(downloadLinks.discord)} href={discordHref} variant="secondary">
+          Discord
+        </ActionButton>
+        <ActionButton href="/live">Live page</ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
+function TournamentTimeline({ steps }) {
+  return (
+    <Surface style={styles.timelineCard}>
+      <View style={styles.timelineTrack}>
+        {steps.map((step, index) => (
+          <View key={step.key} style={styles.timelineStep}>
+            <View style={[
+              styles.timelineMarker,
+              step.state === 'done' && styles.timelineMarkerDone,
+              step.state === 'active' && styles.timelineMarkerActive,
+            ]}>
+              <Text style={[
+                styles.timelineMarkerText,
+                step.state === 'active' && styles.timelineMarkerTextActive,
+              ]}>
+                {index + 1}
+              </Text>
+            </View>
+            <View style={styles.timelineCopy}>
+              <Text style={styles.timelineLabel}>{step.label}</Text>
+              <Text style={[
+                styles.timelineValue,
+                step.state === 'active' && styles.timelineValueActive,
+                step.state === 'done' && styles.timelineValueDone,
+              ]}>
+                {step.value}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </Surface>
   );
 }
 
@@ -1021,6 +1172,7 @@ function RegisteredPlayersPanel({
     : `Actual bracket if seeded now: ${bracketSizeLabel(rosterBracketSize)}. ${rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}`;
   const rosterCountValue = signupSummary.loading ? '--' : String(signupSummary.count);
   const bracketValue = liveBracket ? `${seededCount} seeded` : bracketSizeLabel(rosterBracketSize);
+  const rosterGroups = getRosterGroups(signups, liveBracket);
 
   return (
     <Surface style={styles.rosterCard}>
@@ -1062,22 +1214,32 @@ function RegisteredPlayersPanel({
       {signupSummary.loading ? (
         <Text style={styles.rosterEmptyText}>Loading registered players...</Text>
       ) : signups.length ? (
-        <View style={styles.rosterList}>
-          {signups.map((signup, index) => (
-            <View
-              key={signup.id || `${signup.playerName}-${index}`}
-              style={[styles.rosterRow, signup.currentPlayer && styles.rosterRowCurrent]}>
-              <View style={[styles.rosterRank, signup.currentPlayer && styles.rosterRankCurrent]}>
-                <Text style={[styles.rosterRankText, signup.currentPlayer && styles.rosterRankTextCurrent]}>{index + 1}</Text>
+        <View style={styles.rosterGroupGrid}>
+          {rosterGroups.map((group) => (
+            <View key={group.key} style={styles.rosterGroup}>
+              <View style={styles.rosterGroupHeader}>
+                <Badge tone={group.tone}>{group.title}</Badge>
+                <Text style={styles.rosterGroupCount}>{group.players.length}</Text>
               </View>
-              <View style={styles.rosterPlayerCopy}>
-                <View style={styles.rosterNameRow}>
-                  <Text style={styles.rosterPlayerName}>{signup.playerName || 'Unnamed player'}</Text>
-                  {signup.currentPlayer ? <Badge tone="green">You</Badge> : null}
-                </View>
-                <Text style={styles.rosterPlayerMeta}>
-                  {signup.playerHandle ? signup.playerHandle : 'No handle added'} • {signup.status || 'registered'}
-                </Text>
+              <View style={styles.rosterList}>
+                {group.players.map((signup, index) => (
+                  <View
+                    key={signup.id || `${group.key}-${signup.playerName}-${index}`}
+                    style={[styles.rosterRow, signup.currentPlayer && styles.rosterRowCurrent]}>
+                    <View style={[styles.rosterRank, signup.currentPlayer && styles.rosterRankCurrent]}>
+                      <Text style={[styles.rosterRankText, signup.currentPlayer && styles.rosterRankTextCurrent]}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.rosterPlayerCopy}>
+                      <View style={styles.rosterNameRow}>
+                        <Text style={styles.rosterPlayerName}>{signup.playerName || 'Unnamed player'}</Text>
+                        {signup.currentPlayer ? <Badge tone="green">You</Badge> : null}
+                      </View>
+                      <Text style={styles.rosterPlayerMeta}>
+                        {signup.playerHandle ? signup.playerHandle : 'No handle added'} • {signup.status || 'registered'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
           ))}
@@ -1373,6 +1535,132 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     paddingVertical: 8,
   },
+  broadcastStrip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(8, 25, 21, 0.96)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  broadcastStatus: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+    minWidth: 260,
+  },
+  broadcastDot: {
+    backgroundColor: 'rgba(214, 162, 78, 0.45)',
+    borderColor: 'rgba(214, 162, 78, 0.74)',
+    borderRadius: 999,
+    borderWidth: 3,
+    height: 18,
+    width: 18,
+  },
+  broadcastDotLive: {
+    backgroundColor: '#F05252',
+    borderColor: 'rgba(255, 180, 168, 0.84)',
+  },
+  broadcastCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  broadcastEyebrow: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  broadcastTitle: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+    marginTop: 2,
+  },
+  broadcastActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  timelineCard: {
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    marginBottom: 24,
+    paddingVertical: 14,
+  },
+  timelineTrack: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  timelineStep: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexBasis: 150,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    minHeight: 70,
+    padding: 10,
+  },
+  timelineMarker: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 239, 230, 0.08)',
+    borderColor: 'rgba(244, 239, 230, 0.14)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  timelineMarkerDone: {
+    backgroundColor: 'rgba(97, 210, 145, 0.12)',
+    borderColor: 'rgba(97, 210, 145, 0.42)',
+  },
+  timelineMarkerActive: {
+    backgroundColor: 'rgba(214, 162, 78, 0.18)',
+    borderColor: 'rgba(214, 162, 78, 0.62)',
+  },
+  timelineMarkerText: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  timelineMarkerTextActive: {
+    color: '#D6A24E',
+  },
+  timelineCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timelineLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  timelineValue: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  timelineValueActive: {
+    color: '#D6A24E',
+  },
+  timelineValueDone: {
+    color: '#61D291',
+  },
   dashboardCard: {
     borderColor: 'rgba(214, 162, 78, 0.34)',
     backgroundColor: 'rgba(8, 25, 21, 0.92)',
@@ -1592,6 +1880,32 @@ const styles = StyleSheet.create({
   },
   rosterList: {
     gap: 10,
+  },
+  rosterGroupGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  rosterGroup: {
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    borderColor: 'rgba(244, 239, 230, 0.09)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 250,
+    flexGrow: 1,
+    padding: 12,
+  },
+  rosterGroupHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  rosterGroupCount: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 25,
   },
   rosterRow: {
     alignItems: 'center',
