@@ -16,6 +16,11 @@ const euchreRouteFile = fileURLToPath(new URL('../app/euchre.jsx', import.meta.u
 const aboutRouteFile = fileURLToPath(new URL('../app/about.jsx', import.meta.url));
 const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta.url));
 const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', import.meta.url));
+const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
+const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
+const overlayRouteFile = fileURLToPath(new URL('../app/overlay.jsx', import.meta.url));
+const overlayBracketRouteFile = fileURLToPath(new URL('../app/overlay/bracket.jsx', import.meta.url));
+const overlayCompactRouteFile = fileURLToPath(new URL('../app/overlay/compact.jsx', import.meta.url));
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
@@ -23,6 +28,9 @@ const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.m
 const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
+const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
+const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
+const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
 const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
@@ -67,6 +75,48 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Tournament rankings/);
   assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
+});
+
+test('/next stays wired to the public next-event lobby', () => {
+  assert.ok(existsSync(nextRouteFile));
+  assert.ok(existsSync(nextScreenFile));
+
+  const nextRouteSource = readFileSync(nextRouteFile, 'utf8');
+  const nextScreenSource = readFileSync(nextScreenFile, 'utf8');
+
+  assert.match(nextRouteSource, /NextScreen/);
+  assert.doesNotMatch(nextRouteSource, /Redirect/);
+  assert.match(nextScreenSource, /Next tournament lobby/);
+  assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
+});
+
+test('/live stays wired to stream-day command tools', () => {
+  assert.ok(existsSync(liveRouteFile));
+  assert.ok(existsSync(liveScreenFile));
+
+  const liveScreenSource = readFileSync(liveScreenFile, 'utf8');
+
+  assert.match(liveScreenSource, /Go-live checklist/);
+  assert.match(liveScreenSource, /Announcement kit/);
+  assert.match(liveScreenSource, /Run of show/);
+  assert.match(liveScreenSource, /OBS scene map/);
+  assert.match(liveScreenSource, /navigator\.clipboard\.writeText/);
+});
+
+test('overlay routes stay wired to OBS browser sources', () => {
+  assert.ok(existsSync(overlayRouteFile));
+  assert.ok(existsSync(overlayBracketRouteFile));
+  assert.ok(existsSync(overlayCompactRouteFile));
+  assert.ok(existsSync(overlayScreenFile));
+
+  const bracketRouteSource = readFileSync(overlayBracketRouteFile, 'utf8');
+  const compactRouteSource = readFileSync(overlayCompactRouteFile, 'utf8');
+  const overlayScreenSource = readFileSync(overlayScreenFile, 'utf8');
+
+  assert.match(bracketRouteSource, /variant="bracket"/);
+  assert.match(compactRouteSource, /variant="compact"/);
+  assert.match(overlayScreenSource, /setInterval\(loadEventData, 15000\)/);
+  assert.match(overlayScreenSource, /getOverlayStatusLabel/);
 });
 
 test('the featured tournament route stays wired to the Spades launch event', () => {
