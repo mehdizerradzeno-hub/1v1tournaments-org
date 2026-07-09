@@ -590,6 +590,22 @@ export default function TournamentScreen({ slug }) {
 
       {activeTab === 'roster' ? (
         <>
+          <TournamentTabCommandCard
+            body={
+              isBracketLive
+                ? 'Confirm who made the published bracket, then jump to your match or the live view.'
+                : 'Use this roster to confirm signups before the host seeds the bracket.'
+            }
+            primary={{ label: registrationMeta.value === 'open' ? 'Join roster' : 'View signup', href: checkInPath }}
+            secondary={{ label: 'My match', href: matchStatusPath }}
+            stats={[
+              { label: 'Registered', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
+              { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(rosterBracketSize) },
+              { label: 'Status', value: liveBracket ? 'Published' : registrationMeta.label },
+            ]}
+            title="Roster control"
+          />
+
           <Section
             description={
               isBracketLive
@@ -629,6 +645,22 @@ export default function TournamentScreen({ slug }) {
 
       {activeTab === 'bracket' ? (
         <>
+          <TournamentTabCommandCard
+            body={
+              isBracketLive
+                ? 'Follow the active match flow, table links, winners, and bracket status.'
+                : 'Bracket preview is ready. Live table links appear after the host publishes the bracket.'
+            }
+            primary={{ label: playerHasReadyMatch ? 'Play my match' : 'Check my match', href: matchStatusPath }}
+            secondary={streams.length ? { label: 'Watch live', href: '/live' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
+            stats={[
+              { label: 'Bracket', value: liveBracket ? 'Live' : 'Preview' },
+              { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
+              { label: 'Next', value: getNextPublicMatch(liveBracket)?.label || 'After seed' },
+            ]}
+            title="Bracket control"
+          />
+
           {liveBracket ? (
             <Section
               description="Match cards show assigned players, winners, and Spades room links."
@@ -841,22 +873,22 @@ function TournamentEventConsole({
           <Text style={styles.eventConsoleTitle}>{active.label}</Text>
           <Text style={styles.eventConsoleBody}>{active.body}</Text>
         </View>
-        <View style={styles.eventConsoleSignals}>
-          <View style={styles.eventSignal}>
-            <Text style={styles.eventSignalLabel}>Roster</Text>
-            <Text style={styles.eventSignalValue}>{rosterValue}</Text>
-          </View>
-          <View style={styles.eventSignal}>
-            <Text style={styles.eventSignalLabel}>Bracket</Text>
-            <Text style={styles.eventSignalValue}>{bracketValue}</Text>
-          </View>
-          <View style={[styles.eventSignal, playerHasReadyMatch && styles.eventSignalReady]}>
-            <Text style={styles.eventSignalLabel}>Match</Text>
-            <Text style={[styles.eventSignalValue, playerHasReadyMatch && styles.eventSignalValueReady]}>{matchValue}</Text>
-          </View>
-        </View>
       </View>
       <TournamentTabs activeTab={activeTab} onSelectTab={onSelectTab} />
+      <View style={styles.eventConsoleSignals}>
+        <View style={styles.eventSignal}>
+          <Text style={styles.eventSignalLabel}>Roster</Text>
+          <Text style={styles.eventSignalValue}>{rosterValue}</Text>
+        </View>
+        <View style={styles.eventSignal}>
+          <Text style={styles.eventSignalLabel}>Bracket</Text>
+          <Text style={styles.eventSignalValue}>{bracketValue}</Text>
+        </View>
+        <View style={[styles.eventSignal, playerHasReadyMatch && styles.eventSignalReady]}>
+          <Text style={styles.eventSignalLabel}>Match</Text>
+          <Text style={[styles.eventSignalValue, playerHasReadyMatch && styles.eventSignalValueReady]}>{matchValue}</Text>
+        </View>
+      </View>
     </Surface>
   );
 }
@@ -1116,6 +1148,32 @@ function TournamentDashboard({
         <Text style={styles.dashboardPolicyText}>
           {rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}
         </Text>
+      </View>
+    </Surface>
+  );
+}
+
+function TournamentTabCommandCard({ body, primary, secondary, stats, title }) {
+  return (
+    <Surface style={styles.tabCommandCard}>
+      <View style={styles.tabCommandTopRow}>
+        <View style={styles.tabCommandCopy}>
+          <Text style={styles.tabCommandLabel}>Player path</Text>
+          <Text style={styles.tabCommandTitle}>{title}</Text>
+          <Text style={styles.tabCommandBody}>{body}</Text>
+        </View>
+        <View style={styles.tabCommandActions}>
+          {primary ? <ActionButton href={primary.href}>{primary.label}</ActionButton> : null}
+          {secondary ? <ActionButton href={secondary.href} variant="secondary">{secondary.label}</ActionButton> : null}
+        </View>
+      </View>
+      <View style={styles.tabCommandStats}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={styles.tabCommandStat}>
+            <Text style={styles.tabCommandStatLabel}>{stat.label}</Text>
+            <Text numberOfLines={1} style={styles.tabCommandStatValue}>{stat.value}</Text>
+          </View>
+        ))}
       </View>
     </Surface>
   );
@@ -1808,11 +1866,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   eventConsoleSignals: {
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    minWidth: 230,
+    marginTop: 10,
   },
   eventConsoleTitle: {
     color: '#F4EFE6',
@@ -1825,7 +1882,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   eventSignal: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
@@ -1969,6 +2026,80 @@ const styles = StyleSheet.create({
   playerCommandStatus: {
     flex: 1,
     minWidth: 280,
+  },
+  tabCommandActions: {
+    alignContent: 'flex-start',
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 220,
+  },
+  tabCommandBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 5,
+  },
+  tabCommandCard: {
+    backgroundColor: 'rgba(17, 29, 26, 0.82)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    marginBottom: 18,
+  },
+  tabCommandCopy: {
+    flex: 1.25,
+    minWidth: 240,
+  },
+  tabCommandLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  tabCommandStat: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 110,
+    flexGrow: 1,
+    minHeight: 64,
+    padding: 10,
+  },
+  tabCommandStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  tabCommandStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  tabCommandStatValue: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 5,
+  },
+  tabCommandTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 4,
+  },
+  tabCommandTopRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
   },
   block: {
     marginBottom: 14,
