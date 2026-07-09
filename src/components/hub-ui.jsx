@@ -217,6 +217,30 @@ function HeaderAccountChip({ account, loading }) {
   );
 }
 
+function MobileNav({ pathname, style }) {
+  return (
+    <View style={style}>
+      {MOBILE_NAV_ITEMS.map((item) => {
+        const active = isNavItemActive(pathname, item);
+
+        return (
+          <LinkShell
+            key={`mobile-${item.label}-${item.href}`}
+            href={item.href}
+            style={styles.mobileBottomNavItem}
+            variant={active ? 'primary' : 'secondary'}>
+            <View style={[styles.mobileBottomNavChip, active && styles.mobileBottomNavChipActive]}>
+              <Text style={[styles.mobileBottomNavText, active && styles.mobileBottomNavTextActive]}>
+                {item.label}
+              </Text>
+            </View>
+          </LinkShell>
+        );
+      })}
+    </View>
+  );
+}
+
 export function StatPill({ label, value, tone = 'neutral' }) {
   return (
     <View style={[styles.statPill, styles[`stat${tone[0].toUpperCase()}${tone.slice(1)}`]]}>
@@ -589,6 +613,8 @@ export function HubScreen({
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
   const showTinyHeader = width > 0 && width < 390;
   const showStickyActions = stickyActions && pathname !== '/admin';
+  const showDockedMobileNav = showMobileNav && showStickyActions;
+  const showInlineMobileNav = showMobileNav && !showStickyActions;
   const showStickyActionCopy = width >= 430;
   const compactHero = heroVariant === 'compact';
 
@@ -647,8 +673,8 @@ export function HubScreen({
           contentContainerStyle={[
             styles.scrollContent,
             showStickyActions && styles.scrollContentWithStickyActions,
-            showMobileNav && styles.scrollContentWithMobileNav,
-            showStickyActions && showMobileNav && styles.scrollContentWithStickyActionsAndMobileNav,
+            showDockedMobileNav && styles.scrollContentWithMobileNav,
+            showStickyActions && showDockedMobileNav && styles.scrollContentWithStickyActionsAndMobileNav,
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
@@ -687,6 +713,10 @@ export function HubScreen({
                   );
                 })}
               </View>
+            ) : null}
+
+            {showInlineMobileNav ? (
+              <MobileNav pathname={pathname} style={styles.mobileInlineNav} />
             ) : null}
 
             {showHero ? (
@@ -735,29 +765,9 @@ export function HubScreen({
           </View>
         </ScrollView>
       </SafeAreaView>
-      {showMobileNav ? (
-        <View style={styles.mobileBottomNav}>
-          {MOBILE_NAV_ITEMS.map((item) => {
-            const active = isNavItemActive(pathname, item);
-
-            return (
-              <LinkShell
-                key={`mobile-${item.label}-${item.href}`}
-                href={item.href}
-                style={styles.mobileBottomNavItem}
-                variant={active ? 'primary' : 'secondary'}>
-                <View style={[styles.mobileBottomNavChip, active && styles.mobileBottomNavChipActive]}>
-                  <Text style={[styles.mobileBottomNavText, active && styles.mobileBottomNavTextActive]}>
-                    {item.label}
-                  </Text>
-                </View>
-              </LinkShell>
-            );
-          })}
-        </View>
-      ) : null}
+      {showDockedMobileNav ? <MobileNav pathname={pathname} style={styles.mobileBottomNav} /> : null}
       {showStickyActions ? (
-        <View style={[styles.stickyActionBar, showMobileNav && styles.stickyActionBarWithMobileNav]}>
+        <View style={[styles.stickyActionBar, showDockedMobileNav && styles.stickyActionBarWithMobileNav]}>
           {showStickyActionCopy ? (
             <View style={styles.stickyActionCopy}>
               <Text style={styles.stickyActionLabel}>Next event</Text>
@@ -835,10 +845,10 @@ const styles = StyleSheet.create({
     paddingBottom: 108,
   },
   scrollContentWithMobileNav: {
-    paddingBottom: 104,
+    paddingBottom: 96,
   },
   scrollContentWithStickyActionsAndMobileNav: {
-    paddingBottom: 178,
+    paddingBottom: 166,
   },
   page: {
     width: '100%',
@@ -1023,19 +1033,30 @@ const styles = StyleSheet.create({
   },
   mobileBottomNav: {
     position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
+    left: 10,
+    right: 10,
+    bottom: 8,
     zIndex: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 5,
-    borderRadius: 20,
+    padding: 4,
+    borderRadius: 18,
     backgroundColor: 'rgba(9, 19, 17, 0.96)',
     borderWidth: 1,
     borderColor: theme.colors.lineStrong,
     ...sharedCardShadow,
+  },
+  mobileInlineNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    padding: 4,
+    borderRadius: 18,
+    backgroundColor: 'rgba(9, 19, 17, 0.92)',
+    borderWidth: 1,
+    borderColor: theme.colors.lineStrong,
   },
   mobileBottomNavItem: {
     flex: 1,
@@ -1044,8 +1065,8 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavChip: {
     alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 9,
+    borderRadius: 14,
+    paddingVertical: 7,
     paddingHorizontal: 4,
     backgroundColor: 'transparent',
     borderWidth: 1,
@@ -1057,7 +1078,7 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavText: {
     color: theme.colors.muted,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
@@ -1083,7 +1104,7 @@ const styles = StyleSheet.create({
     ...sharedCardShadow,
   },
   stickyActionBarWithMobileNav: {
-    bottom: 84,
+    bottom: 76,
   },
   stickyActionCopy: {
     flex: 1,
