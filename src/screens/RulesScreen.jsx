@@ -17,19 +17,15 @@ export default function RulesScreen() {
   return (
     <HubScreen
       actions={[
-        { label: 'Spades', href: '/spades' },
-        { label: 'Results', href: '/results', variant: 'secondary' },
-        { label: 'Live', href: '/live', variant: 'ghost' },
+        { label: 'Results', href: '/results' },
+        { label: 'Live', href: '/live', variant: 'secondary' },
       ]}
       eyebrow="Rules"
       footerNote={siteData.site.adminNote}
+      heroVariant="compact"
       lead="General event rules come first, then the game-specific notes for Spades and the coming-soon Euchre lane."
-      stats={[
-        { label: 'Games', value: String(games.length), tone: 'blue' },
-        { label: 'Blocks', value: String(generalRules.length), tone: 'accent' },
-        { label: 'Entry', value: 'Free', tone: 'green' },
-      ]}
-      subtitle="Free entry, no buy-in, no wagering."
+      subtitle="Free entry. No buy-in. No wagering."
+      stickyActions={false}
       title="How the hub is run">
       <PlayerRouteStrip
         body="Rules are here when you need details. For stream day, jump back to the active tournament, your match, or the live table."

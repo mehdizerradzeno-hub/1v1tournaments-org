@@ -112,6 +112,12 @@ test('public support pages keep players routed back to active tournament flow', 
   assert.match(resultsScreenSource, /PlayerRouteStrip/);
   assert.match(leaderboardScreenSource, /PlayerRouteStrip/);
   assert.match(rulesScreenSource, /PlayerRouteStrip/);
+  assert.match(resultsScreenSource, /heroVariant="compact"/);
+  assert.match(leaderboardScreenSource, /heroVariant="compact"/);
+  assert.match(rulesScreenSource, /heroVariant="compact"/);
+  assert.match(resultsScreenSource, /stickyActions=\{false\}/);
+  assert.match(leaderboardScreenSource, /stickyActions=\{false\}/);
+  assert.match(rulesScreenSource, /stickyActions=\{false\}/);
 });
 
 test('/next stays wired to the public next-event lobby', () => {

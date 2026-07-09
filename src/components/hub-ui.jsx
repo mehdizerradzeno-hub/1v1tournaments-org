@@ -577,6 +577,8 @@ export function HubScreen({
   footerNote,
   forceTopNav = false,
   showHero = true,
+  heroVariant = 'default',
+  stickyActions = true,
 }) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
@@ -586,8 +588,9 @@ export function HubScreen({
   const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
   const showTinyHeader = width > 0 && width < 390;
-  const showStickyActions = pathname !== '/admin';
+  const showStickyActions = stickyActions && pathname !== '/admin';
   const showStickyActionCopy = width >= 430;
+  const compactHero = heroVariant === 'compact';
 
   useEffect(() => {
     let active = true;
@@ -687,17 +690,17 @@ export function HubScreen({
             ) : null}
 
             {showHero ? (
-              <Surface style={[styles.heroSurface, showLaptopLayout && styles.heroSurfaceLaptop]}>
-                <View style={styles.heroTopRow}>
+              <Surface style={[styles.heroSurface, compactHero && styles.heroSurfaceCompact, showLaptopLayout && styles.heroSurfaceLaptop]}>
+                <View style={[styles.heroTopRow, compactHero && styles.heroTopRowCompact]}>
                   {eyebrow ? <Badge tone="accent">{eyebrow}</Badge> : null}
                   <Text style={styles.heroDomain}>Tournament hub</Text>
                 </View>
-                <Text accessibilityRole="header" style={[styles.heroTitle, showLaptopLayout && styles.heroTitleLaptop]}>{title}</Text>
-                {subtitle ? <Text style={[styles.heroSubtitle, showLaptopLayout && styles.heroSubtitleLaptop]}>{subtitle}</Text> : null}
-                {lead ? <Text style={[styles.heroLead, showLaptopLayout && styles.heroLeadLaptop]}>{lead}</Text> : null}
+                <Text accessibilityRole="header" style={[styles.heroTitle, compactHero && styles.heroTitleCompact, showLaptopLayout && styles.heroTitleLaptop]}>{title}</Text>
+                {subtitle ? <Text style={[styles.heroSubtitle, compactHero && styles.heroSubtitleCompact, showLaptopLayout && styles.heroSubtitleLaptop]}>{subtitle}</Text> : null}
+                {lead ? <Text style={[styles.heroLead, compactHero && styles.heroLeadCompact, showLaptopLayout && styles.heroLeadLaptop]}>{lead}</Text> : null}
 
                 {actions.length ? (
-                  <View style={[styles.actionRow, showLaptopLayout && styles.actionRowLaptop]}>
+                  <View style={[styles.actionRow, compactHero && styles.actionRowCompact, showLaptopLayout && styles.actionRowLaptop]}>
                     {actions.map((action) => (
                       <ActionButton
                         key={`${action.label}-${action.href || action.variant}`}
@@ -712,7 +715,7 @@ export function HubScreen({
                 ) : null}
 
                 {stats.length ? (
-                  <View style={[styles.statsRow, showLaptopLayout && styles.statsRowLaptop]}>
+                  <View style={[styles.statsRow, compactHero && styles.statsRowCompact, showLaptopLayout && styles.statsRowLaptop]}>
                     {stats.map((stat) => (
                       <StatPill key={stat.label} label={stat.label} value={stat.value} tone={stat.tone || 'neutral'} />
                     ))}
@@ -1150,6 +1153,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accentSoft,
     overflow: 'hidden',
   },
+  heroSurfaceCompact: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+    marginBottom: 12,
+  },
   heroSurfaceLaptop: {
     paddingHorizontal: 28,
     paddingVertical: 20,
@@ -1162,6 +1171,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 14,
+  },
+  heroTopRowCompact: {
+    marginBottom: 8,
   },
   heroDomain: {
     color: theme.colors.muted,
@@ -1180,6 +1192,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     maxWidth: 720,
   },
+  heroTitleCompact: {
+    fontSize: 25,
+    lineHeight: 29,
+    maxWidth: 860,
+  },
   heroTitleLaptop: {
     maxWidth: 980,
   },
@@ -1191,6 +1208,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textTransform: 'uppercase',
   },
+  heroSubtitleCompact: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
+  },
   heroSubtitleLaptop: {
     marginTop: 10,
   },
@@ -1201,6 +1223,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     maxWidth: 760,
   },
+  heroLeadCompact: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    maxWidth: 900,
+  },
   heroLeadLaptop: {
     maxWidth: 1040,
   },
@@ -1208,6 +1236,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 20,
+  },
+  actionRowCompact: {
+    marginTop: 12,
   },
   actionRowLaptop: {
     marginTop: 18,
@@ -1270,6 +1301,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 18,
+  },
+  statsRowCompact: {
+    marginTop: 8,
   },
   statsRowLaptop: {
     marginTop: 16,

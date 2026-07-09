@@ -17,25 +17,19 @@ import { useMergedLiveResults } from '../lib/liveResults.js';
 export default function ResultsScreen() {
   const games = getGames();
   const results = useMergedLiveResults(getResults(), siteData.site.primaryTournamentSlug);
-  const latestResult = results[0] || null;
 
   return (
     <HubScreen
       actions={[
         { label: 'Leaderboard', href: '/leaderboard' },
-        { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug) },
         { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Live', href: '/live', variant: 'ghost' },
       ]}
       eyebrow="Results"
       footerNote={siteData.site.adminNote}
+      heroVariant="compact"
       lead="Archived scoreboards and final tables live here after events are complete."
-      stats={[
-        { label: 'Results', value: String(results.length), tone: 'accent' },
-        { label: 'Games', value: String(games.length), tone: 'blue' },
-        { label: 'Latest winner', value: latestResult ? latestResult.winner : 'TBD', tone: 'green' },
-      ]}
-      subtitle="Recent scoreboards and final tables for the public organization site"
+      subtitle="Posted scoreboards and final tables"
+      stickyActions={false}
       title="Results archive">
       <PlayerRouteStrip
         body="Results are the archive. If you are here before or during an event, go straight to the next tournament, your match, or the live table."

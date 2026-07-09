@@ -6,6 +6,7 @@ import {
   Badge,
   EmptyState,
   HubScreen,
+  PlayerRouteStrip,
   Section,
   StatPill,
   Surface,
@@ -13,34 +14,32 @@ import {
 import { formatPlacement, formatResultDate } from '../lib/format.js';
 import { getGames, getGamePath, getResults, siteData } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
-import { buildTournamentLeaderboard, summarizeTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
+import { buildTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
 
 export default function LeaderboardScreen() {
   const games = getGames();
   const results = useMergedLiveResults(getResults(), siteData.site.primaryTournamentSlug);
   const entries = useMemo(() => buildTournamentLeaderboard(results), [results]);
-  const summary = useMemo(() => summarizeTournamentLeaderboard(entries, results), [entries, results]);
   const leader = entries[0] || null;
 
   return (
     <HubScreen
       actions={[
         { label: 'Results', href: '/results' },
-        { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
         { label: 'Rules', href: '/rules', variant: 'ghost' },
       ]}
       eyebrow="Tournament leaderboard"
       footerNote="Tournament rankings are separate from the Spades in-game leaderboard. This page tracks hosted event performance only."
+      heroVariant="compact"
       lead="Tournament wins, finals, events played, and bracket match records live here after results post."
-      stats={[
-        { label: 'Players', value: String(summary.playerCount), tone: 'accent' },
-        { label: 'Events', value: String(summary.eventCount), tone: 'green' },
-        { label: 'Games', value: String(summary.gameCount || games.length), tone: 'blue' },
-        { label: 'Leader', value: summary.topPlayer, tone: 'accent' },
-      ]}
-      subtitle="Hosted-event standings across Spades now, with room for Euchre and Hearts later"
+      subtitle="Hosted-event standings"
+      stickyActions={false}
       title="Tournament rankings">
+      <PlayerRouteStrip
+        body="Rankings are for after results post. During an event, use the next tournament page, your match status, or the live view."
+      />
+
       <Section
         description="The top player card shows the current tournament resume. It updates as completed event results are posted."
         title="Current leader">
