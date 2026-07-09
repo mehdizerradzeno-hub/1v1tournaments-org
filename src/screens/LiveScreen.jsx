@@ -126,6 +126,11 @@ function buildTwitchChatCommands({ hasDiscord, nextTournamentPath }) {
       where: 'Twitch chat bot',
     },
     {
+      command: '!signup',
+      response: `Create an account and join the tournament: ${absoluteSiteUrl('/next')}`,
+      where: 'Twitch chat bot',
+    },
+    {
       command: '!match',
       response: `Find your match and bracket status: ${absoluteSiteUrl(`${nextTournamentPath}#my-match`)}`,
       where: 'Twitch chat bot',
@@ -136,8 +141,18 @@ function buildTwitchChatCommands({ hasDiscord, nextTournamentPath }) {
       where: 'Twitch chat bot',
     },
     {
+      command: '!format',
+      response: `Tournament format, roster, and bracket details: ${tournamentUrl}`,
+      where: 'Twitch chat bot',
+    },
+    {
       command: '!rules',
       response: `Tournament rules: ${absoluteSiteUrl('/rules')}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!results',
+      response: `Tournament results and standings: ${absoluteSiteUrl('/results')}`,
       where: 'Twitch chat bot',
     },
     {
@@ -528,6 +543,7 @@ function TwitchCommandList({ commands }) {
             <Badge tone="blue">{item.where}</Badge>
           </View>
           <Text selectable style={styles.chatCommandResponse}>{item.response}</Text>
+          <CopyAction label="Copy command" text={item.command} />
           <CopyAction label="Copy response" text={item.response} />
         </Surface>
       ))}
