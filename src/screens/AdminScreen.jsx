@@ -131,6 +131,74 @@ function getBracketPreviewLabel(signupCount, tournament) {
   return `${signupCount} signed up, over target`;
 }
 
+function getBracketReadiness({ bracket, hasHostCredential, selectedMode, selectedRoster, signupCount }) {
+  const modeCanGenerate = canGenerateTournamentMode(selectedMode.value);
+  const needsExactFour = selectedMode.value === 'four-player-double-elimination';
+  const playerReady = needsExactFour
+    ? signupCount === 4
+    : signupCount >= selectedMode.minimumPlayers;
+  const playerRequirement = needsExactFour
+    ? 'Exactly 4 players'
+    : `${selectedMode.minimumPlayers}+ players`;
+  const checks = [
+    {
+      label: 'Host access',
+      ready: hasHostCredential,
+      body: hasHostCredential ? 'Host controls are unlocked.' : 'Sign in as host or paste the fallback token.',
+    },
+    {
+      label: 'Roster',
+      ready: Boolean(selectedRoster),
+      body: selectedRoster ? 'Roster has been refreshed for this event.' : 'Refresh roster before generating.',
+    },
+    {
+      label: 'Mode',
+      ready: modeCanGenerate,
+      body: modeCanGenerate ? `${selectedMode.label} can generate brackets.` : `${selectedMode.label} is saved but not wired yet.`,
+    },
+    {
+      label: 'Players',
+      ready: playerReady,
+      body: needsExactFour
+        ? `${signupCount}/4 registered. Double elimination needs exactly four.`
+        : `${signupCount}/${selectedMode.minimumPlayers} minimum registered.`,
+    },
+  ];
+  const firstBlocker = checks.find((check) => !check.ready);
+  const ready = !bracket && !firstBlocker;
+
+  if (bracket) {
+    return {
+      body: `${bracket.participantCount || signupCount} players seeded. Refresh the bracket after reporting match winners.`,
+      checks,
+      label: 'Published',
+      ready: true,
+      title: 'Bracket is live',
+      tone: 'green',
+    };
+  }
+
+  if (ready) {
+    return {
+      body: `${selectedMode.label} is ready with ${signupCount} registered players.`,
+      checks,
+      label: 'Ready',
+      ready,
+      title: 'Ready to generate',
+      tone: 'green',
+    };
+  }
+
+  return {
+    body: firstBlocker?.body || 'Complete the setup checks before generating.',
+    checks,
+    label: playerRequirement,
+    ready: false,
+    title: firstBlocker ? `${firstBlocker.label} needed` : 'Setup needed',
+    tone: 'accent',
+  };
+}
+
 function numberField(value, fallback) {
   const parsed = Number.parseInt(value, 10);
 
@@ -254,6 +322,15 @@ export default function AdminScreen() {
   const showDraftTools = hasPrivateAdminAccess && !isHostApproved;
   const canShowHostConsole = isHostApproved || hasPrivateAdminAccess;
   const hasHostCredential = Boolean(isHostApproved || rosterToken.trim());
+  const activeTournamentMode = getTournamentMode(liveTournament?.mode);
+  const activeSignupCount = selectedRoster?.signups?.length || 0;
+  const bracketReadiness = getBracketReadiness({
+    bracket,
+    hasHostCredential,
+    selectedMode: activeTournamentMode,
+    selectedRoster,
+    signupCount: activeSignupCount,
+  });
 
   useEffect(() => {
     let active = true;
@@ -844,7 +921,7 @@ export default function AdminScreen() {
 
   function renderScheduleSection() {
     const tournament = liveTournament || selectedTournament;
-    const signupCount = selectedRoster?.signups?.length || 0;
+    const signupCount = activeSignupCount;
     const rosterCap = tournament?.rosterCap || 0;
     const minimumPlayers = tournament?.minimumPlayers || 2;
     const tournamentPath = getTournamentPath(rosterSlug);
@@ -858,11 +935,14 @@ export default function AdminScreen() {
         ? 'Post the event, then share the signup link.'
         : bracket
           ? 'Send players to My Match and monitor results.'
-          : 'Generate the bracket when the roster is ready.';
+          : bracketReadiness.ready
+            ? 'Generate the bracket when the roster is ready.'
+            : bracketReadiness.body;
     const publisherStats = [
       { label: 'Start', value: getStartTimingLabel(tournament), tone: 'accent' },
       { label: 'Registered', value: `${signupCount}${rosterCap ? ` / ${rosterCap}` : ''}`, tone: signupCount >= minimumPlayers ? 'green' : 'blue' },
       { label: 'Bracket', value: bracketLabel, tone: bracket ? 'green' : 'accent' },
+      { label: 'Mode', value: activeTournamentMode.shortLabel, tone: canGenerateTournamentMode(activeTournamentMode.value) ? 'green' : 'accent' },
       { label: 'Status', value: liveRegistrationMeta.label, tone: liveRegistrationMeta.tone },
       { label: 'Check-in', value: `${scheduleCheckInLeadMinutes || 30} min`, tone: 'blue' },
     ];
@@ -1543,7 +1623,7 @@ export default function AdminScreen() {
   function renderHostRunSection() {
     const tournament = liveTournament || selectedTournament;
     const tournamentPath = getTournamentPath(rosterSlug);
-    const signupCount = selectedRoster?.signups?.length || 0;
+    const signupCount = activeSignupCount;
     const matches = bracket?.rounds?.flatMap((round) =>
       round.matches.map((match) => ({ ...match, roundTitle: round.title })),
     ) || [];
@@ -1554,9 +1634,9 @@ export default function AdminScreen() {
 
     if (hasHostCredential && !selectedRoster) {
       nextAction = rosterLoading ? 'Refreshing the registered player roster.' : 'Refresh the roster for the selected tournament.';
-    } else if (signupCount > 0 && signupCount < 2) {
-      nextAction = 'Wait for at least two registered players before generating a bracket.';
-    } else if (signupCount >= 2 && !bracket) {
+    } else if (!bracket && !bracketReadiness.ready) {
+      nextAction = bracketReadiness.body;
+    } else if (!bracket && bracketReadiness.ready) {
       nextAction = 'Generate the bracket, then send players the tournament page.';
     } else if (readyMatches.length) {
       nextAction = 'Tell players to open the tournament page and press Play my match.';
@@ -1592,16 +1672,16 @@ export default function AdminScreen() {
             {renderRunStatusItem({
               label: 'Roster',
               value: selectedRoster ? String(signupCount) : rosterLoading ? 'refreshing' : 'not refreshed',
-              tone: signupCount >= 2 ? 'green' : signupCount ? 'accent' : 'blue',
+              tone: bracketReadiness.checks.find((check) => check.label === 'Players')?.ready ? 'green' : signupCount ? 'accent' : 'blue',
               body: selectedRoster
                 ? `${signupCount} registered player${signupCount === 1 ? '' : 's'} for this event.`
                 : 'Refresh the roster before bracket generation.',
             })}
             {renderRunStatusItem({
-              label: 'Bracket',
-              value: bracket?.status || 'none',
-              tone: bracket ? 'green' : 'blue',
-              body: bracket ? `${matches.length} match${matches.length === 1 ? '' : 'es'} generated.` : 'Generate after at least two players are signed up.',
+              label: 'Readiness',
+              value: bracketReadiness.label,
+              tone: bracketReadiness.tone,
+              body: bracketReadiness.title,
             })}
             {renderRunStatusItem({
               label: 'Ready matches',
@@ -1756,7 +1836,7 @@ export default function AdminScreen() {
   }
 
   function renderLiveRosterSection() {
-    const signupCount = selectedRoster?.signups?.length || 0;
+    const signupCount = activeSignupCount;
     const rosterEmptyTitle = hasHostCredential ? 'No registered players yet' : 'Host access needed';
     const rosterEmptyBody = hasHostCredential
       ? 'This tournament roster is refreshed and empty. New player signups will appear here after you refresh.'
@@ -1869,6 +1949,32 @@ export default function AdminScreen() {
     );
   }
 
+  function renderBracketReadinessPanel() {
+    return (
+      <View style={styles.readinessPanel}>
+        <View style={styles.metaRow}>
+          <Badge tone={bracketReadiness.tone}>{bracketReadiness.label}</Badge>
+          <Text style={styles.readinessTitle}>{bracketReadiness.title}</Text>
+        </View>
+        <Text style={styles.readinessBody}>{bracketReadiness.body}</Text>
+        <View style={styles.readinessGrid}>
+          {bracketReadiness.checks.map((check) => (
+            <View
+              key={check.label}
+              style={[
+                styles.readinessItem,
+                check.ready ? styles.readinessItemReady : styles.readinessItemBlocked,
+              ]}>
+              <Badge tone={check.ready ? 'green' : 'accent'}>{check.ready ? 'OK' : 'Fix'}</Badge>
+              <Text style={styles.readinessLabel}>{check.label}</Text>
+              <Text style={styles.readinessCheckBody}>{check.body}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   function renderBracketManagerSection() {
     const readyMatches = bracket?.rounds
       ?.flatMap((round) => round.matches.map((match) => ({ ...match, roundTitle: round.title })))
@@ -1889,11 +1995,15 @@ export default function AdminScreen() {
             </Text>
           </View>
 
+          {renderBracketReadinessPanel()}
+
           <View style={styles.buttonRow}>
             <ActionButton onPress={handleLoadBracket} variant="secondary">
               {bracketLoading ? 'Loading...' : 'Refresh bracket'}
             </ActionButton>
-            <ActionButton onPress={handleGenerateBracket}>Generate bracket from roster</ActionButton>
+            <ActionButton disabled={!bracketReadiness.ready || bracketLoading} onPress={handleGenerateBracket}>
+              Generate bracket from roster
+            </ActionButton>
             <ActionButton onPress={handleResetBracket} variant="secondary">
               Reset bracket only
             </ActionButton>
@@ -2773,6 +2883,59 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginTop: 18,
+  },
+  readinessPanel: {
+    backgroundColor: 'rgba(244, 239, 230, 0.04)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 16,
+    padding: 14,
+  },
+  readinessTitle: {
+    color: '#F4EFE6',
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  readinessBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  readinessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  readinessItem: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 8,
+    minWidth: 190,
+    padding: 12,
+  },
+  readinessItemReady: {
+    backgroundColor: 'rgba(56, 189, 128, 0.08)',
+    borderColor: 'rgba(56, 189, 128, 0.24)',
+  },
+  readinessItemBlocked: {
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+  },
+  readinessLabel: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
+  },
+  readinessCheckBody: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    lineHeight: 18,
   },
   refreshText: {
     color: '#6CC7FF',
