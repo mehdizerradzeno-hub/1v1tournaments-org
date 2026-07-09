@@ -46,7 +46,7 @@ export const TOURNAMENT_MODES = [
     format: '4-player double-elimination bracket',
     rosterCap: 4,
     minimumPlayers: 4,
-    generation: 'planned',
+    generation: 'live',
     summary: 'Four players, second chance, grand final with optional reset.',
   },
 ];

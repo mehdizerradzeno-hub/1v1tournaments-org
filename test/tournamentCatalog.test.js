@@ -26,7 +26,7 @@ test('hosted tournament records get the full public page shape from simple input
   assert.match(tournament.bracketFlexPolicy, /Advertised 16-player bracket/);
 });
 
-test('recommended tournament modes are available before bracket wiring', () => {
+test('recommended tournament modes expose wired and planned generation state', () => {
   const values = TOURNAMENT_MODES.map((mode) => mode.value);
   const doubleElim = getTournamentMode('four-player-double-elimination');
   const bestOf3 = getTournamentMode('best-of-3-single-elimination');
@@ -41,7 +41,8 @@ test('recommended tournament modes are available before bracket wiring', () => {
   assert.equal(doubleElim.format, '4-player double-elimination bracket');
   assert.equal(bestOf3.format, 'Best-of-3 single-elimination bracket');
   assert.equal(canGenerateTournamentMode('single-elimination'), true);
-  assert.equal(canGenerateTournamentMode('four-player-double-elimination'), false);
+  assert.equal(canGenerateTournamentMode('four-player-double-elimination'), true);
+  assert.equal(canGenerateTournamentMode('round-robin'), false);
 });
 
 test('hosted tournaments merge over seeded tournaments by slug', () => {

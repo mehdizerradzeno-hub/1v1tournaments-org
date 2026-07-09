@@ -13,7 +13,8 @@
     "build:netlify": "npm run build:web",
     "admin:server": "node ./server/adminServer.mjs",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "node --test",
+    "capacity": "node scripts/capacity-check.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9",

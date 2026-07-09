@@ -136,24 +136,50 @@ function getPlayerName(player) {
   return player.handle ? `${player.name} (${player.handle})` : player.name;
 }
 
+function markReadyIfFilled(match) {
+  const filledPlayers = match.players.filter(Boolean);
+
+  if (filledPlayers.length === 2 && match.status === 'pending') {
+    match.status = 'ready';
+  }
+}
+
+function placePlayerInMatch(bracket, matchId, slot, player) {
+  const nextMatch = findMatch(bracket, matchId);
+
+  if (!nextMatch || !player) {
+    return null;
+  }
+
+  nextMatch.players[slot] = player;
+  markReadyIfFilled(nextMatch);
+
+  return nextMatch;
+}
+
 function setMatchWinner(bracket, match, player) {
+  const winnerSlot = match.players.findIndex((candidate) => candidate?.id === player.id);
+  const loser = match.players.find((candidate) => candidate && candidate.id !== player.id) || null;
+
   match.winnerId = player.id;
   match.winnerName = getPlayerName(player);
   match.status = 'final';
 
   if (match.nextMatchId) {
-    const nextMatch = findMatch(bracket, match.nextMatchId);
+    placePlayerInMatch(bracket, match.nextMatchId, match.nextSlot, player);
+  }
 
-    if (nextMatch) {
-      nextMatch.players[match.nextSlot] = player;
+  if (match.loserNextMatchId && loser) {
+    placePlayerInMatch(bracket, match.loserNextMatchId, match.loserNextSlot, loser);
+  }
 
-      const filledPlayers = nextMatch.players.filter(Boolean);
-      if (filledPlayers.length === 2 && nextMatch.status === 'pending') {
-        nextMatch.status = 'ready';
-      }
+  if (match.resetMatchId && winnerSlot === match.resetOnWinnerSlot) {
+    placePlayerInMatch(bracket, match.resetMatchId, 0, match.players[0]);
+    placePlayerInMatch(bracket, match.resetMatchId, 1, match.players[1]);
+    return;
+  }
 
-    }
-  } else {
+  if (!match.nextMatchId && (!match.resetMatchId || winnerSlot !== match.resetOnWinnerSlot)) {
     bracket.status = 'complete';
     bracket.winner = {
       id: player.id,
@@ -240,6 +266,148 @@ function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
   initializeByes(bracket);
 
   return bracket;
+}
+
+function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+  const sortedSignups = [...signups].sort((left, right) => {
+    const leftDate = new Date(left.createdAt || 0).getTime();
+    const rightDate = new Date(right.createdAt || 0).getTime();
+    return leftDate - rightDate;
+  });
+  const participants = sortedSignups.slice(0, 4).map(includeAdminFields ? adminParticipant : publicParticipant);
+
+  if (participants.length !== 4) {
+    throw new Error('4-Man Double Elimination requires exactly four registered players.');
+  }
+
+  const match = ({ id, label, roundIndex, matchIndex, players = [null, null], nextMatchId = null, nextSlot = null, loserNextMatchId = null, loserNextSlot = null, resetMatchId = null, resetOnWinnerSlot = null }) => ({
+    id,
+    label,
+    roundIndex,
+    matchIndex,
+    status: players.filter(Boolean).length === 2 ? 'ready' : 'pending',
+    players,
+    winnerId: null,
+    winnerName: '',
+    nextMatchId,
+    nextSlot,
+    loserNextMatchId,
+    loserNextSlot,
+    resetMatchId,
+    resetOnWinnerSlot,
+    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex),
+  });
+
+  const rounds = [
+    {
+      index: 1,
+      title: 'Winners Round 1',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r1-m1`,
+          label: 'Winners Match 1',
+          roundIndex: 1,
+          matchIndex: 1,
+          players: [participants[0], participants[1]],
+          nextMatchId: `${tournamentSlug}-r2-m1`,
+          nextSlot: 0,
+          loserNextMatchId: `${tournamentSlug}-r2-m2`,
+          loserNextSlot: 0,
+        }),
+        match({
+          id: `${tournamentSlug}-r1-m2`,
+          label: 'Winners Match 2',
+          roundIndex: 1,
+          matchIndex: 2,
+          players: [participants[2], participants[3]],
+          nextMatchId: `${tournamentSlug}-r2-m1`,
+          nextSlot: 1,
+          loserNextMatchId: `${tournamentSlug}-r2-m2`,
+          loserNextSlot: 1,
+        }),
+      ],
+    },
+    {
+      index: 2,
+      title: 'Winners Final + Losers Round 1',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r2-m1`,
+          label: 'Winners Final',
+          roundIndex: 2,
+          matchIndex: 1,
+          nextMatchId: `${tournamentSlug}-r4-m1`,
+          nextSlot: 0,
+          loserNextMatchId: `${tournamentSlug}-r3-m1`,
+          loserNextSlot: 1,
+        }),
+        match({
+          id: `${tournamentSlug}-r2-m2`,
+          label: 'Losers Round 1',
+          roundIndex: 2,
+          matchIndex: 2,
+          nextMatchId: `${tournamentSlug}-r3-m1`,
+          nextSlot: 0,
+        }),
+      ],
+    },
+    {
+      index: 3,
+      title: 'Losers Final',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r3-m1`,
+          label: 'Losers Final',
+          roundIndex: 3,
+          matchIndex: 1,
+          nextMatchId: `${tournamentSlug}-r4-m1`,
+          nextSlot: 1,
+        }),
+      ],
+    },
+    {
+      index: 4,
+      title: 'Grand Final',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r4-m1`,
+          label: 'Grand Final',
+          roundIndex: 4,
+          matchIndex: 1,
+          resetMatchId: `${tournamentSlug}-r5-m1`,
+          resetOnWinnerSlot: 1,
+        }),
+      ],
+    },
+    {
+      index: 5,
+      title: 'Reset Final',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r5-m1`,
+          label: 'Reset Final',
+          roundIndex: 5,
+          matchIndex: 1,
+        }),
+      ],
+    },
+  ];
+
+  const now = new Date().toISOString();
+
+  return {
+    tournamentSlug,
+    status: 'published',
+    format: 'four-player-double-elimination',
+    gameSlug: 'spades',
+    matchBaseUrl: SPADES_MATCH_BASE_URL,
+    participantCount: participants.length,
+    participants,
+    rounds,
+    winner: null,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 async function loadTournamentSignups(tournamentSlug) {
@@ -518,13 +686,21 @@ export async function handler(event) {
 
       const tournamentMode = await loadTournamentMode(tournamentSlug);
 
+      if (tournamentMode.value === 'four-player-double-elimination' && signups.length !== 4) {
+        return json(400, {
+          error: '4-Man Double Elimination requires exactly four registered players before generating a bracket.',
+        });
+      }
+
       if (!canGenerateTournamentMode(tournamentMode.value)) {
         return json(400, {
           error: `${tournamentMode.label} is saved for this event, but bracket generation for that mode is not wired yet.`,
         });
       }
 
-      const bracket = buildBracket({ tournamentSlug, signups, includeAdminFields: true });
+      const bracket = tournamentMode.value === 'four-player-double-elimination'
+        ? buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields: true })
+        : buildBracket({ tournamentSlug, signups, includeAdminFields: true });
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });
