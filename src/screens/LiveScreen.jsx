@@ -146,6 +146,7 @@ export default function LiveScreen() {
         <AnnouncePanel
           announcementItems={announcementItems}
           checklistItems={buildGoLiveChecklist({ hasDiscord, hasTwitch })}
+          hasDiscord={hasDiscord}
         />
       ) : null}
 
@@ -230,6 +231,7 @@ function LiveCommandTabs({ activeTab, onSelectTab }) {
           <ActionButton
             key={tab.id}
             onPress={() => onSelectTab(tab.id)}
+            style={styles.liveTabButton}
             variant={selected ? 'primary' : 'secondary'}>
             {tab.label}
           </ActionButton>
@@ -242,6 +244,19 @@ function LiveCommandTabs({ activeTab, onSelectTab }) {
 function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTournament, nextTournamentPath }) {
   return (
     <>
+      <LiveTabCommandCard
+        body="Start stream day here: open Twitch, confirm the event, then send the live alert."
+        primary={hasTwitch ? { label: 'Open Twitch', href: downloadLinks.twitch, external: true } : { label: 'Set Twitch URL', href: '/stream' }}
+        secondary={{ label: 'Tournament page', href: nextTournamentPath }}
+        stats={[
+          { label: 'Twitch', value: hasTwitch ? 'Ready' : 'Pending' },
+          { label: 'Discord', value: hasDiscord ? 'Ready' : 'Manual' },
+          { label: 'Event', value: nextTournament ? 'Set' : 'Pending' },
+        ]}
+        title="Control room"
+        tone="rose"
+      />
+
       <LiveBroadcastPanel
         hasDiscord={hasDiscord}
         hasTwitch={hasTwitch}
@@ -279,7 +294,19 @@ function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTourname
 function ObsPanel() {
   return (
     <>
-      <Section description="Recommended OBS scenes and browser sources." title="OBS scene map">
+      <LiveTabCommandCard
+        body="Copy browser-source URLs once, then switch scenes from OBS during the event."
+        primary={{ label: 'Compact overlay', href: '/overlay/compact' }}
+        secondary={{ label: 'Bracket overlay', href: '/overlay/bracket' }}
+        stats={[
+          { label: 'Scenes', value: String(OBS_SCENES.length) },
+          { label: 'Primary', value: 'Full' },
+          { label: 'Sizes', value: 'Ready' },
+        ]}
+        title="OBS control"
+      />
+
+      <Section description="Recommended OBS scenes and browser sources." nativeID="obs-scenes" title="OBS scene map">
         <ObsSceneMap items={OBS_SCENES} />
       </Section>
 
@@ -309,14 +336,27 @@ function ObsPanel() {
   );
 }
 
-function AnnouncePanel({ announcementItems, checklistItems }) {
+function AnnouncePanel({ announcementItems, checklistItems, hasDiscord }) {
   return (
     <>
-      <Section description="Copy-ready text for Twitch, Discord, and social posts." title="Announcement kit">
+      <LiveTabCommandCard
+        body="Copy the title and post first, then run the checklist before going live."
+        primary={hasDiscord ? { label: 'Open Discord', href: downloadLinks.discord, external: true } : { label: 'Contact page', href: '/contact' }}
+        secondary={{ label: 'Run checklist', href: '/live#go-live-checklist' }}
+        stats={[
+          { label: 'Copy blocks', value: String(announcementItems.length) },
+          { label: 'Checklist', value: String(checklistItems.length) },
+          { label: 'Discord', value: hasDiscord ? 'Ready' : 'Manual' },
+        ]}
+        title="Announcement control"
+        tone="blue"
+      />
+
+      <Section description="Copy-ready text for Twitch, Discord, and social posts." nativeID="announcement-kit" title="Announcement kit">
         <AnnouncementKit items={announcementItems} />
       </Section>
 
-      <Section description="Automated stream-day readiness check for what can be handled from this site." title="Go-live checklist">
+      <Section description="Automated stream-day readiness check for what can be handled from this site." nativeID="go-live-checklist" title="Go-live checklist">
         <GoLiveChecklist items={checklistItems} />
       </Section>
 
@@ -330,7 +370,19 @@ function AnnouncePanel({ announcementItems, checklistItems }) {
 function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
   return (
     <>
-      <Section description="The links viewers and stream setup need most during the show." title="Stream command center">
+      <LiveTabCommandCard
+        body="Give viewers one clean route: Twitch, tournament page, Discord, and replay links."
+        primary={hasTwitch ? { label: 'Open Twitch', href: downloadLinks.twitch, external: true } : { label: 'Set Twitch URL', href: '/stream' }}
+        secondary={{ label: 'Tournament page', href: nextTournamentPath }}
+        stats={[
+          { label: 'Stream links', value: String(streams.length) },
+          { label: 'Discord', value: hasDiscord ? 'Ready' : 'Pending' },
+          { label: 'Event', value: 'Linked' },
+        ]}
+        title="Links control"
+      />
+
+      <Section description="The links viewers and stream setup need most during the show." nativeID="stream-links" title="Stream command center">
         <View style={styles.commandGrid}>
           <CommandCard
             actionLabel={hasTwitch ? 'Open Twitch' : 'Set Twitch URL'}
@@ -376,6 +428,41 @@ function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
         ) : null}
       </Section>
     </>
+  );
+}
+
+function LiveTabCommandCard({ body, primary, secondary, stats, title, tone = 'accent' }) {
+  return (
+    <Surface
+      style={[
+        styles.liveTabCommandCard,
+        tone === 'rose' && styles.liveTabCommandCardRose,
+        tone === 'blue' && styles.liveTabCommandCardBlue,
+      ]}>
+      <View style={styles.liveTabCommandTopRow}>
+        <View style={styles.liveTabCommandCopy}>
+          <Text style={styles.liveTabCommandLabel}>Live operator</Text>
+          <Text style={styles.liveTabCommandTitle}>{title}</Text>
+          <Text style={styles.liveTabCommandBody}>{body}</Text>
+        </View>
+        <View style={styles.liveTabCommandActions}>
+          <ActionButton external={Boolean(primary.external)} href={primary.href}>
+            {primary.label}
+          </ActionButton>
+          <ActionButton external={Boolean(secondary.external)} href={secondary.href} variant="secondary">
+            {secondary.label}
+          </ActionButton>
+        </View>
+      </View>
+      <View style={styles.liveTabCommandStats}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={styles.liveTabCommandStat}>
+            <Text style={styles.liveTabCommandStatLabel}>{stat.label}</Text>
+            <Text style={styles.liveTabCommandStatValue}>{stat.value}</Text>
+          </View>
+        ))}
+      </View>
+    </Surface>
   );
 }
 
@@ -1099,6 +1186,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
+  },
+  liveTabButton: {
+    flexBasis: 112,
+    flexGrow: 1,
+    marginBottom: 0,
+    marginRight: 0,
+    minWidth: 0,
+  },
+  liveTabCommandActions: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  liveTabCommandBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 7,
+  },
+  liveTabCommandCard: {
+    backgroundColor: 'rgba(17, 29, 26, 0.86)',
+    borderColor: 'rgba(214, 162, 78, 0.32)',
+    marginBottom: 14,
+  },
+  liveTabCommandCardBlue: {
+    backgroundColor: 'rgba(9, 24, 34, 0.82)',
+    borderColor: 'rgba(108, 199, 255, 0.30)',
+  },
+  liveTabCommandCardRose: {
+    backgroundColor: 'rgba(23, 11, 12, 0.82)',
+    borderColor: 'rgba(224, 106, 92, 0.38)',
+  },
+  liveTabCommandCopy: {
+    flex: 1,
+    minWidth: 240,
+  },
+  liveTabCommandLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  liveTabCommandStat: {
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 130,
+    flexGrow: 1,
+    padding: 10,
+  },
+  liveTabCommandStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  liveTabCommandStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
+  liveTabCommandStatValue: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginTop: 3,
+  },
+  liveTabCommandTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 5,
+  },
+  liveTabCommandTopRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
   },
   liveTitle: {
     color: '#F4EFE6',

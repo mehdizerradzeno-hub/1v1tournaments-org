@@ -151,9 +151,14 @@ test('/live stays wired to stream-day command tools', () => {
 
   assert.match(liveScreenSource, /Go-live checklist/);
   assert.match(liveScreenSource, /LiveCockpit/);
+  assert.match(liveScreenSource, /LiveTabCommandCard/);
   assert.match(liveScreenSource, /Cockpit/);
   assert.match(liveScreenSource, /heroVariant="compact"/);
   assert.match(liveScreenSource, /stickyActions=\{false\}/);
+  assert.match(liveScreenSource, /Control room/);
+  assert.match(liveScreenSource, /OBS control/);
+  assert.match(liveScreenSource, /Announcement control/);
+  assert.match(liveScreenSource, /Links control/);
   assert.match(liveScreenSource, /Announcement kit/);
   assert.match(liveScreenSource, /Run of show/);
   assert.match(liveScreenSource, /OBS scene map/);
