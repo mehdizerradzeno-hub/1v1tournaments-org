@@ -1,3 +1,5 @@
+import { getTournamentMode, getTournamentModeValue } from './tournamentModes.js';
+
 const DEFAULT_GAME_SLUG = 'spades';
 const DEFAULT_TIME_ZONE = 'America/New_York';
 const DEFAULT_TIME_ZONE_LABEL = 'ET';
@@ -130,6 +132,7 @@ export function createTournamentRecord(payload = {}) {
   const timeZone = cleanShortText(payload.timeZone, DEFAULT_TIME_ZONE);
   const timeZoneLabel = cleanShortText(payload.timeZoneLabel, DEFAULT_TIME_ZONE_LABEL).slice(0, 12);
   const checkInLeadMinutes = positiveInteger(payload.checkInLeadMinutes, DEFAULT_CHECK_IN_LEAD_MINUTES, 0, 1440);
+  const mode = getTournamentMode(payload.mode || payload.tournamentMode);
   const summary = cleanShortText(payload.summary, `A hosted ${gameSlug} bracket with live signup, match links, and posted results.`);
   const detail = cleanText(
     payload.detail,
@@ -146,9 +149,10 @@ export function createTournamentRecord(payload = {}) {
     timeZone,
     timeZoneLabel,
     registrationStatus: cleanShortText(payload.registrationStatus, 'open'),
+    mode: getTournamentModeValue(mode.value),
     checkInLeadMinutes,
     location: cleanShortText(payload.location, 'Online'),
-    format: cleanShortText(payload.format, 'Single-elimination bracket'),
+    format: cleanShortText(payload.format, mode.format),
     rosterCap,
     minimumPlayers,
     bracketFlexPolicy: cleanText(

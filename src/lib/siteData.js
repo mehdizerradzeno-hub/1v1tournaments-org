@@ -183,6 +183,7 @@ export const siteData = {
       timeZone: 'America/New_York',
       timeZoneLabel: 'ET',
       location: 'Online',
+      mode: 'single-elimination',
       format: 'Single-elimination bracket',
       rosterCap: 8,
       minimumPlayers: 2,

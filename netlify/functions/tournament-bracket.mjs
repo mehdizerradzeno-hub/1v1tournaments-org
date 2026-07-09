@@ -5,6 +5,9 @@ import {
   getBearerToken,
   requireTournamentAdmin,
 } from './_host-auth.mjs';
+import { loadHostedTournament } from './_tournament-events-utils.mjs';
+import { siteData } from '../../src/lib/siteData.js';
+import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
@@ -368,6 +371,13 @@ async function saveBracket(bracket, options = {}) {
   return updatedBracket;
 }
 
+async function loadTournamentMode(tournamentSlug) {
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug) || null;
+
+  return getTournamentMode(hostedTournament?.mode || seededTournament?.mode);
+}
+
 async function deleteBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
   await store.delete(`${tournamentSlug}.json`);
@@ -504,6 +514,14 @@ export async function handler(event) {
 
       if (signups.length < 2) {
         return json(400, { error: 'At least two signups are required before generating a bracket.' });
+      }
+
+      const tournamentMode = await loadTournamentMode(tournamentSlug);
+
+      if (!canGenerateTournamentMode(tournamentMode.value)) {
+        return json(400, {
+          error: `${tournamentMode.label} is saved for this event, but bracket generation for that mode is not wired yet.`,
+        });
       }
 
       const bracket = buildBracket({ tournamentSlug, signups, includeAdminFields: true });

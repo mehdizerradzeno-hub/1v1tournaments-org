@@ -6,6 +6,7 @@ import {
   mergeTournamentLists,
   slugifyTournamentTitle,
 } from '../src/lib/tournamentCatalog.js';
+import { canGenerateTournamentMode, getTournamentMode, TOURNAMENT_MODES } from '../src/lib/tournamentModes.js';
 
 test('hosted tournament records get the full public page shape from simple input', () => {
   const tournament = createTournamentRecord({
@@ -19,9 +20,28 @@ test('hosted tournament records get the full public page shape from simple input
   assert.equal(tournament.gameSlug, 'spades');
   assert.equal(tournament.rosterCap, 16);
   assert.equal(tournament.minimumPlayers, 2);
+  assert.equal(tournament.mode, 'single-elimination');
   assert.equal(tournament.status, 'upcoming');
   assert.equal(tournament.links[0].href, '/tournaments/spades-friday-night-cup');
   assert.match(tournament.bracketFlexPolicy, /Advertised 16-player bracket/);
+});
+
+test('recommended tournament modes are available before bracket wiring', () => {
+  const values = TOURNAMENT_MODES.map((mode) => mode.value);
+  const doubleElim = getTournamentMode('four-player-double-elimination');
+  const bestOf3 = getTournamentMode('best-of-3-single-elimination');
+
+  assert.ok(values.includes('single-elimination'));
+  assert.ok(values.includes('best-of-3-single-elimination'));
+  assert.ok(values.includes('round-robin'));
+  assert.ok(values.includes('king-of-the-table'));
+  assert.ok(values.includes('four-player-double-elimination'));
+  assert.equal(doubleElim.rosterCap, 4);
+  assert.equal(doubleElim.minimumPlayers, 4);
+  assert.equal(doubleElim.format, '4-player double-elimination bracket');
+  assert.equal(bestOf3.format, 'Best-of-3 single-elimination bracket');
+  assert.equal(canGenerateTournamentMode('single-elimination'), true);
+  assert.equal(canGenerateTournamentMode('four-player-double-elimination'), false);
 });
 
 test('hosted tournaments merge over seeded tournaments by slug', () => {

@@ -21,6 +21,11 @@ import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from
 import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import { createTournamentRecord, mergeTournamentLists, slugifyTournamentTitle } from '../lib/tournamentCatalog.js';
 import {
+  canGenerateTournamentMode,
+  getTournamentMode,
+  TOURNAMENT_MODES,
+} from '../lib/tournamentModes.js';
+import {
   dateToScheduleFields,
   getRegistrationStatusMeta,
   getScheduleFieldDefaults,
@@ -185,6 +190,7 @@ export default function AdminScreen() {
   const [eventTitle, setEventTitle] = useState(() => initialScheduleDefaults.title || siteData.tournaments[0]?.title || '');
   const [eventSlug, setEventSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
   const [eventSummary, setEventSummary] = useState(() => siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
+  const [eventMode, setEventMode] = useState(() => siteData.tournaments[0]?.mode || 'single-elimination');
   const [eventRosterCap, setEventRosterCap] = useState(() => String(siteData.tournaments[0]?.rosterCap || 8));
   const [eventMinimumPlayers, setEventMinimumPlayers] = useState(() => String(siteData.tournaments[0]?.minimumPlayers || 2));
   const [eventSaving, setEventSaving] = useState(false);
@@ -405,6 +411,7 @@ export default function AdminScreen() {
     setEventTitle(tournament.title || '');
     setEventSlug(tournament.slug || '');
     setEventSummary(tournament.detail || tournament.summary || '');
+    setEventMode(getTournamentMode(tournament.mode).value);
     setEventRosterCap(String(tournament.rosterCap || 8));
     setEventMinimumPlayers(String(tournament.minimumPlayers || 2));
   }
@@ -420,6 +427,7 @@ export default function AdminScreen() {
     setEventTitle(draftTitle);
     setEventSlug(slugifyTournamentTitle(draftTitle));
     setEventSummary('A free-entry Spades bracket with account signup, hosted match links, and posted results.');
+    setEventMode('single-elimination');
     setEventRosterCap('8');
     setEventMinimumPlayers('2');
     setScheduleDate('');
@@ -430,6 +438,14 @@ export default function AdminScreen() {
     setScheduleCheckInLeadMinutes('30');
     setEventFeedback('Fill in the event title, date, and start time, then save the tournament.', '');
     setScheduleFeedback('', '');
+  }
+
+  function handleSelectEventMode(value) {
+    const selectedMode = getTournamentMode(value);
+
+    setEventMode(selectedMode.value);
+    setEventRosterCap(String(selectedMode.rosterCap));
+    setEventMinimumPlayers(String(selectedMode.minimumPlayers));
   }
 
   function handleCreateAccess() {
@@ -702,12 +718,15 @@ export default function AdminScreen() {
     setEventFeedback('', '');
     setScheduleFeedback('', '');
 
+    const selectedMode = getTournamentMode(eventMode);
     const rosterCap = numberField(eventRosterCap, selectedTournament?.rosterCap || 8);
     const minimumPlayers = Math.min(numberField(eventMinimumPlayers, selectedTournament?.minimumPlayers || 2), rosterCap);
     const tournamentPayload = createTournamentRecord({
       ...(selectedTournament || {}),
       slug,
       title,
+      mode: selectedMode.value,
+      format: selectedMode.format,
       date,
       timeZone: scheduleTimeZone.trim() || 'America/New_York',
       timeZoneLabel: scheduleTimeZoneLabel.trim() || 'ET',
@@ -950,6 +969,33 @@ export default function AdminScreen() {
                   style={styles.input}
                   value={eventMinimumPlayers}
                 />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Tournament mode</Text>
+              <View style={styles.tournamentPicker}>
+                {TOURNAMENT_MODES.map((option) => (
+                  <ActionButton
+                    key={option.value}
+                    onPress={() => handleSelectEventMode(option.value)}
+                    variant={eventMode === option.value ? 'primary' : 'secondary'}>
+                    {option.shortLabel}
+                  </ActionButton>
+                ))}
+              </View>
+              <View style={styles.modeInfoGrid}>
+                {TOURNAMENT_MODES.map((option) => (
+                  <View key={option.value} style={[styles.modeInfoCard, eventMode === option.value && styles.modeInfoCardActive]}>
+                    <View style={styles.metaRow}>
+                      <Badge tone={option.generation === 'live' ? 'green' : 'blue'}>
+                        {option.generation === 'live' ? 'Ready now' : 'Wire next'}
+                      </Badge>
+                      <Text style={styles.modeInfoTitle}>{option.label}</Text>
+                    </View>
+                    <Text style={styles.metaText}>{option.summary}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -1224,9 +1270,15 @@ export default function AdminScreen() {
 
   async function handleGenerateBracket() {
     const token = rosterToken.trim();
+    const selectedMode = getTournamentMode(liveTournament?.mode);
 
     if (!hasHostCredential) {
       setBracketFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before generating a bracket.');
+      return;
+    }
+
+    if (!canGenerateTournamentMode(selectedMode.value)) {
+      setBracketFeedback('', `${selectedMode.label} is saved for the event, but bracket generation for that mode is the next wiring phase.`);
       return;
     }
 
@@ -2407,6 +2459,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     flex: 1,
+  },
+  modeInfoCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexBasis: 230,
+    flexGrow: 1,
+    padding: 12,
+  },
+  modeInfoCardActive: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+  },
+  modeInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+  },
+  modeInfoTitle: {
+    color: '#F4EFE6',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
   },
   panel: {
     borderColor: 'rgba(108, 199, 255, 0.24)',
