@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -293,12 +293,14 @@ function NextLobbyHero({
   tournament,
   tournamentPath,
 }) {
+  const { width } = useWindowDimensions();
+  const isPhone = width > 0 && width < 420;
   const signups = signupSummary.signups || [];
 
   return (
-    <Surface style={styles.lobbyHero}>
+    <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
       <View pointerEvents="none" style={styles.heroGlow} />
-      <View style={styles.heroTop}>
+      <View style={[styles.heroTop, isPhone && styles.heroTopPhone]}>
         <View style={styles.heroCopy}>
           <View style={styles.heroBadgeRow}>
             <Badge tone={bracket ? 'green' : registrationMeta.tone}>
@@ -306,10 +308,10 @@ function NextLobbyHero({
             </Badge>
             <Text style={styles.heroDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
           </View>
-          <Text style={styles.heroTitle}>Next tournament lobby</Text>
-          <Text style={styles.heroText}>{tournament.summary}</Text>
+          <Text style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>Next tournament lobby</Text>
+          <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
         </View>
-        <View style={styles.heroActions}>
+        <View style={[styles.heroActions, isPhone && styles.heroActionsPhone]}>
           <ActionButton href={checkInPath}>{registrationMeta.value === 'open' ? 'Join now' : 'Open signup'}</ActionButton>
           <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">My match</ActionButton>
           <ActionButton href={tournamentPath} variant="secondary">Tournament page</ActionButton>
@@ -332,18 +334,18 @@ function NextLobbyHero({
         </View>
       </View>
 
-      <View style={styles.metricGrid}>
+      <View style={[styles.metricGrid, isPhone && styles.metricGridPhone]}>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Starts in</Text>
-          <Text style={styles.metricValue}>{countdownLabel}</Text>
+          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{countdownLabel}</Text>
         </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Signed up</Text>
-          <Text style={styles.metricValue}>{signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`}</Text>
+          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`}</Text>
         </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Open seats</Text>
-          <Text style={styles.metricValue}>{signupSummary.loading ? '--' : openSeats}</Text>
+          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signupSummary.loading ? '--' : openSeats}</Text>
         </View>
         <View style={[styles.metricTile, styles.metricWide]}>
           <Text style={styles.metricLabel}>Next match</Text>
@@ -394,6 +396,10 @@ const styles = StyleSheet.create({
     gap: 10,
     minWidth: 235,
   },
+  heroActionsPhone: {
+    flexBasis: '100%',
+    minWidth: 0,
+  },
   heroBadgeRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -428,6 +434,10 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     marginTop: 8,
   },
+  heroTextPhone: {
+    fontSize: 14,
+    lineHeight: 21,
+  },
   heroTitle: {
     color: '#F4EFE6',
     fontSize: 34,
@@ -435,16 +445,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 39,
   },
+  heroTitlePhone: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
   heroTop: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 18,
   },
+  heroTopPhone: {
+    gap: 14,
+  },
   lobbyHero: {
     borderColor: 'rgba(214, 162, 78, 0.42)',
     marginBottom: 24,
     overflow: 'hidden',
+  },
+  lobbyHeroPhone: {
+    marginBottom: 18,
   },
   lobbyBottom: {
     alignItems: 'stretch',
@@ -458,6 +478,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 18,
+  },
+  metricGridPhone: {
+    gap: 8,
+    marginTop: 14,
   },
   metricLabel: {
     color: '#AAB4AE',
@@ -489,6 +513,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 36,
     marginTop: 6,
+  },
+  metricValuePhone: {
+    fontSize: 24,
+    lineHeight: 30,
   },
   metricWide: {
     flexBasis: 260,
