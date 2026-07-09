@@ -31,6 +31,8 @@ const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardS
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
 const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
+const resultsScreenFile = fileURLToPath(new URL('../src/screens/ResultsScreen.jsx', import.meta.url));
+const rulesScreenFile = fileURLToPath(new URL('../src/screens/RulesScreen.jsx', import.meta.url));
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
 const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
@@ -91,6 +93,25 @@ test('homepage stays focused on the stream-day front door', () => {
   assert.match(homeScreenSource, /Join tournament/);
   assert.match(homeScreenSource, /Compact lobby/);
   assert.match(homeScreenSource, /TwitchTournamentBoard/);
+});
+
+test('public support pages keep players routed back to active tournament flow', () => {
+  assert.ok(existsSync(hubUiFile));
+  assert.ok(existsSync(resultsScreenFile));
+  assert.ok(existsSync(leaderboardScreenFile));
+  assert.ok(existsSync(rulesScreenFile));
+
+  const hubUiSource = readFileSync(hubUiFile, 'utf8');
+  const resultsScreenSource = readFileSync(resultsScreenFile, 'utf8');
+  const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
+  const rulesScreenSource = readFileSync(rulesScreenFile, 'utf8');
+
+  assert.match(hubUiSource, /PlayerRouteStrip/);
+  assert.match(hubUiSource, /PRIMARY_TOURNAMENT_PATH/);
+  assert.match(hubUiSource, /PRIMARY_MATCH_PATH/);
+  assert.match(resultsScreenSource, /PlayerRouteStrip/);
+  assert.match(leaderboardScreenSource, /PlayerRouteStrip/);
+  assert.match(rulesScreenSource, /PlayerRouteStrip/);
 });
 
 test('/next stays wired to the public next-event lobby', () => {

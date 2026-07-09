@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import {
   Badge,
   HubScreen,
+  PlayerRouteStrip,
   RuleBlock,
   Section,
   Surface,
@@ -30,6 +31,10 @@ export default function RulesScreen() {
       ]}
       subtitle="Free entry, no buy-in, no wagering."
       title="How the hub is run">
+      <PlayerRouteStrip
+        body="Rules are here when you need details. For stream day, jump back to the active tournament, your match, or the live table."
+      />
+
       <Section description="These rules apply across every event on the site." title="General event rules">
         {generalRules.map((section) => (
           <View key={section.title} style={styles.block}>

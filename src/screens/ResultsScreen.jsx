@@ -5,6 +5,7 @@ import {
   Badge,
   EmptyState,
   HubScreen,
+  PlayerRouteStrip,
   ResultCard,
   Section,
   Surface,
@@ -36,6 +37,10 @@ export default function ResultsScreen() {
       ]}
       subtitle="Recent scoreboards and final tables for the public organization site"
       title="Results archive">
+      <PlayerRouteStrip
+        body="Results are the archive. If you are here before or during an event, go straight to the next tournament, your match, or the live table."
+      />
+
       <Section
         action={<ActionButton href="/tournaments/spades-summer-series">Open tournament</ActionButton>}
         description="Completed finals, placements, and posting notes appear here in newest-first order."

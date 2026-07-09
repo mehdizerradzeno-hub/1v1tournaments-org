@@ -136,6 +136,22 @@ export function Surface({ children, style }) {
   return <View style={[styles.surface, style]}>{children}</View>;
 }
 
+export function PlayerRouteStrip({ title = 'Player route', body = 'Start with the next event, then jump to your match or the live table.' }) {
+  return (
+    <Surface style={styles.playerRouteStrip}>
+      <View style={styles.playerRouteCopy}>
+        <Text style={styles.playerRouteLabel}>{title}</Text>
+        <Text style={styles.playerRouteBody}>{body}</Text>
+      </View>
+      <View style={styles.playerRouteActions}>
+        <ActionButton href={PRIMARY_TOURNAMENT_PATH}>Next tournament</ActionButton>
+        <ActionButton href={PRIMARY_MATCH_PATH} variant="secondary">My match</ActionButton>
+        <ActionButton href="/live" variant="secondary">Watch live</ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
 export function Badge({ children, tone = 'neutral', style }) {
   return (
     <View style={[styles.badge, styles[`badge${tone[0].toUpperCase()}${tone.slice(1)}`], style]}>
@@ -1343,6 +1359,40 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.line,
     padding: 18,
     ...sharedCardShadow,
+  },
+  playerRouteStrip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 19, 17, 0.88)',
+    borderColor: theme.colors.accentGlow,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
+    marginBottom: 22,
+  },
+  playerRouteCopy: {
+    flex: 1,
+    minWidth: 240,
+  },
+  playerRouteLabel: {
+    color: theme.colors.accent,
+    fontFamily: MONO_FONT,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    lineHeight: 17,
+    textTransform: 'uppercase',
+  },
+  playerRouteBody: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 5,
+  },
+  playerRouteActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   card: {
     backgroundColor: theme.colors.surface,
