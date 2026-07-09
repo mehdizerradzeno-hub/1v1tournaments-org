@@ -27,7 +27,7 @@ const NAV_ITEMS = [
 const MOBILE_NAV_ITEMS = [
   { label: 'Home', href: '/' },
   { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
+  { label: 'Tourney', href: PRIMARY_TOURNAMENT_PATH },
   { label: 'Ranks', href: '/leaderboard' },
 ];
 
@@ -988,14 +988,14 @@ const styles = StyleSheet.create({
   },
   mobileBottomNav: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 12,
+    right: 12,
     bottom: 12,
     zIndex: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 6,
+    padding: 5,
     borderRadius: 20,
     backgroundColor: 'rgba(9, 19, 17, 0.96)',
     borderWidth: 1,
@@ -1004,13 +1004,14 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavItem: {
     flex: 1,
-    marginHorizontal: 3,
+    marginHorizontal: 2,
+    minWidth: 0,
   },
   mobileBottomNavChip: {
     alignItems: 'center',
     borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: 'transparent',
@@ -1021,7 +1022,7 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavText: {
     color: theme.colors.muted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
