@@ -17,7 +17,13 @@
     "capacity": "node scripts/capacity-check.mjs",
     "capacity:hosted": "node scripts/hosted-capacity-smoke.mjs",
     "bot:twitch": "node scripts/twitch-chat-bot.mjs",
-    "bot:twitch:check": "TWITCH_BOT_DRY_RUN=1 node scripts/twitch-chat-bot.mjs"
+    "bot:twitch:check": "TWITCH_BOT_DRY_RUN=1 node scripts/twitch-chat-bot.mjs",
+    "bot:twitch:install": "node scripts/twitch-bot-service.mjs install",
+    "bot:twitch:start": "node scripts/twitch-bot-service.mjs start",
+    "bot:twitch:stop": "node scripts/twitch-bot-service.mjs stop",
+    "bot:twitch:restart": "node scripts/twitch-bot-service.mjs restart",
+    "bot:twitch:status": "node scripts/twitch-bot-service.mjs status",
+    "bot:twitch:logs": "node scripts/twitch-bot-service.mjs logs"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9",

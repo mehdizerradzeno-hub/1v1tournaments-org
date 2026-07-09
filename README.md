@@ -130,6 +130,21 @@ Start the bot:
 npm run bot:twitch
 ```
 
+Install it as a Mac background service:
+
+```bash
+npm run bot:twitch:install
+```
+
+Manage the background service:
+
+```bash
+npm run bot:twitch:status
+npm run bot:twitch:logs
+npm run bot:twitch:restart
+npm run bot:twitch:stop
+```
+
 Notes:
 
 - `TWITCH_BOT_USERNAME` can be the main channel account or a separate bot account.
@@ -137,6 +152,7 @@ Notes:
 - `TWITCH_CHANNEL` should be `1v1compspades` for the current channel.
 - `STREAM_COMMAND_ENDPOINT` is optional; it defaults to the production command endpoint.
 - The bot refreshes command text every 60 seconds and rate-limits repeated command responses.
+- The Mac service writes logs to `/tmp/1v1tournaments-twitch-bot.log` and errors to `/tmp/1v1tournaments-twitch-bot.err.log`.
 
 Default commands include `!next`, `!join`, `!signup`, `!match`, `!bracket`, `!format`,
 `!rules`, `!results`, `!discord`, and `!live`.

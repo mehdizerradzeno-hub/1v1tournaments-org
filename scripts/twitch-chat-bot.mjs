@@ -1,8 +1,10 @@
 import tls from 'node:tls';
+import net from 'node:net';
 import { existsSync, readFileSync } from 'node:fs';
 
 const TWITCH_IRC_HOST = 'irc.chat.twitch.tv';
-const TWITCH_IRC_PORT = 6697;
+const TWITCH_IRC_TLS_PORT = 6697;
+const TWITCH_IRC_PLAIN_PORT = 6667;
 const DEFAULT_COMMAND_ENDPOINT = 'https://1v1tournaments.org/.netlify/functions/stream-commands';
 const ENV_FILE = '.env.twitch-bot';
 
@@ -177,16 +179,33 @@ async function loadCommands({ force = false } = {}) {
   console.log(`Loaded ${commands.size} stream command${commands.size === 1 ? '' : 's'} from ${commandEndpoint}`);
 }
 
-function connect() {
+function writeLogin(socket) {
+  socket.write(`PASS ${oauthToken}\r\n`);
+  socket.write(`NICK ${botUsername}\r\n`);
+  socket.write('CAP REQ :twitch.tv/tags twitch.tv/commands\r\n');
+  socket.write(`JOIN #${channel}\r\n`);
+}
+
+function connect({ secure = true } = {}) {
   assertConfig();
 
-  const socket = tls.connect(TWITCH_IRC_PORT, TWITCH_IRC_HOST, () => {
-    socket.write(`PASS ${oauthToken}\r\n`);
-    socket.write(`NICK ${botUsername}\r\n`);
-    socket.write('CAP REQ :twitch.tv/tags twitch.tv/commands\r\n');
-    socket.write(`JOIN #${channel}\r\n`);
-    console.log(`Connected to Twitch chat as ${botUsername}, joining #${channel}`);
-  });
+  let lastErrorCode = '';
+  const socket = secure
+    ? tls.connect(
+        {
+          host: TWITCH_IRC_HOST,
+          port: TWITCH_IRC_TLS_PORT,
+          servername: TWITCH_IRC_HOST,
+        },
+        () => {
+          writeLogin(socket);
+          console.log(`Connected to Twitch chat over TLS as ${botUsername}, joining #${channel}`);
+        },
+      )
+    : net.connect(TWITCH_IRC_PLAIN_PORT, TWITCH_IRC_HOST, () => {
+        writeLogin(socket);
+        console.log(`Connected to Twitch chat as ${botUsername}, joining #${channel}`);
+      });
 
   socket.setEncoding('utf8');
 
@@ -206,6 +225,11 @@ function connect() {
       }
 
       const message = parseIrcMessage(line);
+
+      if (message.command === 'NOTICE' && message.trailing) {
+        console.error(`Twitch notice: ${message.trailing}`);
+        continue;
+      }
 
       if (message.command !== 'PRIVMSG') {
         continue;
@@ -232,12 +256,19 @@ function connect() {
   });
 
   socket.on('error', (error) => {
+    lastErrorCode = error.code || '';
     console.error('Twitch chat connection error:', error.message);
   });
 
   socket.on('close', () => {
+    if (secure && lastErrorCode === 'ERR_TLS_CERT_ALTNAME_INVALID') {
+      console.error('TLS certificate name mismatch from Twitch IRC edge. Falling back to plain IRC port 6667...');
+      connect({ secure: false });
+      return;
+    }
+
     console.error('Twitch chat connection closed. Reconnecting in 10 seconds...');
-    setTimeout(connect, 10_000);
+    setTimeout(() => connect({ secure }), 10_000);
   });
 }
 
