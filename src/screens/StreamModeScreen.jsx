@@ -28,6 +28,14 @@ import { theme } from '../lib/theme.js';
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
+const VIEWER_COMMANDS = [
+  { command: '!join', label: 'Join the bracket' },
+  { command: '!next', label: 'Next tournament' },
+  { command: '!match', label: 'Find your match' },
+  { command: '!rules', label: 'Tournament rules' },
+  { command: '!discord', label: 'Discord invite' },
+  { command: '!live', label: 'Live hub' },
+];
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -154,6 +162,30 @@ function getBracketMatchSummary(bracket) {
   };
 }
 
+function getViewerNextSteps(registrationMeta, featuredBracket) {
+  if (featuredBracket) {
+    return [
+      { label: 'Playing', title: 'Find your match', body: 'Open My match or use !match in Twitch chat.' },
+      { label: 'Watching', title: 'Follow the bracket', body: 'Use the tournament page for the live bracket and roster.' },
+      { label: 'Chat', title: 'Ask for links', body: 'Type !live, !rules, or !discord in Twitch chat.' },
+    ];
+  }
+
+  if (registrationMeta.value === 'open') {
+    return [
+      { label: 'Step 1', title: 'Join the bracket', body: 'Use the join button or type !join in Twitch chat.' },
+      { label: 'Step 2', title: 'Watch the roster', body: 'Your public player name appears in the signup list.' },
+      { label: 'Step 3', title: 'Come back for match time', body: 'Use My match when the host publishes the bracket.' },
+    ];
+  }
+
+  return [
+    { label: 'Now', title: 'View tournament', body: 'Registration is not open, but event details are visible.' },
+    { label: 'Later', title: 'Watch for the bracket', body: 'The page updates when the host starts the event.' },
+    { label: 'Chat', title: 'Use commands', body: 'Type !next or !live for the public links.' },
+  ];
+}
+
 export default function StreamModeScreen() {
   const { width } = useWindowDimensions();
   const [eventDataBySlug, setEventDataBySlug] = useState({});
@@ -184,6 +216,7 @@ export default function StreamModeScreen() {
   const openSeats = Math.max(cap - getSignupCount(featuredSignupSummary), 0);
   const bracketMatchSummary = getBracketMatchSummary(featuredBracket);
   const countdownParts = getCountdownParts(featuredTournament, nowMs);
+  const viewerNextSteps = getViewerNextSteps(registrationMeta, featuredBracket);
   const isWide = Platform.OS === 'web' && width >= 920;
 
   useEffect(() => {
@@ -344,6 +377,39 @@ export default function StreamModeScreen() {
                 <Text style={styles.scoreValue}>{getMinimumPlayers(featuredTournament)}+</Text>
               </Surface>
             </View>
+          </View>
+
+          <View style={[styles.priorityGrid, isWide && styles.priorityGridWide]}>
+            <Surface style={styles.nextStepCard}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>What to do next</Text>
+                <Text style={styles.cardMeta}>{featuredBracket ? 'Bracket live' : registrationMeta.label}</Text>
+              </View>
+              <View style={styles.nextStepGrid}>
+                {viewerNextSteps.map((item) => (
+                  <View key={item.title} style={styles.nextStepItem}>
+                    <Text style={styles.nextStepLabel}>{item.label}</Text>
+                    <Text style={styles.nextStepTitle}>{item.title}</Text>
+                    <Text style={styles.nextStepBody}>{item.body}</Text>
+                  </View>
+                ))}
+              </View>
+            </Surface>
+
+            <Surface style={styles.chatCard}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Twitch chat commands</Text>
+                <Text style={styles.cardMeta}>Bot live</Text>
+              </View>
+              <View style={styles.viewerCommandGrid}>
+                {VIEWER_COMMANDS.map((item) => (
+                  <View key={item.command} style={styles.viewerCommandChip}>
+                    <Text style={styles.viewerCommand}>{item.command}</Text>
+                    <Text style={styles.viewerCommandLabel}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </Surface>
           </View>
 
           <View style={[styles.detailGrid, isWide && styles.detailGridWide]}>
@@ -632,6 +698,56 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
+  chatCard: {
+    borderColor: 'rgba(108, 199, 255, 0.28)',
+    flex: 0.92,
+  },
+  nextStepBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  nextStepCard: {
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    flex: 1.08,
+  },
+  nextStepGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  nextStepItem: {
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.16)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 190,
+    flexGrow: 1,
+    minHeight: 124,
+    padding: 12,
+  },
+  nextStepLabel: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  nextStepTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+    marginTop: 7,
+  },
+  priorityGrid: {
+    gap: 14,
+    marginBottom: 18,
+  },
+  priorityGridWide: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+  },
   rosterGrid: {
     gap: 10,
   },
@@ -859,5 +975,33 @@ const styles = StyleSheet.create({
   },
   queueButton: {
     flexShrink: 0,
+  },
+  viewerCommand: {
+    color: theme.colors.blue,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+  },
+  viewerCommandChip: {
+    backgroundColor: 'rgba(108, 199, 255, 0.08)',
+    borderColor: 'rgba(108, 199, 255, 0.20)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 142,
+    flexGrow: 1,
+    minHeight: 76,
+    padding: 11,
+  },
+  viewerCommandGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  viewerCommandLabel: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 4,
   },
 });

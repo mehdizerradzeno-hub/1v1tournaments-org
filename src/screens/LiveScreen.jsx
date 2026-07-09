@@ -179,6 +179,7 @@ export default function LiveScreen() {
         hasTwitch={hasTwitch}
         nextTournament={nextTournament}
         nextTournamentPath={nextTournamentPath}
+        streamCommands={streamCommands}
         streams={streams}
       />
 
@@ -217,7 +218,9 @@ export default function LiveScreen() {
   );
 }
 
-function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath, streams }) {
+function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath, streamCommands, streams }) {
+  const commandCount = streamCommands.loading ? '...' : String(streamCommands.commands.length || buildDefaultStreamCommands({ hasDiscord, nextTournamentPath }).length);
+
   return (
     <Surface style={styles.cockpit}>
       <View style={styles.cockpitStatusRow}>
@@ -255,6 +258,21 @@ function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath
           <View style={styles.cockpitActions}>
             <ActionButton href={nextTournamentPath} variant="secondary">Open event</ActionButton>
             <ActionButton href={`${nextTournamentPath}#my-match`} variant="secondary">My match</ActionButton>
+          </View>
+        </View>
+
+        <View style={[styles.cockpitCard, styles.cockpitCardGreen]}>
+          <Text style={styles.cockpitLabel}>Twitch bot</Text>
+          <Text style={styles.cockpitTitle}>{streamCommands.error ? 'Commands fallback' : 'Commands loaded'}</Text>
+          <Text style={styles.cockpitBody}>
+            {streamCommands.error
+              ? 'Using default command text until the command endpoint is reachable.'
+              : `${commandCount} chat commands are available for viewers.`}
+          </Text>
+          <View style={styles.commandPreviewRow}>
+            {['!join', '!next', '!rules', '!discord'].map((command) => (
+              <Text key={command} style={styles.commandPreviewChip}>{command}</Text>
+            ))}
           </View>
         </View>
 
@@ -989,6 +1007,23 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 12,
   },
+  commandPreviewChip: {
+    backgroundColor: 'rgba(97, 210, 145, 0.12)',
+    borderColor: 'rgba(97, 210, 145, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#61D291',
+    fontSize: 13,
+    fontWeight: '900',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  commandPreviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
   commandAction: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1062,6 +1097,10 @@ const styles = StyleSheet.create({
   cockpitCardBlue: {
     backgroundColor: 'rgba(108, 199, 255, 0.08)',
     borderColor: 'rgba(108, 199, 255, 0.22)',
+  },
+  cockpitCardGreen: {
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.24)',
   },
   cockpitCardPrimary: {
     backgroundColor: 'rgba(224, 106, 92, 0.10)',
@@ -1155,6 +1194,9 @@ const styles = StyleSheet.create({
   },
   discordPanel: {
     borderColor: 'rgba(108, 199, 255, 0.28)',
+    flexBasis: 280,
+    flexGrow: 1,
+    minWidth: 0,
   },
   discordStep: {
     backgroundColor: 'rgba(108, 199, 255, 0.08)',
@@ -1163,6 +1205,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexBasis: 180,
     flexGrow: 1,
+    minWidth: 0,
     padding: 12,
   },
   discordStepLabel: {
@@ -1254,6 +1297,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.28)',
     flexBasis: 280,
     flexGrow: 1,
+    minWidth: 0,
   },
   quickTitle: {
     color: '#F4EFE6',
