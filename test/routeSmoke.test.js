@@ -142,6 +142,8 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextScreenSource, /stickyActions=\{false\}/);
   assert.match(nextScreenSource, /Starts in/);
   assert.match(nextScreenSource, /Signed up players/);
+  assert.match(nextScreenSource, /Twitch viewer shortcut/);
+  assert.match(nextScreenSource, /NEXT_CHAT_COMMANDS/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
 });

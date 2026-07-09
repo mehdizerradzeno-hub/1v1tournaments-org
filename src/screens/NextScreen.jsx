@@ -26,6 +26,12 @@ import {
 } from '../lib/tournamentHostingClient.js';
 
 const DEFAULT_ROSTER_CAP = 8;
+const NEXT_CHAT_COMMANDS = [
+  { command: '!join', label: 'Signup' },
+  { command: '!match', label: 'Match' },
+  { command: '!rules', label: 'Rules' },
+  { command: '!discord', label: 'Discord' },
+];
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -311,6 +317,21 @@ function NextLobbyHero({
         </View>
       </View>
 
+      <View style={styles.shortcutStrip}>
+        <View style={styles.shortcutCopy}>
+          <Text style={styles.shortcutLabel}>Twitch viewer shortcut</Text>
+          <Text style={styles.shortcutTitle}>Join, check your match, or grab links from chat.</Text>
+        </View>
+        <View style={styles.shortcutCommands}>
+          {NEXT_CHAT_COMMANDS.map((item) => (
+            <View key={item.command} style={styles.shortcutCommand}>
+              <Text selectable style={styles.shortcutCommandText}>{item.command}</Text>
+              <Text style={styles.shortcutCommandLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
       <View style={styles.metricGrid}>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Starts in</Text>
@@ -540,5 +561,65 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 22,
+  },
+  shortcutCommand: {
+    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+    borderColor: 'rgba(108, 199, 255, 0.22)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 96,
+    flexGrow: 1,
+    minHeight: 62,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  shortcutCommandLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  shortcutCommands: {
+    flex: 1.1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    minWidth: 230,
+  },
+  shortcutCommandText: {
+    color: '#6CC7FF',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+  },
+  shortcutCopy: {
+    flex: 1,
+    minWidth: 210,
+  },
+  shortcutLabel: {
+    color: '#6CC7FF',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  shortcutStrip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(108, 199, 255, 0.06)',
+    borderColor: 'rgba(108, 199, 255, 0.18)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 16,
+    padding: 12,
+  },
+  shortcutTitle: {
+    color: '#F4EFE6',
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 23,
+    marginTop: 4,
   },
 });
