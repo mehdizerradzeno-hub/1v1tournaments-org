@@ -196,6 +196,28 @@ export async function saveTournamentEvent({ token, tournament }) {
   return result;
 }
 
+export async function deleteTournamentEvent({ token, slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${EVENTS_ENDPOINT}${query}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'delete',
+      tournamentSlug: slug,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Tournament event could not be deleted.');
+  }
+
+  return result;
+}
+
 export async function saveTournamentSettings({ token, slug, settings }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${SETTINGS_ENDPOINT}${query}`, {

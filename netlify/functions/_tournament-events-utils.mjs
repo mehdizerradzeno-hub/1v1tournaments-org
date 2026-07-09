@@ -65,6 +65,21 @@ export async function loadHostedTournament(tournamentSlug) {
   return store.get(eventKey(slug), { type: 'json' });
 }
 
+export async function deleteHostedTournament(tournamentSlug) {
+  const slug = cleanText(tournamentSlug);
+
+  if (!slug) {
+    return false;
+  }
+
+  const store = getStoreWithFallback(STORE_NAME);
+  const existing = await store.get(eventKey(slug), { type: 'json' });
+
+  await store.delete(eventKey(slug));
+
+  return Boolean(existing);
+}
+
 export async function saveHostedTournament(tournament, account = null) {
   const store = getStoreWithFallback(STORE_NAME);
   const updatedAt = new Date().toISOString();

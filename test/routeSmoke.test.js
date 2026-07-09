@@ -229,6 +229,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /fetchTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentEvents/);
   assert.match(hostingClientSource, /saveTournamentEvent/);
+  assert.match(hostingClientSource, /deleteTournamentEvent/);
   assert.match(hostingClientSource, /saveTournamentSettings/);
   assert.match(hostingClientSource, /resetTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
@@ -268,8 +269,9 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Host checklist/);
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
   assert.match(adminScreenSource, /Reset tournament/);
-  assert.match(adminScreenSource, /Clear signups \+ bracket/);
-  assert.match(adminScreenSource, /Yes, clear signups \+ bracket/);
+  assert.match(adminScreenSource, /Clear tournament/);
+  assert.match(adminScreenSource, /Yes, clear tournament/);
+  assert.match(adminScreenSource, /deleteTournamentEvent/);
   assert.match(adminScreenSource, /Post tournament/);
   assert.match(adminScreenSource, /Save event/);
   assert.match(adminScreenSource, /New tournament/);

@@ -3,6 +3,7 @@ import { connectLambda } from '@netlify/blobs';
 import { cleanText } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
 import {
+  deleteHostedTournament,
   listHostedTournaments,
   loadHostedTournament,
   normalizeHostedTournament,
@@ -75,8 +76,31 @@ export async function handler(event) {
     return json(400, { error: 'Tournament event payload must be valid JSON.' });
   }
 
-  if (!['save', 'upsert', undefined].includes(payload.action)) {
+  if (!['delete', 'save', 'upsert', undefined].includes(payload.action)) {
     return json(400, { error: 'Choose a supported tournament event action.' });
+  }
+
+  if (payload.action === 'delete') {
+    const tournamentSlug = cleanText(requestedSlug || payload.tournamentSlug || payload.slug);
+
+    if (!tournamentSlug) {
+      return json(400, { error: 'Choose a tournament before deleting it.' });
+    }
+
+    try {
+      const deleted = await deleteHostedTournament(tournamentSlug);
+
+      return json(200, {
+        ok: true,
+        deleted,
+        hostAuth: adminCheck.method,
+        tournamentSlug,
+        tournaments: await listHostedTournaments(),
+      });
+    } catch (error) {
+      console.error('Tournament event delete failed', error);
+      return json(500, { error: 'Tournament event storage is not available yet.' });
+    }
   }
 
   const tournament = normalizeHostedTournament(payload.tournament || payload);

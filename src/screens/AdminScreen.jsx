@@ -30,6 +30,7 @@ import {
 } from '../lib/tournamentSettings.js';
 import {
   clearTournamentData,
+  deleteTournamentEvent,
   fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentEvents,
@@ -1095,9 +1096,9 @@ export default function AdminScreen() {
             <View style={styles.resetDangerHeader}>
               <Badge tone="rose">Reset tournament</Badge>
               <View style={styles.resetDangerCopy}>
-                <Text style={styles.resetDangerTitle}>Clear signups + bracket for this event</Text>
+                <Text style={styles.resetDangerTitle}>Clear this tournament</Text>
                 <Text style={styles.resetDangerBody}>
-                  Use this when you want a clean roster for new applicants. It keeps player accounts and the public tournament page.
+                  Use this when you want to remove a test event like tourney7. It deletes signups, bracket, schedule override, and any hosted event record. Player accounts are kept.
                 </Text>
               </View>
             </View>
@@ -1109,7 +1110,7 @@ export default function AdminScreen() {
                 </Text>
                 <View style={styles.buttonRow}>
                   <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                    {clearLoading ? 'Clearing...' : 'Yes, clear signups + bracket'}
+                    {clearLoading ? 'Clearing...' : 'Yes, clear tournament'}
                   </ActionButton>
                   <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                     Cancel
@@ -1119,7 +1120,7 @@ export default function AdminScreen() {
             ) : (
               <View style={styles.buttonRow}>
                 <ActionButton disabled={!hasHostCredential || clearLoading} onPress={handleRequestClearTournamentData} variant="danger">
-                  Clear signups + bracket
+                  Clear tournament
                 </ActionButton>
               </View>
             )}
@@ -1297,16 +1298,53 @@ export default function AdminScreen() {
 
     try {
       const result = await clearTournamentData({ token, slug: rosterSlug });
+      const [settingsResult, eventResult] = await Promise.allSettled([
+        resetTournamentSettings({ token, slug: rosterSlug }),
+        deleteTournamentEvent({ token, slug: rosterSlug }),
+      ]);
       const emptyRoster = result.rosters?.[0] || { tournamentSlug: rosterSlug, signups: [] };
       const deletedSignupCount = result.deletedSignupCount || 0;
+      const deletedHostedEvent = eventResult.status === 'fulfilled' ? Boolean(eventResult.value.deleted) : false;
+      const nextHostedTournaments = eventResult.status === 'fulfilled'
+        ? eventResult.value.tournaments || []
+        : hostedTournaments.filter((tournament) => tournament.slug !== rosterSlug);
 
       setRosters([emptyRoster]);
       setBracket(null);
+      setScheduleSettings(null);
+      setHostedTournaments(nextHostedTournaments);
       setClearConfirmOpen(false);
       setRosterLastRefreshedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       setRosterFeedback(`Roster cleared: ${deletedSignupCount} registered player${deletedSignupCount === 1 ? '' : 's'} removed.`, '');
       setBracketFeedback('Bracket cleared for this tournament.', '');
-      setHostFeedback('Tournament test data cleared. Player accounts were kept.', '');
+      setScheduleFeedback(
+        settingsResult.status === 'fulfilled'
+          ? 'Schedule override cleared for this tournament.'
+          : '',
+        settingsResult.status === 'rejected'
+          ? settingsResult.reason instanceof Error
+            ? settingsResult.reason.message
+            : 'Could not clear schedule override.'
+          : '',
+      );
+      setEventFeedback(
+        eventResult.status === 'fulfilled'
+          ? deletedHostedEvent
+            ? 'Hosted event record deleted.'
+            : 'No hosted event record existed for this slug.'
+          : '',
+        eventResult.status === 'rejected'
+          ? eventResult.reason instanceof Error
+            ? eventResult.reason.message
+            : 'Could not delete hosted event record.'
+          : '',
+      );
+      setHostFeedback(
+        deletedHostedEvent
+          ? 'Tournament cleared, including hosted event record. Player accounts were kept.'
+          : 'Tournament data cleared. No hosted event record existed for this slug. Player accounts were kept.',
+        '',
+      );
     } catch (error) {
       setHostFeedback('', error instanceof Error ? error.message : 'Could not clear tournament test data.');
     } finally {
