@@ -59,6 +59,32 @@ function buildGoLiveChecklist({ hasDiscord, hasTwitch }) {
   ];
 }
 
+const RUN_OF_SHOW = [
+  {
+    title: 'Before live',
+    items: ['Open Twitch Studio or OBS.', 'Add full overlay as a browser source.', 'Open /next and confirm signup count.', 'Post the short announcement.'],
+  },
+  {
+    title: 'Bracket launch',
+    items: ['Switch to bracket overlay.', 'Confirm the tournament page shows bracket live.', 'Tell players to use My match.', 'Keep /live open for links.'],
+  },
+  {
+    title: 'During matches',
+    items: ['Use compact overlay on gameplay scene.', 'Refresh spectator table if a table changes.', 'Announce the next match from bracket overlay.', 'Watch roster and match status update automatically.'],
+  },
+  {
+    title: 'After final',
+    items: ['Switch back to full overlay.', 'Call out champion and final result.', 'Send viewers to Results.', 'Keep replay/archive links on /live.'],
+  },
+];
+
+const OBS_SCENES = [
+  { scene: 'Starting soon', source: 'Full overlay', url: '/overlay', size: '1280 x 360' },
+  { scene: 'Gameplay', source: 'Compact overlay', url: '/overlay/compact', size: '1280 x 170' },
+  { scene: 'Bracket break', source: 'Bracket overlay', url: '/overlay/bracket', size: '1100 x 260' },
+  { scene: 'Intermission', source: 'Live hub', url: '/live', size: 'Browser window' },
+];
+
 export default function LiveScreen() {
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
@@ -127,6 +153,14 @@ export default function LiveScreen() {
 
       <Section description="Automated stream-day readiness check for what can be handled from this site." title="Go-live checklist">
         <GoLiveChecklist items={buildGoLiveChecklist({ hasDiscord, hasTwitch })} />
+      </Section>
+
+      <Section description="A practical operator flow for running the tournament stream." title="Run of show">
+        <RunOfShow items={RUN_OF_SHOW} />
+      </Section>
+
+      <Section description="Recommended OBS scenes and browser sources." title="OBS scene map">
+        <ObsSceneMap items={OBS_SCENES} />
       </Section>
 
       <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
@@ -341,6 +375,53 @@ function GoLiveChecklist({ items }) {
         Clipboard buttons use the browser clipboard when available. Overlays, the next-event lobby, and tournament pages refresh live data automatically.
       </Text>
     </Surface>
+  );
+}
+
+function RunOfShow({ items }) {
+  return (
+    <View style={styles.runGrid}>
+      {items.map((section, sectionIndex) => (
+        <Surface key={section.title} style={styles.runCard}>
+          <View style={styles.runCardTop}>
+            <View style={styles.runNumber}>
+              <Text style={styles.runNumberText}>{sectionIndex + 1}</Text>
+            </View>
+            <Text style={styles.runTitle}>{section.title}</Text>
+          </View>
+          <View style={styles.runSteps}>
+            {section.items.map((item) => (
+              <View key={item} style={styles.runStep}>
+                <View style={styles.runStepDot} />
+                <Text style={styles.runStepText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        </Surface>
+      ))}
+    </View>
+  );
+}
+
+function ObsSceneMap({ items }) {
+  return (
+    <View style={styles.sceneGrid}>
+      {items.map((item) => {
+        const url = item.url.startsWith('/') ? absoluteSiteUrl(item.url) : item.url;
+
+        return (
+          <Surface key={item.scene} style={styles.sceneCard}>
+            <Text style={styles.sceneLabel}>{item.scene}</Text>
+            <Text style={styles.sceneSource}>{item.source}</Text>
+            <View style={styles.sceneUrlBox}>
+              <Text selectable style={styles.sceneUrl}>{url}</Text>
+              <CopyAction label="Copy URL" text={url} />
+            </View>
+            <Text style={styles.sceneSize}>{item.size}</Text>
+          </Surface>
+        );
+      })}
+    </View>
   );
 }
 
@@ -758,5 +839,112 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 18,
     marginTop: 3,
+  },
+  runCard: {
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    flexBasis: 260,
+    flexGrow: 1,
+  },
+  runCardTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  runGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  runNumber: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.16)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  runNumberText: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  runStep: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  runStepDot: {
+    backgroundColor: '#61D291',
+    borderRadius: 999,
+    height: 7,
+    marginTop: 7,
+    width: 7,
+  },
+  runSteps: {
+    gap: 8,
+    marginTop: 14,
+  },
+  runStepText: {
+    color: '#AAB4AE',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  runTitle: {
+    color: '#F4EFE6',
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 25,
+  },
+  sceneCard: {
+    borderColor: 'rgba(97, 210, 145, 0.22)',
+    flexBasis: 245,
+    flexGrow: 1,
+  },
+  sceneGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  sceneLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  sceneSize: {
+    color: '#61D291',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+    marginTop: 10,
+    textTransform: 'uppercase',
+  },
+  sceneSource: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+    marginTop: 6,
+  },
+  sceneUrl: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  sceneUrlBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 10,
+    padding: 10,
   },
 });
