@@ -132,6 +132,32 @@ function heroSignupAction(status, checkInPath, tournamentPath) {
   return { label: 'View roster', href: `${tournamentPath}#registered-players` };
 }
 
+function getOpenSeats(count, size) {
+  return Math.max(size - count, 0);
+}
+
+function getNextPublicMatch(bracket) {
+  const rounds = bracket?.rounds || [];
+  const matches = rounds.flatMap((round) => round.matches || []);
+
+  return matches.find((match) => match.status === 'ready' || match.status === 'active')
+    || matches.find((match) => !match.winnerName && match.status !== 'final')
+    || matches[0]
+    || null;
+}
+
+function matchPlayersLabel(match) {
+  const players = match?.players?.map(playerLabel).filter(Boolean) || [];
+
+  if (players.length) {
+    return players.join(' vs ');
+  }
+
+  const teams = match?.teams || [];
+
+  return teams.length ? teams.join(' vs ') : 'Players appear after seeding';
+}
+
 export default function TournamentScreen({ slug }) {
   const [liveBracket, setLiveBracket] = useState(null);
   const [bracketState, setBracketState] = useState({ loading: true, error: '' });
@@ -364,6 +390,20 @@ export default function TournamentScreen({ slug }) {
           : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
       }
       title={visibleTournament.title}>
+      <TournamentLobbyHero
+        advertisedRosterCap={advertisedRosterCap}
+        checkInPath={checkInPath}
+        isBracketLive={isBracketLive}
+        liveBracket={liveBracket}
+        matchStatusPath={matchStatusPath}
+        playerHasReadyMatch={playerHasReadyMatch}
+        registrationMeta={registrationMeta}
+        signupSummary={signupSummary}
+        streams={streams}
+        tournament={visibleTournament}
+        tournamentPath={tournamentPath}
+      />
+
       <Section
         description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
         nativeID="my-match"
@@ -571,6 +611,102 @@ export default function TournamentScreen({ slug }) {
         )}
       </Section>
     </HubScreen>
+  );
+}
+
+function TournamentLobbyHero({
+  advertisedRosterCap,
+  checkInPath,
+  isBracketLive,
+  liveBracket,
+  matchStatusPath,
+  playerHasReadyMatch,
+  registrationMeta,
+  signupSummary,
+  streams,
+  tournament,
+  tournamentPath,
+}) {
+  const signups = signupSummary.signups || [];
+  const signupCount = signupSummary.loading ? '--' : String(signupSummary.count);
+  const openSeats = signupSummary.loading ? '--' : String(getOpenSeats(signupSummary.count, advertisedRosterCap));
+  const nextMatch = getNextPublicMatch(liveBracket);
+  const primaryAction = playerHasReadyMatch
+    ? { label: 'Play my match', href: matchStatusPath }
+    : isBracketLive
+      ? { label: 'Find my match', href: matchStatusPath }
+      : registrationMeta.value === 'open'
+        ? { label: 'Join tournament', href: checkInPath }
+        : { label: 'View tournament', href: tournamentPath };
+
+  return (
+    <Surface style={styles.lobbyCard}>
+      <View pointerEvents="none" style={styles.lobbyGlow} />
+      <View style={styles.lobbyTopRow}>
+        <View style={styles.lobbyCopy}>
+          <View style={styles.lobbyBadgeRow}>
+            <Badge tone={liveBracket ? 'green' : registrationMeta.tone}>
+              {liveBracket ? 'Bracket live' : registrationMeta.label}
+            </Badge>
+            <Text style={styles.lobbyDate}>
+              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+            </Text>
+          </View>
+          <Text style={styles.lobbyTitle}>Tournament lobby</Text>
+          <Text style={styles.lobbySummary}>
+            {tournament.format} • {tournament.location} • {tournament.entryLine}
+          </Text>
+        </View>
+        <View style={styles.lobbyActions}>
+          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
+          <ActionButton href={matchStatusPath} variant="secondary">My match</ActionButton>
+          {streams.length ? <ActionButton href="/live" variant="secondary">Watch live</ActionButton> : null}
+        </View>
+      </View>
+
+      <View style={styles.lobbyGrid}>
+        <View style={styles.lobbyMetric}>
+          <Text style={styles.lobbyMetricLabel}>Signed up</Text>
+          <Text style={styles.lobbyMetricValue}>
+            {signupCount}
+            <Text style={styles.lobbyMetricSub}> / {advertisedRosterCap}</Text>
+          </Text>
+        </View>
+        <View style={styles.lobbyMetric}>
+          <Text style={styles.lobbyMetricLabel}>Open seats</Text>
+          <Text style={styles.lobbyMetricValue}>{openSeats}</Text>
+        </View>
+        <View style={[styles.lobbyMetric, styles.lobbyMatchMetric]}>
+          <Text style={styles.lobbyMetricLabel}>{nextMatch ? nextMatch.label || 'Up next' : 'Match focus'}</Text>
+          <Text numberOfLines={1} style={styles.lobbyMatchText}>
+            {nextMatch ? matchPlayersLabel(nextMatch) : 'Waiting for seeding'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.lobbyRosterPreview}>
+        <View style={styles.lobbyRosterHeader}>
+          <Text style={styles.lobbyRosterTitle}>Who is in</Text>
+          <Text style={styles.lobbyRosterMeta}>
+            {signupSummary.loading ? 'Loading roster' : `${signups.length} visible`}
+          </Text>
+        </View>
+        <View style={styles.lobbyRosterChips}>
+          {signupSummary.loading ? (
+            <Text style={styles.lobbyEmpty}>Loading players...</Text>
+          ) : signups.length ? (
+            signups.slice(0, 8).map((signup, index) => (
+              <View key={signup.id || `${signup.playerName}-${index}`} style={styles.lobbyPlayerChip}>
+                <Text numberOfLines={1} style={styles.lobbyPlayerText}>{signup.playerName || 'Player'}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.lobbyEmpty}>No public signups yet. Keep the join link visible.</Text>
+          )}
+          {signups.length > 8 ? <Text style={styles.lobbyMore}>+{signups.length - 8} more</Text> : null}
+        </View>
+      </View>
+    </Surface>
   );
 }
 
@@ -996,6 +1132,170 @@ function LiveBracketBoard({ bracket }) {
 }
 
 const styles = StyleSheet.create({
+  lobbyCard: {
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  lobbyGlow: {
+    backgroundColor: 'rgba(214, 162, 78, 0.16)',
+    borderRadius: 180,
+    height: 260,
+    position: 'absolute',
+    right: -110,
+    top: -130,
+    width: 260,
+  },
+  lobbyTopRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+  },
+  lobbyCopy: {
+    flex: 1.3,
+    minWidth: 260,
+  },
+  lobbyBadgeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  lobbyDate: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+    textTransform: 'uppercase',
+  },
+  lobbyTitle: {
+    color: '#F4EFE6',
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 39,
+  },
+  lobbySummary: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
+    marginTop: 8,
+  },
+  lobbyActions: {
+    alignContent: 'flex-start',
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 235,
+  },
+  lobbyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  lobbyMetric: {
+    backgroundColor: 'rgba(5, 11, 10, 0.58)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexGrow: 1,
+    flexBasis: 150,
+    minHeight: 96,
+    padding: 14,
+  },
+  lobbyMatchMetric: {
+    backgroundColor: 'rgba(97, 210, 145, 0.09)',
+    borderColor: 'rgba(97, 210, 145, 0.24)',
+    flexBasis: 260,
+  },
+  lobbyMetricLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  lobbyMetricValue: {
+    color: '#F4EFE6',
+    fontSize: 31,
+    fontWeight: '900',
+    lineHeight: 36,
+    marginTop: 7,
+  },
+  lobbyMetricSub: {
+    color: '#AAB4AE',
+    fontSize: 18,
+  },
+  lobbyMatchText: {
+    color: '#F4EFE6',
+    fontSize: 21,
+    fontWeight: '900',
+    lineHeight: 27,
+    marginTop: 8,
+  },
+  lobbyRosterPreview: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 14,
+  },
+  lobbyRosterHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  lobbyRosterTitle: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  lobbyRosterMeta: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  lobbyRosterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  lobbyPlayerChip: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 180,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  lobbyPlayerText: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  lobbyEmpty: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  lobbyMore: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '900',
+    paddingVertical: 8,
+  },
   dashboardCard: {
     borderColor: 'rgba(214, 162, 78, 0.34)',
     backgroundColor: 'rgba(8, 25, 21, 0.92)',
