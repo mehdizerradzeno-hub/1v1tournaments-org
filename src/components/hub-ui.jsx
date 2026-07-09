@@ -569,6 +569,7 @@ export function HubScreen({
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
+  const showTinyHeader = width > 0 && width < 390;
   const showStickyActions = pathname !== '/admin';
   const showStickyActionCopy = width >= 430;
 
@@ -632,13 +633,13 @@ export function HubScreen({
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
-            <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop]}>
+            <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
               <Link href="/" asChild>
-                <Pressable accessibilityRole="link" style={styles.brandLink}>
+                <Pressable accessibilityRole="link" style={showTinyHeader ? styles.brandLinkTiny : styles.brandLink}>
                   <View style={styles.brandMark}>
                     <Text style={styles.brandMarkText}>1v1</Text>
                   </View>
-                  <View style={styles.brandCopy}>
+                  <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
                     <Text style={styles.brandTitle}>1v1 Tournaments</Text>
                     <Text style={styles.brandDomain}>Free-entry Spades events</Text>
                   </View>
@@ -848,11 +849,23 @@ const styles = StyleSheet.create({
   brandRowLaptop: {
     marginBottom: 10,
   },
+  brandRowTiny: {
+    flexWrap: 'nowrap',
+    gap: 8,
+    padding: 8,
+  },
   brandLink: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     flexShrink: 1,
+    minWidth: 0,
+  },
+  brandLinkTiny: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 0,
+    flexShrink: 0,
     minWidth: 0,
   },
   brandMark: {
@@ -877,6 +890,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     marginLeft: 12,
+  },
+  brandCopyTiny: {
+    display: 'none',
   },
   brandTitle: {
     color: theme.colors.text,

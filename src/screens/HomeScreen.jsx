@@ -6,14 +6,11 @@ import {
   Badge,
   GameCard,
   HubScreen,
-  QuickActionCard,
   ResultCard,
   Section,
-  StepStrip,
   StreamCard,
   StatPill,
   Surface,
-  TournamentCard,
   EmptyState,
   BulletList,
 } from '../components/hub-ui.jsx';
@@ -45,15 +42,6 @@ const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
 const APP_STORE_BADGE_WIDTH = 178;
 const APP_STORE_BADGE_HEIGHT = 53;
-
-const PLAYER_FLOW_STEPS = [
-  { title: 'Create account', body: 'One player account keeps your signup and match seat tied to you.' },
-  { title: 'Sign up', body: 'Join the tournament roster before the host seeds the bracket.' },
-  { title: 'Reminder window', body: 'Thirty minutes before start is the right time for an opt-in email reminder.' },
-  { title: 'Join game', body: 'Use My match to open your assigned Spades table.' },
-  { title: 'Play game', body: 'Finish the match in Spades while the hub keeps the bracket.' },
-  { title: 'See results', body: 'Return to the hub for the updated bracket and winner status.' },
-];
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -302,6 +290,16 @@ export default function HomeScreen() {
       showHero={false}
       subtitle="Free-entry Spades tournaments with account-based signup, hosted brackets, and clear match links."
       title={siteData.site.name}>
+      <HomepageFrontDoor
+        bracket={featuredBracket}
+        matchStatusPath={featuredMatchStatusPath}
+        registrationMeta={featuredRegistrationMeta}
+        signupPath={featuredSignupPath}
+        signupSummary={featuredSignupSummary}
+        tournament={featuredTournament}
+        tournamentPath={featuredTournamentPath}
+      />
+
       <PremiumCountdownHero
         bracket={featuredBracket}
         countdown={featuredCountdown}
@@ -343,77 +341,6 @@ export default function HomeScreen() {
           nowMs={nowMs}
           tournaments={hydratedUpcoming}
         />
-      </Section>
-
-      <Section
-        description="The event page holds roster, bracket, match status, live table, rules, and results."
-        title="Tournament hub">
-        {featuredTournament ? (
-          <View style={styles.hubTournamentCard}>
-            <TournamentCard
-              gameName={gameLookup.get(featuredTournament.gameSlug)?.name || featuredTournament.gameSlug}
-              href={featuredTournamentPath}
-              tournament={featuredTournament}
-            />
-          </View>
-        ) : null}
-      </Section>
-
-      <Section
-        description="What the current bracket system can handle, and what I recommend for launch."
-        title="Tournament sizes">
-        <TournamentCapacityPanel />
-      </Section>
-
-      <Section description="The whole player path, in order." title="How to play">
-        <StepStrip steps={PLAYER_FLOW_STEPS} />
-      </Section>
-
-      <Section
-        description="The main player links stay here if someone scrolls past the countdown."
-        title="Quick actions">
-        <View style={styles.quickGrid}>
-          <QuickActionCard
-            actionLabel="Create account"
-            body="Create or open your player account, then reserve your spot before the bracket is seeded."
-            href={featuredSignupPath}
-            meta="Player"
-            title="Sign up"
-            tone="green"
-          />
-          <QuickActionCard
-            actionLabel={featuredBracket ? 'Find table' : 'Check status'}
-            body={featuredBracket ? 'Open your current tournament status and assigned match.' : 'After signup, this shows whether you are waiting, matched, or ready.'}
-            href={featuredMatchStatusPath}
-            meta="Player"
-            title="My match"
-            tone="green"
-          />
-          <QuickActionCard
-            actionLabel="See bracket"
-            body="Open the event page for the roster, bracket, match links, stream, rules, and results."
-            href={featuredTournamentPath}
-            meta="Event"
-            title="Tournament page"
-            tone="accent"
-          />
-          <QuickActionCard
-            actionLabel="View ranks"
-            body="See tournament-only standings for hosted events, separate from the Spades in-game leaderboard."
-            href="/leaderboard"
-            meta="Rankings"
-            title="Tournament leaderboard"
-            tone="accent"
-          />
-          <QuickActionCard
-            actionLabel="Watch table"
-            body="Open the spectator table for the current Spades match."
-            href="/live"
-            meta="Spectator"
-            title="Watch live"
-            tone="blue"
-          />
-        </View>
       </Section>
 
       {spades ? (
@@ -680,6 +607,116 @@ function PremiumDownloadSection() {
         </View>
       </Section>
     </>
+  );
+}
+
+function HomepageFrontDoor({
+  bracket,
+  matchStatusPath,
+  registrationMeta,
+  signupPath,
+  signupSummary,
+  tournament,
+  tournamentPath,
+}) {
+  if (!tournament) {
+    return null;
+  }
+
+  const signups = signupSummary.signups || [];
+  const cap = getRosterCap(tournament);
+  const registeredCount = signupSummary.count || signups.length || 0;
+  const signupLoading = Boolean(signupSummary.loading);
+  const registrationOpen = registrationMeta.value === 'open';
+  const bracketLive = Boolean(bracket);
+  const joinHref = registrationOpen ? signupPath : tournamentPath;
+  const joinLabel = registrationOpen ? 'Join now' : 'View event';
+  const joinBody = registrationOpen
+    ? 'Create or open your tournament account and reserve your seat.'
+    : 'Registration is not open, but the event page still shows schedule, roster, and rules.';
+
+  return (
+    <Section
+      description="The homepage now points visitors to the three places they need most on stream day."
+      eyebrow="Start here"
+      nativeID="start-here"
+      title="Choose your next move">
+      <Surface style={styles.frontDoorShell}>
+        <View style={styles.frontDoorHeader}>
+          <View style={styles.frontDoorTitleBlock}>
+            <Badge tone={bracketLive ? 'green' : registrationMeta.tone}>
+              {bracketLive ? 'Bracket live' : registrationMeta.label}
+            </Badge>
+            <Text style={styles.frontDoorTitle}>{tournament.title}</Text>
+            <Text style={styles.frontDoorMeta}>
+              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+            </Text>
+          </View>
+          <View style={styles.frontDoorCountTile}>
+            <Text style={styles.frontDoorCountLabel}>Signed up</Text>
+            <Text style={styles.frontDoorCountValue}>
+              {signupLoading ? '--' : registeredCount}
+              <Text style={styles.frontDoorCountCap}> / {cap}</Text>
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.frontDoorGrid}>
+          <FrontDoorCard
+            actionLabel="Open next tournament"
+            body="See time, roster, bracket, rules, results, and match status in one event page."
+            href={tournamentPath}
+            meta="Next"
+            title="Next tournament"
+            tone="accent"
+          />
+          <FrontDoorCard
+            actionLabel="Watch live"
+            body="Open the live command page with the spectator table, Twitch link, and stream-day links."
+            href="/live"
+            meta="Stream"
+            title="Watch live"
+            tone="blue"
+          />
+          <FrontDoorCard
+            actionLabel={joinLabel}
+            body={joinBody}
+            href={joinHref}
+            meta="Player"
+            title="Join tournament"
+            tone="green"
+          />
+        </View>
+
+        <View style={styles.frontDoorSecondaryRow}>
+          <ActionButton href={matchStatusPath} variant="secondary">
+            My match
+          </ActionButton>
+          <ActionButton href="/next" variant="secondary">
+            Compact lobby
+          </ActionButton>
+          <ActionButton href="/leaderboard" variant="secondary">
+            Tournament leaderboard
+          </ActionButton>
+          <ActionButton href="/rules" variant="secondary">
+            Rules
+          </ActionButton>
+        </View>
+      </Surface>
+    </Section>
+  );
+}
+
+function FrontDoorCard({ actionLabel, body, href, meta, title, tone }) {
+  return (
+    <Surface style={[styles.frontDoorCard, styles[`frontDoorCard${tone[0].toUpperCase()}${tone.slice(1)}`]]}>
+      <Text style={styles.frontDoorCardMeta}>{meta}</Text>
+      <Text style={styles.frontDoorCardTitle}>{title}</Text>
+      <Text style={styles.frontDoorCardBody}>{body}</Text>
+      <ActionButton href={href} style={styles.frontDoorCardAction}>
+        {actionLabel}
+      </ActionButton>
+    </Surface>
   );
 }
 
@@ -1038,40 +1075,141 @@ function UpcomingRosterPreview({ loading, signups }) {
   );
 }
 
-function TournamentCapacityPanel() {
-  return (
-    <Surface style={styles.capacityPanel}>
-      <View style={styles.capacityTopRow}>
-        <View style={styles.capacityCopy}>
-          <Badge tone="green">Recommended setup</Badge>
-          <Text style={styles.capacityTitle}>Advertise a fixed size. Run the real bracket flexibly.</Text>
-          <Text style={styles.capacityBody}>
-            Show a clear target like 8-player bracket so players know what they are joining.
-            The host can still run with 2+ players, and the bracket fills open seats with automatic byes.
-          </Text>
-        </View>
-        <View style={styles.capacityStats}>
-          <StatPill label="Default cap" value="8" tone="green" />
-          <StatPill label="Quick cup" value="4" tone="accent" />
-          <StatPill label="Minimum" value="2" tone="blue" />
-          <StatPill label="Byes" value="Auto" tone="green" />
-        </View>
-      </View>
-      <BulletList
-        items={[
-          'Recommended launch default: advertise 8 seats and show registered players as 2 / 8, 5 / 8, and so on.',
-          'If the event underfills, run the actual bracket with the players who joined and use byes.',
-          'If the event overfills, close signups, waitlist extras, or spin up another bracket.',
-        ]}
-        tone="green"
-      />
-    </Surface>
-  );
-}
-
 const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
+  },
+  frontDoorShell: {
+    backgroundColor: '#07110F',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    borderRadius: 22,
+    overflow: 'hidden',
+    padding: 16,
+  },
+  frontDoorHeader: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  frontDoorTitleBlock: {
+    flex: 1,
+    minWidth: 260,
+  },
+  frontDoorTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 36,
+    marginTop: 10,
+  },
+  frontDoorMeta: {
+    color: '#FFD66B',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    lineHeight: 18,
+    marginTop: 6,
+    textTransform: 'uppercase',
+  },
+  frontDoorCountTile: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 104,
+    minWidth: 168,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  frontDoorCountLabel: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  frontDoorCountValue: {
+    color: '#FFD66B',
+    fontFamily: 'monospace',
+    fontSize: 38,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 44,
+    marginTop: 4,
+  },
+  frontDoorCountCap: {
+    color: '#F4EFE6',
+    fontSize: 18,
+  },
+  frontDoorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  frontDoorCard: {
+    backgroundColor: 'rgba(17, 29, 26, 0.88)',
+    borderColor: 'rgba(244, 239, 230, 0.14)',
+    borderRadius: 18,
+    flexBasis: 250,
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    minHeight: 238,
+    minWidth: 0,
+    padding: 16,
+  },
+  frontDoorCardAccent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.11)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
+  frontDoorCardBlue: {
+    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+    borderColor: 'rgba(108, 199, 255, 0.36)',
+  },
+  frontDoorCardGreen: {
+    backgroundColor: 'rgba(97, 210, 145, 0.10)',
+    borderColor: 'rgba(97, 210, 145, 0.36)',
+  },
+  frontDoorCardMeta: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  frontDoorCardTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 29,
+    marginTop: 8,
+  },
+  frontDoorCardBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  frontDoorCardAction: {
+    marginTop: 16,
+  },
+  frontDoorSecondaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
   },
   twitchBoard: {
     backgroundColor: '#06100E',
@@ -1445,11 +1583,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 8,
   },
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginRight: -12,
-  },
   premiumHero: {
     backgroundColor: '#07110F',
     borderColor: 'rgba(214, 162, 78, 0.34)',
@@ -1756,9 +1889,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 3,
   },
-  hubTournamentCard: {
-    marginTop: 14,
-  },
   scheduleSummaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1917,39 +2047,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     minWidth: 220,
-  },
-  capacityPanel: {
-    borderColor: 'rgba(97, 210, 145, 0.28)',
-  },
-  capacityTopRow: {
-    alignItems: 'stretch',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  capacityCopy: {
-    flex: 1,
-    minWidth: 260,
-  },
-  capacityTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
-    fontSize: 26,
-    fontWeight: '800',
-    lineHeight: 31,
-    marginTop: 10,
-  },
-  capacityBody: {
-    color: '#AAB4AE',
-    fontSize: 15,
-    lineHeight: 23,
-    marginTop: 8,
-  },
-  capacityStats: {
-    flexBasis: 340,
-    flexDirection: 'row',
-    flexGrow: 1,
-    flexWrap: 'wrap',
   },
   spadesSpotlight: {
     borderColor: 'rgba(214, 162, 78, 0.28)',

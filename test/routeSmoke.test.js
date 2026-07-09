@@ -79,6 +79,20 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
   assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
 });
 
+test('homepage stays focused on the stream-day front door', () => {
+  assert.ok(existsSync(homeScreenFile));
+
+  const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
+
+  assert.match(homeScreenSource, /HomepageFrontDoor/);
+  assert.match(homeScreenSource, /Choose your next move/);
+  assert.match(homeScreenSource, /Next tournament/);
+  assert.match(homeScreenSource, /Watch live/);
+  assert.match(homeScreenSource, /Join tournament/);
+  assert.match(homeScreenSource, /Compact lobby/);
+  assert.match(homeScreenSource, /TwitchTournamentBoard/);
+});
+
 test('/next stays wired to the public next-event lobby', () => {
   assert.ok(existsSync(nextRouteFile));
   assert.ok(existsSync(nextScreenFile));
@@ -264,7 +278,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
-  assert.match(homeScreenSource, /title="My match"/);
+  assert.match(homeScreenSource, /My match/);
   assert.match(homeScreenSource, /Tournament leaderboard/);
   assert.match(homeScreenSource, /mergeTournamentSettings/);
   assert.match(homeScreenSource, /fetchTournamentEvents/);
