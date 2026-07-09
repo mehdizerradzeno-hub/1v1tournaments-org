@@ -260,6 +260,7 @@ export default function NextScreen() {
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
+      showHero={false}
       subtitle={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
       stickyActions={false}
       title={tournament.title}>
@@ -296,26 +297,48 @@ function NextLobbyHero({
   const { width } = useWindowDimensions();
   const isPhone = width > 0 && width < 420;
   const signups = signupSummary.signups || [];
+  const signedUpValue = signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`;
+  const openSeatsValue = signupSummary.loading ? '--' : openSeats;
 
   return (
     <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
-      <View pointerEvents="none" style={styles.heroGlow} />
-      <View style={[styles.heroTop, isPhone && styles.heroTopPhone]}>
-        <View style={styles.heroCopy}>
-          <View style={styles.heroBadgeRow}>
-            <Badge tone={bracket ? 'green' : registrationMeta.tone}>
-              {bracket ? 'Bracket live' : registrationMeta.label}
-            </Badge>
-            <Text style={styles.heroDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
-          </View>
+      <View style={styles.heroBadgeRow}>
+        <Badge tone={bracket ? 'green' : registrationMeta.tone}>
+          {bracket ? 'Bracket live' : registrationMeta.label}
+        </Badge>
+        <Text style={styles.heroDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
+      </View>
+
+      <View style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
+        <View style={styles.countdownCopy}>
+          <Text style={styles.countdownLabel}>Starts in</Text>
+          <Text style={[styles.countdownValue, isPhone && styles.countdownValuePhone]}>{countdownLabel}</Text>
           <Text style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>Next tournament lobby</Text>
           <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
         </View>
         <View style={[styles.heroActions, isPhone && styles.heroActionsPhone]}>
           <ActionButton href={checkInPath}>{registrationMeta.value === 'open' ? 'Join now' : 'Open signup'}</ActionButton>
           <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">My match</ActionButton>
-          <ActionButton href={tournamentPath} variant="secondary">Tournament page</ActionButton>
-          <ActionButton href="/live" variant="secondary">Watch live</ActionButton>
+          <ActionButton href={tournamentPath} variant="secondary">Details</ActionButton>
+        </View>
+      </View>
+
+      <View style={[styles.metricGrid, isPhone && styles.metricGridPhone]}>
+        <View style={styles.metricTile}>
+          <Text style={styles.metricLabel}>Players</Text>
+          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signedUpValue}</Text>
+        </View>
+        <View style={styles.metricTile}>
+          <Text style={styles.metricLabel}>Open seats</Text>
+          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{openSeatsValue}</Text>
+        </View>
+        <View style={styles.metricTile}>
+          <Text style={styles.metricLabel}>Registration</Text>
+          <Text numberOfLines={1} style={styles.metricLink}>{registrationMeta.label}</Text>
+        </View>
+        <View style={[styles.metricTile, styles.metricWide]}>
+          <Text style={styles.metricLabel}>Next match</Text>
+          <Text numberOfLines={1} style={styles.metricLink}>{getNextMatchLabel(bracket)}</Text>
         </View>
       </View>
 
@@ -331,25 +354,6 @@ function NextLobbyHero({
               <Text style={styles.shortcutCommandLabel}>{item.label}</Text>
             </View>
           ))}
-        </View>
-      </View>
-
-      <View style={[styles.metricGrid, isPhone && styles.metricGridPhone]}>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Starts in</Text>
-          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{countdownLabel}</Text>
-        </View>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Signed up</Text>
-          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`}</Text>
-        </View>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Open seats</Text>
-          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signupSummary.loading ? '--' : openSeats}</Text>
-        </View>
-        <View style={[styles.metricTile, styles.metricWide]}>
-          <Text style={styles.metricLabel}>Next match</Text>
-          <Text numberOfLines={1} style={styles.metricLink}>{getNextMatchLabel(bracket)}</Text>
         </View>
       </View>
 
@@ -388,28 +392,64 @@ function NextLobbyHero({
 }
 
 const styles = StyleSheet.create({
-  heroActions: {
-    alignContent: 'flex-start',
-    flex: 1,
+  countdownCopy: {
+    flex: 1.3,
+    minWidth: 240,
+  },
+  countdownLabel: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  countdownPanel: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(5, 11, 10, 0.72)',
+    borderColor: 'rgba(214, 162, 78, 0.20)',
+    borderRadius: 16,
+    borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    minWidth: 235,
+    gap: 24,
+    justifyContent: 'space-between',
+    padding: 24,
+  },
+  countdownPanelPhone: {
+    gap: 16,
+    padding: 16,
+  },
+  countdownValue: {
+    color: '#F4EFE6',
+    fontSize: 64,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 70,
+    marginTop: 8,
+  },
+  countdownValuePhone: {
+    fontSize: 46,
+    lineHeight: 52,
+  },
+  heroActions: {
+    alignContent: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-end',
+    minWidth: 220,
   },
   heroActionsPhone: {
     flexBasis: '100%',
+    justifyContent: 'flex-start',
     minWidth: 0,
   },
   heroBadgeRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
-  },
-  heroCopy: {
-    flex: 1.4,
-    minWidth: 260,
+    gap: 8,
+    marginBottom: 16,
   },
   heroDate: {
     color: '#D6A24E',
@@ -417,15 +457,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 17,
     textTransform: 'uppercase',
-  },
-  heroGlow: {
-    backgroundColor: 'rgba(214, 162, 78, 0.16)',
-    borderRadius: 180,
-    height: 260,
-    position: 'absolute',
-    right: -110,
-    top: -130,
-    width: 260,
   },
   heroText: {
     color: '#AAB4AE',
@@ -440,26 +471,18 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#F4EFE6',
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 39,
+    lineHeight: 34,
+    marginTop: 4,
   },
   heroTitlePhone: {
-    fontSize: 28,
-    lineHeight: 32,
-  },
-  heroTop: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
-  },
-  heroTopPhone: {
-    gap: 14,
+    fontSize: 24,
+    lineHeight: 30,
   },
   lobbyHero: {
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
     marginBottom: 24,
     overflow: 'hidden',
   },
@@ -470,18 +493,17 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
-    marginTop: 14,
+    gap: 16,
+    marginTop: 16,
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 18,
+    gap: 8,
+    marginTop: 16,
   },
   metricGridPhone: {
     gap: 8,
-    marginTop: 14,
   },
   metricLabel: {
     color: '#AAB4AE',
@@ -491,28 +513,28 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   metricLink: {
-    color: '#D6A24E',
-    fontSize: 18,
+    color: '#F4EFE6',
+    fontSize: 17,
     fontWeight: '900',
-    lineHeight: 24,
+    lineHeight: 22,
     marginTop: 8,
   },
   metricTile: {
-    backgroundColor: 'rgba(5, 11, 10, 0.58)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 145,
     flexGrow: 1,
-    minHeight: 88,
-    padding: 14,
+    minHeight: 84,
+    padding: 16,
   },
   metricValue: {
     color: '#F4EFE6',
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 36,
-    marginTop: 6,
+    lineHeight: 34,
+    marginTop: 8,
   },
   metricValuePhone: {
     fontSize: 24,
@@ -591,8 +613,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   shortcutCommand: {
-    backgroundColor: 'rgba(108, 199, 255, 0.10)',
-    borderColor: 'rgba(108, 199, 255, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 96,
@@ -615,7 +637,7 @@ const styles = StyleSheet.create({
     minWidth: 230,
   },
   shortcutCommandText: {
-    color: '#6CC7FF',
+    color: '#D6A24E',
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 21,
@@ -625,7 +647,7 @@ const styles = StyleSheet.create({
     minWidth: 210,
   },
   shortcutLabel: {
-    color: '#6CC7FF',
+    color: '#D6A24E',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -633,8 +655,8 @@ const styles = StyleSheet.create({
   },
   shortcutStrip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(108, 199, 255, 0.06)',
-    borderColor: 'rgba(108, 199, 255, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',

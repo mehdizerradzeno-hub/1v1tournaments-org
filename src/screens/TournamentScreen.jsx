@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -187,6 +187,23 @@ function getOpenSeats(count, size) {
   return Math.max(size - count, 0);
 }
 
+function getCountdownLabel(tournament, nowMs) {
+  const startMs = new Date(tournament?.date).getTime();
+
+  if (!Number.isFinite(startMs)) {
+    return 'Date TBA';
+  }
+
+  const remainingMinutes = Math.max(Math.floor((startMs - nowMs) / 60000), 0);
+  const days = Math.floor(remainingMinutes / 1440);
+  const hours = Math.floor((remainingMinutes % 1440) / 60);
+  const minutes = remainingMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function getNextPublicMatch(bracket) {
   const rounds = bracket?.rounds || [];
   const matches = rounds.flatMap((round) => round.matches || []);
@@ -358,6 +375,7 @@ export default function TournamentScreen({ slug }) {
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const [hostedTournament, setHostedTournament] = useState(null);
   const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '' });
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const seededTournament = getTournamentBySlug(slug);
   const tournament = useMemo(
     () => (hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament),
@@ -496,6 +514,16 @@ export default function TournamentScreen({ slug }) {
     };
   }, [slug, seededTournament]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 15000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+
   if (!tournament) {
     if (tournamentLookup.loading) {
       return (
@@ -588,7 +616,23 @@ export default function TournamentScreen({ slug }) {
           : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
       }
       stickyActions={false}
+      showHero={false}
       title={visibleTournament.title}>
+      <TournamentLobbyHero
+        advertisedRosterCap={advertisedRosterCap}
+        checkInPath={checkInPath}
+        countdownLabel={getCountdownLabel(visibleTournament, nowMs)}
+        isBracketLive={isBracketLive}
+        liveBracket={liveBracket}
+        matchStatusPath={matchStatusPath}
+        playerHasReadyMatch={playerHasReadyMatch}
+        registrationMeta={registrationMeta}
+        signupSummary={signupSummary}
+        streams={streams}
+        tournament={visibleTournament}
+        tournamentPath={tournamentPath}
+      />
+
       <TournamentArrivalRail
         checkInPath={checkInPath}
         isBracketLive={isBracketLive}
@@ -608,20 +652,6 @@ export default function TournamentScreen({ slug }) {
         registrationMeta={registrationMeta}
         result={result}
         signupSummary={signupSummary}
-      />
-
-      <TournamentLobbyHero
-        advertisedRosterCap={advertisedRosterCap}
-        checkInPath={checkInPath}
-        isBracketLive={isBracketLive}
-        liveBracket={liveBracket}
-        matchStatusPath={matchStatusPath}
-        playerHasReadyMatch={playerHasReadyMatch}
-        registrationMeta={registrationMeta}
-        signupSummary={signupSummary}
-        streams={streams}
-        tournament={visibleTournament}
-        tournamentPath={tournamentPath}
       />
 
       {activeTab === 'play' ? (
@@ -1113,6 +1143,7 @@ function TournamentArrivalRail({
 function TournamentLobbyHero({
   advertisedRosterCap,
   checkInPath,
+  countdownLabel,
   isBracketLive,
   liveBracket,
   matchStatusPath,
@@ -1123,8 +1154,10 @@ function TournamentLobbyHero({
   tournament,
   tournamentPath,
 }) {
+  const { width } = useWindowDimensions();
+  const isPhone = width > 0 && width < 420;
   const signups = signupSummary.signups || [];
-  const signupCount = signupSummary.loading ? '--' : String(signupSummary.count);
+  const signupCount = signupSummary.loading ? '--' : `${signupSummary.count}/${advertisedRosterCap}`;
   const openSeats = signupSummary.loading ? '--' : String(getOpenSeats(signupSummary.count, advertisedRosterCap));
   const nextMatch = getNextPublicMatch(liveBracket);
   const primaryAction = playerHasReadyMatch
@@ -1137,23 +1170,25 @@ function TournamentLobbyHero({
 
   return (
     <Surface style={styles.lobbyCard}>
-      <View pointerEvents="none" style={styles.lobbyGlow} />
-      <View style={styles.lobbyTopRow}>
+      <View style={styles.lobbyBadgeRow}>
+        <Badge tone={liveBracket ? 'green' : registrationMeta.tone}>
+          {liveBracket ? 'Bracket live' : registrationMeta.label}
+        </Badge>
+        <Text style={styles.lobbyDate}>
+          {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+        </Text>
+      </View>
+
+      <View style={[styles.lobbyCountdownPanel, isPhone && styles.lobbyCountdownPanelPhone]}>
         <View style={styles.lobbyCopy}>
-          <View style={styles.lobbyBadgeRow}>
-            <Badge tone={liveBracket ? 'green' : registrationMeta.tone}>
-              {liveBracket ? 'Bracket live' : registrationMeta.label}
-            </Badge>
-            <Text style={styles.lobbyDate}>
-              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
-            </Text>
-          </View>
+          <Text style={styles.lobbyCountdownLabel}>Starts in</Text>
+          <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>{countdownLabel}</Text>
           <Text style={styles.lobbyTitle}>Tournament lobby</Text>
           <Text style={styles.lobbySummary}>
-            {tournament.format} • {tournament.location} • {tournament.entryLine}
+            {tournament.format} | {tournament.location} | {tournament.entryLine}
           </Text>
         </View>
-        <View style={styles.lobbyActions}>
+        <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
           <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
           <ActionButton href={matchStatusPath} variant="secondary">My match</ActionButton>
           {streams.length ? <ActionButton href="/live" variant="secondary">Watch live</ActionButton> : null}
@@ -1165,7 +1200,6 @@ function TournamentLobbyHero({
           <Text style={styles.lobbyMetricLabel}>Signed up</Text>
           <Text style={styles.lobbyMetricValue}>
             {signupCount}
-            <Text style={styles.lobbyMetricSub}> / {advertisedRosterCap}</Text>
           </Text>
         </View>
         <View style={styles.lobbyMetric}>
@@ -1866,34 +1900,55 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   lobbyCard: {
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
     marginBottom: 24,
     overflow: 'hidden',
   },
-  lobbyGlow: {
-    backgroundColor: 'rgba(214, 162, 78, 0.16)',
-    borderRadius: 180,
-    height: 260,
-    position: 'absolute',
-    right: -110,
-    top: -130,
-    width: 260,
+  lobbyCountdownLabel: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+    textTransform: 'uppercase',
   },
-  lobbyTopRow: {
+  lobbyCountdownPanel: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(5, 11, 10, 0.72)',
+    borderColor: 'rgba(214, 162, 78, 0.20)',
+    borderRadius: 16,
+    borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 18,
+    gap: 24,
+    justifyContent: 'space-between',
+    padding: 24,
+  },
+  lobbyCountdownPanelPhone: {
+    gap: 16,
+    padding: 16,
+  },
+  lobbyCountdownValue: {
+    color: '#F4EFE6',
+    fontSize: 64,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 70,
+    marginTop: 8,
+  },
+  lobbyCountdownValuePhone: {
+    fontSize: 46,
+    lineHeight: 52,
   },
   lobbyCopy: {
     flex: 1.3,
-    minWidth: 260,
+    minWidth: 240,
   },
   lobbyBadgeRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 16,
   },
   lobbyDate: {
     color: '#D6A24E',
@@ -1904,10 +1959,11 @@ const styles = StyleSheet.create({
   },
   lobbyTitle: {
     color: '#F4EFE6',
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 39,
+    lineHeight: 34,
+    marginTop: 4,
   },
   lobbySummary: {
     color: '#AAB4AE',
@@ -1918,31 +1974,34 @@ const styles = StyleSheet.create({
   },
   lobbyActions: {
     alignContent: 'flex-start',
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    minWidth: 235,
+    gap: 8,
+    justifyContent: 'flex-end',
+    minWidth: 220,
+  },
+  lobbyActionsPhone: {
+    flexBasis: '100%',
+    justifyContent: 'flex-start',
+    minWidth: 0,
   },
   lobbyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 18,
+    gap: 8,
+    marginTop: 16,
   },
   lobbyMetric: {
-    backgroundColor: 'rgba(5, 11, 10, 0.58)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
     flexGrow: 1,
     flexBasis: 150,
-    minHeight: 96,
-    padding: 14,
+    minHeight: 84,
+    padding: 16,
   },
   lobbyMatchMetric: {
-    backgroundColor: 'rgba(97, 210, 145, 0.09)',
-    borderColor: 'rgba(97, 210, 145, 0.24)',
     flexBasis: 260,
   },
   lobbyMetricLabel: {
@@ -1955,20 +2014,20 @@ const styles = StyleSheet.create({
   },
   lobbyMetricValue: {
     color: '#F4EFE6',
-    fontSize: 31,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 36,
-    marginTop: 7,
+    lineHeight: 34,
+    marginTop: 8,
   },
   lobbyMetricSub: {
     color: '#AAB4AE',
-    fontSize: 18,
+    fontSize: 16,
   },
   lobbyMatchText: {
     color: '#F4EFE6',
-    fontSize: 21,
+    fontSize: 17,
     fontWeight: '900',
-    lineHeight: 27,
+    lineHeight: 22,
     marginTop: 8,
   },
   lobbyRosterPreview: {
@@ -1976,8 +2035,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
-    marginTop: 14,
-    padding: 14,
+    marginTop: 16,
+    padding: 16,
   },
   lobbyRosterHeader: {
     alignItems: 'center',
