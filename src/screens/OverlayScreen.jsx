@@ -117,7 +117,7 @@ function getOverlayStatusLabel(bracket, registrationMeta) {
   return registrationMeta.label.toUpperCase();
 }
 
-export default function OverlayScreen() {
+export default function OverlayScreen({ variant = 'full' }) {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -234,10 +234,70 @@ export default function OverlayScreen() {
   if (!featuredTournament) {
     return (
       <View style={styles.overlayRoot}>
-        <View style={styles.overlayShell}>
+        <View style={[styles.overlayShell, variant === 'compact' && styles.compactShell]}>
           <Text style={styles.kicker}>1v1 TOURNAMENTS</Text>
           <Text style={styles.title}>Next event loading</Text>
           <Text style={styles.joinText}>Join: 1v1tournaments.org/next</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (variant === 'compact') {
+    return (
+      <View style={[styles.overlayRoot, styles.compactRoot]}>
+        <View style={[styles.overlayShell, styles.compactShell]}>
+          <View style={styles.compactMain}>
+            <View style={styles.compactLiveGroup}>
+              <View style={[styles.statusDot, bracket && styles.statusDotLive]} />
+              <Text style={styles.compactKicker}>{getOverlayStatusLabel(bracket, registrationMeta)}</Text>
+            </View>
+            <Text numberOfLines={1} style={styles.compactTitle}>{featuredTournament.title}</Text>
+            <Text numberOfLines={1} style={styles.compactMatch}>{getMatchPlayerLabel(nextMatch)}</Text>
+          </View>
+          <View style={styles.compactStats}>
+            <Text style={styles.compactStatLabel}>Signed up</Text>
+            <Text style={styles.compactStatValue}>{signupSummary.loading ? '--' : `${count}/${cap}`}</Text>
+          </View>
+          <View style={styles.compactJoin}>
+            <Text style={styles.compactStatLabel}>Join</Text>
+            <Text numberOfLines={1} style={styles.compactJoinText}>1v1tournaments.org/next</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (variant === 'bracket') {
+    return (
+      <View style={[styles.overlayRoot, styles.bracketRoot]}>
+        <View style={[styles.overlayShell, styles.bracketShell]}>
+          <View style={styles.topRow}>
+            <View style={styles.titleBlock}>
+              <Text style={styles.kicker}>{bracket ? 'CURRENT MATCH' : 'NEXT MATCH'}</Text>
+              <Text numberOfLines={1} style={styles.title}>{getMatchPlayerLabel(nextMatch)}</Text>
+              <Text numberOfLines={1} style={styles.dateLine}>
+                {nextMatch?.label || formatDateLine(featuredTournament.date, featuredTournament.timeZone, featuredTournament.timeZoneLabel)}
+              </Text>
+            </View>
+            <View style={styles.statusPill}>
+              <View style={[styles.statusDot, bracket && styles.statusDotLive]} />
+              <Text style={styles.statusText}>{getOverlayStatusLabel(bracket, registrationMeta)}</Text>
+            </View>
+          </View>
+          <View style={styles.bracketInfoRow}>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Signed up</Text>
+              <Text style={styles.metricValue}>{signupSummary.loading ? '--' : `${count}/${cap}`}</Text>
+            </View>
+            <View style={styles.matchCard}>
+              <Text style={styles.metricLabel}>Tournament</Text>
+              <Text numberOfLines={1} style={styles.matchText}>{featuredTournament.title}</Text>
+              <Text numberOfLines={1} style={styles.matchMeta}>
+                {bracket ? 'Bracket is live' : `Starts in ${getCountdownLabel(featuredTournament, nowMs)}`}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     );
@@ -329,6 +389,85 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 18,
     width: '100%',
+  },
+  compactRoot: {
+    justifyContent: 'flex-end',
+    minHeight: 150,
+  },
+  compactShell: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  compactMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  compactLiveGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 2,
+  },
+  compactKicker: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  compactTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 27,
+  },
+  compactMatch: {
+    color: theme.colors.green,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 2,
+  },
+  compactStats: {
+    backgroundColor: 'rgba(244, 239, 230, 0.07)',
+    borderColor: 'rgba(244, 239, 230, 0.14)',
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 104,
+    padding: 10,
+  },
+  compactStatLabel: {
+    color: theme.colors.muted,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  compactStatValue: {
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 28,
+  },
+  compactJoin: {
+    minWidth: 220,
+  },
+  compactJoinText: {
+    color: theme.colors.accent,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+  },
+  bracketRoot: {
+    minHeight: 250,
+  },
+  bracketShell: {
+    maxWidth: 1100,
+  },
+  bracketInfoRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   topRow: {
     alignItems: 'flex-start',

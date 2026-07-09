@@ -10,7 +10,8 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { downloadLinks } from '../lib/downloadLinks.js';
-import { getGamePath, getStreams, siteData } from '../lib/siteData.js';
+import { formatDateLine } from '../lib/format.js';
+import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -20,6 +21,9 @@ export default function LiveScreen() {
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
   const hasDiscord = isConfiguredUrl(downloadLinks.discord);
+  const upcoming = getUpcomingTournaments();
+  const nextTournament = upcoming[0] || null;
+  const nextTournamentPath = nextTournament ? getTournamentPath(nextTournament.slug) : '/next';
 
   return (
     <HubScreen
@@ -32,7 +36,7 @@ export default function LiveScreen() {
       ].filter(Boolean)}
       eyebrow="Watch"
       footerNote={siteData.site.adminNote}
-      lead="Use this page when the tournament is live. Twitch is the main broadcast link, Discord is the community room, and the tournament page keeps signup, bracket, and match status clear."
+      lead="The public command center for stream day: Twitch first, next tournament second, community and overlays one tap away."
       stats={[
         { label: 'Broadcast', value: hasTwitch ? 'Twitch' : 'Pending', tone: hasTwitch ? 'rose' : 'neutral' },
         { label: 'Links', value: String(streams.length + (hasTwitch ? 1 : 0) + (hasDiscord ? 1 : 0)), tone: 'accent' },
@@ -41,7 +45,51 @@ export default function LiveScreen() {
       ]}
       subtitle="Twitch broadcast, tournament links, and community channels"
       title="Live coverage">
-      <LiveBroadcastPanel hasDiscord={hasDiscord} hasTwitch={hasTwitch} />
+      <LiveBroadcastPanel
+        hasDiscord={hasDiscord}
+        hasTwitch={hasTwitch}
+        nextTournament={nextTournament}
+        nextTournamentPath={nextTournamentPath}
+      />
+
+      <Section description="The links viewers and stream setup need most during the show." title="Stream command center">
+        <View style={styles.commandGrid}>
+          <CommandCard
+            actionLabel={hasTwitch ? 'Open Twitch' : 'Set Twitch URL'}
+            body="Main broadcast destination for live tournament coverage."
+            href={hasTwitch ? downloadLinks.twitch : '/stream'}
+            meta={hasTwitch ? 'Primary' : 'Needs config'}
+            title="Twitch broadcast"
+            tone="rose"
+            external={hasTwitch}
+          />
+          <CommandCard
+            actionLabel="Open tournament"
+            body="Public bracket, signup count, roster groups, and player match status."
+            href={nextTournamentPath}
+            meta="Guest hub"
+            title="Tournament page"
+            tone="accent"
+          />
+          <CommandCard
+            actionLabel={hasDiscord ? 'Join Discord' : 'Set Discord URL'}
+            body="Use Discord for live alerts, table coordination, and community chatter."
+            href={hasDiscord ? downloadLinks.discord : '/contact'}
+            meta={hasDiscord ? 'Community' : 'Placeholder'}
+            title="Discord"
+            tone="blue"
+            external={hasDiscord}
+          />
+        </View>
+      </Section>
+
+      <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
+        <View style={styles.overlayGrid}>
+          <OverlayLinkCard body="Full tournament panel with signup count, countdown, roster chips, QR code, and next match." href="/overlay" title="Full overlay" />
+          <OverlayLinkCard body="Lower-third layout for gameplay scenes when the table needs most of the screen." href="/overlay/compact" title="Compact overlay" />
+          <OverlayLinkCard body="Current or next match focus for bracket transitions and between-game scenes." href="/overlay/bracket" title="Bracket overlay" />
+        </View>
+      </Section>
 
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
         {streams.map((stream) => (
@@ -72,10 +120,10 @@ export default function LiveScreen() {
   );
 }
 
-function LiveBroadcastPanel({ hasDiscord, hasTwitch }) {
+function LiveBroadcastPanel({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath }) {
   return (
     <Section
-      description="A clear public signal for viewers when tournament coverage is active."
+      description="Twitch stays first, with the next event and bracket one click behind it."
       title="Broadcast hub">
       <Surface style={styles.livePanel}>
         <View style={styles.livePanelTopRow}>
@@ -86,10 +134,26 @@ function LiveBroadcastPanel({ hasDiscord, hasTwitch }) {
           </View>
           <Text style={styles.liveMeta}>Twitch + tournament hub</Text>
         </View>
-        <Text style={styles.liveTitle}>Watch live on Twitch</Text>
+        <Text style={styles.liveTitle}>{hasTwitch ? 'Watch live on Twitch' : 'Twitch broadcast link pending'}</Text>
         <Text style={styles.liveCopy}>
-          Keep this page open for the broadcast link, signup path, public bracket, and community updates.
+          {nextTournament
+            ? `${nextTournament.title} is the next event. Keep this page open for Twitch, the tournament page, overlays, and community links.`
+            : 'Keep this page open for Twitch, the tournament page, overlays, and community links.'}
         </Text>
+        {nextTournament ? (
+          <View style={styles.nextEventCard}>
+            <View style={styles.nextEventCopy}>
+              <Text style={styles.nextEventLabel}>Next event</Text>
+              <Text style={styles.nextEventTitle}>{nextTournament.title}</Text>
+              <Text style={styles.nextEventMeta}>
+                {formatDateLine(nextTournament.date, nextTournament.timeZone, nextTournament.timeZoneLabel)}
+              </Text>
+            </View>
+            <ActionButton href={nextTournamentPath} variant="secondary">
+              Open event
+            </ActionButton>
+          </View>
+        ) : null}
         <View style={styles.liveActionRow}>
           {hasTwitch ? (
             <ActionButton external href={downloadLinks.twitch}>
@@ -99,7 +163,7 @@ function LiveBroadcastPanel({ hasDiscord, hasTwitch }) {
           <ActionButton href="/stream" variant="secondary">
             Stream board
           </ActionButton>
-          <ActionButton href="/tournaments/spades-summer-series" variant="secondary">
+          <ActionButton href={nextTournamentPath} variant="secondary">
             Tournament page
           </ActionButton>
           {hasDiscord ? (
@@ -118,9 +182,79 @@ function LiveBroadcastPanel({ hasDiscord, hasTwitch }) {
   );
 }
 
+function CommandCard({ actionLabel, body, external = false, href, meta, title, tone }) {
+  return (
+    <Surface style={[styles.commandCard, tone === 'rose' && styles.commandCardRose, tone === 'blue' && styles.commandCardBlue]}>
+      <Text style={styles.commandMeta}>{meta}</Text>
+      <Text style={styles.commandTitle}>{title}</Text>
+      <Text style={styles.commandBody}>{body}</Text>
+      <View style={styles.commandAction}>
+        <ActionButton external={external} href={href} variant={tone === 'rose' ? 'primary' : 'secondary'}>
+          {actionLabel}
+        </ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
+function OverlayLinkCard({ body, href, title }) {
+  return (
+    <Surface style={styles.overlayCard}>
+      <Text style={styles.overlayTitle}>{title}</Text>
+      <Text style={styles.overlayBody}>{body}</Text>
+      <ActionButton href={href} variant="secondary">
+        Open source
+      </ActionButton>
+    </Surface>
+  );
+}
+
 const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
+  },
+  commandAction: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
+  },
+  commandBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  commandCard: {
+    borderColor: 'rgba(214, 162, 78, 0.26)',
+    flexBasis: 245,
+    flexGrow: 1,
+  },
+  commandCardBlue: {
+    borderColor: 'rgba(108, 199, 255, 0.28)',
+  },
+  commandCardRose: {
+    backgroundColor: 'rgba(23, 11, 12, 0.78)',
+    borderColor: 'rgba(224, 106, 92, 0.44)',
+  },
+  commandGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  commandMeta: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  commandTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 6,
   },
   noteCard: {
     borderColor: 'rgba(108, 199, 255, 0.24)',
@@ -197,5 +331,67 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 34,
     marginTop: 16,
+  },
+  nextEventCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginTop: 16,
+    padding: 14,
+  },
+  nextEventCopy: {
+    flex: 1,
+    minWidth: 230,
+  },
+  nextEventLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  nextEventMeta: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  nextEventTitle: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+    marginTop: 4,
+  },
+  overlayBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginBottom: 14,
+    marginTop: 8,
+  },
+  overlayCard: {
+    borderColor: 'rgba(97, 210, 145, 0.24)',
+    flexBasis: 245,
+    flexGrow: 1,
+  },
+  overlayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  overlayTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
   },
 });
