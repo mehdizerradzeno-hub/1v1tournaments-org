@@ -585,6 +585,7 @@ function PremiumCountdownHero({
         />
         <PremiumLinkButton href={downloadLinks.webSpades} label="Play on the Web" />
         <PremiumLinkButton href={downloadLinks.tournaments} label="Join Tournaments" />
+        <PremiumLinkButton href={downloadLinks.twitch} label="Watch on Twitch" />
         <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
         <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
       </View>
@@ -736,6 +737,11 @@ function TwitchTournamentBoard({
               <ActionButton href="/live" variant="secondary">
                 Watch live
               </ActionButton>
+              {isConfiguredUrl(downloadLinks.twitch) ? (
+                <ActionButton external href={downloadLinks.twitch} variant="secondary">
+                  Twitch
+                </ActionButton>
+              ) : null}
             </View>
           </View>
 

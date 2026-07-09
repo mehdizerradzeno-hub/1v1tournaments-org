@@ -56,9 +56,11 @@ test('the Euchre lane stays public-but-coming-soon', () => {
 test('the YouTube channel link points at the new channel URL', () => {
   const channel = getStreams().find((stream) => stream.slug === 'youtube-channel');
   const live = getStreams().find((stream) => stream.slug === 'main-live');
+  const spectator = getStreams().find((stream) => stream.slug === 'spectator-table');
 
   assert.equal(channel?.href, 'https://m.youtube.com/channel/UCkqnaYQ2I47O8e20sIsHpfQ?ra=m');
-  assert.equal(live?.href, 'https://1v1spades.com/room/spades-summer-series-r1-m1?spectator=1');
+  assert.equal(live?.href, 'https://www.twitch.tv/1v1compspades');
+  assert.equal(spectator?.href, 'https://1v1spades.com/room/spades-summer-series-r1-m1?spectator=1');
 });
 
 test('general rules keep the no-buy-in wording visible in one place', () => {

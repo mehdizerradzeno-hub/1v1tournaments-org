@@ -215,6 +215,14 @@ export const siteData = {
   streams: [
     {
       slug: 'main-live',
+      label: 'Twitch live',
+      title: 'Watch the tournament broadcast',
+      href: 'https://www.twitch.tv/1v1compspades',
+      description: 'Main Twitch channel for live tournament coverage and stream-day announcements.',
+      kind: 'live',
+    },
+    {
+      slug: 'spectator-table',
       label: 'Spectator table',
       title: 'Watch the current Spades table',
       href: 'https://1v1spades.com/room/spades-summer-series-r1-m1?spectator=1',
