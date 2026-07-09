@@ -132,6 +132,9 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextRouteSource, /NextScreen/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
   assert.match(nextScreenSource, /Next tournament lobby/);
+  assert.match(nextScreenSource, /heroVariant="compact"/);
+  assert.match(nextScreenSource, /stickyActions=\{false\}/);
+  assert.match(nextScreenSource, /Starts in/);
   assert.match(nextScreenSource, /Signed up players/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
@@ -147,6 +150,10 @@ test('/live stays wired to stream-day command tools', () => {
   const discordAlertSource = readFileSync(discordAlertFunctionFile, 'utf8');
 
   assert.match(liveScreenSource, /Go-live checklist/);
+  assert.match(liveScreenSource, /LiveCockpit/);
+  assert.match(liveScreenSource, /Cockpit/);
+  assert.match(liveScreenSource, /heroVariant="compact"/);
+  assert.match(liveScreenSource, /stickyActions=\{false\}/);
   assert.match(liveScreenSource, /Announcement kit/);
   assert.match(liveScreenSource, /Run of show/);
   assert.match(liveScreenSource, /OBS scene map/);
@@ -317,6 +324,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /TOURNAMENT_TABS/);
   assert.match(tournamentScreenSource, /TournamentTabs/);
+  assert.match(tournamentScreenSource, /heroVariant="compact"/);
   assert.match(tournamentScreenSource, /title="My match"/);
   assert.match(tournamentScreenSource, /fetchTournamentEvent/);
   assert.match(tournamentScreenSource, /mergeTournamentSettings/);

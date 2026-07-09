@@ -252,18 +252,15 @@ export default function NextScreen() {
       ].filter(Boolean)}
       eyebrow="Next event"
       footerNote={siteData.site.adminNote}
-      lead="A single public lobby for guests: start time, signup count, join link, live link, and bracket status without digging through admin screens."
-      stats={[
-        { label: 'Starts in', value: getCountdownLabel(tournament, nowMs), tone: 'accent' },
-        { label: 'Signed up', value: signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`, tone: signupCount ? 'green' : 'blue' },
-        { label: 'Open seats', value: signupSummary.loading ? '--' : String(openSeats), tone: openSeats ? 'accent' : 'neutral' },
-        { label: 'Status', value: bracket ? 'Bracket live' : registrationMeta.label, tone: bracket ? 'green' : registrationMeta.tone },
-      ]}
+      heroVariant="compact"
+      lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
       subtitle={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+      stickyActions={false}
       title={tournament.title}>
       <NextLobbyHero
         bracket={bracket}
         checkInPath={checkInPath}
+        countdownLabel={getCountdownLabel(tournament, nowMs)}
         joinUrl={joinUrl}
         openSeats={openSeats}
         registrationMeta={registrationMeta}
@@ -280,6 +277,7 @@ export default function NextScreen() {
 function NextLobbyHero({
   bracket,
   checkInPath,
+  countdownLabel,
   joinUrl,
   openSeats,
   registrationMeta,
@@ -314,6 +312,10 @@ function NextLobbyHero({
       </View>
 
       <View style={styles.metricGrid}>
+        <View style={styles.metricTile}>
+          <Text style={styles.metricLabel}>Starts in</Text>
+          <Text style={styles.metricValue}>{countdownLabel}</Text>
+        </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Signed up</Text>
           <Text style={styles.metricValue}>{signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`}</Text>

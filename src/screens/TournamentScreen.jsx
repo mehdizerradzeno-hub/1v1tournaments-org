@@ -504,6 +504,7 @@ export default function TournamentScreen({ slug }) {
       actions={heroActions}
       eyebrow={game?.badge || 'Tournament'}
       footerNote={siteData.site.adminNote}
+      heroVariant="compact"
       lead={visibleTournament.detail}
       stats={[
         { label: 'Format', value: visibleTournament.format, tone: 'blue' },

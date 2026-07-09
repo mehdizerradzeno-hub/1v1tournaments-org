@@ -115,15 +115,19 @@ export default function LiveScreen() {
       ].filter(Boolean)}
       eyebrow="Watch"
       footerNote={siteData.site.adminNote}
-      lead="The public command center for stream day: Twitch first, next tournament second, community and overlays one tap away."
-      stats={[
-        { label: 'Broadcast', value: hasTwitch ? 'Twitch' : 'Pending', tone: hasTwitch ? 'rose' : 'neutral' },
-        { label: 'Links', value: String(streams.length + (hasTwitch ? 1 : 0) + (hasDiscord ? 1 : 0)), tone: 'accent' },
-        { label: 'Community', value: hasDiscord ? 'Discord' : 'Set URL', tone: hasDiscord ? 'blue' : 'neutral' },
-        { label: 'YouTube', value: 'Archive', tone: 'blue' },
-      ]}
-      subtitle="Twitch broadcast, tournament links, and community channels"
+      heroVariant="compact"
+      lead="Twitch, next event, overlays, and announcement tools in one place."
+      subtitle="Broadcast command center"
+      stickyActions={false}
       title="Live coverage">
+      <LiveCockpit
+        hasDiscord={hasDiscord}
+        hasTwitch={hasTwitch}
+        nextTournament={nextTournament}
+        nextTournamentPath={nextTournamentPath}
+        streams={streams}
+      />
+
       <LiveCommandTabs activeTab={activeTab} onSelectTab={setActiveTab} />
 
       {activeTab === 'control' ? (
@@ -154,6 +158,65 @@ export default function LiveScreen() {
         />
       ) : null}
     </HubScreen>
+  );
+}
+
+function LiveCockpit({ hasDiscord, hasTwitch, nextTournament, nextTournamentPath, streams }) {
+  return (
+    <Surface style={styles.cockpit}>
+      <View style={styles.cockpitStatusRow}>
+        <View style={styles.liveStatusGroup}>
+          <View style={styles.liveDot} />
+          <Badge tone={hasTwitch ? 'rose' : 'neutral'}>{hasTwitch ? 'Twitch ready' : 'Twitch pending'}</Badge>
+          <Text style={styles.cockpitStatusText}>Cockpit</Text>
+        </View>
+        <Text style={styles.cockpitMeta}>{streams.length} stream link{streams.length === 1 ? '' : 's'}</Text>
+      </View>
+
+      <View style={styles.cockpitGrid}>
+        <View style={[styles.cockpitCard, styles.cockpitCardPrimary]}>
+          <Text style={styles.cockpitLabel}>Broadcast</Text>
+          <Text style={styles.cockpitTitle}>{hasTwitch ? 'Go to Twitch first' : 'Add Twitch URL'}</Text>
+          <Text style={styles.cockpitBody}>Open the broadcast, then keep this hub beside OBS for overlays and announcements.</Text>
+          <View style={styles.cockpitActions}>
+            {hasTwitch ? (
+              <ActionButton external href={downloadLinks.twitch}>Open Twitch</ActionButton>
+            ) : (
+              <ActionButton href="/stream">Set Twitch URL</ActionButton>
+            )}
+            <ActionButton href="/overlay/compact" variant="secondary">Compact overlay</ActionButton>
+          </View>
+        </View>
+
+        <View style={styles.cockpitCard}>
+          <Text style={styles.cockpitLabel}>Next tournament</Text>
+          <Text style={styles.cockpitTitle}>{nextTournament?.title || 'Event pending'}</Text>
+          <Text style={styles.cockpitBody}>
+            {nextTournament
+              ? formatDateLine(nextTournament.date, nextTournament.timeZone, nextTournament.timeZoneLabel)
+              : 'Publish the next event to turn this into the stream lobby.'}
+          </Text>
+          <View style={styles.cockpitActions}>
+            <ActionButton href={nextTournamentPath} variant="secondary">Open event</ActionButton>
+            <ActionButton href={`${nextTournamentPath}#my-match`} variant="secondary">My match</ActionButton>
+          </View>
+        </View>
+
+        <View style={[styles.cockpitCard, styles.cockpitCardBlue]}>
+          <Text style={styles.cockpitLabel}>Community</Text>
+          <Text style={styles.cockpitTitle}>{hasDiscord ? 'Discord linked' : 'Discord invite pending'}</Text>
+          <Text style={styles.cockpitBody}>Send people to Discord for live alerts, tables, and quick tournament updates.</Text>
+          <View style={styles.cockpitActions}>
+            {hasDiscord ? (
+              <ActionButton external href={downloadLinks.discord} variant="secondary">Open Discord</ActionButton>
+            ) : (
+              <ActionButton href="/contact" variant="secondary">Contact page</ActionButton>
+            )}
+            <ActionButton href="/rules" variant="secondary">Rules</ActionButton>
+          </View>
+        </View>
+      </View>
+    </Surface>
   );
 }
 
@@ -740,6 +803,82 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 28,
+    marginTop: 6,
+  },
+  cockpit: {
+    backgroundColor: 'rgba(17, 29, 26, 0.88)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
+    marginBottom: 14,
+  },
+  cockpitActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  cockpitBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  cockpitCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 250,
+    flexGrow: 1,
+    padding: 14,
+  },
+  cockpitCardBlue: {
+    backgroundColor: 'rgba(108, 199, 255, 0.08)',
+    borderColor: 'rgba(108, 199, 255, 0.22)',
+  },
+  cockpitCardPrimary: {
+    backgroundColor: 'rgba(224, 106, 92, 0.10)',
+    borderColor: 'rgba(224, 106, 92, 0.34)',
+  },
+  cockpitGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  cockpitLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  cockpitMeta: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+    textTransform: 'uppercase',
+  },
+  cockpitStatusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  cockpitStatusText: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  cockpitTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 25,
     marginTop: 6,
   },
   controlGrid: {
