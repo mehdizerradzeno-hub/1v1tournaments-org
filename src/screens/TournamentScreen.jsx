@@ -48,10 +48,10 @@ function signupCountLabel(count, loading = false) {
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
 const TOURNAMENT_TABS = [
-  { id: 'play', label: 'Play' },
-  { id: 'roster', label: 'Roster' },
-  { id: 'bracket', label: 'Bracket' },
-  { id: 'info', label: 'Info' },
+  { id: 'play', label: 'Play', body: 'Player status, live path, and main action.' },
+  { id: 'roster', label: 'Roster', body: 'Who is signed up and bracket-ready.' },
+  { id: 'bracket', label: 'Bracket', body: 'Current match flow and table access.' },
+  { id: 'info', label: 'Info', body: 'Rules, agenda, links, and results.' },
 ];
 
 function positiveInteger(value, fallback) {
@@ -497,7 +497,6 @@ export default function TournamentScreen({ slug }) {
   const minimumPlayers = getMinimumPlayers(visibleTournament);
   const liveBracketSize = bracketSizeFromBracket(liveBracket, liveBracket?.participantCount || 0);
   const rosterBracketSize = actualBracketSizeFromSignups(signupSummary.count, minimumPlayers);
-  const activeBracketSize = liveBracket ? liveBracketSize : rosterBracketSize;
 
   return (
     <HubScreen
@@ -506,19 +505,25 @@ export default function TournamentScreen({ slug }) {
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead={visibleTournament.detail}
-      stats={[
-        { label: 'Format', value: visibleTournament.format, tone: 'blue' },
-        { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
-        { label: 'Seats', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
-        { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(activeBracketSize), tone: liveBracket ? 'green' : 'accent' },
-        { label: 'Location', value: visibleTournament.location, tone: 'accent' },
-      ]}
       subtitle={
         isPrimaryGame
           ? `Spades launch event • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`
           : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
       }
+      stickyActions={false}
       title={visibleTournament.title}>
+      <TournamentEventConsole
+        activeTab={activeTab}
+        advertisedRosterCap={advertisedRosterCap}
+        isBracketLive={isBracketLive}
+        liveBracket={liveBracket}
+        onSelectTab={setActiveTab}
+        playerHasReadyMatch={playerHasReadyMatch}
+        registrationMeta={registrationMeta}
+        result={result}
+        signupSummary={signupSummary}
+      />
+
       <TournamentLobbyHero
         advertisedRosterCap={advertisedRosterCap}
         checkInPath={checkInPath}
@@ -532,8 +537,6 @@ export default function TournamentScreen({ slug }) {
         tournament={visibleTournament}
         tournamentPath={tournamentPath}
       />
-
-      <TournamentTabs activeTab={activeTab} onSelectTab={setActiveTab} />
 
       {activeTab === 'play' ? (
         <>
@@ -804,6 +807,60 @@ function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
   );
 }
 
+function getConsolePhase({ isBracketLive, registrationMeta, result }) {
+  if (result) return { label: 'Results posted', tone: 'green' };
+  if (isBracketLive) return { label: 'Bracket live', tone: 'accent' };
+  return { label: registrationMeta.label, tone: registrationMeta.tone };
+}
+
+function TournamentEventConsole({
+  activeTab,
+  advertisedRosterCap,
+  isBracketLive,
+  liveBracket,
+  onSelectTab,
+  playerHasReadyMatch,
+  registrationMeta,
+  result,
+  signupSummary,
+}) {
+  const active = TOURNAMENT_TABS.find((tab) => tab.id === activeTab) || TOURNAMENT_TABS[0];
+  const phase = getConsolePhase({ isBracketLive, registrationMeta, result });
+  const rosterValue = signupSummary.loading ? '--' : `${signupSummary.count}/${advertisedRosterCap}`;
+  const bracketValue = liveBracket ? `${liveBracket.participantCount || 0} seeded` : 'Pending';
+  const matchValue = playerHasReadyMatch ? 'Ready' : isBracketLive ? 'Check' : 'After seed';
+
+  return (
+    <Surface style={styles.eventConsole}>
+      <View style={styles.eventConsoleTopRow}>
+        <View style={styles.eventConsoleCopy}>
+          <View style={styles.eventConsoleBadgeRow}>
+            <Badge tone={phase.tone}>{phase.label}</Badge>
+            <Text style={styles.eventConsoleMeta}>Event console</Text>
+          </View>
+          <Text style={styles.eventConsoleTitle}>{active.label}</Text>
+          <Text style={styles.eventConsoleBody}>{active.body}</Text>
+        </View>
+        <View style={styles.eventConsoleSignals}>
+          <View style={styles.eventSignal}>
+            <Text style={styles.eventSignalLabel}>Roster</Text>
+            <Text style={styles.eventSignalValue}>{rosterValue}</Text>
+          </View>
+          <View style={styles.eventSignal}>
+            <Text style={styles.eventSignalLabel}>Bracket</Text>
+            <Text style={styles.eventSignalValue}>{bracketValue}</Text>
+          </View>
+          <View style={[styles.eventSignal, playerHasReadyMatch && styles.eventSignalReady]}>
+            <Text style={styles.eventSignalLabel}>Match</Text>
+            <Text style={[styles.eventSignalValue, playerHasReadyMatch && styles.eventSignalValueReady]}>{matchValue}</Text>
+          </View>
+        </View>
+      </View>
+      <TournamentTabs activeTab={activeTab} onSelectTab={onSelectTab} />
+    </Surface>
+  );
+}
+
 function TournamentTabs({ activeTab, onSelectTab }) {
   return (
     <View style={styles.tournamentTabBar}>
@@ -814,6 +871,7 @@ function TournamentTabs({ activeTab, onSelectTab }) {
           <ActionButton
             key={tab.id}
             onPress={() => onSelectTab(tab.id)}
+            style={styles.tournamentTabButton}
             variant={selected ? 'primary' : 'secondary'}>
             {tab.label}
           </ActionButton>
@@ -1718,11 +1776,100 @@ const styles = StyleSheet.create({
   timelineValueDone: {
     color: '#61D291',
   },
+  eventConsole: {
+    backgroundColor: 'rgba(17, 29, 26, 0.90)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    marginBottom: 18,
+    paddingBottom: 10,
+  },
+  eventConsoleBadgeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  eventConsoleBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  eventConsoleCopy: {
+    flex: 1.2,
+    minWidth: 220,
+  },
+  eventConsoleMeta: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  eventConsoleSignals: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    minWidth: 230,
+  },
+  eventConsoleTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+  },
+  eventConsoleTopRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 12,
+  },
+  eventSignal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 96,
+    flexGrow: 1,
+    minHeight: 68,
+    padding: 10,
+  },
+  eventSignalReady: {
+    backgroundColor: 'rgba(97, 210, 145, 0.09)',
+    borderColor: 'rgba(97, 210, 145, 0.24)',
+  },
+  eventSignalLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  eventSignalValue: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 5,
+  },
+  eventSignalValueReady: {
+    color: '#61D291',
+  },
   tournamentTabBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 0,
+  },
+  tournamentTabButton: {
+    flexBasis: 104,
+    flexGrow: 1,
+    marginBottom: 0,
+    marginRight: 0,
+    minWidth: 0,
   },
   dashboardCard: {
     borderColor: 'rgba(214, 162, 78, 0.34)',
