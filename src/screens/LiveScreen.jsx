@@ -17,6 +17,12 @@ function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
 }
 
+function absoluteSiteUrl(path) {
+  const origin = downloadLinks.tournaments || 'https://1v1tournaments.org';
+
+  return `${origin.replace(/\/$/, '')}${path}`;
+}
+
 export default function LiveScreen() {
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
@@ -85,10 +91,29 @@ export default function LiveScreen() {
 
       <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
         <View style={styles.overlayGrid}>
-          <OverlayLinkCard body="Full tournament panel with signup count, countdown, roster chips, QR code, and next match." href="/overlay" title="Full overlay" />
-          <OverlayLinkCard body="Lower-third layout for gameplay scenes when the table needs most of the screen." href="/overlay/compact" title="Compact overlay" />
-          <OverlayLinkCard body="Current or next match focus for bracket transitions and between-game scenes." href="/overlay/bracket" title="Bracket overlay" />
+          <OverlayLinkCard
+            body="Full tournament panel with signup count, countdown, roster chips, QR code, and next match."
+            href="/overlay"
+            recommendedSize="1280 x 360"
+            title="Full overlay"
+          />
+          <OverlayLinkCard
+            body="Lower-third layout for gameplay scenes when the table needs most of the screen."
+            href="/overlay/compact"
+            recommendedSize="1280 x 170"
+            title="Compact overlay"
+          />
+          <OverlayLinkCard
+            body="Current or next match focus for bracket transitions and between-game scenes."
+            href="/overlay/bracket"
+            recommendedSize="1100 x 260"
+            title="Bracket overlay"
+          />
         </View>
+      </Section>
+
+      <Section description="Clear stream-day notification status for the community layer." title="Discord alerts">
+        <DiscordAlertPanel hasDiscord={hasDiscord} />
       </Section>
 
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
@@ -197,13 +222,66 @@ function CommandCard({ actionLabel, body, external = false, href, meta, title, t
   );
 }
 
-function OverlayLinkCard({ body, href, title }) {
+function DiscordAlertPanel({ hasDiscord }) {
+  return (
+    <Surface style={styles.discordPanel}>
+      <View style={styles.discordTopRow}>
+        <Badge tone={hasDiscord ? 'blue' : 'neutral'}>{hasDiscord ? 'Configured' : 'Coming soon'}</Badge>
+        <Text style={styles.discordMeta}>Live alerts</Text>
+      </View>
+      <Text style={styles.discordTitle}>
+        {hasDiscord ? 'Discord is ready for stream-day alerts.' : 'Discord alerts are reserved for the next automation pass.'}
+      </Text>
+      <Text style={styles.discordCopy}>
+        {hasDiscord
+          ? 'Use the Discord button for manual live announcements now. Later this can send automatic alerts when the bracket is published or the stream goes live.'
+          : 'Set DISCORD_URL in downloadLinks.js when the server invite is ready. The public buttons will appear automatically, and the later bot pass can post live/bracket announcements.'}
+      </Text>
+      <View style={styles.discordSteps}>
+        <View style={styles.discordStep}>
+          <Text style={styles.discordStepLabel}>Now</Text>
+          <Text style={styles.discordStepValue}>{hasDiscord ? 'Invite linked' : 'Invite placeholder'}</Text>
+        </View>
+        <View style={styles.discordStep}>
+          <Text style={styles.discordStepLabel}>Later</Text>
+          <Text style={styles.discordStepValue}>Auto live alerts</Text>
+        </View>
+      </View>
+      <View style={styles.discordActions}>
+        {hasDiscord ? (
+          <ActionButton external href={downloadLinks.discord} variant="secondary">
+            Open Discord
+          </ActionButton>
+        ) : (
+          <ActionButton href="/contact" variant="secondary">
+            Contact page
+          </ActionButton>
+        )}
+        <ActionButton href="/live" variant="ghost">
+          Live hub
+        </ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
+function OverlayLinkCard({ body, href, recommendedSize, title }) {
+  const url = absoluteSiteUrl(href);
+
   return (
     <Surface style={styles.overlayCard}>
       <Text style={styles.overlayTitle}>{title}</Text>
       <Text style={styles.overlayBody}>{body}</Text>
+      <View style={styles.overlayUrlBox}>
+        <Text style={styles.overlayUrlLabel}>Browser source URL</Text>
+        <Text selectable style={styles.overlayUrlText}>{url}</Text>
+      </View>
+      <View style={styles.overlayUrlBox}>
+        <Text style={styles.overlayUrlLabel}>Recommended size</Text>
+        <Text style={styles.overlayUrlText}>{recommendedSize}</Text>
+      </View>
       <ActionButton href={href} variant="secondary">
-        Open source
+        Preview source
       </ActionButton>
     </Surface>
   );
@@ -255,6 +333,71 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 28,
     marginTop: 6,
+  },
+  discordActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  discordCopy: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  discordMeta: {
+    color: '#6CC7FF',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  discordPanel: {
+    borderColor: 'rgba(108, 199, 255, 0.28)',
+  },
+  discordStep: {
+    backgroundColor: 'rgba(108, 199, 255, 0.08)',
+    borderColor: 'rgba(108, 199, 255, 0.20)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 180,
+    flexGrow: 1,
+    padding: 12,
+  },
+  discordStepLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  discordSteps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  discordStepValue: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginTop: 4,
+  },
+  discordTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 12,
+  },
+  discordTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   noteCard: {
     borderColor: 'rgba(108, 199, 255, 0.24)',
@@ -393,5 +536,27 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 26,
+  },
+  overlayUrlBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 10,
+  },
+  overlayUrlLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  overlayUrlText: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+    marginTop: 3,
   },
 });
