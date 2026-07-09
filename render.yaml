@@ -1,0 +1,21 @@
+services:
+  - type: worker
+    name: 1v1tournaments-twitch-bot
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm run bot:twitch
+    autoDeploy: true
+    envVars:
+      - key: TWITCH_BOT_USERNAME
+        sync: false
+      - key: TWITCH_OAUTH_TOKEN
+        sync: false
+      - key: TWITCH_CHANNEL
+        value: 1v1compspades
+      - key: STREAM_COMMAND_ENDPOINT
+        value: https://1v1tournaments.org/.netlify/functions/stream-commands
+      - key: TWITCH_COMMAND_REFRESH_MS
+        value: 60000
+      - key: TWITCH_COMMAND_COOLDOWN_MS
+        value: 4000

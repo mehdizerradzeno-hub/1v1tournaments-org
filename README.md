@@ -157,6 +157,46 @@ Notes:
 Default commands include `!next`, `!join`, `!signup`, `!match`, `!bracket`, `!format`,
 `!rules`, `!results`, `!discord`, and `!live`.
 
+### Production Twitch Bot Worker
+
+Long term, run the Twitch chat bot as an always-on Render worker instead of relying on
+the Mac staying awake. The repository includes `render.yaml` for a Render Blueprint
+service named `1v1tournaments-twitch-bot`.
+
+Create the worker in Render:
+
+1. Open Render and choose **New > Blueprint**.
+2. Connect the GitHub repo for `1v1tournaments-org`.
+3. Select the `render.yaml` blueprint.
+4. Add the private environment variables when Render prompts for them:
+
+```bash
+TWITCH_BOT_USERNAME=1v1compspades
+TWITCH_OAUTH_TOKEN=oauth:your_private_twitch_chat_token
+```
+
+The blueprint sets these non-secret values automatically:
+
+```bash
+TWITCH_CHANNEL=1v1compspades
+STREAM_COMMAND_ENDPOINT=https://1v1tournaments.org/.netlify/functions/stream-commands
+TWITCH_COMMAND_REFRESH_MS=60000
+TWITCH_COMMAND_COOLDOWN_MS=4000
+```
+
+After the worker deploys, check the Render logs for:
+
+```text
+Loaded 10 stream commands
+Connected to Twitch chat
+```
+
+Once Render is responding to commands in Twitch chat, stop the Mac backup service:
+
+```bash
+npm run bot:twitch:stop
+```
+
 ## Check-In Placeholder Flow
 
 - Public tournament pages link to `/check-in/[slug]` for account-based tournament signup.
