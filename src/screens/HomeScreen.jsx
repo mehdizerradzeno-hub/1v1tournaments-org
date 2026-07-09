@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Text, View, StyleSheet, useWindowDimensions } from 'react-native';
+import { Image, Linking, Pressable, Text, View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import {
   ActionButton,
@@ -18,6 +18,7 @@ import {
   BulletList,
 } from '../components/hub-ui.jsx';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
+import { APP_STORE_BADGE_URL, downloadLinks } from '../lib/downloadLinks.js';
 import {
   buildResultFromTournamentBracket,
   getGameBySlug,
@@ -42,6 +43,8 @@ import {
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
+const APP_STORE_BADGE_WIDTH = 178;
+const APP_STORE_BADGE_HEIGHT = 53;
 
 const PLAYER_FLOW_STEPS = [
   { title: 'Create account', body: 'One player account keeps your signup and match seat tied to you.' },
@@ -163,6 +166,18 @@ function getNextUpcomingTournament(tournaments, nowMs) {
   return futureTournament?.tournament || datedTournaments[0]?.tournament || tournaments[0] || null;
 }
 
+function isConfiguredUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+function openExternalUrl(href) {
+  if (!isConfiguredUrl(href)) {
+    return;
+  }
+
+  Linking.openURL(href).catch(() => {});
+}
+
 export default function HomeScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
@@ -240,6 +255,7 @@ export default function HomeScreen() {
             bracket: bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null,
             signupSummary: {
               count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
+              signups: signupResult.status === 'fulfilled' ? signupResult.value.signups || [] : [],
               loading: false,
               unavailable: signupResult.status !== 'fulfilled',
             },
@@ -297,6 +313,18 @@ export default function HomeScreen() {
         tournament={featuredTournament}
         tournamentPath={featuredTournamentPath}
       />
+
+      <TwitchTournamentBoard
+        bracket={featuredBracket}
+        matchStatusPath={featuredMatchStatusPath}
+        registrationMeta={featuredRegistrationMeta}
+        signupPath={featuredSignupPath}
+        signupSummary={featuredSignupSummary}
+        tournament={featuredTournament}
+        tournamentPath={featuredTournamentPath}
+      />
+
+      <PremiumDownloadSection />
 
       <Section
         action={<ActionButton href={featuredTournamentPath}>Open next event</ActionButton>}
@@ -550,6 +578,18 @@ function PremiumCountdownHero({
       </View>
 
       <View style={styles.heroActionRow}>
+        <AppStoreBadgeButton
+          href={downloadLinks.appStoreSpades}
+          label="Download 1v1 Spades on the App Store"
+          large
+        />
+        <PremiumLinkButton href={downloadLinks.webSpades} label="Play on the Web" />
+        <PremiumLinkButton href={downloadLinks.tournaments} label="Join Tournaments" />
+        <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
+        <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
+      </View>
+
+      <View style={styles.heroActionRowSecondary}>
         <ActionButton href={matchStatusPath} style={styles.heroActionButton}>
           Find my match
         </ActionButton>
@@ -574,6 +614,272 @@ function PremiumCountdownHero({
         ))}
       </View>
     </Surface>
+  );
+}
+
+function PremiumDownloadSection() {
+  const games = [
+    {
+      key: 'spades',
+      title: '1v1 Spades',
+      eyebrow: 'Live now',
+      body: 'Open the competitive Spades app, play on web, or install from the App Store once your public listing URL is set.',
+      appStoreUrl: downloadLinks.appStoreSpades,
+      webUrl: downloadLinks.webSpades,
+      accent: '#D6A24E',
+    },
+    {
+      key: 'euchre',
+      title: '1v1 Euchre',
+      eyebrow: 'Next game',
+      body: 'Euchre is wired for the same 1v1 family experience. The App Store badge appears automatically when its URL is configured.',
+      appStoreUrl: downloadLinks.appStoreEuchre,
+      webUrl: downloadLinks.webEuchre,
+      accent: '#6CC7FF',
+    },
+  ];
+
+  return (
+    <>
+      <Section
+        description="Install the apps, launch the web versions, or jump straight into hosted events from one consistent landing section."
+        eyebrow="Official downloads"
+        nativeID="downloads"
+        title="Play the 1v1 card lineup">
+        <View style={styles.downloadGamesGrid}>
+          {games.map((game) => (
+            <PremiumGameDownloadCard key={game.key} game={game} />
+          ))}
+        </View>
+      </Section>
+
+      <Section
+        description="The tournament hub owns signup, event rules, brackets, and public event pages."
+        eyebrow="Tournament hub"
+        title="Run the bracket from 1v1Tournaments.org">
+        <View style={styles.tournamentDownloadGrid}>
+          <PremiumLinkPanel
+            body="Open the public hub for account signup, brackets, event pages, and results."
+            href={downloadLinks.tournaments}
+            label="Visit 1v1Tournaments.org"
+            tone="accent"
+          />
+          <PremiumLinkPanel
+            body="Jump to the next posted tournament and check the current schedule."
+            href={`${downloadLinks.tournaments}/#next-tournaments`}
+            label="Upcoming Events"
+            tone="green"
+          />
+          <PremiumLinkPanel
+            body="Review free-entry event rules, match flow, and platform notes."
+            href={`${downloadLinks.tournaments}/rules`}
+            label="Tournament Rules"
+            tone="blue"
+          />
+        </View>
+      </Section>
+    </>
+  );
+}
+
+function TwitchTournamentBoard({
+  bracket,
+  matchStatusPath,
+  registrationMeta,
+  signupPath,
+  signupSummary,
+  tournament,
+  tournamentPath,
+}) {
+  if (!tournament) {
+    return null;
+  }
+
+  const signups = signupSummary.signups || [];
+  const cap = getRosterCap(tournament);
+  const openSeats = Math.max(cap - (signupSummary.count || signups.length || 0), 0);
+  const signupLoading = Boolean(signupSummary.loading);
+  const signupUnavailable = Boolean(signupSummary.unavailable);
+  const registrationOpen = registrationMeta.value === 'open';
+  const bracketLive = Boolean(bracket);
+
+  return (
+    <Section
+      description="Built for stream viewers: the next event, signup count, and public roster are visible without opening admin tools."
+      eyebrow="Twitch ready"
+      nativeID="twitch-board"
+      title="Next tournament">
+      <Surface style={styles.twitchBoard}>
+        <View pointerEvents="none" style={styles.twitchBoardGlow} />
+        <View style={styles.twitchBoardMain}>
+          <View style={styles.twitchEventCopy}>
+            <View style={styles.twitchTopRow}>
+              <Badge tone={bracketLive ? 'green' : registrationMeta.tone}>
+                {bracketLive ? 'Bracket live' : registrationMeta.label}
+              </Badge>
+              <Text style={styles.twitchLiveTag}>Stream overlay friendly</Text>
+            </View>
+            <Text style={styles.twitchTitle}>{tournament.title}</Text>
+            <Text style={styles.twitchDate}>
+              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+            </Text>
+            <Text style={styles.twitchSummary}>
+              {tournament.format} • {tournament.location} • {tournament.entryLine}
+            </Text>
+            <View style={styles.twitchActions}>
+              <ActionButton href={registrationOpen ? signupPath : tournamentPath}>
+                {registrationOpen ? 'Join this tournament' : 'View tournament'}
+              </ActionButton>
+              <ActionButton href={matchStatusPath} variant="secondary">
+                My match
+              </ActionButton>
+              <ActionButton href="/live" variant="secondary">
+                Watch live
+              </ActionButton>
+            </View>
+          </View>
+
+          <View style={styles.twitchScoreStack}>
+            <View style={styles.twitchScoreTile}>
+              <Text style={styles.twitchScoreLabel}>Signed up</Text>
+              <Text style={styles.twitchScoreValue}>
+                {signupLoading ? '--' : signupSummary.count || signups.length || 0}
+                <Text style={styles.twitchScoreSub}> / {cap}</Text>
+              </Text>
+            </View>
+            <View style={styles.twitchScoreTile}>
+              <Text style={styles.twitchScoreLabel}>Open seats</Text>
+              <Text style={styles.twitchScoreValue}>{signupLoading ? '--' : openSeats}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.twitchRosterPanel}>
+          <View style={styles.twitchRosterHeader}>
+            <Text style={styles.twitchRosterTitle}>Public signup roster</Text>
+            <Text style={styles.twitchRosterMeta}>
+              {signupUnavailable ? 'Live roster unavailable' : signupLoading ? 'Loading players' : `${signups.length} visible`}
+            </Text>
+          </View>
+          {signupLoading ? (
+            <Text style={styles.twitchRosterEmpty}>Loading registered players...</Text>
+          ) : signups.length ? (
+            <View style={styles.twitchRosterGrid}>
+              {signups.slice(0, 12).map((signup, index) => (
+                <View key={signup.id || `${signup.playerName}-${index}`} style={styles.twitchRosterRow}>
+                  <View style={styles.twitchRosterRank}>
+                    <Text style={styles.twitchRosterRankText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.twitchRosterNameBlock}>
+                    <Text numberOfLines={1} style={styles.twitchRosterName}>
+                      {signup.playerName || 'Unnamed player'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.twitchRosterHandle}>
+                      {signup.playerHandle || signup.status || 'registered'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {signups.length > 12 ? (
+                <View style={styles.twitchRosterMore}>
+                  <Text style={styles.twitchRosterMoreText}>+{signups.length - 12} more players</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <Text style={styles.twitchRosterEmpty}>
+              No public signups yet. Send viewers to Join this tournament to get the roster started.
+            </Text>
+          )}
+        </View>
+      </Surface>
+    </Section>
+  );
+}
+
+function PremiumGameDownloadCard({ game }) {
+  return (
+    <Surface style={[styles.downloadGameCard, { borderColor: game.accent }]}>
+      <View style={styles.downloadGameTopRow}>
+        <Badge tone={game.key === 'spades' ? 'green' : 'blue'}>{game.eyebrow}</Badge>
+        <Text style={styles.downloadGameMark}>1v1</Text>
+      </View>
+      <Text style={styles.downloadGameTitle}>{game.title}</Text>
+      <Text style={styles.downloadGameBody}>{game.body}</Text>
+      <View style={styles.downloadButtonStack}>
+        <AppStoreBadgeButton href={game.appStoreUrl} label={`Download ${game.title} on the App Store`} />
+        <PremiumLinkButton href={game.webUrl} label="Play on Web" />
+      </View>
+    </Surface>
+  );
+}
+
+function AppStoreBadgeButton({ href, label, large = false }) {
+  if (!isConfiguredUrl(href)) {
+    return null;
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="link"
+      onPress={() => openExternalUrl(href)}
+      style={({ hovered, pressed }) => [
+        styles.appStoreBadgeShell,
+        large && styles.appStoreBadgeShellLarge,
+        hovered && styles.downloadHover,
+        pressed && styles.downloadPressed,
+      ]}>
+      <Image
+        accessibilityIgnoresInvertColors
+        resizeMode="contain"
+        source={{ uri: APP_STORE_BADGE_URL }}
+        style={[styles.appStoreBadgeImage, large && styles.appStoreBadgeImageLarge]}
+      />
+    </Pressable>
+  );
+}
+
+function PremiumLinkButton({ href, label }) {
+  const enabled = isConfiguredUrl(href);
+
+  return (
+    <Pressable
+      accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
+      accessibilityRole={enabled ? 'link' : 'button'}
+      disabled={!enabled}
+      onPress={() => openExternalUrl(href)}
+      style={({ hovered, pressed }) => [
+        styles.premiumLinkButton,
+        !enabled && styles.premiumLinkButtonDisabled,
+        hovered && enabled && styles.downloadHover,
+        pressed && enabled && styles.downloadPressed,
+      ]}>
+      <Text style={[styles.premiumLinkButtonText, !enabled && styles.premiumLinkButtonTextDisabled]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function PremiumLinkPanel({ body, href, label, tone }) {
+  const enabled = isConfiguredUrl(href);
+
+  return (
+    <Pressable
+      accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
+      accessibilityRole={enabled ? 'link' : 'button'}
+      disabled={!enabled}
+      onPress={() => openExternalUrl(href)}
+      style={({ hovered, pressed }) => [
+        styles.tournamentLinkPanel,
+        styles[`tournamentLinkPanel${tone[0].toUpperCase()}${tone.slice(1)}`],
+        hovered && enabled && styles.downloadHover,
+        pressed && enabled && styles.downloadPressed,
+      ]}>
+      <Text style={styles.tournamentLinkLabel}>{label}</Text>
+      <Text style={styles.tournamentLinkBody}>{body}</Text>
+    </Pressable>
   );
 }
 
@@ -641,6 +947,7 @@ function UpcomingTournamentList({
           hasLiveBracket: Boolean(bracket),
         });
         const signupSummary = eventData.signupSummary || { count: 0, loading: true };
+        const signups = signupSummary.signups || [];
         const tournamentPath = getTournamentPath(tournament.slug);
         const signupPath = getCheckInPath(tournament.slug);
         const matchPath = `${tournamentPath}#my-match`;
@@ -678,6 +985,7 @@ function UpcomingTournamentList({
                 <StatPill label="Minimum" value={`${getMinimumPlayers(tournament)} players`} tone="blue" />
                 <StatPill label="Entry" value="Free" tone="green" />
               </View>
+              <UpcomingRosterPreview loading={signupSummary.loading} signups={signups} />
             </View>
             <View style={styles.upcomingActions}>
               <ActionButton href={registrationIsOpen ? signupPath : tournamentPath}>
@@ -690,6 +998,36 @@ function UpcomingTournamentList({
           </Surface>
         );
       })}
+    </View>
+  );
+}
+
+function UpcomingRosterPreview({ loading, signups }) {
+  if (loading) {
+    return <Text style={styles.upcomingRosterEmpty}>Loading public roster...</Text>;
+  }
+
+  if (!signups.length) {
+    return <Text style={styles.upcomingRosterEmpty}>No public signups yet.</Text>;
+  }
+
+  return (
+    <View style={styles.upcomingRosterPreview}>
+      <Text style={styles.upcomingRosterLabel}>Signed up</Text>
+      <View style={styles.upcomingRosterNames}>
+        {signups.slice(0, 6).map((signup, index) => (
+          <View key={signup.id || `${signup.playerName}-${index}`} style={styles.upcomingRosterChip}>
+            <Text numberOfLines={1} style={styles.upcomingRosterChipText}>
+              {signup.playerName || 'Unnamed player'}
+            </Text>
+          </View>
+        ))}
+        {signups.length > 6 ? (
+          <View style={styles.upcomingRosterChip}>
+            <Text style={styles.upcomingRosterChipText}>+{signups.length - 6}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -728,6 +1066,378 @@ function TournamentCapacityPanel() {
 const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
+  },
+  twitchBoard: {
+    backgroundColor: '#06100E',
+    borderColor: 'rgba(214, 162, 78, 0.40)',
+    borderRadius: 24,
+    overflow: 'hidden',
+    padding: 0,
+  },
+  twitchBoardGlow: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderRadius: 999,
+    height: 240,
+    position: 'absolute',
+    right: -90,
+    top: -110,
+    width: 360,
+  },
+  twitchBoardMain: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    padding: 18,
+  },
+  twitchEventCopy: {
+    flex: 2,
+    minWidth: 280,
+  },
+  twitchTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
+  },
+  twitchLiveTag: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  twitchTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 40,
+  },
+  twitchDate: {
+    color: '#FFD66B',
+    fontFamily: 'monospace',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    lineHeight: 20,
+    marginTop: 8,
+    textTransform: 'uppercase',
+  },
+  twitchSummary: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  twitchActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
+  },
+  twitchScoreStack: {
+    flexBasis: 290,
+    flexDirection: 'row',
+    flexGrow: 1,
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  twitchScoreTile: {
+    backgroundColor: 'rgba(214, 162, 78, 0.13)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexBasis: 132,
+    flexGrow: 1,
+    justifyContent: 'center',
+    minHeight: 128,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  twitchScoreLabel: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  twitchScoreValue: {
+    color: '#FFD66B',
+    fontFamily: 'monospace',
+    fontSize: 44,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 50,
+    marginTop: 6,
+  },
+  twitchScoreSub: {
+    color: '#F4EFE6',
+    fontSize: 22,
+  },
+  twitchRosterPanel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    borderTopWidth: 1,
+    padding: 18,
+  },
+  twitchRosterHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  twitchRosterTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 27,
+  },
+  twitchRosterMeta: {
+    color: '#AAB4AE',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  twitchRosterGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  twitchRosterRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(23, 38, 34, 0.82)',
+    borderColor: 'rgba(97, 210, 145, 0.28)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 230,
+    flexDirection: 'row',
+    flexGrow: 1,
+    minHeight: 70,
+    minWidth: 0,
+    padding: 10,
+  },
+  twitchRosterRank: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(97, 210, 145, 0.14)',
+    borderColor: 'rgba(97, 210, 145, 0.38)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    marginRight: 10,
+    width: 42,
+  },
+  twitchRosterRankText: {
+    color: '#61D291',
+    fontFamily: 'monospace',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  twitchRosterNameBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  twitchRosterName: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+  },
+  twitchRosterHandle: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  twitchRosterMore: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.35)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 230,
+    flexGrow: 1,
+    justifyContent: 'center',
+    minHeight: 70,
+    padding: 12,
+  },
+  twitchRosterMoreText: {
+    color: '#FFD66B',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  twitchRosterEmpty: {
+    color: '#AAB4AE',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  downloadGamesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  downloadGameCard: {
+    backgroundColor: '#08110F',
+    borderRadius: 20,
+    flexBasis: 320,
+    flexGrow: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  downloadGameTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  downloadGameMark: {
+    color: '#D6A24E',
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  downloadGameTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 33,
+  },
+  downloadGameBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  downloadButtonStack: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+  },
+  appStoreBadgeShell: {
+    alignItems: 'center',
+    height: APP_STORE_BADGE_HEIGHT,
+    justifyContent: 'center',
+    width: APP_STORE_BADGE_WIDTH,
+  },
+  appStoreBadgeShellLarge: {
+    height: 60,
+    width: 202,
+  },
+  appStoreBadgeImage: {
+    height: APP_STORE_BADGE_HEIGHT,
+    width: APP_STORE_BADGE_WIDTH,
+  },
+  appStoreBadgeImageLarge: {
+    height: 60,
+    width: 202,
+  },
+  premiumLinkButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.16)',
+    borderColor: 'rgba(214, 162, 78, 0.62)',
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    transitionDuration: '160ms',
+    transitionProperty: 'transform, opacity, background-color, border-color',
+  },
+  premiumLinkButtonDisabled: {
+    backgroundColor: 'rgba(244, 239, 230, 0.05)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    opacity: 0.62,
+  },
+  premiumLinkButtonText: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    lineHeight: 17,
+    textTransform: 'uppercase',
+  },
+  premiumLinkButtonTextDisabled: {
+    color: '#AAB4AE',
+  },
+  downloadHover: {
+    transform: [{ translateY: -2 }],
+  },
+  downloadPressed: {
+    opacity: 0.82,
+    transform: [{ translateY: 1 }],
+  },
+  tournamentDownloadGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  tournamentLinkPanel: {
+    backgroundColor: 'rgba(17, 29, 26, 0.88)',
+    borderColor: 'rgba(244, 239, 230, 0.14)',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexBasis: 250,
+    flexGrow: 1,
+    minHeight: 138,
+    minWidth: 0,
+    padding: 16,
+    transitionDuration: '160ms',
+    transitionProperty: 'transform, opacity, background-color, border-color',
+  },
+  tournamentLinkPanelAccent: {
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
+  tournamentLinkPanelGreen: {
+    backgroundColor: 'rgba(97, 210, 145, 0.10)',
+    borderColor: 'rgba(97, 210, 145, 0.36)',
+  },
+  tournamentLinkPanelBlue: {
+    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+    borderColor: 'rgba(108, 199, 255, 0.36)',
+  },
+  tournamentLinkLabel: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 25,
+  },
+  tournamentLinkBody: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+    marginTop: 8,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -963,6 +1673,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     marginTop: 18,
+    gap: 10,
+  },
+  heroActionRowSecondary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 10,
   },
   heroActionButton: {
     minWidth: 190,
@@ -1148,6 +1865,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
+  },
+  upcomingRosterPreview: {
+    marginTop: 10,
+  },
+  upcomingRosterLabel: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  upcomingRosterNames: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  upcomingRosterChip: {
+    backgroundColor: 'rgba(97, 210, 145, 0.12)',
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: 180,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  upcomingRosterChipText: {
+    color: '#F4EFE6',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 15,
+  },
+  upcomingRosterEmpty: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 10,
   },
   upcomingActions: {
     alignSelf: 'center',

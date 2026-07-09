@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { label: 'Home', href: '/' },
   { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
   { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
+  { label: 'Stream', href: '/stream' },
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
   { label: 'Rules', href: '/rules' },

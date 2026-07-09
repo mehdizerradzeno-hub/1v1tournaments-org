@@ -11,3 +11,8 @@
   from = "/check-in/*"
   to = "/check-in/[slug].html"
   status = 200
+
+[[redirects]]
+  from = "/next"
+  to = "/check-in/spades-summer-series"
+  status = 302
