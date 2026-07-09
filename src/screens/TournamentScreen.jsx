@@ -146,6 +146,42 @@ function getNextPublicMatch(bracket) {
     || null;
 }
 
+function getBracketMatches(bracket) {
+  return bracket?.rounds?.flatMap((round) => round.matches || []) || [];
+}
+
+function getMatchTone(match) {
+  if (match?.status === 'final') return 'green';
+  if (match?.status === 'ready' || match?.status === 'active') return 'accent';
+  return 'blue';
+}
+
+function getMatchStatusLabel(match) {
+  if (!match) return 'Waiting';
+  if (match.status === 'final') return 'Final';
+  if (match.status === 'ready') return 'Up next';
+  if (match.status === 'active') return 'Live now';
+  return 'Waiting';
+}
+
+function getMatchPlayerRows(match) {
+  const players = match?.players || [];
+
+  if (players.length) {
+    return players.map((player, index) => ({
+      key: player?.id || `${match.id}-player-${index}`,
+      label: playerLabel(player),
+      isWinner: Boolean(match.winnerId && player?.id === match.winnerId) || playerLabel(player) === match.winnerName,
+      seed: player?.seed || index + 1,
+    }));
+  }
+
+  return [
+    { key: `${match?.id || 'match'}-slot-1`, label: 'TBD', isWinner: false, seed: 1 },
+    { key: `${match?.id || 'match'}-slot-2`, label: 'TBD', isWinner: false, seed: 2 },
+  ];
+}
+
 function matchPlayersLabel(match) {
   const players = match?.players?.map(playerLabel).filter(Boolean) || [];
 
@@ -1058,9 +1094,10 @@ function RegisteredPlayersPanel({
 function LiveBracketBoard({ bracket }) {
   const [openingMatchId, setOpeningMatchId] = useState('');
   const [accessError, setAccessError] = useState('');
-  const completedCount = bracket.rounds
-    .flatMap((round) => round.matches)
-    .filter((match) => match.status === 'final').length;
+  const matches = getBracketMatches(bracket);
+  const completedCount = matches.filter((match) => match.status === 'final').length;
+  const readyCount = matches.filter((match) => match.status === 'ready' || match.status === 'active').length;
+  const nextMatch = getNextPublicMatch(bracket);
 
   async function handleOpenMatch(match) {
     setAccessError('');
@@ -1085,30 +1122,70 @@ function LiveBracketBoard({ bracket }) {
   return (
     <Surface style={styles.liveBracketCard}>
       <View style={styles.liveBracketHeader}>
-        <Badge tone={bracket.status === 'complete' ? 'green' : 'accent'}>{bracket.status}</Badge>
-        <Text style={styles.liveBracketMeta}>
-          {bracket.participantCount} players • {completedCount} final
-        </Text>
+        <View style={styles.liveBracketHeaderCopy}>
+          <Badge tone={bracket.status === 'complete' ? 'green' : 'accent'}>{bracket.status}</Badge>
+          <Text style={styles.liveBracketTitle}>Public bracket</Text>
+          <Text style={styles.liveBracketMeta}>
+            {bracket.participantCount} players • {completedCount}/{matches.length} matches final • {readyCount} ready
+          </Text>
+        </View>
+        <View style={styles.liveBracketStats}>
+          <View style={styles.liveBracketStat}>
+            <Text style={styles.liveBracketStatValue}>{bracket.participantCount}</Text>
+            <Text style={styles.liveBracketStatLabel}>Players</Text>
+          </View>
+          <View style={styles.liveBracketStat}>
+            <Text style={styles.liveBracketStatValue}>{completedCount}</Text>
+            <Text style={styles.liveBracketStatLabel}>Final</Text>
+          </View>
+        </View>
       </View>
       {bracket.winner ? <Text style={styles.liveBracketWinner}>Champion: {bracket.winner.name}</Text> : null}
       {accessError ? <Text style={styles.liveBracketError}>{accessError}</Text> : null}
+
+      {nextMatch ? (
+        <View style={styles.upNextCard}>
+          <View style={styles.upNextTopRow}>
+            <Badge tone={getMatchTone(nextMatch)}>{getMatchStatusLabel(nextMatch)}</Badge>
+            <Text style={styles.upNextRound}>{nextMatch.label}</Text>
+          </View>
+          <Text style={styles.upNextPlayers}>{matchPlayersLabel(nextMatch)}</Text>
+          {nextMatch.status === 'ready' ? (
+            <View style={styles.upNextActions}>
+              <ActionButton onPress={() => handleOpenMatch(nextMatch)}>
+                {openingMatchId === nextMatch.id ? 'Opening...' : 'Play match'}
+              </ActionButton>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.liveRounds}>
         {bracket.rounds.map((round) => (
           <View key={round.index} style={styles.liveRound}>
             <Text style={styles.liveRoundTitle}>{round.title}</Text>
             {round.matches.map((match) => {
-              const players = match.players || [];
+              const playerRows = getMatchPlayerRows(match);
 
               return (
-                <View key={match.id} style={styles.liveMatch}>
+                <View key={match.id} style={[styles.liveMatch, match.status === 'ready' && styles.liveMatchReady, match.status === 'final' && styles.liveMatchFinal]}>
                   <View style={styles.liveMatchTopRow}>
-                    <Badge tone={match.status === 'final' ? 'green' : match.status === 'ready' ? 'accent' : 'blue'}>
-                      {match.status}
-                    </Badge>
+                    <Badge tone={getMatchTone(match)}>{getMatchStatusLabel(match)}</Badge>
                     <Text style={styles.liveMatchLabel}>{match.label}</Text>
                   </View>
-                  <Text style={styles.liveMatchPlayers}>{players.map(playerLabel).join(' vs ')}</Text>
+                  <View style={styles.liveMatchPlayerList}>
+                    {playerRows.map((player) => (
+                      <View key={player.key} style={[styles.liveMatchPlayerRow, player.isWinner && styles.liveMatchPlayerWinner]}>
+                        <View style={styles.liveMatchSeed}>
+                          <Text style={styles.liveMatchSeedText}>{player.seed}</Text>
+                        </View>
+                        <Text numberOfLines={1} style={[styles.liveMatchPlayerName, player.isWinner && styles.liveMatchPlayerNameWinner]}>
+                          {player.label}
+                        </Text>
+                        {player.isWinner ? <Text style={styles.liveMatchWinnerChip}>Winner</Text> : null}
+                      </View>
+                    ))}
+                  </View>
                   {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {match.winnerName}</Text> : null}
                   <View style={styles.liveMatchActions}>
                     {match.status === 'ready' ? (
@@ -1693,17 +1770,57 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(97, 210, 145, 0.30)',
   },
   liveBracketHeader: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 10,
+    gap: 14,
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  liveBracketHeaderCopy: {
+    flex: 1,
+    minWidth: 230,
+  },
+  liveBracketTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 10,
   },
   liveBracketMeta: {
     color: '#AAB4AE',
-    flex: 1,
     fontSize: 13,
     lineHeight: 19,
+    marginTop: 5,
+  },
+  liveBracketStats: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  liveBracketStat: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 16,
+    borderWidth: 1,
+    minWidth: 74,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  liveBracketStatValue: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 26,
+  },
+  liveBracketStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   liveBracketWinner: {
     color: '#61D291',
@@ -1718,6 +1835,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
     marginBottom: 12,
+  },
+  upNextCard: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 14,
+  },
+  upNextTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  upNextRound: {
+    color: '#D6A24E',
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  upNextPlayers: {
+    color: '#F4EFE6',
+    fontSize: 21,
+    fontWeight: '900',
+    lineHeight: 27,
+    marginTop: 10,
+  },
+  upNextActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
   },
   liveRounds: {
     marginTop: 8,
@@ -1739,6 +1890,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     padding: 14,
   },
+  liveMatchReady: {
+    backgroundColor: 'rgba(214, 162, 78, 0.09)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+  },
+  liveMatchFinal: {
+    backgroundColor: 'rgba(97, 210, 145, 0.07)',
+    borderColor: 'rgba(97, 210, 145, 0.28)',
+  },
   liveMatchTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1751,12 +1910,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  liveMatchPlayers: {
+  liveMatchPlayerList: {
+    gap: 8,
+    marginTop: 12,
+  },
+  liveMatchPlayerRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  liveMatchPlayerWinner: {
+    backgroundColor: 'rgba(97, 210, 145, 0.11)',
+    borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  liveMatchSeed: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 239, 230, 0.08)',
+    borderRadius: 999,
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
+  },
+  liveMatchSeedText: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 14,
+  },
+  liveMatchPlayerName: {
     color: '#F4EFE6',
-    fontSize: 16,
+    flex: 1,
+    fontSize: 15,
     fontWeight: '800',
-    lineHeight: 22,
-    marginTop: 10,
+    lineHeight: 20,
+  },
+  liveMatchPlayerNameWinner: {
+    color: '#61D291',
+  },
+  liveMatchWinnerChip: {
+    color: '#61D291',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
   },
   liveMatchWinner: {
     color: '#D6A24E',
