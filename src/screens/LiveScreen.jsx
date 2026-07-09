@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -13,7 +13,8 @@ import {
 import { downloadLinks } from '../lib/downloadLinks.js';
 import { formatDateLine } from '../lib/format.js';
 import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
-import { sendDiscordAlert } from '../lib/tournamentHostingClient.js';
+import { buildDefaultStreamCommands } from '../lib/streamCommands.js';
+import { fetchStreamCommands, sendDiscordAlert } from '../lib/tournamentHostingClient.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -111,65 +112,9 @@ const PRESENTATION_PLAN = [
   },
 ];
 
-function buildTwitchChatCommands({ hasDiscord, nextTournamentPath }) {
-  const tournamentUrl = absoluteSiteUrl(nextTournamentPath);
-
-  return [
-    {
-      command: '!next',
-      response: `Next tournament: ${absoluteSiteUrl('/next')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!join',
-      response: `Join the next tournament: ${absoluteSiteUrl('/next')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!signup',
-      response: `Create an account and join the tournament: ${absoluteSiteUrl('/next')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!match',
-      response: `Find your match and bracket status: ${absoluteSiteUrl(`${nextTournamentPath}#my-match`)}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!bracket',
-      response: `Tournament bracket and roster: ${tournamentUrl}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!format',
-      response: `Tournament format, roster, and bracket details: ${tournamentUrl}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!rules',
-      response: `Tournament rules: ${absoluteSiteUrl('/rules')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!results',
-      response: `Tournament results and standings: ${absoluteSiteUrl('/results')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!discord',
-      response: hasDiscord ? `Join Discord: ${downloadLinks.discord}` : `Discord will be posted here: ${absoluteSiteUrl('/live')}`,
-      where: 'Twitch chat bot',
-    },
-    {
-      command: '!live',
-      response: `Live hub and stream links: ${absoluteSiteUrl('/live')}`,
-      where: 'Twitch chat bot',
-    },
-  ];
-}
-
 export default function LiveScreen() {
   const [activeTab, setActiveTab] = useState('control');
+  const [streamCommands, setStreamCommands] = useState({ commands: [], loading: true, error: '', source: 'default' });
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
   const hasDiscord = isConfiguredUrl(downloadLinks.discord);
@@ -178,6 +123,40 @@ export default function LiveScreen() {
   const nextTournamentPath = nextTournament ? getTournamentPath(nextTournament.slug) : '/next';
   const announcementItems = buildAnnouncementCopy(nextTournament, nextTournamentPath);
   const discordAnnouncement = announcementItems.find((item) => item.label === 'Discord live post')?.text || '';
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCommands() {
+      try {
+        const result = await fetchStreamCommands();
+
+        if (active) {
+          setStreamCommands({
+            commands: result.commands || [],
+            error: '',
+            loading: false,
+            source: result.source || 'saved',
+          });
+        }
+      } catch (error) {
+        if (active) {
+          setStreamCommands({
+            commands: buildDefaultStreamCommands({ hasDiscord, nextTournamentPath }),
+            error: error instanceof Error ? error.message : 'Using default stream commands.',
+            loading: false,
+            source: 'default',
+          });
+        }
+      }
+    }
+
+    loadCommands();
+
+    return () => {
+      active = false;
+    };
+  }, [hasDiscord, nextTournamentPath]);
 
   return (
     <HubScreen
@@ -231,6 +210,7 @@ export default function LiveScreen() {
           hasTwitch={hasTwitch}
           nextTournamentPath={nextTournamentPath}
           streams={streams}
+          streamCommands={streamCommands}
         />
       ) : null}
     </HubScreen>
@@ -444,8 +424,10 @@ function AnnouncePanel({ announcementItems, checklistItems, hasDiscord }) {
   );
 }
 
-function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
-  const chatCommands = buildTwitchChatCommands({ hasDiscord, nextTournamentPath });
+function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams, streamCommands }) {
+  const chatCommands = streamCommands.commands.length
+    ? streamCommands.commands
+    : buildDefaultStreamCommands({ hasDiscord, nextTournamentPath });
 
   return (
     <>
@@ -456,7 +438,7 @@ function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
         stats={[
           { label: 'Stream links', value: String(streams.length) },
           { label: 'Discord', value: hasDiscord ? 'Ready' : 'Pending' },
-          { label: 'Event', value: 'Linked' },
+          { label: 'Commands', value: streamCommands.loading ? 'Loading' : streamCommands.source },
         ]}
         title="Links control"
       />
@@ -493,6 +475,7 @@ function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
       </Section>
 
       <Section description="Copy these into Twitch's built-in chat commands or your bot dashboard." title="Twitch command list">
+        {streamCommands.error ? <Text style={styles.commandWarning}>{streamCommands.error}</Text> : null}
         <TwitchCommandList commands={chatCommands} />
       </Section>
 
@@ -998,6 +981,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
+  },
+  commandWarning: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginBottom: 12,
   },
   commandAction: {
     flexDirection: 'row',

@@ -48,7 +48,9 @@ const tournamentSettingsUtilsFile = fileURLToPath(new URL('../netlify/functions/
 const tournamentEventsFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-events.mjs', import.meta.url));
 const tournamentEventsUtilsFile = fileURLToPath(new URL('../netlify/functions/_tournament-events-utils.mjs', import.meta.url));
 const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/discord-alert.mjs', import.meta.url));
+const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
+const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const tournamentCatalogFile = fileURLToPath(new URL('../src/lib/tournamentCatalog.js', import.meta.url));
 const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
 const netlifyConfigFile = fileURLToPath(new URL('../netlify.toml', import.meta.url));
@@ -144,10 +146,13 @@ test('/live stays wired to stream-day command tools', () => {
   assert.ok(existsSync(liveRouteFile));
   assert.ok(existsSync(liveScreenFile));
   assert.ok(existsSync(discordAlertFunctionFile));
+  assert.ok(existsSync(streamCommandsFunctionFile));
 
   const liveScreenSource = readFileSync(liveScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
   const discordAlertSource = readFileSync(discordAlertFunctionFile, 'utf8');
+  const streamCommandsSource = readFileSync(streamCommandsFunctionFile, 'utf8');
+  const streamCommandsClientSource = readFileSync(streamCommandsClientFile, 'utf8');
 
   assert.match(liveScreenSource, /Go-live checklist/);
   assert.match(liveScreenSource, /LiveCockpit/);
@@ -161,11 +166,7 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /Links control/);
   assert.match(liveScreenSource, /Presentation setup/);
   assert.match(liveScreenSource, /Twitch command list/);
-  assert.match(liveScreenSource, /!join/);
-  assert.match(liveScreenSource, /!signup/);
-  assert.match(liveScreenSource, /!match/);
-  assert.match(liveScreenSource, /!format/);
-  assert.match(liveScreenSource, /!results/);
+  assert.match(liveScreenSource, /fetchStreamCommands/);
   assert.match(liveScreenSource, /Copy command/);
   assert.match(liveScreenSource, /Announcement kit/);
   assert.match(liveScreenSource, /Run of show/);
@@ -177,6 +178,17 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /sendDiscordAlert/);
   assert.match(hostingClientSource, /DISCORD_ALERT_ENDPOINT/);
   assert.match(hostingClientSource, /sendDiscordAlert/);
+  assert.match(hostingClientSource, /STREAM_COMMANDS_ENDPOINT/);
+  assert.match(hostingClientSource, /fetchStreamCommands/);
+  assert.match(streamCommandsSource, /stream-commands/);
+  assert.match(streamCommandsSource, /requireTournamentAdmin/);
+  assert.match(streamCommandsSource, /normalizeStreamCommands/);
+  assert.match(streamCommandsClientSource, /buildDefaultStreamCommands/);
+  assert.match(streamCommandsClientSource, /!join/);
+  assert.match(streamCommandsClientSource, /!signup/);
+  assert.match(streamCommandsClientSource, /!match/);
+  assert.match(streamCommandsClientSource, /!format/);
+  assert.match(streamCommandsClientSource, /!results/);
   assert.match(discordAlertSource, /DISCORD_WEBHOOK_URL/);
   assert.match(discordAlertSource, /requireTournamentAdmin/);
   assert.match(discordAlertSource, /allowed_mentions/);
@@ -437,7 +449,11 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /resetTournamentSettings/);
   assert.match(adminScreenSource, /Host approved/);
   assert.match(adminScreenSource, /hostApproved/);
+  assert.match(adminScreenSource, /Stream commands/);
+  assert.match(adminScreenSource, /handleSaveStreamCommands/);
+  assert.match(adminScreenSource, /Copy endpoint/);
   assert.match(hostingClientSource, /resetTournamentBracket/);
+  assert.match(hostingClientSource, /saveStreamCommands/);
   assert.match(hostingClientSource, /adminHeaders/);
   assert.match(hostingClientSource, /credentials: 'include'/);
 });

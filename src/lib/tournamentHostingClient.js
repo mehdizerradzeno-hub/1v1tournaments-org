@@ -7,6 +7,7 @@ const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
 const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
+const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 
 function isLocalStaticPreview() {
@@ -443,6 +444,55 @@ export async function sendDiscordAlert({ token, message }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Discord alert could not be sent.');
+  }
+
+  return result;
+}
+
+export async function fetchStreamCommands() {
+  const response = await fetch(readEndpoint(STREAM_COMMANDS_ENDPOINT), {
+    credentials: readCredentials(readEndpoint(STREAM_COMMANDS_ENDPOINT)),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Stream commands could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function saveStreamCommands({ token, commands }) {
+  const response = await fetch(STREAM_COMMANDS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ commands }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Stream commands could not be saved.');
+  }
+
+  return result;
+}
+
+export async function resetStreamCommands({ token }) {
+  const response = await fetch(STREAM_COMMANDS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ action: 'reset' }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Stream commands could not be reset.');
   }
 
   return result;

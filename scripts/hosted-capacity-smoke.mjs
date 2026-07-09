@@ -10,6 +10,7 @@ const paths = [
   '/check-in/spades-summer-series',
   '/.netlify/functions/tournament-signup?slug=spades-summer-series',
   '/.netlify/functions/tournament-bracket?slug=spades-summer-series',
+  '/.netlify/functions/stream-commands',
 ];
 
 function positiveInteger(value, fallback) {

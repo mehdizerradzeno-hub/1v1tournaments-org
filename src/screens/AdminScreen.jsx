@@ -45,9 +45,13 @@ import {
   reportTournamentMatchWinner,
   resetTournamentSettings,
   resetTournamentBracket,
+  fetchStreamCommands,
+  resetStreamCommands,
   saveTournamentEvent,
+  saveStreamCommands,
   saveTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
+import { STREAM_COMMAND_ENDPOINT, buildDefaultStreamCommands } from '../lib/streamCommands.js';
 import {
   buildAdminDraftPacket,
   clearAdminSessionRecord,
@@ -275,6 +279,10 @@ export default function AdminScreen() {
   const [bracketError, setBracketError] = useState('');
   const [hostMessage, setHostMessage] = useState('');
   const [hostError, setHostError] = useState('');
+  const [streamCommandText, setStreamCommandText] = useState(() => JSON.stringify(buildDefaultStreamCommands(), null, 2));
+  const [streamCommandLoading, setStreamCommandLoading] = useState(false);
+  const [streamCommandMessage, setStreamCommandMessage] = useState('');
+  const [streamCommandError, setStreamCommandError] = useState('');
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
   const [playerAccount, setPlayerAccount] = useState(null);
@@ -466,6 +474,11 @@ export default function AdminScreen() {
   function setHostFeedback(nextMessage = '', nextError = '') {
     setHostMessage(nextMessage);
     setHostError(nextError);
+  }
+
+  function setStreamCommandFeedback(nextMessage = '', nextError = '') {
+    setStreamCommandMessage(nextMessage);
+    setStreamCommandError(nextError);
   }
 
   function applyScheduleFields(tournament, settings = null) {
@@ -1608,6 +1621,92 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleLoadStreamCommands() {
+    setStreamCommandLoading(true);
+    setStreamCommandFeedback('', '');
+
+    try {
+      const result = await fetchStreamCommands();
+      setStreamCommandText(JSON.stringify(result.commands || buildDefaultStreamCommands(), null, 2));
+      setStreamCommandFeedback(`Loaded ${result.source || 'saved'} stream commands.`, '');
+    } catch (error) {
+      setStreamCommandFeedback('', error instanceof Error ? error.message : 'Could not load stream commands.');
+    } finally {
+      setStreamCommandLoading(false);
+    }
+  }
+
+  async function handleSaveStreamCommands() {
+    const token = rosterToken.trim();
+
+    if (!hasHostCredential) {
+      setStreamCommandFeedback('', 'Sign in with a host-approved account or enter the fallback token before saving stream commands.');
+      return;
+    }
+
+    let commands;
+
+    try {
+      commands = JSON.parse(streamCommandText);
+    } catch {
+      setStreamCommandFeedback('', 'Stream commands must be valid JSON.');
+      return;
+    }
+
+    setStreamCommandLoading(true);
+    setStreamCommandFeedback('', '');
+
+    try {
+      const result = await saveStreamCommands({ token, commands });
+      const savedCommands = result.commands || commands;
+      setStreamCommandText(JSON.stringify(savedCommands, null, 2));
+      setStreamCommandFeedback(`Saved ${savedCommands.length} stream command${savedCommands.length === 1 ? '' : 's'}.`, '');
+    } catch (error) {
+      setStreamCommandFeedback('', error instanceof Error ? error.message : 'Could not save stream commands.');
+    } finally {
+      setStreamCommandLoading(false);
+    }
+  }
+
+  async function handleResetStreamCommands() {
+    const token = rosterToken.trim();
+
+    if (!hasHostCredential) {
+      setStreamCommandFeedback('', 'Sign in with a host-approved account or enter the fallback token before resetting stream commands.');
+      return;
+    }
+
+    setStreamCommandLoading(true);
+    setStreamCommandFeedback('', '');
+
+    try {
+      const result = await resetStreamCommands({ token });
+      setStreamCommandText(JSON.stringify(result.commands || buildDefaultStreamCommands(), null, 2));
+      setStreamCommandFeedback('Reset stream commands to defaults.', '');
+    } catch (error) {
+      setStreamCommandFeedback('', error instanceof Error ? error.message : 'Could not reset stream commands.');
+    } finally {
+      setStreamCommandLoading(false);
+    }
+  }
+
+  async function handleCopyStreamCommandEndpoint() {
+    const endpoint = `https://1v1tournaments.org${STREAM_COMMAND_ENDPOINT}`;
+
+    try {
+      if (canUseClipboard()) {
+        await globalThis.navigator.clipboard.writeText(endpoint);
+        setStreamCommandFeedback('Bot command endpoint copied.', '');
+        return;
+      }
+
+      Alert.alert('Bot command endpoint', endpoint);
+      setStreamCommandFeedback('Clipboard is not available here, so the endpoint was shown in an alert.', '');
+    } catch {
+      setStreamCommandFeedback('', 'Could not copy the bot command endpoint.');
+    }
+  }
+
   function renderRunStatusItem({ label, value, tone = 'blue', body }) {
     return (
       <View style={styles.runStatusItem}>
@@ -2080,6 +2179,53 @@ export default function AdminScreen() {
     );
   }
 
+  function renderStreamCommandSection() {
+    return (
+      <Section
+        description="Edit the public commands used by Twitch chat bots, Discord helpers, and the Live page."
+        title="Stream commands">
+        <Surface style={styles.panel}>
+          <View style={styles.metaRow}>
+            <Badge tone="accent">Bot endpoint</Badge>
+            <Text style={styles.metaText}>https://1v1tournaments.org{STREAM_COMMAND_ENDPOINT}</Text>
+          </View>
+          <Text style={styles.copy}>
+            Save command JSON here, then point a Twitch or Discord bot at the public endpoint. Commands are read-only for bots and require host access to edit.
+          </Text>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            onChangeText={setStreamCommandText}
+            placeholder="Stream command JSON"
+            placeholderTextColor="#6B766F"
+            scrollEnabled
+            selectTextOnFocus
+            spellCheck={false}
+            style={styles.serverEditor}
+            value={streamCommandText}
+          />
+          {streamCommandError ? <Text style={styles.errorText}>{streamCommandError}</Text> : null}
+          {streamCommandMessage ? <Text style={styles.successText}>{streamCommandMessage}</Text> : null}
+          <View style={styles.buttonRow}>
+            <ActionButton onPress={handleLoadStreamCommands} variant="secondary">
+              {streamCommandLoading ? 'Loading...' : 'Load commands'}
+            </ActionButton>
+            <ActionButton disabled={!hasHostCredential || streamCommandLoading} onPress={handleSaveStreamCommands}>
+              Save commands
+            </ActionButton>
+            <ActionButton disabled={!hasHostCredential || streamCommandLoading} onPress={handleResetStreamCommands} variant="secondary">
+              Reset defaults
+            </ActionButton>
+            <ActionButton onPress={handleCopyStreamCommandEndpoint} variant="ghost">
+              Copy endpoint
+            </ActionButton>
+          </View>
+        </Surface>
+      </Section>
+    );
+  }
+
   const actions = [
     { label: 'Home', href: '/' },
     { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
@@ -2304,6 +2450,8 @@ export default function AdminScreen() {
       {renderLiveRosterSection()}
 
       {renderBracketManagerSection()}
+
+      {renderStreamCommandSection()}
 
       {showDraftTools ? (
         <>
