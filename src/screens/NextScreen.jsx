@@ -261,6 +261,7 @@ export default function NextScreen() {
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
       showHero={false}
+      showNavigation={false}
       subtitle={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
       stickyActions={false}
       title={tournament.title}>

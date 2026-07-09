@@ -601,6 +601,7 @@ export function HubScreen({
   footerNote,
   forceTopNav = false,
   showHero = true,
+  showNavigation = true,
   heroVariant = 'default',
   stickyActions = true,
 }) {
@@ -609,12 +610,12 @@ export function HubScreen({
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
-  const showTopNav = forceTopNav || !showMobileNav;
+  const showTopNav = showNavigation && (forceTopNav || !showMobileNav);
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
   const showTinyHeader = width > 0 && width < 390;
   const showStickyActions = stickyActions && pathname !== '/admin';
-  const showDockedMobileNav = showMobileNav && showStickyActions;
-  const showInlineMobileNav = showMobileNav && !showStickyActions;
+  const showDockedMobileNav = showNavigation && showMobileNav && showStickyActions;
+  const showInlineMobileNav = showNavigation && showMobileNav && !showStickyActions;
   const showStickyActionCopy = width >= 430;
   const compactHero = heroVariant === 'compact';
 

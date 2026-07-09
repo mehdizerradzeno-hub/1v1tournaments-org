@@ -617,6 +617,7 @@ export default function TournamentScreen({ slug }) {
       }
       stickyActions={false}
       showHero={false}
+      showNavigation={false}
       title={visibleTournament.title}>
       <TournamentLobbyHero
         advertisedRosterCap={advertisedRosterCap}
