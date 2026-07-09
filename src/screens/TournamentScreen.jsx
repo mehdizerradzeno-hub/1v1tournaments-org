@@ -317,12 +317,14 @@ export default function TournamentScreen({ slug }) {
 
     loadTournamentRecord();
 
-    async function loadBracket() {
+    async function loadBracket({ silent = false } = {}) {
       if (!slug) {
         return;
       }
 
-      setBracketState({ loading: true, error: '' });
+      if (!silent) {
+        setBracketState({ loading: true, error: '' });
+      }
 
       try {
         const result = await fetchTournamentBracket({ slug });
@@ -344,8 +346,10 @@ export default function TournamentScreen({ slug }) {
 
     loadBracket();
 
-    async function loadSignupSummary() {
-      setSignupSummary((current) => ({ ...current, loading: true, error: '' }));
+    async function loadSignupSummary({ silent = false } = {}) {
+      if (!silent) {
+        setSignupSummary((current) => ({ ...current, loading: true, error: '' }));
+      }
 
       try {
         const result = await fetchSignupSummary({ slug });
@@ -374,8 +378,10 @@ export default function TournamentScreen({ slug }) {
 
     loadSignupSummary();
 
-    async function loadPlayerStatus() {
-      setPlayerStatus((current) => ({ ...current, loading: true, error: '' }));
+    async function loadPlayerStatus({ silent = false } = {}) {
+      if (!silent) {
+        setPlayerStatus((current) => ({ ...current, loading: true, error: '' }));
+      }
 
       try {
         const result = await fetchTournamentPlayerStatus({ slug });
@@ -395,9 +401,15 @@ export default function TournamentScreen({ slug }) {
     }
 
     loadPlayerStatus();
+    const refreshTimer = setInterval(() => {
+      loadBracket({ silent: true });
+      loadSignupSummary({ silent: true });
+      loadPlayerStatus({ silent: true });
+    }, 15000);
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
     };
   }, [slug, seededTournament]);
 

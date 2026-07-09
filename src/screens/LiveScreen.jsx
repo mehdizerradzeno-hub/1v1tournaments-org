@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -15,6 +16,10 @@ import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, sit
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+function canUseClipboard() {
+  return typeof globalThis.navigator !== 'undefined' && Boolean(globalThis.navigator?.clipboard?.writeText);
 }
 
 function absoluteSiteUrl(path) {
@@ -42,6 +47,15 @@ function buildAnnouncementCopy(nextTournament, nextTournamentPath) {
       label: 'Short social post',
       text: `${eventTitle} is coming up. Join the bracket, watch live, and follow results here: ${eventUrl}`,
     },
+  ];
+}
+
+function buildGoLiveChecklist({ hasDiscord, hasTwitch }) {
+  return [
+    { label: 'Twitch URL', ready: hasTwitch, value: hasTwitch ? 'Connected' : 'Set TWITCH_URL' },
+    { label: 'Discord URL', ready: hasDiscord, value: hasDiscord ? 'Connected' : 'Optional placeholder' },
+    { label: 'Overlay URLs', ready: true, value: 'Ready' },
+    { label: 'Announcement copy', ready: true, value: 'Ready' },
   ];
 }
 
@@ -109,6 +123,10 @@ export default function LiveScreen() {
             external={hasDiscord}
           />
         </View>
+      </Section>
+
+      <Section description="Automated stream-day readiness check for what can be handled from this site." title="Go-live checklist">
+        <GoLiveChecklist items={buildGoLiveChecklist({ hasDiscord, hasTwitch })} />
       </Section>
 
       <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
@@ -298,8 +316,57 @@ function AnnouncementKit({ items }) {
         <Surface key={item.label} style={styles.announcementCard}>
           <Text style={styles.announcementLabel}>{item.label}</Text>
           <Text selectable style={styles.announcementText}>{item.text}</Text>
+          <CopyAction text={item.text} />
         </Surface>
       ))}
+    </View>
+  );
+}
+
+function GoLiveChecklist({ items }) {
+  return (
+    <Surface style={styles.checklistCard}>
+      <View style={styles.checklistGrid}>
+        {items.map((item) => (
+          <View key={item.label} style={[styles.checklistItem, item.ready && styles.checklistItemReady]}>
+            <View style={[styles.checklistDot, item.ready && styles.checklistDotReady]} />
+            <View style={styles.checklistCopy}>
+              <Text style={styles.checklistLabel}>{item.label}</Text>
+              <Text style={[styles.checklistValue, item.ready && styles.checklistValueReady]}>{item.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.checklistNote}>
+        Clipboard buttons use the browser clipboard when available. Overlays, the next-event lobby, and tournament pages refresh live data automatically.
+      </Text>
+    </Surface>
+  );
+}
+
+function CopyAction({ label = 'Copy', text }) {
+  const [feedback, setFeedback] = useState('');
+
+  async function handleCopy() {
+    if (!canUseClipboard()) {
+      setFeedback('Select text');
+      return;
+    }
+
+    try {
+      await globalThis.navigator.clipboard.writeText(text);
+      setFeedback('Copied');
+      setTimeout(() => setFeedback(''), 1800);
+    } catch {
+      setFeedback('Could not copy');
+    }
+  }
+
+  return (
+    <View style={styles.copyActionRow}>
+      <ActionButton onPress={handleCopy} variant="secondary">
+        {feedback || label}
+      </ActionButton>
     </View>
   );
 }
@@ -314,6 +381,7 @@ function OverlayLinkCard({ body, href, recommendedSize, title }) {
       <View style={styles.overlayUrlBox}>
         <Text style={styles.overlayUrlLabel}>Browser source URL</Text>
         <Text selectable style={styles.overlayUrlText}>{url}</Text>
+        <CopyAction label="Copy URL" text={url} />
       </View>
       <View style={styles.overlayUrlBox}>
         <Text style={styles.overlayUrlLabel}>Recommended size</Text>
@@ -353,6 +421,70 @@ const styles = StyleSheet.create({
   },
   block: {
     marginBottom: 14,
+  },
+  checklistCard: {
+    borderColor: 'rgba(97, 210, 145, 0.28)',
+  },
+  checklistCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  checklistDot: {
+    backgroundColor: 'rgba(244, 239, 230, 0.16)',
+    borderColor: 'rgba(244, 239, 230, 0.24)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 14,
+    width: 14,
+  },
+  checklistDotReady: {
+    backgroundColor: '#61D291',
+    borderColor: 'rgba(97, 210, 145, 0.72)',
+  },
+  checklistGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  checklistItem: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexBasis: 210,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    padding: 12,
+  },
+  checklistItemReady: {
+    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    borderColor: 'rgba(97, 210, 145, 0.22)',
+  },
+  checklistLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  checklistNote: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  checklistValue: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  checklistValueReady: {
+    color: '#61D291',
   },
   commandAction: {
     flexDirection: 'row',
@@ -396,6 +528,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 28,
     marginTop: 6,
+  },
+  copyActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
   },
   discordActions: {
     flexDirection: 'row',

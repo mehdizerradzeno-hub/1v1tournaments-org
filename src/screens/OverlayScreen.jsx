@@ -177,8 +177,15 @@ export default function OverlayScreen({ variant = 'full' }) {
     }
 
     let active = true;
+    let refreshing = false;
 
     async function loadEventData() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
       const settled = await Promise.allSettled(
         upcoming.map(async (tournament) => {
           const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
@@ -212,12 +219,16 @@ export default function OverlayScreen({ variant = 'full' }) {
             .map((result) => [result.value.slug, result.value]),
         ),
       );
+
+      refreshing = false;
     }
 
     loadEventData();
+    const refreshTimer = setInterval(loadEventData, 15000);
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
     };
   }, [upcoming, upcomingSlugs]);
 
