@@ -49,6 +49,7 @@ const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/dis
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const tournamentCatalogFile = fileURLToPath(new URL('../src/lib/tournamentCatalog.js', import.meta.url));
 const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
+const netlifyConfigFile = fileURLToPath(new URL('../netlify.toml', import.meta.url));
 
 test('/spades stays wired to the dedicated Spades route file', () => {
   assert.equal(getGamePath('spades'), '/spades');
@@ -81,14 +82,17 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
 test('/next stays wired to the public next-event lobby', () => {
   assert.ok(existsSync(nextRouteFile));
   assert.ok(existsSync(nextScreenFile));
+  assert.ok(existsSync(netlifyConfigFile));
 
   const nextRouteSource = readFileSync(nextRouteFile, 'utf8');
   const nextScreenSource = readFileSync(nextScreenFile, 'utf8');
+  const netlifyConfigSource = readFileSync(netlifyConfigFile, 'utf8');
 
   assert.match(nextRouteSource, /NextScreen/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
   assert.match(nextScreenSource, /Next tournament lobby/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
+  assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
 });
 
 test('/live stays wired to stream-day command tools', () => {
