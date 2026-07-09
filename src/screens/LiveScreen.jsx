@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ActionButton,
@@ -305,12 +305,13 @@ function CommandCard({ actionLabel, body, external = false, href, meta, title, t
 
 function DiscordAlertPanel({ hasDiscord, message }) {
   const [sendState, setSendState] = useState({ sending: false, feedback: '', error: '' });
+  const [adminToken, setAdminToken] = useState('');
 
   async function handleSendDiscordAlert() {
     setSendState({ sending: true, feedback: '', error: '' });
 
     try {
-      await sendDiscordAlert({ message });
+      await sendDiscordAlert({ message, token: adminToken.trim() });
       setSendState({ sending: false, feedback: 'Discord alert sent.', error: '' });
     } catch (error) {
       setSendState({
@@ -344,6 +345,22 @@ function DiscordAlertPanel({ hasDiscord, message }) {
           <Text style={styles.discordStepLabel}>Later</Text>
           <Text style={styles.discordStepValue}>Auto live alerts</Text>
         </View>
+      </View>
+      <View style={styles.discordTokenBlock}>
+        <Text style={styles.discordTokenLabel}>Fallback admin token</Text>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setAdminToken}
+          placeholder="Netlify TOURNAMENT_ADMIN_TOKEN"
+          placeholderTextColor="rgba(244, 239, 230, 0.40)"
+          secureTextEntry
+          style={styles.discordTokenInput}
+          value={adminToken}
+        />
+        <Text style={styles.discordTokenHelp}>
+          Use this when signed-in host auth is unavailable during a manual deploy.
+        </Text>
       </View>
       <View style={styles.discordActions}>
         <ActionButton onPress={handleSendDiscordAlert}>
@@ -705,6 +722,36 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 22,
     marginTop: 4,
+  },
+  discordTokenBlock: {
+    marginTop: 14,
+  },
+  discordTokenHelp: {
+    color: '#AAB4AE',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  discordTokenInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  discordTokenLabel: {
+    color: '#6CC7FF',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
   },
   discordTitle: {
     color: '#F4EFE6',

@@ -110,6 +110,8 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /OBS scene map/);
   assert.match(liveScreenSource, /navigator\.clipboard\.writeText/);
   assert.match(liveScreenSource, /Send live alert/);
+  assert.match(liveScreenSource, /Fallback admin token/);
+  assert.match(liveScreenSource, /TOURNAMENT_ADMIN_TOKEN/);
   assert.match(liveScreenSource, /sendDiscordAlert/);
   assert.match(hostingClientSource, /DISCORD_ALERT_ENDPOINT/);
   assert.match(hostingClientSource, /sendDiscordAlert/);
