@@ -93,6 +93,66 @@ const LIVE_TABS = [
   { id: 'links', label: 'Links' },
 ];
 
+const PRESENTATION_PLAN = [
+  {
+    label: 'Twitch chat',
+    title: 'Send viewers to /next',
+    body: 'Use chat commands for join, match, Discord, rules, and live links.',
+  },
+  {
+    label: 'OBS',
+    title: 'Use the overlay package',
+    body: 'Full overlay before the event, compact during gameplay, bracket overlay between matches.',
+  },
+  {
+    label: 'Host screen',
+    title: 'Keep /live open',
+    body: 'Use this dashboard for Twitch, Discord, copy blocks, alerts, and browser-source URLs.',
+  },
+];
+
+function buildTwitchChatCommands({ hasDiscord, nextTournamentPath }) {
+  const tournamentUrl = absoluteSiteUrl(nextTournamentPath);
+
+  return [
+    {
+      command: '!next',
+      response: `Next tournament: ${absoluteSiteUrl('/next')}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!join',
+      response: `Join the next tournament: ${absoluteSiteUrl('/next')}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!match',
+      response: `Find your match and bracket status: ${absoluteSiteUrl(`${nextTournamentPath}#my-match`)}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!bracket',
+      response: `Tournament bracket and roster: ${tournamentUrl}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!rules',
+      response: `Tournament rules: ${absoluteSiteUrl('/rules')}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!discord',
+      response: hasDiscord ? `Join Discord: ${downloadLinks.discord}` : `Discord will be posted here: ${absoluteSiteUrl('/live')}`,
+      where: 'Twitch chat bot',
+    },
+    {
+      command: '!live',
+      response: `Live hub and stream links: ${absoluteSiteUrl('/live')}`,
+      where: 'Twitch chat bot',
+    },
+  ];
+}
+
 export default function LiveScreen() {
   const [activeTab, setActiveTab] = useState('control');
   const streams = getStreams();
@@ -244,6 +304,8 @@ function LiveCommandTabs({ activeTab, onSelectTab }) {
 function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTournament, nextTournamentPath }) {
   return (
     <>
+      <PresentationPlan />
+
       <LiveTabCommandCard
         body="Start stream day here: open Twitch, confirm the event, then send the live alert."
         primary={hasTwitch ? { label: 'Open Twitch', href: downloadLinks.twitch, external: true } : { label: 'Set Twitch URL', href: '/stream' }}
@@ -368,6 +430,8 @@ function AnnouncePanel({ announcementItems, checklistItems, hasDiscord }) {
 }
 
 function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
+  const chatCommands = buildTwitchChatCommands({ hasDiscord, nextTournamentPath });
+
   return (
     <>
       <LiveTabCommandCard
@@ -413,6 +477,10 @@ function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
         </View>
       </Section>
 
+      <Section description="Copy these into Twitch's built-in chat commands or your bot dashboard." title="Twitch command list">
+        <TwitchCommandList commands={chatCommands} />
+      </Section>
+
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
         {streams.map((stream) => (
           <View key={stream.slug} style={styles.block}>
@@ -428,6 +496,42 @@ function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
         ) : null}
       </Section>
     </>
+  );
+}
+
+function PresentationPlan() {
+  return (
+    <Section description="Recommended public presentation setup for Twitch day." title="Presentation setup">
+      <View style={styles.presentationGrid}>
+        {PRESENTATION_PLAN.map((item, index) => (
+          <Surface key={item.label} style={styles.presentationCard}>
+            <View style={styles.presentationNumber}>
+              <Text style={styles.presentationNumberText}>{index + 1}</Text>
+            </View>
+            <Text style={styles.presentationLabel}>{item.label}</Text>
+            <Text style={styles.presentationTitle}>{item.title}</Text>
+            <Text style={styles.presentationBody}>{item.body}</Text>
+          </Surface>
+        ))}
+      </View>
+    </Section>
+  );
+}
+
+function TwitchCommandList({ commands }) {
+  return (
+    <View style={styles.chatCommandGrid}>
+      {commands.map((item) => (
+        <Surface key={item.command} style={styles.chatCommandCard}>
+          <View style={styles.chatCommandTopRow}>
+            <Text selectable style={styles.chatCommandName}>{item.command}</Text>
+            <Badge tone="blue">{item.where}</Badge>
+          </View>
+          <Text selectable style={styles.chatCommandResponse}>{item.response}</Text>
+          <CopyAction label="Copy response" text={item.response} />
+        </Surface>
+      ))}
+    </View>
   );
 }
 
@@ -849,6 +953,36 @@ const styles = StyleSheet.create({
   checklistValueReady: {
     color: '#61D291',
   },
+  chatCommandCard: {
+    borderColor: 'rgba(108, 199, 255, 0.24)',
+    flexBasis: 250,
+    flexGrow: 1,
+  },
+  chatCommandGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  chatCommandName: {
+    color: '#6CC7FF',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+  },
+  chatCommandResponse: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 21,
+    marginTop: 12,
+  },
+  chatCommandTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
   commandAction: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1121,6 +1255,54 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 28,
     marginTop: 8,
+  },
+  presentationBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  presentationCard: {
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    flexBasis: 240,
+    flexGrow: 1,
+  },
+  presentationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  presentationLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    marginTop: 12,
+    textTransform: 'uppercase',
+  },
+  presentationNumber: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.16)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  presentationNumberText: {
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  presentationTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+    marginTop: 6,
   },
   tabBar: {
     flexDirection: 'row',

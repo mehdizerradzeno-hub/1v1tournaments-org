@@ -159,6 +159,10 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /OBS control/);
   assert.match(liveScreenSource, /Announcement control/);
   assert.match(liveScreenSource, /Links control/);
+  assert.match(liveScreenSource, /Presentation setup/);
+  assert.match(liveScreenSource, /Twitch command list/);
+  assert.match(liveScreenSource, /!join/);
+  assert.match(liveScreenSource, /!match/);
   assert.match(liveScreenSource, /Announcement kit/);
   assert.match(liveScreenSource, /Run of show/);
   assert.match(liveScreenSource, /OBS scene map/);
