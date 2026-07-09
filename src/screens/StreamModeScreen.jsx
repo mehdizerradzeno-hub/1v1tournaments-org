@@ -14,7 +14,6 @@ import {
   getCheckInPath,
   getTournamentPath,
   getUpcomingTournaments,
-  siteData,
 } from '../lib/siteData.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
 import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
