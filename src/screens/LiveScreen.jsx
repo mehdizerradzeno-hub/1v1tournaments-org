@@ -86,7 +86,15 @@ const OBS_SCENES = [
   { scene: 'Intermission', source: 'Live hub', url: '/live', size: 'Browser window' },
 ];
 
+const LIVE_TABS = [
+  { id: 'control', label: 'Control' },
+  { id: 'obs', label: 'OBS' },
+  { id: 'announce', label: 'Announce' },
+  { id: 'links', label: 'Links' },
+];
+
 export default function LiveScreen() {
+  const [activeTab, setActiveTab] = useState('control');
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
   const hasDiscord = isConfiguredUrl(downloadLinks.discord);
@@ -116,6 +124,61 @@ export default function LiveScreen() {
       ]}
       subtitle="Twitch broadcast, tournament links, and community channels"
       title="Live coverage">
+      <LiveCommandTabs activeTab={activeTab} onSelectTab={setActiveTab} />
+
+      {activeTab === 'control' ? (
+        <ControlPanel
+          discordAnnouncement={discordAnnouncement}
+          hasDiscord={hasDiscord}
+          hasTwitch={hasTwitch}
+          nextTournament={nextTournament}
+          nextTournamentPath={nextTournamentPath}
+        />
+      ) : null}
+
+      {activeTab === 'obs' ? <ObsPanel /> : null}
+
+      {activeTab === 'announce' ? (
+        <AnnouncePanel
+          announcementItems={announcementItems}
+          checklistItems={buildGoLiveChecklist({ hasDiscord, hasTwitch })}
+        />
+      ) : null}
+
+      {activeTab === 'links' ? (
+        <LinksPanel
+          hasDiscord={hasDiscord}
+          hasTwitch={hasTwitch}
+          nextTournamentPath={nextTournamentPath}
+          streams={streams}
+        />
+      ) : null}
+    </HubScreen>
+  );
+}
+
+function LiveCommandTabs({ activeTab, onSelectTab }) {
+  return (
+    <View style={styles.tabBar}>
+      {LIVE_TABS.map((tab) => {
+        const selected = activeTab === tab.id;
+
+        return (
+          <ActionButton
+            key={tab.id}
+            onPress={() => onSelectTab(tab.id)}
+            variant={selected ? 'primary' : 'secondary'}>
+            {tab.label}
+          </ActionButton>
+        );
+      })}
+    </View>
+  );
+}
+
+function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTournament, nextTournamentPath }) {
+  return (
+    <>
       <LiveBroadcastPanel
         hasDiscord={hasDiscord}
         hasTwitch={hasTwitch}
@@ -123,6 +186,87 @@ export default function LiveScreen() {
         nextTournamentPath={nextTournamentPath}
       />
 
+      <Section description="The stream-day controls that should stay within reach." title="Control desk">
+        <View style={styles.controlGrid}>
+          <DiscordAlertPanel hasDiscord={hasDiscord} message={discordAnnouncement} />
+          <Surface style={styles.quickPanel}>
+            <Text style={styles.quickMeta}>Quick actions</Text>
+            <Text style={styles.quickTitle}>Open the important stuff</Text>
+            <View style={styles.quickActions}>
+              {hasTwitch ? (
+                <ActionButton external href={downloadLinks.twitch}>
+                  Open Twitch
+                </ActionButton>
+              ) : (
+                <ActionButton href="/stream">Set Twitch URL</ActionButton>
+              )}
+              <ActionButton href={nextTournamentPath} variant="secondary">
+                Tournament page
+              </ActionButton>
+              <CopyAction label="Copy full overlay" text={absoluteSiteUrl('/overlay')} />
+              <CopyAction label="Copy bracket overlay" text={absoluteSiteUrl('/overlay/bracket')} />
+            </View>
+          </Surface>
+        </View>
+      </Section>
+    </>
+  );
+}
+
+function ObsPanel() {
+  return (
+    <>
+      <Section description="Recommended OBS scenes and browser sources." title="OBS scene map">
+        <ObsSceneMap items={OBS_SCENES} />
+      </Section>
+
+      <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
+        <View style={styles.overlayGrid}>
+          <OverlayLinkCard
+            body="Full tournament panel with signup count, countdown, roster chips, QR code, and next match."
+            href="/overlay"
+            recommendedSize="1280 x 360"
+            title="Full overlay"
+          />
+          <OverlayLinkCard
+            body="Lower-third layout for gameplay scenes when the table needs most of the screen."
+            href="/overlay/compact"
+            recommendedSize="1280 x 170"
+            title="Compact overlay"
+          />
+          <OverlayLinkCard
+            body="Current or next match focus for bracket transitions and between-game scenes."
+            href="/overlay/bracket"
+            recommendedSize="1100 x 260"
+            title="Bracket overlay"
+          />
+        </View>
+      </Section>
+    </>
+  );
+}
+
+function AnnouncePanel({ announcementItems, checklistItems }) {
+  return (
+    <>
+      <Section description="Copy-ready text for Twitch, Discord, and social posts." title="Announcement kit">
+        <AnnouncementKit items={announcementItems} />
+      </Section>
+
+      <Section description="Automated stream-day readiness check for what can be handled from this site." title="Go-live checklist">
+        <GoLiveChecklist items={checklistItems} />
+      </Section>
+
+      <Section description="A practical operator flow for running the tournament stream." title="Run of show">
+        <RunOfShow items={RUN_OF_SHOW} />
+      </Section>
+    </>
+  );
+}
+
+function LinksPanel({ hasDiscord, hasTwitch, nextTournamentPath, streams }) {
+  return (
+    <>
       <Section description="The links viewers and stream setup need most during the show." title="Stream command center">
         <View style={styles.commandGrid}>
           <CommandCard
@@ -154,49 +298,6 @@ export default function LiveScreen() {
         </View>
       </Section>
 
-      <Section description="Automated stream-day readiness check for what can be handled from this site." title="Go-live checklist">
-        <GoLiveChecklist items={buildGoLiveChecklist({ hasDiscord, hasTwitch })} />
-      </Section>
-
-      <Section description="A practical operator flow for running the tournament stream." title="Run of show">
-        <RunOfShow items={RUN_OF_SHOW} />
-      </Section>
-
-      <Section description="Recommended OBS scenes and browser sources." title="OBS scene map">
-        <ObsSceneMap items={OBS_SCENES} />
-      </Section>
-
-      <Section description="Browser-source URLs for Twitch scenes." title="Overlay sources">
-        <View style={styles.overlayGrid}>
-          <OverlayLinkCard
-            body="Full tournament panel with signup count, countdown, roster chips, QR code, and next match."
-            href="/overlay"
-            recommendedSize="1280 x 360"
-            title="Full overlay"
-          />
-          <OverlayLinkCard
-            body="Lower-third layout for gameplay scenes when the table needs most of the screen."
-            href="/overlay/compact"
-            recommendedSize="1280 x 170"
-            title="Compact overlay"
-          />
-          <OverlayLinkCard
-            body="Current or next match focus for bracket transitions and between-game scenes."
-            href="/overlay/bracket"
-            recommendedSize="1100 x 260"
-            title="Bracket overlay"
-          />
-        </View>
-      </Section>
-
-      <Section description="Clear stream-day notification status for the community layer." title="Discord alerts">
-        <DiscordAlertPanel hasDiscord={hasDiscord} message={discordAnnouncement} />
-      </Section>
-
-      <Section description="Copy-ready text for Twitch, Discord, and social posts." title="Announcement kit">
-        <AnnouncementKit items={announcementItems} />
-      </Section>
-
       <Section description="Open the spectator table during a match. Use YouTube for the channel and replay links." title="Current links">
         {streams.map((stream) => (
           <View key={stream.slug} style={styles.block}>
@@ -211,18 +312,7 @@ export default function LiveScreen() {
           />
         ) : null}
       </Section>
-
-      <Section description="The official watch path for tournament day." title="Coverage note">
-        <Surface style={styles.noteCard}>
-          <Text style={styles.noteCopy}>
-            Keep this page open during events when viewers need the spectator table or replay links.
-          </Text>
-          <ActionButton href="/rules" variant="secondary">
-            Keep the rules and live links aligned
-          </ActionButton>
-        </Surface>
-      </Section>
-    </HubScreen>
+    </>
   );
 }
 
@@ -652,6 +742,12 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     marginTop: 6,
   },
+  controlGrid: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   copyActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -774,6 +870,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  quickMeta: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  quickPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    flexBasis: 280,
+    flexGrow: 1,
+  },
+  quickTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 8,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 6,
   },
   liveActionRow: {
     flexDirection: 'row',
