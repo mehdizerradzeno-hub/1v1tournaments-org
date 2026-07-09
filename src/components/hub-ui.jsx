@@ -31,6 +31,12 @@ const MOBILE_NAV_ITEMS = [
   { label: 'Ranks', href: '/leaderboard' },
 ];
 
+const STICKY_ACTION_ITEMS = [
+  { label: 'Join', href: PRIMARY_CHECK_IN_PATH, tone: 'primary' },
+  { label: 'My match', href: PRIMARY_MATCH_PATH, tone: 'secondary', activePath: PRIMARY_TOURNAMENT_PATH },
+  { label: 'Watch', href: '/live', tone: 'secondary' },
+];
+
 const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
 
@@ -563,6 +569,8 @@ export function HubScreen({
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = forceTopNav || !showMobileNav;
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
+  const showStickyActions = pathname !== '/admin';
+  const showStickyActionCopy = width >= 430;
 
   useEffect(() => {
     let active = true;
@@ -616,7 +624,12 @@ export function HubScreen({
       </View>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, showMobileNav && styles.scrollContentWithMobileNav]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            showStickyActions && styles.scrollContentWithStickyActions,
+            showMobileNav && styles.scrollContentWithMobileNav,
+            showStickyActions && showMobileNav && styles.scrollContentWithStickyActionsAndMobileNav,
+          ]}
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
             <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop]}>
@@ -723,6 +736,35 @@ export function HubScreen({
           })}
         </View>
       ) : null}
+      {showStickyActions ? (
+        <View style={[styles.stickyActionBar, showMobileNav && styles.stickyActionBarWithMobileNav]}>
+          {showStickyActionCopy ? (
+            <View style={styles.stickyActionCopy}>
+              <Text style={styles.stickyActionLabel}>Next event</Text>
+              <Text numberOfLines={1} style={styles.stickyActionTitle}>Join or find your match</Text>
+            </View>
+          ) : null}
+          <View style={styles.stickyActionButtons}>
+            {STICKY_ACTION_ITEMS.map((item) => {
+              const active = isNavItemActive(pathname, item);
+
+              return (
+                <LinkShell
+                  key={`sticky-${item.label}-${item.href}`}
+                  href={item.href}
+                  style={styles.stickyActionButton}
+                  variant={item.tone === 'primary' ? 'primary' : 'secondary'}>
+                  <View style={[styles.stickyActionChip, active && styles.stickyActionChipActive, item.tone === 'primary' && styles.stickyActionChipPrimary]}>
+                    <Text style={[styles.stickyActionText, item.tone === 'primary' && styles.stickyActionTextPrimary, active && styles.stickyActionTextActive]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                </LinkShell>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -769,8 +811,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 40,
   },
+  scrollContentWithStickyActions: {
+    paddingBottom: 108,
+  },
   scrollContentWithMobileNav: {
     paddingBottom: 104,
+  },
+  scrollContentWithStickyActionsAndMobileNav: {
+    paddingBottom: 178,
   },
   page: {
     width: '100%',
@@ -979,6 +1027,87 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   mobileBottomNavTextActive: {
+    color: theme.colors.text,
+  },
+  stickyActionBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 12,
+    zIndex: 30,
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 19, 17, 0.97)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    padding: 8,
+    ...sharedCardShadow,
+  },
+  stickyActionBarWithMobileNav: {
+    bottom: 84,
+  },
+  stickyActionCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingLeft: 8,
+  },
+  stickyActionLabel: {
+    color: theme.colors.accent,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  stickyActionTitle: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+    marginTop: 1,
+  },
+  stickyActionButtons: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: 6,
+  },
+  stickyActionButton: {
+    marginBottom: 0,
+    marginRight: 0,
+  },
+  stickyActionChip: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 42,
+    minWidth: 66,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  stickyActionChipPrimary: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  stickyActionChipActive: {
+    borderColor: theme.colors.accent,
+  },
+  stickyActionText: {
+    color: theme.colors.text,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  stickyActionTextPrimary: {
+    color: '#101010',
+  },
+  stickyActionTextActive: {
     color: theme.colors.text,
   },
   heroSurface: {
