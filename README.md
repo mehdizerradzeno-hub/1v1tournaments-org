@@ -74,6 +74,30 @@ Future edits:
 - Put private draft tournament placeholders under `siteData.admin.draftTournaments` until a real remote auth layer exists.
 - The server state file lives at `.data/admin-state.json`, which is ignored by git.
 
+## Discord Live Alerts
+
+The `/live` page includes a host-only **Send live alert** button. It posts through
+`netlify/functions/discord-alert.mjs` and never stores the Discord webhook in source control.
+
+Required Netlify environment variable:
+
+```bash
+npx --yes netlify-cli env:set DISCORD_WEBHOOK_URL "https://discord.com/api/webhooks/..."
+```
+
+Project:
+
+- Netlify project: `1v1tournaments-org`
+- Project URL: `https://1v1tournaments.org`
+- Dashboard: `https://app.netlify.com/projects/1v1tournaments-org`
+
+The function also requires normal host access:
+
+- Signed-in host-approved account, or
+- `TOURNAMENT_ADMIN_TOKEN` as a bearer token
+
+After setting `DISCORD_WEBHOOK_URL`, redeploy or trigger a new Netlify deploy, then open `/live` and press **Send live alert**.
+
 ## Check-In Placeholder Flow
 
 - Public tournament pages link to `/check-in/[slug]` for account-based tournament signup.
