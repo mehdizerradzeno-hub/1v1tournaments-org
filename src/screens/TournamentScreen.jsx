@@ -557,33 +557,33 @@ export default function TournamentScreen({ slug }) {
           />
 
           <Section
-            description="Start here. Signed-in players see the exact next action without reading the roster or bracket."
+            description="Account status, table access, roster size, and bracket state in one scan."
             nativeID="my-match"
-            title="Your tournament status">
-            <PlayerTournamentStatus
-              checkInPath={checkInPath}
-              playerStatus={playerStatus}
-              slug={visibleTournament.slug}
-            />
-          </Section>
-
-          <Section
-            description="Roster size, bracket state, and the main action in one compact control center."
-            nativeID="tournament-dashboard"
-            title="Tournament control center">
-            <TournamentDashboard
-              advertisedRosterCap={advertisedRosterCap}
-              checkInPath={checkInPath}
-              isBracketLive={isBracketLive}
-              liveBracket={liveBracket}
-              matchStatusPath={matchStatusPath}
-              minimumPlayers={minimumPlayers}
-              playerStatus={playerStatus}
-              registrationMeta={registrationMeta}
-              signupSummary={signupSummary}
-              streams={streams}
-              tournament={visibleTournament}
-            />
+            title="Player command center">
+            <View style={styles.playerCommandGrid}>
+              <View style={styles.playerCommandStatus}>
+                <PlayerTournamentStatus
+                  checkInPath={checkInPath}
+                  playerStatus={playerStatus}
+                  slug={visibleTournament.slug}
+                />
+              </View>
+              <View style={styles.playerCommandDashboard}>
+                <TournamentDashboard
+                  advertisedRosterCap={advertisedRosterCap}
+                  checkInPath={checkInPath}
+                  isBracketLive={isBracketLive}
+                  liveBracket={liveBracket}
+                  matchStatusPath={matchStatusPath}
+                  minimumPlayers={minimumPlayers}
+                  playerStatus={playerStatus}
+                  registrationMeta={registrationMeta}
+                  signupSummary={signupSummary}
+                  streams={streams}
+                  tournament={visibleTournament}
+                />
+              </View>
+            </View>
           </Section>
         </>
       ) : null}
@@ -1955,6 +1955,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 20,
+  },
+  playerCommandDashboard: {
+    flex: 1.05,
+    minWidth: 280,
+  },
+  playerCommandGrid: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  playerCommandStatus: {
+    flex: 1,
+    minWidth: 280,
   },
   block: {
     marginBottom: 14,
