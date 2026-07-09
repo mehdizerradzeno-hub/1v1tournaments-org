@@ -54,6 +54,7 @@ const TOURNAMENT_TABS = [
   { id: 'bracket', label: 'Bracket', body: 'Current match flow and table access.' },
   { id: 'info', label: 'Info', body: 'Rules, agenda, links, and results.' },
 ];
+const TWITCH_VIEWER_COMMANDS = ['!join', '!next', '!match', '!bracket', '!rules', '!discord'];
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -264,6 +265,38 @@ function buildTournamentTimeline({ isBracketLive, liveBracket, registrationMeta,
       value: result ? 'Posted' : 'After final',
       state: result ? 'done' : 'waiting',
     },
+  ];
+}
+
+function getArrivalSteps({ isBracketLive, playerHasReadyMatch, registrationMeta }) {
+  if (playerHasReadyMatch) {
+    return [
+      { label: 'Now', title: 'Play your match', body: 'Your account has an assigned table ready.' },
+      { label: 'Then', title: 'Report result', body: 'Winner advances from the tournament page.' },
+      { label: 'Watch', title: 'Keep Twitch open', body: 'Chat commands stay live for links.' },
+    ];
+  }
+
+  if (isBracketLive) {
+    return [
+      { label: 'Now', title: 'Find your match', body: 'Sign in and open My match for table access.' },
+      { label: 'View', title: 'Follow bracket', body: 'Bracket cards show current and completed matches.' },
+      { label: 'Chat', title: 'Use !match', body: 'Twitch chat can send players back here.' },
+    ];
+  }
+
+  if (registrationMeta.value === 'open') {
+    return [
+      { label: 'Step 1', title: 'Join roster', body: 'Create or open your account and reserve a seat.' },
+      { label: 'Step 2', title: 'Confirm name', body: 'Your public player name appears in the roster.' },
+      { label: 'Step 3', title: 'Wait for bracket', body: 'Match links appear after the host seeds.' },
+    ];
+  }
+
+  return [
+    { label: 'Now', title: 'Review event', body: 'Check rules, format, and current roster status.' },
+    { label: 'Later', title: 'Watch for updates', body: 'The bracket appears here after the host starts.' },
+    { label: 'Chat', title: 'Use !next', body: 'Twitch commands point viewers to this page.' },
   ];
 }
 
@@ -556,6 +589,15 @@ export default function TournamentScreen({ slug }) {
       }
       stickyActions={false}
       title={visibleTournament.title}>
+      <TournamentArrivalRail
+        checkInPath={checkInPath}
+        isBracketLive={isBracketLive}
+        matchStatusPath={matchStatusPath}
+        playerHasReadyMatch={playerHasReadyMatch}
+        registrationMeta={registrationMeta}
+        tournamentPath={tournamentPath}
+      />
+
       <TournamentEventConsole
         activeTab={activeTab}
         advertisedRosterCap={advertisedRosterCap}
@@ -1012,6 +1054,56 @@ function TournamentTimeline({ steps }) {
               </Text>
             </View>
           </View>
+        ))}
+      </View>
+    </Surface>
+  );
+}
+
+function TournamentArrivalRail({
+  checkInPath,
+  isBracketLive,
+  matchStatusPath,
+  playerHasReadyMatch,
+  registrationMeta,
+  tournamentPath,
+}) {
+  const steps = getArrivalSteps({ isBracketLive, playerHasReadyMatch, registrationMeta });
+  const primaryAction = playerHasReadyMatch
+    ? { label: 'Play my match', href: matchStatusPath }
+    : isBracketLive
+      ? { label: 'Find my match', href: matchStatusPath }
+      : registrationMeta.value === 'open'
+        ? { label: 'Join roster', href: checkInPath }
+        : { label: 'View roster', href: `${tournamentPath}#registered-players` };
+
+  return (
+    <Surface style={styles.arrivalRail}>
+      <View style={styles.arrivalHeader}>
+        <View style={styles.arrivalHeaderCopy}>
+          <Text style={styles.arrivalEyebrow}>Arriving from Twitch</Text>
+          <Text style={styles.arrivalTitle}>Start here</Text>
+        </View>
+        <View style={styles.arrivalActions}>
+          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
+          <ActionButton href="/live" variant="secondary">Watch live</ActionButton>
+        </View>
+      </View>
+
+      <View style={styles.arrivalGrid}>
+        {steps.map((step) => (
+          <View key={step.title} style={styles.arrivalStep}>
+            <Text style={styles.arrivalStepLabel}>{step.label}</Text>
+            <Text style={styles.arrivalStepTitle}>{step.title}</Text>
+            <Text style={styles.arrivalStepBody}>{step.body}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.arrivalCommandRow}>
+        <Text style={styles.arrivalCommandLabel}>Twitch commands</Text>
+        {TWITCH_VIEWER_COMMANDS.map((command) => (
+          <Text key={command} selectable style={styles.arrivalCommandChip}>{command}</Text>
         ))}
       </View>
     </Surface>
@@ -1672,6 +1764,107 @@ function LiveBracketBoard({ bracket }) {
 }
 
 const styles = StyleSheet.create({
+  arrivalActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  arrivalCommandChip: {
+    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+    borderColor: 'rgba(108, 199, 255, 0.22)',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#6CC7FF',
+    fontSize: 13,
+    fontWeight: '900',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  arrivalCommandLabel: {
+    color: '#AAB4AE',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    marginRight: 2,
+    textTransform: 'uppercase',
+  },
+  arrivalCommandRow: {
+    alignItems: 'center',
+    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+  },
+  arrivalEyebrow: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  arrivalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  arrivalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  arrivalHeaderCopy: {
+    flex: 1,
+    minWidth: 190,
+  },
+  arrivalRail: {
+    backgroundColor: 'rgba(8, 25, 21, 0.96)',
+    borderColor: 'rgba(108, 199, 255, 0.26)',
+    marginBottom: 16,
+  },
+  arrivalStep: {
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 190,
+    flexGrow: 1,
+    minHeight: 108,
+    padding: 12,
+  },
+  arrivalStepBody: {
+    color: '#AAB4AE',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  arrivalStepLabel: {
+    color: '#6CC7FF',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  arrivalStepTitle: {
+    color: '#F4EFE6',
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginTop: 5,
+  },
+  arrivalTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 2,
+  },
   lobbyCard: {
     borderColor: 'rgba(214, 162, 78, 0.42)',
     marginBottom: 24,
