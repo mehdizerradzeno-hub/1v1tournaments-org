@@ -1,10 +1,16 @@
 import tls from 'node:tls';
+import { existsSync, readFileSync } from 'node:fs';
 
 const TWITCH_IRC_HOST = 'irc.chat.twitch.tv';
 const TWITCH_IRC_PORT = 6697;
 const DEFAULT_COMMAND_ENDPOINT = 'https://1v1tournaments.org/.netlify/functions/stream-commands';
+const ENV_FILE = '.env.twitch-bot';
+
+loadEnvFile(ENV_FILE);
+
 const COMMAND_REFRESH_MS = positiveInteger(process.env.TWITCH_COMMAND_REFRESH_MS, 60_000);
 const RESPONSE_COOLDOWN_MS = positiveInteger(process.env.TWITCH_COMMAND_COOLDOWN_MS, 4_000);
+const DRY_RUN = cleanEnv(process.env.TWITCH_BOT_DRY_RUN) === '1';
 
 const botUsername = cleanEnv(process.env.TWITCH_BOT_USERNAME).toLowerCase();
 const oauthToken = cleanEnv(process.env.TWITCH_OAUTH_TOKEN);
@@ -17,6 +23,36 @@ const cooldowns = new Map();
 
 function cleanEnv(value) {
   return String(value || '').trim();
+}
+
+function loadEnvFile(path) {
+  if (!existsSync(path)) {
+    return;
+  }
+
+  const lines = readFileSync(path, 'utf8').split(/\r?\n/);
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) {
+      return;
+    }
+
+    const equalsIndex = trimmed.indexOf('=');
+
+    if (equalsIndex <= 0) {
+      return;
+    }
+
+    const key = trimmed.slice(0, equalsIndex).trim();
+    const rawValue = trimmed.slice(equalsIndex + 1).trim();
+    const value = rawValue.replace(/^["']|["']$/g, '');
+
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  });
 }
 
 function positiveInteger(value, fallback) {
@@ -33,7 +69,12 @@ function assertConfig() {
 
   if (missing.length) {
     console.error(`Missing required env: ${missing.join(', ')}`);
-    console.error('Example: TWITCH_BOT_USERNAME=yourbot TWITCH_OAUTH_TOKEN=oauth:xxxx TWITCH_CHANNEL=1v1compspades npm run bot:twitch');
+    console.error(`Create ${ENV_FILE} from ${ENV_FILE}.example, then run npm run bot:twitch.`);
+    process.exit(1);
+  }
+
+  if (!oauthToken.startsWith('oauth:')) {
+    console.error('TWITCH_OAUTH_TOKEN must start with oauth:.');
     process.exit(1);
   }
 }
@@ -201,4 +242,10 @@ function connect() {
 }
 
 await loadCommands({ force: true });
-connect();
+
+if (DRY_RUN) {
+  assertConfig();
+  console.log(`Dry run OK: ${commands.size} commands loaded for #${channel} as ${botUsername}.`);
+} else {
+  connect();
+}

@@ -53,6 +53,8 @@ const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingCli
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
 const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
+const gitignoreFile = fileURLToPath(new URL('../.gitignore', import.meta.url));
+const twitchBotEnvExampleFile = fileURLToPath(new URL('../.env.twitch-bot.example', import.meta.url));
 const tournamentCatalogFile = fileURLToPath(new URL('../src/lib/tournamentCatalog.js', import.meta.url));
 const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
 const netlifyConfigFile = fileURLToPath(new URL('../netlify.toml', import.meta.url));
@@ -426,21 +428,31 @@ test('Spades match results can report winners through a narrow callback token', 
 
 test('Twitch chat bot runner reads editable stream commands', () => {
   assert.ok(existsSync(twitchBotScriptFile));
+  assert.ok(existsSync(twitchBotEnvExampleFile));
 
   const botSource = readFileSync(twitchBotScriptFile, 'utf8');
   const packageSource = readFileSync(packageFile, 'utf8');
+  const gitignoreSource = readFileSync(gitignoreFile, 'utf8');
+  const envExampleSource = readFileSync(twitchBotEnvExampleFile, 'utf8');
   const readmeSource = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
 
   assert.match(packageSource, /bot:twitch/);
+  assert.match(packageSource, /bot:twitch:check/);
+  assert.match(gitignoreSource, /\.env\*/);
+  assert.match(envExampleSource, /TWITCH_OAUTH_TOKEN=oauth:paste_token_here/);
+  assert.match(envExampleSource, /TWITCH_CHANNEL=1v1compspades/);
   assert.match(botSource, /irc\.chat\.twitch\.tv/);
   assert.match(botSource, /TWITCH_BOT_USERNAME/);
   assert.match(botSource, /TWITCH_OAUTH_TOKEN/);
+  assert.match(botSource, /\.env\.twitch-bot/);
+  assert.match(botSource, /TWITCH_BOT_DRY_RUN/);
   assert.match(botSource, /STREAM_COMMAND_ENDPOINT/);
   assert.match(botSource, /stream-commands/);
   assert.match(botSource, /PRIVMSG/);
   assert.match(readmeSource, /Twitch Chat Bot/);
+  assert.match(readmeSource, /\.env\.twitch-bot/);
+  assert.match(readmeSource, /npm run bot:twitch:check/);
   assert.match(readmeSource, /npm run bot:twitch/);
-  assert.match(readmeSource, /TWITCH_CHANNEL=1v1compspades/);
 });
 
 test('the private admin route stays wired to the hub editor shell', () => {

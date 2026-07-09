@@ -109,12 +109,24 @@ https://1v1tournaments.org/.netlify/functions/stream-commands
 Hosts can edit those commands from `/admin` under **Stream commands**. The `/live`
 page and bot runner both read the same endpoint.
 
-Run the local Twitch bot with:
+Create a private local env file:
 
 ```bash
-TWITCH_BOT_USERNAME=your_bot_username \
-TWITCH_OAUTH_TOKEN=oauth:your_twitch_chat_oauth_token \
-TWITCH_CHANNEL=1v1compspades \
+cp .env.twitch-bot.example .env.twitch-bot
+```
+
+Then paste the bot account username and Twitch chat OAuth token into `.env.twitch-bot`.
+That file is ignored by git.
+
+Check the setup without joining chat:
+
+```bash
+npm run bot:twitch:check
+```
+
+Start the bot:
+
+```bash
 npm run bot:twitch
 ```
 

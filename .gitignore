@@ -1,4 +1,6 @@
 .data/
+.env*
+!.env.twitch-bot.example
 node_modules/
 .expo/
 .netlify/
