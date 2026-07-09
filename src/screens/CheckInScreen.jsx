@@ -13,6 +13,7 @@ import {
 import { formatDateLine } from '../lib/format.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   createPlayerAccount,
   fetchPlayerAccount,
@@ -27,6 +28,35 @@ import {
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
   return `${count} signed up`;
+}
+
+function getSignupFormatDetails(tournament) {
+  const mode = getTournamentMode(tournament?.mode);
+
+  if (mode.value === 'four-player-double-elimination') {
+    return {
+      mode,
+      requirement: 'Exactly 4 players',
+      body: 'A compact second-chance bracket: lose once and move to losers bracket; lose twice and you are out.',
+      footnote: 'If the losers-side finalist wins grand final, a reset final decides the tournament.',
+    };
+  }
+
+  if (mode.value === 'single-elimination') {
+    return {
+      mode,
+      requirement: `${mode.minimumPlayers}+ players`,
+      body: 'Fast bracket flow: one loss knocks a player out and winners advance until one champion remains.',
+      footnote: 'Open bracket seats can become byes when the host seeds the roster.',
+    };
+  }
+
+  return {
+    mode,
+    requirement: `${mode.minimumPlayers}+ players`,
+    body: mode.summary,
+    footnote: 'The host will confirm this format before the bracket is published.',
+  };
 }
 
 const PASSWORD_REQUIREMENT_ITEMS = [
@@ -474,6 +504,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
   const checkIn = visibleTournament.checkIn;
+  const formatDetails = getSignupFormatDetails(visibleTournament);
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
@@ -515,6 +546,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         { label: 'Registration', value: registrationMeta.label, tone: registrationMeta.tone },
         { label: 'Account', value: account ? 'Signed in' : 'Required', tone: account ? 'green' : 'accent' },
         { label: 'Signed up', value: signupCountLabel(signupSummary.count, signupSummary.loading), tone: signupSummary.count ? 'green' : 'blue' },
+        { label: 'Format', value: formatDetails.mode.shortLabel, tone: 'accent' },
         { label: 'Check-in', value: checkIn?.preview || 'TBD', tone: 'accent' },
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
@@ -527,6 +559,15 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           account={account}
           latestSignup={signup}
           signupSummary={signupSummary}
+        />
+      </Section>
+
+      <Section description="Know the bracket style and player requirement before reserving a spot." title="Tournament format">
+        <SignupFormatPanel
+          formatDetails={formatDetails}
+          liveBracket={liveBracket}
+          signupSummary={signupSummary}
+          tournament={visibleTournament}
         />
       </Section>
 
@@ -797,6 +838,34 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   );
 }
 
+function SignupFormatPanel({ formatDetails, liveBracket, signupSummary, tournament }) {
+  const signupValue = signupSummary.loading ? 'Loading' : `${signupSummary.count}/${tournament.rosterCap || formatDetails.mode.rosterCap}`;
+  const statusLabel = liveBracket ? 'Bracket live' : 'Before seeding';
+
+  return (
+    <Surface style={styles.formatPanel}>
+      <View style={styles.formatTopRow}>
+        <View style={styles.formatCopy}>
+          <Badge tone={liveBracket ? 'green' : 'accent'}>{statusLabel}</Badge>
+          <Text style={styles.formatTitle}>{formatDetails.mode.label}</Text>
+          <Text style={styles.formatBody}>{formatDetails.body}</Text>
+        </View>
+        <View style={styles.formatStats}>
+          <View style={styles.formatStat}>
+            <Text style={styles.formatStatLabel}>Requirement</Text>
+            <Text style={styles.formatStatValue}>{formatDetails.requirement}</Text>
+          </View>
+          <View style={styles.formatStat}>
+            <Text style={styles.formatStatLabel}>Signed up</Text>
+            <Text style={styles.formatStatValue}>{signupValue}</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={styles.formatFootnote}>{formatDetails.footnote}</Text>
+    </Surface>
+  );
+}
+
 function isOwnSignup(signup, account, latestSignup) {
   if (!signup) return false;
   if (signup.currentPlayer) return true;
@@ -888,6 +957,75 @@ const styles = StyleSheet.create({
   },
   rosterCard: {
     borderColor: 'rgba(97, 210, 145, 0.30)',
+  },
+  formatPanel: {
+    backgroundColor: 'rgba(8, 25, 21, 0.90)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  formatTopRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  formatCopy: {
+    flex: 1.25,
+    minWidth: 240,
+  },
+  formatTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 10,
+  },
+  formatBody: {
+    color: '#AAB4AE',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  formatStats: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 220,
+  },
+  formatStat: {
+    backgroundColor: 'rgba(244, 239, 230, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 130,
+    flexGrow: 1,
+    padding: 12,
+  },
+  formatStatLabel: {
+    color: '#AAB4AE',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  formatStatValue: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+    marginTop: 5,
+  },
+  formatFootnote: {
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#D6A24E',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 14,
+    padding: 12,
   },
   rosterHeroRow: {
     flexDirection: 'row',

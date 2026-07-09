@@ -359,6 +359,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.doesNotMatch(tournamentScreenSource, /Launch gameplay/);
   assert.doesNotMatch(tournamentScreenSource, /Host admin/);
   assert.match(checkInScreenSource, /Confirm password/);
+  assert.match(checkInScreenSource, /SignupFormatPanel/);
+  assert.match(checkInScreenSource, /getSignupFormatDetails/);
+  assert.match(checkInScreenSource, /Exactly 4 players/);
   assert.match(checkInScreenSource, /Password requirements/);
   assert.match(checkInScreenSource, /registrationOpen/);
   assert.match(checkInScreenSource, /fetchTournamentEvent/);
