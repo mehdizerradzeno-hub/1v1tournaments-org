@@ -98,6 +98,37 @@ The function also requires normal host access:
 
 After setting `DISCORD_WEBHOOK_URL`, redeploy or trigger a new Netlify deploy, then open `/live` and press **Send live alert**.
 
+## Twitch Chat Bot
+
+The site publishes editable stream commands at:
+
+```text
+https://1v1tournaments.org/.netlify/functions/stream-commands
+```
+
+Hosts can edit those commands from `/admin` under **Stream commands**. The `/live`
+page and bot runner both read the same endpoint.
+
+Run the local Twitch bot with:
+
+```bash
+TWITCH_BOT_USERNAME=your_bot_username \
+TWITCH_OAUTH_TOKEN=oauth:your_twitch_chat_oauth_token \
+TWITCH_CHANNEL=1v1compspades \
+npm run bot:twitch
+```
+
+Notes:
+
+- `TWITCH_BOT_USERNAME` can be the main channel account or a separate bot account.
+- `TWITCH_OAUTH_TOKEN` must be a Twitch chat OAuth token for that account.
+- `TWITCH_CHANNEL` should be `1v1compspades` for the current channel.
+- `STREAM_COMMAND_ENDPOINT` is optional; it defaults to the production command endpoint.
+- The bot refreshes command text every 60 seconds and rate-limits repeated command responses.
+
+Default commands include `!next`, `!join`, `!signup`, `!match`, `!bracket`, `!format`,
+`!rules`, `!results`, `!discord`, and `!live`.
+
 ## Check-In Placeholder Flow
 
 - Public tournament pages link to `/check-in/[slug]` for account-based tournament signup.

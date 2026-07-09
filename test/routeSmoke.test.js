@@ -51,6 +51,8 @@ const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/dis
 const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
+const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
+const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
 const tournamentCatalogFile = fileURLToPath(new URL('../src/lib/tournamentCatalog.js', import.meta.url));
 const tournamentSettingsClientFile = fileURLToPath(new URL('../src/lib/tournamentSettings.js', import.meta.url));
 const netlifyConfigFile = fileURLToPath(new URL('../netlify.toml', import.meta.url));
@@ -420,6 +422,25 @@ test('Spades match results can report winners through a narrow callback token', 
   assert.match(readmeSource, /Spades Match Result Callback/);
   assert.match(readmeSource, /GET https:\/\/1v1tournaments\.org\/\.netlify\/functions\/tournament-bracket\?matchId=/);
   assert.match(readmeSource, /"action": "report-winner"/);
+});
+
+test('Twitch chat bot runner reads editable stream commands', () => {
+  assert.ok(existsSync(twitchBotScriptFile));
+
+  const botSource = readFileSync(twitchBotScriptFile, 'utf8');
+  const packageSource = readFileSync(packageFile, 'utf8');
+  const readmeSource = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
+
+  assert.match(packageSource, /bot:twitch/);
+  assert.match(botSource, /irc\.chat\.twitch\.tv/);
+  assert.match(botSource, /TWITCH_BOT_USERNAME/);
+  assert.match(botSource, /TWITCH_OAUTH_TOKEN/);
+  assert.match(botSource, /STREAM_COMMAND_ENDPOINT/);
+  assert.match(botSource, /stream-commands/);
+  assert.match(botSource, /PRIVMSG/);
+  assert.match(readmeSource, /Twitch Chat Bot/);
+  assert.match(readmeSource, /npm run bot:twitch/);
+  assert.match(readmeSource, /TWITCH_CHANNEL=1v1compspades/);
 });
 
 test('the private admin route stays wired to the hub editor shell', () => {
