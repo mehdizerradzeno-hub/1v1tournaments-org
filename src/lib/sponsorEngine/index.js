@@ -1,5 +1,6 @@
 export * from './audit.js';
 export * from './adminNavigation.js';
+export * from './automations.js';
 export * from './crm.js';
 export * from './inquiry.js';
 export * from './outreach.js';

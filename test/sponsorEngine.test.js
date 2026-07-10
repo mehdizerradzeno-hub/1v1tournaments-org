@@ -7,6 +7,8 @@ import {
   createMockResearchProvider,
   createOutreachDraft,
   createResearchCandidate,
+  createMonthlySponsorDataHygieneReport,
+  createWeeklySponsorPipelineReview,
   createSponsorProposal,
   createSponsorInquiryRecord,
   createSponsorshipDeal,
@@ -21,6 +23,8 @@ import {
   normalizeCompanyName,
   normalizeDomain,
   parseSponsorCsv,
+  prepareDailySponsorFollowUps,
+  prepareDailySponsorResearch,
   prepareFollowUpDraft,
   proposalToPlainText,
   proposalToPrintHtml,
@@ -30,6 +34,7 @@ import {
   sanitizeFetchedText,
   scoreSponsorFit,
   sendApprovedDraft,
+  sponsorSecurityChecklist,
   SPONSOR_ROLES,
   summarizeSponsorPipeline,
   validateSponsorInquiry,
@@ -502,4 +507,91 @@ test('proposal generator creates review-only proposal copy and print-safe html',
   assert.match(text, /August tournament window/);
   assert.match(html, /&lt;Example Cards&gt;/);
   assert.doesNotMatch(html, /<Example Cards>/);
+});
+
+test('safe sponsor automations prepare work without external actions', async () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-auto',
+    companyName: 'Example Cards',
+    website: 'https://examplecards.com',
+    companyDescription: 'Premium playing cards.',
+    publicContactFormUrl: 'https://examplecards.com/partners',
+    publicContactSourceUrl: 'https://examplecards.com/partners',
+    sourceUrls: [{ url: 'https://examplecards.com/partners', sourceType: 'manual' }],
+    brandSafetyStatus: 'CLEAR',
+    legalRiskStatus: 'CLEAR',
+    status: 'CONTACTED',
+  });
+  const draft = createOutreachDraft({
+    prospect,
+    createdAt: '2026-07-09T00:00:00.000Z',
+  });
+  const researchRun = await prepareDailySponsorResearch({
+    query: 'playing cards',
+    existingProspects: [prospect],
+    limit: 2,
+  });
+  const followUps = prepareDailySponsorFollowUps({
+    prospects: [prospect],
+    drafts: [draft],
+    interactions: [],
+    now: '2026-07-10T00:00:00.000Z',
+  });
+
+  assert.equal(researchRun.automationPolicy, 'Preparation only. Do not contact companies automatically.');
+  assert.ok(researchRun.candidatesFound >= 1);
+  assert.equal(followUps.tasks.length, 1);
+  assert.match(followUps.tasks[0].policy, /Draft only/);
+});
+
+test('weekly review and monthly hygiene reports expose honest operational gaps', () => {
+  const prospects = [
+    createEmptySponsorProspect({
+      id: 'p1',
+      companyName: 'Example Cards',
+      website: 'https://examplecards.com',
+      status: 'NEW',
+      dataQualityStatus: 'MISSING_SOURCES',
+      researchedAt: '2026-04-01T00:00:00.000Z',
+      nextActionAt: '2026-07-01T00:00:00.000Z',
+    }),
+    createEmptySponsorProspect({
+      id: 'p2',
+      companyName: 'Example Cards Duplicate',
+      website: 'https://examplecards.com/contact',
+      status: 'QUALIFIED',
+      dataQualityStatus: 'VERIFIED',
+      sourceUrls: [{ url: 'https://examplecards.com/contact', sourceType: 'manual' }],
+    }),
+  ];
+  const review = createWeeklySponsorPipelineReview({
+    prospects,
+    drafts: [{ status: 'NEEDS_REVIEW' }],
+    deals: [{ stage: 'PROPOSAL_DRAFT' }],
+    interactions: [{ prospectId: 'p1', interactionType: 'BOUNCE' }],
+    now: '2026-07-10T00:00:00.000Z',
+  });
+  const hygiene = createMonthlySponsorDataHygieneReport({
+    prospects,
+    interactions: [{ prospectId: 'p1', interactionType: 'BOUNCE' }],
+    now: '2026-07-10T00:00:00.000Z',
+  });
+
+  assert.equal(review.newProspects, 1);
+  assert.equal(review.proposals, 1);
+  assert.equal(review.overdueActions, 1);
+  assert.ok(review.recommendedNextPriorities.includes('Review overdue next actions.'));
+  assert.deepEqual(hygiene.staleResearch, ['p1']);
+  assert.deepEqual(hygiene.missingSourceUrls, ['p1']);
+  assert.deepEqual(hygiene.duplicateDomains[0].ids, ['p1', 'p2']);
+  assert.equal(hygiene.deletionPolicy, 'Never delete records automatically.');
+});
+
+test('sponsor security checklist captures the hard safety gates', () => {
+  const checklist = sponsorSecurityChecklist().join(' ');
+
+  assert.match(checklist, /draft-only/);
+  assert.match(checklist, /explicit send action/);
+  assert.match(checklist, /untrusted data/);
+  assert.match(checklist, /unverified metrics/);
 });
