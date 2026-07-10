@@ -13,6 +13,8 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 - Sponsor admin uses focused workspace tabs: Inbox, Prospects, Research, Drafts, Pipeline, and Export.
 - Outreach drafts and proposal previews are saved server-side for host review.
 - Saved drafts and proposal previews can be archived without deleting their history.
+- Saved outreach drafts and proposal previews can be edited and saved before any manual follow-up.
+- Editing an approved draft returns it to `NEEDS_REVIEW` so changed copy is reviewed again.
 - No research jobs are active.
 - No email provider is enabled.
 - No external sponsor contact is possible.
@@ -38,6 +40,8 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 7. Mark restricted or opted-out records as `DO_NOT_CONTACT`.
 8. Generate a draft.
 9. Validate claims and provenance.
-10. Approve or reject.
-11. Generate proposal previews when useful.
-12. Perform a separate explicit send action only when sending is intentionally enabled.
+10. Edit the subject/body if needed, then save the draft for review.
+11. Approve or reject.
+12. Generate proposal previews when useful.
+13. Edit the proposal review notice or internal notes if needed.
+14. Perform a separate explicit send action only when sending is intentionally enabled.

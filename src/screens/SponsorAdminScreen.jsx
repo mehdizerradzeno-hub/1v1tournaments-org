@@ -350,7 +350,78 @@ function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
   );
 }
 
-function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrepareFollowUp, onArchive }) {
+function DraftReviewCard({ draft, onApprove, onArchive, onPrepareFollowUp, onSaveEdit }) {
+  const [subject, setSubject] = useState(draft.subject || '');
+  const [body, setBody] = useState(draft.body || '');
+
+  return (
+    <View style={styles.approvalCard}>
+      <View style={styles.researchCardHeader}>
+        <View style={styles.researchCardCopy}>
+          <TextInput
+            onChangeText={setSubject}
+            placeholder="Draft subject"
+            placeholderTextColor="#7C8782"
+            style={styles.editableTitleInput}
+            value={subject}
+          />
+          <Text style={styles.researchMeta}>
+            {draft.recipient || 'No recipient route'} | Quality {draft.qualityScore}/100
+          </Text>
+        </View>
+        <Badge tone={draft.status === 'APPROVED' ? 'green' : draft.status === 'NEEDS_REVIEW' ? 'blue' : 'accent'}>
+          {draft.status}
+        </Badge>
+      </View>
+      <TextInput
+        multiline
+        onChangeText={setBody}
+        placeholder="Draft body"
+        placeholderTextColor="#7C8782"
+        style={styles.editableBodyInput}
+        value={body}
+      />
+      <View style={styles.factList}>
+        {draft.personalizationFacts.map((fact) => (
+          <Text key={`${draft.id}-${fact.label}`} selectable style={styles.factText}>
+            {fact.label}: {fact.value} Source: {fact.sourceUrl || 'Not yet provided'}
+          </Text>
+        ))}
+      </View>
+      {draft.validation?.warnings?.length ? (
+        <View style={styles.riskList}>
+          {draft.validation.warnings.map((warning) => (
+            <Text key={warning} style={styles.riskText}>{warning}</Text>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.approvalActions}>
+        <ActionButton onPress={() => onSaveEdit(draft, { subject, body })} variant="secondary">
+          Save edits
+        </ActionButton>
+        <ActionButton
+          disabled={draft.status !== 'NEEDS_REVIEW'}
+          onPress={() => onApprove(draft)}
+          variant="secondary">
+          Approve draft
+        </ActionButton>
+        <ActionButton
+          disabled={draft.status !== 'APPROVED'}
+          onPress={() => onPrepareFollowUp(draft)}
+          variant="secondary">
+          Prepare follow-up
+        </ActionButton>
+        <ActionButton
+          onPress={() => onArchive('draft', draft.id)}
+          variant="ghost">
+          Archive
+        </ActionButton>
+      </View>
+    </View>
+  );
+}
+
+function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrepareFollowUp, onArchive, onSaveEdit }) {
   const visibleDrafts = drafts.filter((draft) => draft.status !== 'ARCHIVED');
 
   return (
@@ -370,53 +441,14 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
       {visibleDrafts.length ? (
         <View style={styles.researchList}>
           {visibleDrafts.map((draft) => (
-            <View key={draft.id} style={styles.approvalCard}>
-              <View style={styles.researchCardHeader}>
-                <View style={styles.researchCardCopy}>
-                  <Text style={styles.researchCompany}>{draft.subject}</Text>
-                  <Text style={styles.researchMeta}>
-                    {draft.recipient || 'No recipient route'} | Quality {draft.qualityScore}/100
-                  </Text>
-                </View>
-                <Badge tone={draft.status === 'APPROVED' ? 'green' : draft.status === 'NEEDS_REVIEW' ? 'blue' : 'accent'}>
-                  {draft.status}
-                </Badge>
-              </View>
-              <Text selectable style={styles.draftBody}>{draft.body}</Text>
-              <View style={styles.factList}>
-                {draft.personalizationFacts.map((fact) => (
-                  <Text key={`${draft.id}-${fact.label}`} selectable style={styles.factText}>
-                    {fact.label}: {fact.value} Source: {fact.sourceUrl || 'Not yet provided'}
-                  </Text>
-                ))}
-              </View>
-              {draft.validation?.warnings?.length ? (
-                <View style={styles.riskList}>
-                  {draft.validation.warnings.map((warning) => (
-                    <Text key={warning} style={styles.riskText}>{warning}</Text>
-                  ))}
-                </View>
-              ) : null}
-              <View style={styles.approvalActions}>
-                <ActionButton
-                  disabled={draft.status !== 'NEEDS_REVIEW'}
-                  onPress={() => onApprove(draft)}
-                  variant="secondary">
-                  Approve draft
-                </ActionButton>
-                <ActionButton
-                  disabled={draft.status !== 'APPROVED'}
-                  onPress={() => onPrepareFollowUp(draft)}
-                  variant="secondary">
-                  Prepare follow-up
-                </ActionButton>
-                <ActionButton
-                  onPress={() => onArchive('draft', draft.id)}
-                  variant="ghost">
-                  Archive
-                </ActionButton>
-              </View>
-            </View>
+            <DraftReviewCard
+              key={draft.id}
+              draft={draft}
+              onApprove={onApprove}
+              onArchive={onArchive}
+              onPrepareFollowUp={onPrepareFollowUp}
+              onSaveEdit={onSaveEdit}
+            />
           ))}
         </View>
       ) : (
@@ -429,7 +461,48 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
   );
 }
 
-function ProposalPreview({ proposals, selectedProspect, onGenerate, onArchive }) {
+function ProposalCard({ onArchive, onSaveEdit, proposal }) {
+  const [reviewNotice, setReviewNotice] = useState(proposal.reviewNotice || '');
+  const [notes, setNotes] = useState(proposal.notes || '');
+
+  return (
+    <View style={styles.approvalCard}>
+      <View style={styles.researchCardHeader}>
+        <View style={styles.researchCardCopy}>
+          <Text style={styles.researchCompany}>{proposal.prospectName}</Text>
+          <Text style={styles.researchMeta}>{proposal.packageName} | {proposal.status}</Text>
+        </View>
+        <Badge tone="blue">Review</Badge>
+      </View>
+      <TextInput
+        onChangeText={setReviewNotice}
+        placeholder="Review notice"
+        placeholderTextColor="#7C8782"
+        style={styles.editableTitleInput}
+        value={reviewNotice}
+      />
+      <TextInput
+        multiline
+        onChangeText={setNotes}
+        placeholder="Proposal notes"
+        placeholderTextColor="#7C8782"
+        style={styles.editableBodyInput}
+        value={notes}
+      />
+      <Text selectable style={styles.draftBody}>{proposalToPlainText({ ...proposal, reviewNotice, notes })}</Text>
+      <View style={styles.approvalActions}>
+        <ActionButton onPress={() => onSaveEdit(proposal, { reviewNotice, notes })} variant="secondary">
+          Save edits
+        </ActionButton>
+        <ActionButton onPress={() => onArchive('proposal', proposal.id)} variant="ghost">
+          Archive
+        </ActionButton>
+      </View>
+    </View>
+  );
+}
+
+function ProposalPreview({ proposals, selectedProspect, onGenerate, onArchive, onSaveEdit }) {
   const visibleProposals = proposals.filter((proposal) => proposal.status !== 'ARCHIVED');
 
   return (
@@ -449,22 +522,12 @@ function ProposalPreview({ proposals, selectedProspect, onGenerate, onArchive })
       {visibleProposals.length ? (
         <View style={styles.researchList}>
           {visibleProposals.map((proposal) => (
-            <View key={proposal.id} style={styles.approvalCard}>
-              <View style={styles.researchCardHeader}>
-                <View style={styles.researchCardCopy}>
-                  <Text style={styles.researchCompany}>{proposal.prospectName}</Text>
-                  <Text style={styles.researchMeta}>{proposal.packageName} | {proposal.status}</Text>
-                </View>
-                <Badge tone="blue">Review</Badge>
-              </View>
-              <Text style={styles.proposalNotice}>{proposal.reviewNotice}</Text>
-              <Text selectable style={styles.draftBody}>{proposalToPlainText(proposal)}</Text>
-              <View style={styles.approvalActions}>
-                <ActionButton onPress={() => onArchive('proposal', proposal.id)} variant="ghost">
-                  Archive
-                </ActionButton>
-              </View>
-            </View>
+            <ProposalCard
+              key={proposal.id}
+              onArchive={onArchive}
+              onSaveEdit={onSaveEdit}
+              proposal={proposal}
+            />
           ))}
         </View>
       ) : (
@@ -751,6 +814,39 @@ export default function SponsorAdminScreen() {
     }
   }
 
+  async function saveDraftEdit(draft, fields) {
+    const updated = {
+      ...draft,
+      ...fields,
+      approvedAt: '',
+      approvedBy: '',
+      status: draft.status === 'APPROVED' ? 'NEEDS_REVIEW' : draft.status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await saveSponsorCollateral({ type: 'draft', record: updated });
+
+      setOutreachDrafts(result.drafts || outreachDrafts.map((item) => (
+        item.id === draft.id ? updated : item
+      )));
+      setProposals(result.proposals || proposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Draft edits saved for review. No message was sent.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Draft edits could not be saved.',
+        message: '',
+      });
+    }
+  }
+
   async function prepareFollowUp(draft) {
     const prospect = prospects.find((item) => item.id === draft.prospectId) || selectedProspect || {};
     const result = prepareFollowUpDraft({ prospect, parentDraft: draft });
@@ -803,6 +899,36 @@ export default function SponsorAdminScreen() {
       setCollateralState({
         loading: false,
         error: error instanceof Error ? error.message : 'Proposal preview could not be saved.',
+        message: '',
+      });
+    }
+  }
+
+  async function saveProposalEdit(proposal, fields) {
+    const updated = {
+      ...proposal,
+      ...fields,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await saveSponsorCollateral({ type: 'proposal', record: updated });
+
+      setOutreachDrafts(result.drafts || outreachDrafts);
+      setProposals(result.proposals || proposals.map((item) => (
+        item.id === proposal.id ? updated : item
+      )));
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Proposal edits saved. No sponsor was contacted.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Proposal edits could not be saved.',
         message: '',
       });
     }
@@ -1003,6 +1129,7 @@ export default function SponsorAdminScreen() {
                   onArchive={archiveCollateral}
                   onGenerate={generateOutreachDraft}
                   onPrepareFollowUp={prepareFollowUp}
+                  onSaveEdit={saveDraftEdit}
                   selectedProspect={selectedProspect}
                 />
               </Section>
@@ -1013,6 +1140,7 @@ export default function SponsorAdminScreen() {
                 <ProposalPreview
                   onGenerate={generateProposal}
                   onArchive={archiveCollateral}
+                  onSaveEdit={saveProposalEdit}
                   proposals={proposals}
                   selectedProspect={selectedProspect}
                 />
@@ -1226,6 +1354,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
     padding: 12,
+  },
+  editableBodyInput: {
+    backgroundColor: 'rgba(5, 11, 10, 0.62)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    minHeight: 150,
+    padding: 12,
+    textAlignVertical: 'top',
+  },
+  editableTitleInput: {
+    backgroundColor: 'rgba(5, 11, 10, 0.62)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   pipelineBoard: {
     flexDirection: 'row',

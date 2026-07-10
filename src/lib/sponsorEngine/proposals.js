@@ -132,6 +132,11 @@ export function proposalToPlainText(proposal = {}) {
     `Status: ${proposal.status}`,
     proposal.reviewNotice,
     '',
+    ...(proposal.notes ? [
+      'Notes',
+      proposal.notes,
+      '',
+    ] : []),
     ...(proposal.sections || []).flatMap((section) => [
       section.title,
       section.body,
