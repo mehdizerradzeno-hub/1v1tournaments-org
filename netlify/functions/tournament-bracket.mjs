@@ -119,7 +119,7 @@ function pairSlots(participants, size) {
   return pairs;
 }
 
-function findMatch(bracket, matchId) {
+export function findMatch(bracket, matchId) {
   for (const round of bracket.rounds) {
     const match = round.matches.find((item) => item.id === matchId);
 
@@ -157,7 +157,7 @@ function placePlayerInMatch(bracket, matchId, slot, player) {
   return nextMatch;
 }
 
-function setMatchWinner(bracket, match, player) {
+export function setMatchWinner(bracket, match, player) {
   const winnerSlot = match.players.findIndex((candidate) => candidate?.id === player.id);
   const loser = match.players.find((candidate) => candidate && candidate.id !== player.id) || null;
 
@@ -202,7 +202,7 @@ function initializeByes(bracket) {
   });
 }
 
-function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+export function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
   const sortedSignups = [...signups].sort((left, right) => {
     const leftDate = new Date(left.createdAt || 0).getTime();
     const rightDate = new Date(right.createdAt || 0).getTime();
@@ -268,7 +268,7 @@ function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
   return bracket;
 }
 
-function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields = false }) {
   const sortedSignups = [...signups].sort((left, right) => {
     const leftDate = new Date(left.createdAt || 0).getTime();
     const rightDate = new Date(right.createdAt || 0).getTime();
