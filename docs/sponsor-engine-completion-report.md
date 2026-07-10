@@ -16,7 +16,8 @@ No deployment, production write, external outreach, email send, post, merge, or 
 - Approval transition logging with explicit separation between approved drafts and send attempts.
 - Mock email provider and send authorization gate.
 - Follow-up draft preparation with stop rules for replies, opt-outs, bounces, WON, LOST, PAUSED, and DO_NOT_CONTACT.
-- Public `/sponsors` page with sponsorship package cards, verified-only metric handling, and sponsor inquiry validation.
+- Public `/sponsors` page with sponsorship package cards, verified-only metric handling, sponsor inquiry validation, and server-side inquiry intake.
+- Host-only sponsor inquiry inbox with manual review/archive actions, Netlify Blob persistence, and hashed client rate limiting.
 - Public `/media-kit` page with brand/product overview and no fabricated audience statistics.
 - Proposal/deal generator with review-only proposal copy and print-safe HTML export helper.
 - Scheduled automation helpers for research preparation, follow-up preparation, weekly pipeline review, and monthly data hygiene.
@@ -47,7 +48,7 @@ Generated `dist/` files were not committed.
 
 ## Database migrations
 
-No production database migration was applied. The current implementation uses local/domain modules and mock-safe flows. The model plan is documented in `docs/sponsor-engine-architecture.md` and can be wired to persistent storage after explicit approval.
+No production database migration was applied. Public sponsor inquiries are stored through Netlify Blobs by `/.netlify/functions/sponsor-inquiries`. Sponsor CRM records, outreach drafts, proposal previews, and provider integrations still use local/domain modules and mock-safe flows. The model plan is documented in `docs/sponsor-engine-architecture.md` and can be expanded after explicit approval.
 
 ## Commands run
 
@@ -88,11 +89,11 @@ npm run build:web
 
 ## Known limitations
 
-- CRM persistence is not yet wired to Netlify Blobs or another database.
+- CRM prospect/draft/proposal persistence is not yet wired to Netlify Blobs or another database.
 - Drag-and-drop Kanban is not implemented yet.
 - Live search/fetch providers are mocked.
 - Email/calendar/file-storage integrations are mocked.
-- Inquiry form validates locally in the static page; server-side storage and bot protection require an approved backend wiring pass.
+- Public sponsor inquiries now persist through a Netlify Function with hashed rate limiting. CAPTCHA or a third-party bot-defense provider is not wired yet.
 - PDF export helper outputs print-ready HTML, not a generated binary PDF.
 - Screenshots were not captured in this pass.
 
@@ -136,14 +137,16 @@ Then open:
 
 1. Sign in with a host-approved account.
 2. Open `/admin/sponsors`.
-3. Import CSV preview or prepare the mock research queue.
-4. Review sources, fit scores, duplicate flags, and risk flags.
-5. Accept safe prospects into the local CRM preview.
-6. Generate outreach drafts.
-7. Review validation warnings and source-backed personalization.
-8. Approve only valid drafts.
-9. Generate proposal previews when a sponsor is ready.
-10. Use weekly/monthly automation reports to guide manual follow-up.
+3. Review the sponsor inquiry inbox.
+4. Mark real leads as reviewed or archive spam/test submissions.
+5. Import CSV preview or prepare the mock research queue.
+6. Review sources, fit scores, duplicate flags, and risk flags.
+7. Accept safe prospects into the local CRM preview.
+8. Generate outreach drafts.
+9. Review validation warnings and source-backed personalization.
+10. Approve only valid drafts.
+11. Generate proposal previews when a sponsor is ready.
+12. Use weekly/monthly automation reports to guide manual follow-up.
 
 ## Deployment steps
 
@@ -151,7 +154,7 @@ Deployment was not performed. When approved:
 
 1. Review the branch diff.
 2. Run the final validation gate.
-3. Wire persistence and server-side inquiry handling if required.
+3. Review sponsor inquiry storage and rate-limit settings.
 4. Configure environment variables in hosting provider.
 5. Deploy through the normal Netlify workflow.
 6. Verify `/admin/sponsors`, `/sponsors`, and `/media-kit`.
@@ -159,7 +162,7 @@ Deployment was not performed. When approved:
 ## Recommended next actions
 
 1. Add persistent storage for sponsor CRM records.
-2. Add server-side inquiry function with rate limiting and bot protection.
+2. Add CAPTCHA or a third-party bot-defense provider if inquiry spam becomes a problem.
 3. Add authenticated admin sub-routes for prospects, research, approvals, packages, proposals, and settings.
 4. Add drag-and-drop pipeline movement after persistence is ready.
 5. Add real provider adapters one at a time behind explicit credentials and approval gates.

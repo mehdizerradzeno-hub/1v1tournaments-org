@@ -2263,6 +2263,7 @@ export default function AdminScreen() {
 
   const actions = [
     { label: 'Home', href: '/' },
+    { label: 'Sponsors', href: '/admin/sponsors', variant: 'secondary' },
     { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
     { label: 'Rules', href: '/rules', variant: 'ghost' },
   ];
