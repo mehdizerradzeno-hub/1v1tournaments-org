@@ -1,15 +1,16 @@
 import { performance } from 'node:perf_hooks';
 
 const baseUrl = String(process.env.CAPACITY_BASE_URL || 'https://1v1tournaments.org').replace(/\/$/, '');
+const tournamentSlug = String(process.env.CAPACITY_TOURNAMENT_SLUG || '10-pm-4-man-spades-test').trim();
 const rounds = positiveInteger(process.env.CAPACITY_ROUNDS, 2);
 const concurrency = positiveInteger(process.env.CAPACITY_CONCURRENCY, 4);
 const paths = [
   '/',
   '/live',
-  '/tournaments/spades-summer-series',
-  '/check-in/spades-summer-series',
-  '/.netlify/functions/tournament-signup?slug=spades-summer-series',
-  '/.netlify/functions/tournament-bracket?slug=spades-summer-series',
+  `/tournaments/${encodeURIComponent(tournamentSlug)}`,
+  `/check-in/${encodeURIComponent(tournamentSlug)}`,
+  `/.netlify/functions/tournament-signup?slug=${encodeURIComponent(tournamentSlug)}`,
+  `/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(tournamentSlug)}`,
   '/.netlify/functions/stream-commands',
 ];
 
@@ -97,6 +98,7 @@ const summary = [...byPath.entries()].map(([path, pathResults]) => {
 });
 
 console.log(`Hosted capacity smoke: ${baseUrl}`);
+console.log(`Tournament slug: ${tournamentSlug}`);
 console.log(`Read-only requests: ${results.length} total, concurrency ${concurrency}, rounds ${rounds}`);
 console.table(summary);
 
