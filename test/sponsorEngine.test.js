@@ -7,6 +7,7 @@ import {
   createMockResearchProvider,
   createOutreachDraft,
   createResearchCandidate,
+  createSponsorInquiryRecord,
   exportSponsorProspectsCsv,
   filterSponsorProspects,
   groupProspectsByStage,
@@ -27,6 +28,7 @@ import {
   sendApprovedDraft,
   SPONSOR_ROLES,
   summarizeSponsorPipeline,
+  validateSponsorInquiry,
   validateOutreachDraft,
 } from '../src/lib/sponsorEngine/index.js';
 
@@ -396,4 +398,55 @@ test('follow-up preparation stops after replies, opt-outs, and maximum sequence 
   assert.match(stopped.reason, /stopped/);
   assert.equal(maxed.draft, null);
   assert.match(maxed.reason, /Maximum/);
+});
+
+test('public sponsor inquiry validation accepts only consented legitimate submissions', () => {
+  const invalid = validateSponsorInquiry({
+    name: 'Sam',
+    company: 'Example Cards',
+    workEmail: 'bad-email',
+    website: 'https://examplecards.com',
+    message: 'Hi',
+    consent: false,
+  });
+  const valid = validateSponsorInquiry({
+    name: 'Sam Partner',
+    company: 'Example Cards',
+    workEmail: 'sam@examplecards.com',
+    website: 'examplecards.com',
+    sponsorshipInterest: 'Tournament sponsorship',
+    estimatedBudgetRange: '$500-$1,000',
+    desiredTiming: 'Next month',
+    message: 'We are interested in a tournament sponsorship conversation.',
+    consent: true,
+  });
+
+  assert.equal(invalid.accepted, false);
+  assert.match(invalid.errors.join(' '), /valid work email/);
+  assert.match(invalid.errors.join(' '), /Consent/);
+  assert.equal(valid.accepted, true);
+  assert.equal(valid.inquiry.workEmail, 'sam@examplecards.com');
+});
+
+test('accepted sponsor inquiries create privacy-safe audit records', () => {
+  const result = createSponsorInquiryRecord({
+    name: 'Sam Partner',
+    company: 'Example Cards',
+    workEmail: 'sam@examplecards.com',
+    website: 'https://examplecards.com',
+    sponsorshipInterest: 'Product partnership',
+    estimatedBudgetRange: '$250-$500',
+    desiredTiming: 'This season',
+    message: 'We want to discuss a product partnership for card-game players.',
+    consent: true,
+    receivedAt: '2026-07-10T00:00:00.000Z',
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.inquiry.status, 'NEW');
+  assert.equal(result.auditEvent.action, 'sponsor.inquiry.received');
+  assert.deepEqual(result.auditEvent.afterData, {
+    company: 'Example Cards',
+    sponsorshipInterest: 'Product partnership',
+  });
 });

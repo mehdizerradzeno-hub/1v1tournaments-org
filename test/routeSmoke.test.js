@@ -15,6 +15,8 @@ const spadesRouteFile = fileURLToPath(new URL('../app/spades.jsx', import.meta.u
 const euchreRouteFile = fileURLToPath(new URL('../app/euchre.jsx', import.meta.url));
 const aboutRouteFile = fileURLToPath(new URL('../app/about.jsx', import.meta.url));
 const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta.url));
+const sponsorsRouteFile = fileURLToPath(new URL('../app/sponsors.jsx', import.meta.url));
+const mediaKitRouteFile = fileURLToPath(new URL('../app/media-kit.jsx', import.meta.url));
 const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', import.meta.url));
 const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
 const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
@@ -27,6 +29,7 @@ const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
 const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
+const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
@@ -76,6 +79,18 @@ test('/about stays wired to the public organization page', () => {
 
 test('/contact stays wired to the public contact page', () => {
   assert.ok(existsSync(contactRouteFile));
+});
+
+test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
+  assert.ok(existsSync(sponsorsRouteFile));
+  assert.ok(existsSync(mediaKitRouteFile));
+  assert.ok(existsSync(sponsorPublicScreenFile));
+
+  const sponsorScreenSource = readFileSync(sponsorPublicScreenFile, 'utf8');
+
+  assert.match(sponsorScreenSource, /Reach a Competitive Card-Game Community/);
+  assert.match(sponsorScreenSource, /Audience metrics are omitted publicly until verified/);
+  assert.match(sponsorScreenSource, /Private CRM details are never shown publicly/);
 });
 
 test('/leaderboard stays wired to tournament-only rankings', () => {
