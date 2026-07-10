@@ -116,6 +116,15 @@ const PRIMARY_PROSPECT_STATUSES = [
   'DO_NOT_CONTACT',
 ];
 
+const SPONSOR_WORKSPACE_TABS = [
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'prospects', label: 'Prospects' },
+  { id: 'research', label: 'Research' },
+  { id: 'drafts', label: 'Drafts' },
+  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'export', label: 'Export' },
+];
+
 function ProspectDetail({ loading, onUpdateStatus, prospect }) {
   if (!prospect) {
     return (
@@ -464,6 +473,7 @@ export default function SponsorAdminScreen() {
   const [proposals, setProposals] = useState([]);
   const [inquiryState, setInquiryState] = useState({ loading: false, error: '', inquiries: [] });
   const [prospectState, setProspectState] = useState({ loading: false, error: '', message: '' });
+  const [activeTab, setActiveTab] = useState('inbox');
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
@@ -724,132 +734,165 @@ export default function SponsorAdminScreen() {
           </Section>
 
           <Section
-            description="Public sponsor inquiries are stored server-side and reviewed manually."
-            title="Inquiry inbox">
-            <SponsorInquiryInbox
-              error={inquiryState.error}
-              inquiries={inquiryState.inquiries}
-              loading={inquiryState.loading}
-              onRefresh={loadSponsorInquiries}
-              onUpdateStatus={updateInquiryStatus}
-            />
-          </Section>
-
-          <Section
-            description="Paste CSV data to preview normalized prospects. Saving preview stores host-reviewed records in the sponsor CRM."
-            title="CSV import preview">
-            <Surface style={styles.importPanel}>
-              <TextInput
-                multiline
-                onChangeText={setCsvText}
-                spellCheck={false}
-                style={styles.csvInput}
-                value={csvText}
-              />
-              <View style={styles.importFooter}>
-                <View style={styles.importCopy}>
-                  <Text style={styles.importTitle}>{importPreview.prospects.length} preview records</Text>
-                  <Text style={styles.importMeta}>
-                    {importPreview.errors.length ? importPreview.errors.join(' ') : 'No structural CSV errors found.'}
-                  </Text>
-                </View>
-                <ActionButton disabled={Boolean(importPreview.errors.length) || prospectState.loading} onPress={acceptPreview}>
-                  {prospectState.loading ? 'Saving...' : 'Save preview'}
-                </ActionButton>
+            description="Move through one focused sponsor task at a time."
+            title="Workspace">
+            <Surface style={styles.tabPanel}>
+              <View style={styles.tabRow}>
+                {SPONSOR_WORKSPACE_TABS.map((tab) => (
+                  <ActionButton
+                    key={tab.id}
+                    onPress={() => setActiveTab(tab.id)}
+                    variant={activeTab === tab.id ? 'primary' : 'secondary'}>
+                    {tab.label}
+                  </ActionButton>
+                ))}
               </View>
             </Surface>
           </Section>
 
-          <Section
-            description="Search and filter the current local preview records."
-            title="Prospects">
-            <View style={styles.crmGrid}>
-              <Surface style={styles.listPanel}>
-                <View style={styles.filterRow}>
+          {activeTab === 'inbox' ? (
+            <Section
+              description="Public sponsor inquiries are stored server-side and reviewed manually."
+              title="Inquiry inbox">
+              <SponsorInquiryInbox
+                error={inquiryState.error}
+                inquiries={inquiryState.inquiries}
+                loading={inquiryState.loading}
+                onRefresh={loadSponsorInquiries}
+                onUpdateStatus={updateInquiryStatus}
+              />
+            </Section>
+          ) : null}
+
+          {activeTab === 'prospects' ? (
+            <>
+              <Section
+                description="Paste CSV data to preview normalized prospects. Saving preview stores host-reviewed records in the sponsor CRM."
+                title="CSV import preview">
+                <Surface style={styles.importPanel}>
                   <TextInput
-                    onChangeText={setQuery}
-                    placeholder="Search company, domain, contact"
-                    placeholderTextColor="#7C8782"
-                    style={styles.filterInput}
-                    value={query}
+                    multiline
+                    onChangeText={setCsvText}
+                    spellCheck={false}
+                    style={styles.csvInput}
+                    value={csvText}
                   />
-                  <TextInput
-                    autoCapitalize="characters"
-                    onChangeText={setStatusFilter}
-                    placeholder="Status"
-                    placeholderTextColor="#7C8782"
-                    style={styles.filterInputSmall}
-                    value={statusFilter}
+                  <View style={styles.importFooter}>
+                    <View style={styles.importCopy}>
+                      <Text style={styles.importTitle}>{importPreview.prospects.length} preview records</Text>
+                      <Text style={styles.importMeta}>
+                        {importPreview.errors.length ? importPreview.errors.join(' ') : 'No structural CSV errors found.'}
+                      </Text>
+                    </View>
+                    <ActionButton disabled={Boolean(importPreview.errors.length) || prospectState.loading} onPress={acceptPreview}>
+                      {prospectState.loading ? 'Saving...' : 'Save preview'}
+                    </ActionButton>
+                  </View>
+                </Surface>
+              </Section>
+
+              <Section
+                description="Search, select, and manually move saved sponsor prospects through the pipeline."
+                title="Prospects">
+                <View style={styles.crmGrid}>
+                  <Surface style={styles.listPanel}>
+                    <View style={styles.filterRow}>
+                      <TextInput
+                        onChangeText={setQuery}
+                        placeholder="Search company, domain, contact"
+                        placeholderTextColor="#7C8782"
+                        style={styles.filterInput}
+                        value={query}
+                      />
+                      <TextInput
+                        autoCapitalize="characters"
+                        onChangeText={setStatusFilter}
+                        placeholder="Status"
+                        placeholderTextColor="#7C8782"
+                        style={styles.filterInputSmall}
+                        value={statusFilter}
+                      />
+                    </View>
+                    {filteredProspects.length ? filteredProspects.map((prospect) => (
+                      <ProspectRow
+                        key={prospect.id || prospect.companyName}
+                        onSelect={() => setSelectedId(prospect.id)}
+                        prospect={prospect}
+                        selected={selectedProspect?.id === prospect.id}
+                      />
+                    )) : (
+                      <EmptyState
+                        body="No prospects are loaded yet. Use the CSV preview above to inspect import data."
+                        title="No prospects"
+                      />
+                    )}
+                  </Surface>
+                  <ProspectDetail
+                    loading={prospectState.loading}
+                    onUpdateStatus={changeProspectStatus}
+                    prospect={selectedProspect}
                   />
                 </View>
-                {filteredProspects.length ? filteredProspects.map((prospect) => (
-                  <ProspectRow
-                    key={prospect.id || prospect.companyName}
-                    onSelect={() => setSelectedId(prospect.id)}
-                    prospect={prospect}
-                    selected={selectedProspect?.id === prospect.id}
-                  />
-                )) : (
-                  <EmptyState
-                    body="No prospects are loaded yet. Use the CSV preview above to inspect import data."
-                    title="No prospects"
-                  />
-                )}
-              </Surface>
-              <ProspectDetail
-                loading={prospectState.loading}
-                onUpdateStatus={changeProspectStatus}
-                prospect={selectedProspect}
+              </Section>
+            </>
+          ) : null}
+
+          {activeTab === 'research' ? (
+            <Section
+              description="Prepare sponsor candidates from approved mock providers. Live search providers can be added later behind the same interface."
+              title="Research queue">
+              <ResearchQueue
+                candidates={researchRun?.candidates || []}
+                loading={researchLoading}
+                onAccept={acceptResearchCandidate}
+                onPrepare={prepareResearchQueue}
               />
-            </View>
-          </Section>
+            </Section>
+          ) : null}
 
-          <Section
-            description="Prepare sponsor candidates from approved mock providers. Live search providers can be added later behind the same interface."
-            title="Research queue">
-            <ResearchQueue
-              candidates={researchRun?.candidates || []}
-              loading={researchLoading}
-              onAccept={acceptResearchCandidate}
-              onPrepare={prepareResearchQueue}
-            />
-          </Section>
+          {activeTab === 'drafts' ? (
+            <>
+              <Section
+                description="Drafts require validation and approval. Sending is deliberately not available from this phase."
+                title="Approval queue">
+                <ApprovalQueue
+                  drafts={outreachDrafts}
+                  onApprove={approveDraft}
+                  onGenerate={generateOutreachDraft}
+                  onPrepareFollowUp={prepareFollowUp}
+                  selectedProspect={selectedProspect}
+                />
+              </Section>
 
-          <Section
-            description="Drafts require validation and approval. Sending is deliberately not available from this phase."
-            title="Approval queue">
-            <ApprovalQueue
-              drafts={outreachDrafts}
-              onApprove={approveDraft}
-              onGenerate={generateOutreachDraft}
-              onPrepareFollowUp={prepareFollowUp}
-              selectedProspect={selectedProspect}
-            />
-          </Section>
+              <Section
+                description="Generate proposal previews from selected prospects and starter package definitions."
+                title="Proposals">
+                <ProposalPreview
+                  onGenerate={generateProposal}
+                  proposals={proposals}
+                  selectedProspect={selectedProspect}
+                />
+              </Section>
+            </>
+          ) : null}
 
-          <Section
-            description="Generate proposal previews from selected prospects and starter package definitions."
-            title="Proposals">
-            <ProposalPreview
-              onGenerate={generateProposal}
-              proposals={proposals}
-              selectedProspect={selectedProspect}
-            />
-          </Section>
+          {activeTab === 'pipeline' ? (
+            <Section
+              description="Pipeline columns are populated by saved sponsor prospect records. Drag-and-drop comes after status updates mature."
+              title="Pipeline board">
+              <PipelineBoard prospects={prospects} />
+            </Section>
+          ) : null}
 
-          <Section
-            description="Pipeline columns are populated by saved sponsor prospect records. Drag-and-drop comes after stage updates are wired."
-            title="Pipeline board">
-            <PipelineBoard prospects={prospects} />
-          </Section>
-
-          <Section
-            description="Exports the currently loaded sponsor prospect records."
-            title="CSV export">
-            <Surface style={styles.exportPanel}>
-              <Text selectable style={styles.exportText}>{exportSponsorProspectsCsv(prospects)}</Text>
-            </Surface>
-          </Section>
+          {activeTab === 'export' ? (
+            <Section
+              description="Exports the currently loaded sponsor prospect records."
+              title="CSV export">
+              <Surface style={styles.exportPanel}>
+                <Text selectable style={styles.exportText}>{exportSponsorProspectsCsv(prospects)}</Text>
+              </Surface>
+            </Section>
+          ) : null}
         </>
       )}
     </HubScreen>
@@ -1282,5 +1325,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 28,
     marginTop: 7,
+  },
+  tabPanel: {
+    borderColor: theme.colors.line,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
 });

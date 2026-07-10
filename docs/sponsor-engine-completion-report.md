@@ -20,6 +20,7 @@ No deployment, production write, external outreach, email send, post, merge, or 
 - Host-only sponsor inquiry inbox with manual review/archive actions, Netlify Blob persistence, and hashed client rate limiting.
 - Host-only sponsor prospect persistence for CSV imports and accepted research candidates through Netlify Blobs.
 - Manual sponsor prospect stage/status controls, including `DO_NOT_CONTACT`, with host-protected persistence.
+- Focused sponsor admin workspace tabs for Inbox, Prospects, Research, Drafts, Pipeline, and Export.
 - Public `/media-kit` page with brand/product overview and no fabricated audience statistics.
 - Proposal/deal generator with review-only proposal copy and print-safe HTML export helper.
 - Scheduled automation helpers for research preparation, follow-up preparation, weekly pipeline review, and monthly data hygiene.
@@ -164,7 +165,7 @@ Deployment was not performed. When approved:
 ## Recommended next actions
 
 1. Add persistent storage for outreach drafts and proposal previews.
-2. Split sponsor admin into focused tabs or sub-routes as volume grows.
+2. Promote sponsor workspace tabs into sub-routes if volume or team access grows.
 3. Add CAPTCHA or a third-party bot-defense provider if inquiry spam becomes a problem.
 4. Add authenticated admin sub-routes for prospects, research, approvals, packages, proposals, and settings.
 5. Add real provider adapters one at a time behind explicit credentials and approval gates.

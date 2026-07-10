@@ -10,6 +10,7 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 - The inquiry inbox supports refresh, mark reviewed, and archive.
 - Sponsor prospects from CSV preview and accepted research candidates are stored server-side through Netlify Blobs.
 - Saved sponsor prospects can be moved manually through pipeline stages, including `DO_NOT_CONTACT`.
+- Sponsor admin uses focused workspace tabs: Inbox, Prospects, Research, Drafts, Pipeline, and Export.
 - Outreach drafts and proposal previews are still review/local until persistence is approved.
 - No research jobs are active.
 - No email provider is enabled.

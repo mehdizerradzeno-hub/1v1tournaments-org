@@ -30,6 +30,7 @@ const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.m
 const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
 const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
+const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
@@ -87,10 +88,12 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.ok(existsSync(sponsorsRouteFile));
   assert.ok(existsSync(mediaKitRouteFile));
   assert.ok(existsSync(sponsorPublicScreenFile));
+  assert.ok(existsSync(sponsorAdminScreenFile));
   assert.ok(existsSync(sponsorInquiriesFunctionFile));
   assert.ok(existsSync(sponsorProspectsFunctionFile));
 
   const sponsorScreenSource = readFileSync(sponsorPublicScreenFile, 'utf8');
+  const sponsorAdminScreenSource = readFileSync(sponsorAdminScreenFile, 'utf8');
   const sponsorInquiriesSource = readFileSync(sponsorInquiriesFunctionFile, 'utf8');
   const sponsorProspectsSource = readFileSync(sponsorProspectsFunctionFile, 'utf8');
 
@@ -98,6 +101,8 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorScreenSource, /Audience metrics are omitted publicly until verified/);
   assert.match(sponsorScreenSource, /Private CRM details are never shown publicly/);
   assert.match(sponsorScreenSource, /submitSponsorInquiry/);
+  assert.match(sponsorAdminScreenSource, /SPONSOR_WORKSPACE_TABS/);
+  assert.match(sponsorAdminScreenSource, /activeTab/);
   assert.match(sponsorInquiriesSource, /requireTournamentAdmin/);
   assert.match(sponsorInquiriesSource, /RATE_LIMIT_MAX/);
   assert.match(sponsorInquiriesSource, /sponsor-inquiries/);
