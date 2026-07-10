@@ -103,10 +103,12 @@ export function createSponsorInquiryRecord(input = {}, { actorId = 'public-spons
     };
   }
 
+  const inquiryId = cleanText(input.id, 120) || `sponsor-inquiry-${validation.inquiry.receivedAt}`;
+
   return {
     inquiry: {
       ...validation.inquiry,
-      id: `sponsor-inquiry-${validation.inquiry.receivedAt}`,
+      id: inquiryId,
       status: 'NEW',
     },
     errors: [],
@@ -114,7 +116,7 @@ export function createSponsorInquiryRecord(input = {}, { actorId = 'public-spons
       actorId,
       action: 'sponsor.inquiry.received',
       entityType: 'SponsorInquiry',
-      entityId: `sponsor-inquiry-${validation.inquiry.receivedAt}`,
+      entityId: inquiryId,
       afterData: {
         company: validation.inquiry.company,
         sponsorshipInterest: validation.inquiry.sponsorshipInterest,

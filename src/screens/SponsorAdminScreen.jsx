@@ -9,7 +9,11 @@ import {
   Section,
   Surface,
 } from '../components/hub-ui.jsx';
-import { fetchPlayerAccount } from '../lib/tournamentHostingClient.js';
+import {
+  fetchPlayerAccount,
+  fetchSponsorInquiries,
+  updateSponsorInquiryStatus,
+} from '../lib/tournamentHostingClient.js';
 import {
   exportSponsorProspectsCsv,
   filterSponsorProspects,
@@ -169,6 +173,69 @@ function PipelineBoard({ prospects }) {
         );
       })}
     </View>
+  );
+}
+
+function SponsorInquiryInbox({ error, inquiries, loading, onRefresh, onUpdateStatus }) {
+  return (
+    <Surface style={styles.inquiryPanel}>
+      <View style={styles.researchHeader}>
+        <View style={styles.researchCopy}>
+          <Text style={styles.researchTitle}>Sponsor inquiry inbox</Text>
+          <Text style={styles.researchBody}>
+            Public sponsor form submissions land here for manual review. No email is sent automatically.
+          </Text>
+        </View>
+        <ActionButton disabled={loading} onPress={onRefresh} variant="secondary">
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </ActionButton>
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {inquiries.length ? (
+        <View style={styles.inquiryList}>
+          {inquiries.map((inquiry) => (
+            <View key={inquiry.id} style={styles.inquiryCard}>
+              <View style={styles.researchCardHeader}>
+                <View style={styles.researchCardCopy}>
+                  <Text style={styles.researchCompany}>{inquiry.company}</Text>
+                  <Text style={styles.researchMeta}>
+                    {inquiry.name} | {inquiry.workEmail} | {inquiry.estimatedBudgetRange}
+                  </Text>
+                </View>
+                <Badge tone={inquiry.status === 'NEW' ? 'accent' : inquiry.status === 'REVIEWED' ? 'green' : 'neutral'}>
+                  {inquiry.status}
+                </Badge>
+              </View>
+              <Text style={styles.inquiryMessage}>{inquiry.message}</Text>
+              <Text selectable style={styles.sourceText}>
+                {inquiry.sponsorshipInterest} | {inquiry.website || 'No website'} | {inquiry.receivedAt}
+              </Text>
+              <View style={styles.approvalActions}>
+                <ActionButton
+                  disabled={loading || inquiry.status === 'REVIEWED'}
+                  onPress={() => onUpdateStatus(inquiry.id, 'REVIEWED')}
+                  variant="secondary">
+                  Mark reviewed
+                </ActionButton>
+                <ActionButton
+                  disabled={loading || inquiry.status === 'ARCHIVED'}
+                  onPress={() => onUpdateStatus(inquiry.id, 'ARCHIVED')}
+                  variant="ghost">
+                  Archive
+                </ActionButton>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <EmptyState
+          body="When a company submits the public sponsor form, it will appear here after server-side validation."
+          title="No sponsor inquiries yet"
+        />
+      )}
+    </Surface>
   );
 }
 
@@ -360,11 +427,58 @@ export default function SponsorAdminScreen() {
   const [researchLoading, setResearchLoading] = useState(false);
   const [outreachDrafts, setOutreachDrafts] = useState([]);
   const [proposals, setProposals] = useState([]);
+  const [inquiryState, setInquiryState] = useState({ loading: false, error: '', inquiries: [] });
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
   const summary = summarizeSponsorPipeline(prospects);
   const canUseAdmin = Boolean(hostState.account?.hostApproved);
+
+  async function loadSponsorInquiries() {
+    setInquiryState((currentState) => ({ ...currentState, loading: true, error: '' }));
+
+    try {
+      const result = await fetchSponsorInquiries();
+
+      setInquiryState({
+        loading: false,
+        error: '',
+        inquiries: result.inquiries || [],
+      });
+    } catch (error) {
+      setInquiryState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor inquiries could not be loaded.',
+        inquiries: [],
+      });
+    }
+  }
+
+  async function updateInquiryStatus(inquiryId, status) {
+    setInquiryState((currentState) => ({ ...currentState, loading: true, error: '' }));
+
+    try {
+      const result = await updateSponsorInquiryStatus({ inquiryId, status });
+
+      setInquiryState({
+        loading: false,
+        error: '',
+        inquiries: result.inquiries || [],
+      });
+    } catch (error) {
+      setInquiryState((currentState) => ({
+        ...currentState,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor inquiry could not be updated.',
+      }));
+    }
+  }
+
+  useEffect(() => {
+    if (canUseAdmin) {
+      loadSponsorInquiries();
+    }
+  }, [canUseAdmin]);
 
   function acceptPreview() {
     const nextProspects = importPreview.prospects.map((prospect, index) => ({
@@ -484,6 +598,18 @@ export default function SponsorAdminScreen() {
               <StatTile label="Data-quality alerts" value={summary.dataQualityAlerts} />
               <StatTile label="Do not contact" value={summary.doNotContact} />
             </View>
+          </Section>
+
+          <Section
+            description="Public sponsor inquiries are stored server-side and reviewed manually."
+            title="Inquiry inbox">
+            <SponsorInquiryInbox
+              error={inquiryState.error}
+              inquiries={inquiryState.inquiries}
+              loading={inquiryState.loading}
+              onRefresh={loadSponsorInquiries}
+              onUpdateStatus={updateInquiryStatus}
+            />
           </Section>
 
           <Section
@@ -701,6 +827,12 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
+  errorText: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
   importCopy: {
     flex: 1,
     minWidth: 210,
@@ -728,6 +860,27 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     lineHeight: 22,
+  },
+  inquiryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  inquiryList: {
+    gap: 12,
+  },
+  inquiryMessage: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  inquiryPanel: {
+    borderColor: theme.colors.line,
+    gap: 14,
   },
   listPanel: {
     flex: 0.9,

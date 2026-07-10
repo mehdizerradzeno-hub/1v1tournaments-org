@@ -3,12 +3,12 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, Badge, BulletList, HubScreen, Section, Surface } from '../components/hub-ui.jsx';
 import {
-  createSponsorInquiryRecord,
   SPONSOR_BUDGET_RANGES,
   SPONSOR_INTEREST_OPTIONS,
   STARTER_SPONSORSHIP_PACKAGES,
   validateSponsorInquiry,
 } from '../lib/sponsorEngine/index.js';
+import { submitSponsorInquiry } from '../lib/tournamentHostingClient.js';
 import { getGamePath, siteData } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
 
@@ -44,19 +44,41 @@ function PackageCard({ item }) {
 
 function SponsorInquiryForm() {
   const [form, setForm] = useState(EMPTY_INQUIRY);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitState, setSubmitState] = useState({ submitting: false, submitted: false, error: '', confirmation: '' });
   const validation = useMemo(() => validateSponsorInquiry(form), [form]);
 
   function updateField(field, value) {
-    setSubmitted(false);
+    setSubmitState({ submitting: false, submitted: false, error: '', confirmation: '' });
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
   }
 
-  function submit() {
-    const result = createSponsorInquiryRecord(form);
+  async function submit() {
+    if (!validation.accepted || submitState.submitting) {
+      return;
+    }
 
-    if (!result.errors.length) {
-      setSubmitted(true);
+    setSubmitState({ submitting: true, submitted: false, error: '', confirmation: '' });
+
+    try {
+      const result = await submitSponsorInquiry({
+        ...form,
+        sourcePage: '/sponsors',
+      });
+
+      setSubmitState({
+        submitting: false,
+        submitted: true,
+        error: '',
+        confirmation: result.inquiry?.id || 'received',
+      });
+      setForm(EMPTY_INQUIRY);
+    } catch (error) {
+      setSubmitState({
+        submitting: false,
+        submitted: false,
+        error: error instanceof Error ? error.message : 'Sponsor inquiry could not be submitted.',
+        confirmation: '',
+      });
     }
   }
 
@@ -155,14 +177,19 @@ function SponsorInquiryForm() {
       ) : null}
 
       <View style={styles.formFooter}>
-        <ActionButton disabled={!validation.accepted} onPress={submit}>
-          Submit inquiry
+        <ActionButton disabled={!validation.accepted || submitState.submitting} onPress={submit}>
+          {submitState.submitting ? 'Submitting...' : 'Submit inquiry'}
         </ActionButton>
         <Text style={styles.privacyText}>
           Inquiry review is manual. Private CRM details are never shown publicly.
         </Text>
       </View>
-      {submitted ? <Text style={styles.successText}>Inquiry validated locally and ready for safe CRM intake.</Text> : null}
+      {submitState.error ? <Text style={styles.errorText}>{submitState.error}</Text> : null}
+      {submitState.submitted ? (
+        <Text style={styles.successText}>
+          Inquiry received for manual review. Reference: {submitState.confirmation}
+        </Text>
+      ) : null}
     </Surface>
   );
 }

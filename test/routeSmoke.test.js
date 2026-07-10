@@ -53,6 +53,7 @@ const tournamentEventsUtilsFile = fileURLToPath(new URL('../netlify/functions/_t
 const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/discord-alert.mjs', import.meta.url));
 const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
 const healthFunctionFile = fileURLToPath(new URL('../netlify/functions/health.mjs', import.meta.url));
+const sponsorInquiriesFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-inquiries.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
@@ -85,12 +86,18 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.ok(existsSync(sponsorsRouteFile));
   assert.ok(existsSync(mediaKitRouteFile));
   assert.ok(existsSync(sponsorPublicScreenFile));
+  assert.ok(existsSync(sponsorInquiriesFunctionFile));
 
   const sponsorScreenSource = readFileSync(sponsorPublicScreenFile, 'utf8');
+  const sponsorInquiriesSource = readFileSync(sponsorInquiriesFunctionFile, 'utf8');
 
   assert.match(sponsorScreenSource, /Reach a Competitive Card-Game Community/);
   assert.match(sponsorScreenSource, /Audience metrics are omitted publicly until verified/);
   assert.match(sponsorScreenSource, /Private CRM details are never shown publicly/);
+  assert.match(sponsorScreenSource, /submitSponsorInquiry/);
+  assert.match(sponsorInquiriesSource, /requireTournamentAdmin/);
+  assert.match(sponsorInquiriesSource, /RATE_LIMIT_MAX/);
+  assert.match(sponsorInquiriesSource, /sponsor-inquiries/);
 });
 
 test('/leaderboard stays wired to tournament-only rankings', () => {
@@ -210,6 +217,9 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(hostingClientSource, /fetchStreamCommands/);
   assert.match(hostingClientSource, /HEALTH_ENDPOINT/);
   assert.match(hostingClientSource, /fetchRuntimeHealth/);
+  assert.match(hostingClientSource, /SPONSOR_INQUIRIES_ENDPOINT/);
+  assert.match(hostingClientSource, /fetchSponsorInquiries/);
+  assert.match(hostingClientSource, /updateSponsorInquiryStatus/);
   assert.match(streamCommandsSource, /stream-commands/);
   assert.match(streamCommandsSource, /requireTournamentAdmin/);
   assert.match(streamCommandsSource, /normalizeStreamCommands/);
