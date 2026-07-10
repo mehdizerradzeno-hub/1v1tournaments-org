@@ -135,6 +135,20 @@ function getTournamentFormatDetails(tournament) {
     };
   }
 
+  if (mode.value === 'three-player-two-life') {
+    return {
+      mode,
+      bullets: [
+        'Exactly 3 players enter the rotation.',
+        'Every player starts with two lives.',
+        'Each match loss removes one life.',
+        'The last player with lives remaining wins.',
+      ],
+      requirement: 'Exactly 3 players',
+      rhythm: 'Two-life rotation',
+    };
+  }
+
   if (mode.value === 'single-elimination') {
     return {
       mode,

@@ -49,6 +49,16 @@ export const TOURNAMENT_MODES = [
     generation: 'live',
     summary: 'Four players, second chance, grand final with optional reset.',
   },
+  {
+    value: 'three-player-two-life',
+    label: '3-Man Two-Life',
+    shortLabel: '3-man two-life',
+    format: '3-player two-life ladder',
+    rosterCap: 3,
+    minimumPlayers: 3,
+    generation: 'live',
+    summary: 'Three players, two lives each. Lose twice and you are out.',
+  },
 ];
 
 export const DEFAULT_TOURNAMENT_MODE = 'single-elimination';

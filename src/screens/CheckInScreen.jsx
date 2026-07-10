@@ -42,6 +42,15 @@ function getSignupFormatDetails(tournament) {
     };
   }
 
+  if (mode.value === 'three-player-two-life') {
+    return {
+      mode,
+      requirement: 'Exactly 3 players',
+      body: 'Three players start with two lives. Each loss removes one life, and the last player with lives remaining wins.',
+      footnote: 'The waiting player rotates into the next match so the stream keeps moving.',
+    };
+  }
+
   if (mode.value === 'single-elimination') {
     return {
       mode,

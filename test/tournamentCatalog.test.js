@@ -29,6 +29,7 @@ test('hosted tournament records get the full public page shape from simple input
 test('recommended tournament modes expose wired and planned generation state', () => {
   const values = TOURNAMENT_MODES.map((mode) => mode.value);
   const doubleElim = getTournamentMode('four-player-double-elimination');
+  const twoLife = getTournamentMode('three-player-two-life');
   const bestOf3 = getTournamentMode('best-of-3-single-elimination');
 
   assert.ok(values.includes('single-elimination'));
@@ -36,12 +37,17 @@ test('recommended tournament modes expose wired and planned generation state', (
   assert.ok(values.includes('round-robin'));
   assert.ok(values.includes('king-of-the-table'));
   assert.ok(values.includes('four-player-double-elimination'));
+  assert.ok(values.includes('three-player-two-life'));
   assert.equal(doubleElim.rosterCap, 4);
   assert.equal(doubleElim.minimumPlayers, 4);
   assert.equal(doubleElim.format, '4-player double-elimination bracket');
+  assert.equal(twoLife.rosterCap, 3);
+  assert.equal(twoLife.minimumPlayers, 3);
+  assert.equal(twoLife.format, '3-player two-life ladder');
   assert.equal(bestOf3.format, 'Best-of-3 single-elimination bracket');
   assert.equal(canGenerateTournamentMode('single-elimination'), true);
   assert.equal(canGenerateTournamentMode('four-player-double-elimination'), true);
+  assert.equal(canGenerateTournamentMode('three-player-two-life'), true);
   assert.equal(canGenerateTournamentMode('round-robin'), false);
 });
 
