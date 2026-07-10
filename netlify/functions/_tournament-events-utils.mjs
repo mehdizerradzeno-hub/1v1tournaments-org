@@ -1,5 +1,6 @@
 import { cleanText, getStoreWithFallback } from './_account-utils.mjs';
 import { createTournamentRecord, slugifyTournamentTitle } from '../../src/lib/tournamentCatalog.js';
+import { siteData } from '../../src/lib/siteData.js';
 
 const STORE_NAME = 'tournament-events';
 
@@ -8,6 +9,9 @@ function eventKey(tournamentSlug) {
 }
 
 function byDateAsc(left, right) {
+  if (left?.deleted && !right?.deleted) return 1;
+  if (!left?.deleted && right?.deleted) return -1;
+
   const leftTime = new Date(left.date).getTime();
   const rightTime = new Date(right.date).getTime();
 
@@ -62,7 +66,9 @@ export async function loadHostedTournament(tournamentSlug) {
   }
 
   const store = getStoreWithFallback(STORE_NAME);
-  return store.get(eventKey(slug), { type: 'json' });
+  const tournament = await store.get(eventKey(slug), { type: 'json' });
+
+  return tournament?.deleted ? null : tournament;
 }
 
 export async function deleteHostedTournament(tournamentSlug) {
@@ -74,10 +80,28 @@ export async function deleteHostedTournament(tournamentSlug) {
 
   const store = getStoreWithFallback(STORE_NAME);
   const existing = await store.get(eventKey(slug), { type: 'json' });
+  const seededTournament = siteData.tournaments.some((tournament) => tournament.slug === slug);
 
   await store.delete(eventKey(slug));
 
-  return Boolean(existing);
+  if (seededTournament) {
+    const updatedAt = new Date().toISOString();
+    await store.setJSON(eventKey(slug), {
+      slug,
+      deleted: true,
+      status: 'deleted',
+      updatedAt,
+      updatedBy: 'host-clear',
+    }, {
+      metadata: {
+        tournamentSlug: slug,
+        status: 'deleted',
+        updatedAt,
+      },
+    });
+  }
+
+  return Boolean(existing) || seededTournament;
 }
 
 export async function saveHostedTournament(tournament, account = null) {
