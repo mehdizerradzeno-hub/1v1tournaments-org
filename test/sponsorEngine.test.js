@@ -5,24 +5,29 @@ import {
   createAuditEvent,
   createEmptySponsorProspect,
   createMockResearchProvider,
+  createOutreachDraft,
   createResearchCandidate,
   exportSponsorProspectsCsv,
   filterSponsorProspects,
   groupProspectsByStage,
   getSponsorAdminRoutesForPhase,
+  approveOutreachDraft,
   isSponsorSendingAllowed,
   isTierCCategory,
   markDuplicateProspects,
   normalizeCompanyName,
   normalizeDomain,
   parseSponsorCsv,
+  prepareFollowUpDraft,
   prospectDeduplicationKey,
   redactSponsorAuditPayload,
   runResearchPreparation,
   sanitizeFetchedText,
   scoreSponsorFit,
+  sendApprovedDraft,
   SPONSOR_ROLES,
   summarizeSponsorPipeline,
+  validateOutreachDraft,
 } from '../src/lib/sponsorEngine/index.js';
 
 test('sponsor company and domain normalization supports deduplication', () => {
@@ -271,4 +276,124 @@ test('research preparation uses bounded mock providers and detects duplicates', 
   assert.ok(run.candidatesFound >= 1);
   assert.equal(run.candidates[0].prospect.duplicateOfId, 'existing-card-brand');
   assert.equal(run.candidates[0].status, 'DUPLICATE_REVIEW');
+});
+
+test('outreach drafts use sourced personalization and require review before approval', () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-1',
+    companyName: 'Example Cards',
+    website: 'https://examplecards.com',
+    industry: 'Playing cards',
+    companyDescription: 'Premium playing cards for competitive players.',
+    headquarters: 'Raleigh, NC',
+    publicContactFormUrl: 'https://examplecards.com/partners',
+    publicContactSourceUrl: 'https://examplecards.com/partners',
+    contactPageUrl: 'https://examplecards.com/contact',
+    sourceUrls: [{ url: 'https://examplecards.com/partners', sourceType: 'manual' }],
+    brandSafetyStatus: 'CLEAR',
+    legalRiskStatus: 'CLEAR',
+    status: 'QUALIFIED',
+  });
+
+  const draft = createOutreachDraft({ prospect, templateType: 'local-business-sponsorship' });
+
+  assert.equal(draft.status, 'NEEDS_REVIEW');
+  assert.match(draft.body, /Apple App Store/);
+  assert.match(draft.body, /no thanks/i);
+  assert.ok(draft.personalizationFacts.length >= 2);
+  assert.equal(draft.validation.warnings.length, 0);
+  assert.ok(draft.qualityScore >= 70);
+});
+
+test('outreach validation blocks unsupported claims and risky prospects', () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-risk',
+    companyName: 'FastBet Example',
+    website: 'https://fastbet.example',
+    industry: 'Sportsbook',
+    legalRiskStatus: 'NEEDS_REVIEW',
+    brandSafetyStatus: 'NEEDS_REVIEW',
+  });
+  const draft = {
+    subject: 'Guaranteed ROI as discussed',
+    body: 'As discussed, we can guarantee impressions.',
+    recipient: '',
+    recipientSourceUrl: '',
+    personalizationFacts: [],
+    factualClaims: [{ claim: 'Huge audience', sourceUrl: '', supported: false }],
+    sourceUrls: [],
+  };
+  const validation = validateOutreachDraft(draft, prospect);
+
+  assert.equal(validation.eligibleForApproval, false);
+  assert.match(validation.warnings.join(' '), /Unsupported factual claims/);
+  assert.match(validation.warnings.join(' '), /compliance review/);
+  assert.match(validation.warnings.join(' '), /risky familiarity|guaranteed-results/);
+});
+
+test('approval transitions create audit metadata and preserve explicit send separation', async () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-send',
+    companyName: 'Example Cards',
+    website: 'https://examplecards.com',
+    companyDescription: 'Premium playing cards.',
+    publicContactFormUrl: 'https://examplecards.com/partners',
+    publicContactSourceUrl: 'https://examplecards.com/partners',
+    sourceUrls: [{ url: 'https://examplecards.com/partners', sourceType: 'manual' }],
+    brandSafetyStatus: 'CLEAR',
+    legalRiskStatus: 'CLEAR',
+    status: 'QUALIFIED',
+  });
+  const draft = createOutreachDraft({ prospect });
+  const approval = approveOutreachDraft(draft, {
+    approvedBy: 'host',
+    approvedAt: '2026-07-10T00:00:00.000Z',
+  });
+
+  assert.deepEqual(approval.errors, []);
+  assert.equal(approval.draft.status, 'APPROVED');
+  assert.equal(approval.auditEvent.action, 'sponsor.outreach.approved');
+
+  const blocked = await sendApprovedDraft({
+    roles: [SPONSOR_ROLES.admin],
+    settings: { sendingEnabled: false, providerConfigured: false },
+    draft: approval.draft,
+    prospect,
+  });
+
+  assert.equal(blocked.sent, false);
+  assert.match(blocked.blockers.join(' '), /disabled/);
+  assert.match(blocked.blockers.join(' '), /explicit send action/);
+});
+
+test('follow-up preparation stops after replies, opt-outs, and maximum sequence length', () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-follow',
+    companyName: 'Example Cards',
+    website: 'https://examplecards.com',
+    companyDescription: 'Premium playing cards.',
+    publicContactFormUrl: 'https://examplecards.com/partners',
+    publicContactSourceUrl: 'https://examplecards.com/partners',
+    sourceUrls: [{ url: 'https://examplecards.com/partners', sourceType: 'manual' }],
+    brandSafetyStatus: 'CLEAR',
+    legalRiskStatus: 'CLEAR',
+    status: 'CONTACTED',
+  });
+  const parentDraft = createOutreachDraft({ prospect });
+  const next = prepareFollowUpDraft({ prospect, parentDraft });
+  const stopped = prepareFollowUpDraft({
+    prospect,
+    parentDraft,
+    interactions: [{ interactionType: 'EMAIL', direction: 'INBOUND' }],
+  });
+  const maxed = prepareFollowUpDraft({
+    prospect,
+    parentDraft: { ...parentDraft, followUpNumber: 2 },
+  });
+
+  assert.equal(next.draft.followUpNumber, 1);
+  assert.equal(stopped.draft, null);
+  assert.match(stopped.reason, /stopped/);
+  assert.equal(maxed.draft, null);
+  assert.match(maxed.reason, /Maximum/);
 });

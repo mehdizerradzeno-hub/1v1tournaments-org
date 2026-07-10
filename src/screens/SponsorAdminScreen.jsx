@@ -14,7 +14,10 @@ import {
   exportSponsorProspectsCsv,
   filterSponsorProspects,
   groupProspectsByStage,
+  approveOutreachDraft,
+  createOutreachDraft,
   parseSponsorCsv,
+  prepareFollowUpDraft,
   runResearchPreparation,
   SPONSOR_PIPELINE_COLUMNS,
   summarizeSponsorPipeline,
@@ -231,6 +234,78 @@ function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
   );
 }
 
+function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrepareFollowUp }) {
+  return (
+    <Surface style={styles.approvalPanel}>
+      <View style={styles.researchHeader}>
+        <View style={styles.researchCopy}>
+          <Text style={styles.researchTitle}>Draft approval queue</Text>
+          <Text style={styles.researchBody}>
+            Generates review-only outreach drafts. Approval does not send messages.
+          </Text>
+        </View>
+        <ActionButton disabled={!selectedProspect} onPress={onGenerate}>
+          Generate draft
+        </ActionButton>
+      </View>
+
+      {drafts.length ? (
+        <View style={styles.researchList}>
+          {drafts.map((draft) => (
+            <View key={draft.id} style={styles.approvalCard}>
+              <View style={styles.researchCardHeader}>
+                <View style={styles.researchCardCopy}>
+                  <Text style={styles.researchCompany}>{draft.subject}</Text>
+                  <Text style={styles.researchMeta}>
+                    {draft.recipient || 'No recipient route'} | Quality {draft.qualityScore}/100
+                  </Text>
+                </View>
+                <Badge tone={draft.status === 'APPROVED' ? 'green' : draft.status === 'NEEDS_REVIEW' ? 'blue' : 'accent'}>
+                  {draft.status}
+                </Badge>
+              </View>
+              <Text selectable style={styles.draftBody}>{draft.body}</Text>
+              <View style={styles.factList}>
+                {draft.personalizationFacts.map((fact) => (
+                  <Text key={`${draft.id}-${fact.label}`} selectable style={styles.factText}>
+                    {fact.label}: {fact.value} Source: {fact.sourceUrl || 'Not yet provided'}
+                  </Text>
+                ))}
+              </View>
+              {draft.validation?.warnings?.length ? (
+                <View style={styles.riskList}>
+                  {draft.validation.warnings.map((warning) => (
+                    <Text key={warning} style={styles.riskText}>{warning}</Text>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.approvalActions}>
+                <ActionButton
+                  disabled={draft.status !== 'NEEDS_REVIEW'}
+                  onPress={() => onApprove(draft)}
+                  variant="secondary">
+                  Approve draft
+                </ActionButton>
+                <ActionButton
+                  disabled={draft.status !== 'APPROVED'}
+                  onPress={() => onPrepareFollowUp(draft)}
+                  variant="secondary">
+                  Prepare follow-up
+                </ActionButton>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <EmptyState
+          body="Select a prospect and generate an initial review draft. The draft must pass validation before approval."
+          title="No drafts prepared"
+        />
+      )}
+    </Surface>
+  );
+}
+
 export default function SponsorAdminScreen() {
   const hostState = useHostAccount();
   const [prospects, setProspects] = useState([]);
@@ -240,6 +315,7 @@ export default function SponsorAdminScreen() {
   const [csvText, setCsvText] = useState(EMPTY_IMPORT);
   const [researchRun, setResearchRun] = useState(null);
   const [researchLoading, setResearchLoading] = useState(false);
+  const [outreachDrafts, setOutreachDrafts] = useState([]);
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
@@ -287,6 +363,38 @@ export default function SponsorAdminScreen() {
         candidates: currentRun.candidates.filter((item) => item.id !== candidate.id),
       }
       : currentRun);
+  }
+
+  function generateOutreachDraft() {
+    if (!selectedProspect) return;
+
+    const draft = createOutreachDraft({
+      prospect: selectedProspect,
+      templateType: selectedProspect.headquarters?.toLowerCase().includes('nc')
+        ? 'local-business-sponsorship'
+        : 'initial-introduction',
+    });
+
+    setOutreachDrafts((currentDrafts) => [draft, ...currentDrafts]);
+  }
+
+  function approveDraft(draft) {
+    const result = approveOutreachDraft(draft, { approvedBy: hostState.account?.id || 'local-host' });
+
+    if (result.errors.length) return;
+
+    setOutreachDrafts((currentDrafts) => currentDrafts.map((item) => (
+      item.id === draft.id ? result.draft : item
+    )));
+  }
+
+  function prepareFollowUp(draft) {
+    const prospect = prospects.find((item) => item.id === draft.prospectId) || selectedProspect || {};
+    const result = prepareFollowUpDraft({ prospect, parentDraft: draft });
+
+    if (!result.draft) return;
+
+    setOutreachDrafts((currentDrafts) => [result.draft, ...currentDrafts]);
   }
 
   return (
@@ -395,6 +503,18 @@ export default function SponsorAdminScreen() {
               loading={researchLoading}
               onAccept={acceptResearchCandidate}
               onPrepare={prepareResearchQueue}
+            />
+          </Section>
+
+          <Section
+            description="Drafts require validation and approval. Sending is deliberately not available from this phase."
+            title="Approval queue">
+            <ApprovalQueue
+              drafts={outreachDrafts}
+              onApprove={approveDraft}
+              onGenerate={generateOutreachDraft}
+              onPrepareFollowUp={prepareFollowUp}
+              selectedProspect={selectedProspect}
             />
           </Section>
 
@@ -546,6 +666,33 @@ const styles = StyleSheet.create({
   listPanel: {
     flex: 0.9,
     minWidth: 300,
+  },
+  approvalActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  approvalCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  approvalPanel: {
+    borderColor: theme.colors.line,
+  },
+  draftBody: {
+    backgroundColor: 'rgba(5, 11, 10, 0.62)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    padding: 12,
   },
   pipelineBoard: {
     flexDirection: 'row',
