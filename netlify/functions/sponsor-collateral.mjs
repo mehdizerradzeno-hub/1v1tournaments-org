@@ -156,6 +156,38 @@ export async function handler(event) {
       });
     }
 
+    if (action === 'archive') {
+      const recordId = String(payload.recordId || '').trim();
+      const existing = (await listRecords(type)).find((record) => record.id === recordId);
+
+      if (!recordId) {
+        return json(400, { error: 'Choose a sponsor draft or proposal to archive.' });
+      }
+
+      if (!existing) {
+        return json(404, { error: 'Sponsor draft or proposal was not found.' });
+      }
+
+      const archived = normalizeRecord({
+        ...existing,
+        status: 'ARCHIVED',
+        archivedAt: nowIso(),
+        archivedBy: adminCheck.account?.id || adminCheck.account?.email || 'host',
+      }, {
+        account: adminCheck.account,
+        type,
+      });
+
+      await saveRecords(type, [archived]);
+
+      return json(200, {
+        ok: true,
+        record: archived,
+        drafts: await listRecords('draft'),
+        proposals: await listRecords('proposal'),
+      });
+    }
+
     return json(400, { error: 'Unsupported sponsor collateral action.' });
   } catch (error) {
     console.error('Sponsor collateral save failed', error);

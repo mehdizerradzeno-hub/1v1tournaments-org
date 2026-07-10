@@ -682,3 +682,25 @@ export async function saveSponsorCollateral({ token, type, record }) {
 
   return result;
 }
+
+export async function archiveSponsorCollateral({ token, type, recordId }) {
+  const response = await fetch(SPONSOR_COLLATERAL_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'archive',
+      type,
+      recordId,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor draft or proposal could not be archived.');
+  }
+
+  return result;
+}

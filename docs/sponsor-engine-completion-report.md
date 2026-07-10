@@ -22,6 +22,7 @@ No deployment, production write, external outreach, email send, post, merge, or 
 - Manual sponsor prospect stage/status controls, including `DO_NOT_CONTACT`, with host-protected persistence.
 - Focused sponsor admin workspace tabs for Inbox, Prospects, Research, Drafts, Pipeline, and Export.
 - Host-only outreach draft and proposal-preview persistence through Netlify Blobs.
+- Soft archive controls for saved outreach drafts and proposal previews.
 - Public `/media-kit` page with brand/product overview and no fabricated audience statistics.
 - Proposal/deal generator with review-only proposal copy and print-safe HTML export helper.
 - Scheduled automation helpers for research preparation, follow-up preparation, weekly pipeline review, and monthly data hygiene.
@@ -93,7 +94,7 @@ npm run build:web
 
 ## Known limitations
 
-- Outreach draft and proposal editing is not yet wired; saved records are generated previews.
+- Outreach draft and proposal text editing is not yet wired; saved records are generated previews.
 - Drag-and-drop Kanban is not implemented yet. Stage changes use explicit manual buttons.
 - Live search/fetch providers are mocked.
 - Email/calendar/file-storage integrations are mocked.
@@ -165,7 +166,7 @@ Deployment was not performed. When approved:
 
 ## Recommended next actions
 
-1. Add edit/archive actions for saved outreach drafts and proposal previews.
+1. Add text editing for saved outreach drafts and proposal previews.
 2. Promote sponsor workspace tabs into sub-routes if volume or team access grows.
 3. Add CAPTCHA or a third-party bot-defense provider if inquiry spam becomes a problem.
 4. Add authenticated admin sub-routes for prospects, research, approvals, packages, proposals, and settings.

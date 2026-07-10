@@ -10,6 +10,7 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import {
+  archiveSponsorCollateral,
   fetchSponsorCollateral,
   fetchPlayerAccount,
   fetchSponsorInquiries,
@@ -349,7 +350,9 @@ function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
   );
 }
 
-function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrepareFollowUp }) {
+function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrepareFollowUp, onArchive }) {
+  const visibleDrafts = drafts.filter((draft) => draft.status !== 'ARCHIVED');
+
   return (
     <Surface style={styles.approvalPanel}>
       <View style={styles.researchHeader}>
@@ -364,9 +367,9 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
         </ActionButton>
       </View>
 
-      {drafts.length ? (
+      {visibleDrafts.length ? (
         <View style={styles.researchList}>
-          {drafts.map((draft) => (
+          {visibleDrafts.map((draft) => (
             <View key={draft.id} style={styles.approvalCard}>
               <View style={styles.researchCardHeader}>
                 <View style={styles.researchCardCopy}>
@@ -407,6 +410,11 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
                   variant="secondary">
                   Prepare follow-up
                 </ActionButton>
+                <ActionButton
+                  onPress={() => onArchive('draft', draft.id)}
+                  variant="ghost">
+                  Archive
+                </ActionButton>
               </View>
             </View>
           ))}
@@ -421,7 +429,9 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
   );
 }
 
-function ProposalPreview({ proposals, selectedProspect, onGenerate }) {
+function ProposalPreview({ proposals, selectedProspect, onGenerate, onArchive }) {
+  const visibleProposals = proposals.filter((proposal) => proposal.status !== 'ARCHIVED');
+
   return (
     <Surface style={styles.proposalPanel}>
       <View style={styles.researchHeader}>
@@ -436,9 +446,9 @@ function ProposalPreview({ proposals, selectedProspect, onGenerate }) {
         </ActionButton>
       </View>
 
-      {proposals.length ? (
+      {visibleProposals.length ? (
         <View style={styles.researchList}>
-          {proposals.map((proposal) => (
+          {visibleProposals.map((proposal) => (
             <View key={proposal.id} style={styles.approvalCard}>
               <View style={styles.researchCardHeader}>
                 <View style={styles.researchCardCopy}>
@@ -449,6 +459,11 @@ function ProposalPreview({ proposals, selectedProspect, onGenerate }) {
               </View>
               <Text style={styles.proposalNotice}>{proposal.reviewNotice}</Text>
               <Text selectable style={styles.draftBody}>{proposalToPlainText(proposal)}</Text>
+              <View style={styles.approvalActions}>
+                <ActionButton onPress={() => onArchive('proposal', proposal.id)} variant="ghost">
+                  Archive
+                </ActionButton>
+              </View>
             </View>
           ))}
         </View>
@@ -793,6 +808,28 @@ export default function SponsorAdminScreen() {
     }
   }
 
+  async function archiveCollateral(type, recordId) {
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await archiveSponsorCollateral({ type, recordId });
+
+      setOutreachDrafts(result.drafts || outreachDrafts);
+      setProposals(result.proposals || proposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: `${type === 'proposal' ? 'Proposal' : 'Draft'} archived.`,
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor draft or proposal could not be archived.',
+        message: '',
+      });
+    }
+  }
+
   return (
     <HubScreen
       actions={[
@@ -963,6 +1000,7 @@ export default function SponsorAdminScreen() {
                 <ApprovalQueue
                   drafts={outreachDrafts}
                   onApprove={approveDraft}
+                  onArchive={archiveCollateral}
                   onGenerate={generateOutreachDraft}
                   onPrepareFollowUp={prepareFollowUp}
                   selectedProspect={selectedProspect}
@@ -974,6 +1012,7 @@ export default function SponsorAdminScreen() {
                 title="Proposals">
                 <ProposalPreview
                   onGenerate={generateProposal}
+                  onArchive={archiveCollateral}
                   proposals={proposals}
                   selectedProspect={selectedProspect}
                 />

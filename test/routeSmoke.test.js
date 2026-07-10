@@ -116,6 +116,7 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorCollateralSource, /requireTournamentAdmin/);
   assert.match(sponsorCollateralSource, /sponsor-outreach-drafts/);
   assert.match(sponsorCollateralSource, /sponsor-deals/);
+  assert.match(sponsorCollateralSource, /archive/);
 });
 
 test('/leaderboard stays wired to tournament-only rankings', () => {

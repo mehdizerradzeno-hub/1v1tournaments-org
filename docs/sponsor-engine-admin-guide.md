@@ -12,6 +12,7 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 - Saved sponsor prospects can be moved manually through pipeline stages, including `DO_NOT_CONTACT`.
 - Sponsor admin uses focused workspace tabs: Inbox, Prospects, Research, Drafts, Pipeline, and Export.
 - Outreach drafts and proposal previews are saved server-side for host review.
+- Saved drafts and proposal previews can be archived without deleting their history.
 - No research jobs are active.
 - No email provider is enabled.
 - No external sponsor contact is possible.
