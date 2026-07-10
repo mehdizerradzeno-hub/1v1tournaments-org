@@ -1764,6 +1764,23 @@ export default function AdminScreen() {
     const readyMatches = matches.filter((match) => match.status === 'ready');
     const finalMatches = matches.filter((match) => match.status === 'final');
     const pendingMatches = matches.filter((match) => match.status !== 'final');
+    const firstReadyMatch = readyMatches[0];
+    const runPhase = !hasHostCredential
+      ? { label: 'Access', tone: 'accent' }
+      : !selectedRoster
+        ? { label: 'Roster', tone: 'blue' }
+        : !bracket
+          ? { label: bracketReadiness.ready ? 'Seed bracket' : 'Setup', tone: bracketReadiness.ready ? 'green' : 'accent' }
+          : bracket.winner
+            ? { label: 'Complete', tone: 'green' }
+            : readyMatches.length
+              ? { label: 'Match live', tone: 'green' }
+              : { label: 'Waiting', tone: 'blue' };
+    const modeRunNote = activeTournamentMode.value === 'four-player-double-elimination'
+      ? '4-man test flow: save this mode, refresh until the roster shows exactly 4, generate once, then report every winner from this panel.'
+      : activeTournamentMode.value === 'three-player-two-life'
+        ? '3-man two-life flow: refresh until the roster shows exactly 3, generate once, then report each lost-life match from this panel.'
+        : 'Run flow: refresh roster, generate when ready, then report winners from the bracket manager.';
     let nextAction = 'Sign in as an approved host or enter the fallback token to view the roster.';
 
     if (hasHostCredential && !selectedRoster) {
@@ -1786,12 +1803,12 @@ export default function AdminScreen() {
         title="Host checklist">
         <Surface style={styles.runPanel}>
           <View style={styles.metaRow}>
-            <Badge tone="accent">Host flow</Badge>
+            <Badge tone={runPhase.tone}>{runPhase.label}</Badge>
             <Text style={styles.metaText}>{tournament?.title || rosterSlug}</Text>
           </View>
           <Text style={styles.runTitle}>{nextAction}</Text>
           <Text style={styles.copy}>
-            Use this top to bottom: check access, refresh the roster, generate or refresh the bracket, then send players to their tournament page.
+            {modeRunNote}
           </Text>
 
           <View style={styles.runStatusGrid}>
@@ -1821,7 +1838,9 @@ export default function AdminScreen() {
               label: 'Ready matches',
               value: String(readyMatches.length),
               tone: readyMatches.length ? 'green' : 'blue',
-              body: readyMatches.length ? 'Players can launch these from their status card.' : 'Ready matches appear after both seats are assigned.',
+              body: firstReadyMatch
+                ? `${firstReadyMatch.roundTitle}: ${firstReadyMatch.label}`
+                : 'Ready matches appear after both seats are assigned.',
             })}
           </View>
 
@@ -1838,6 +1857,9 @@ export default function AdminScreen() {
 
           <View style={styles.buttonRow}>
             <ActionButton href={tournamentPath}>Open tournament page</ActionButton>
+            <ActionButton href="/stream" variant="secondary">
+              Open stream view
+            </ActionButton>
             <ActionButton onPress={handleCopyPlayerInstructions} variant="secondary">
               Copy player instructions
             </ActionButton>
