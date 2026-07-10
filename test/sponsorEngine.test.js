@@ -4,14 +4,20 @@ import test from 'node:test';
 import {
   createAuditEvent,
   createEmptySponsorProspect,
+  exportSponsorProspectsCsv,
+  filterSponsorProspects,
+  groupProspectsByStage,
   getSponsorAdminRoutesForPhase,
   isSponsorSendingAllowed,
   isTierCCategory,
+  markDuplicateProspects,
   normalizeCompanyName,
   normalizeDomain,
+  parseSponsorCsv,
   prospectDeduplicationKey,
   redactSponsorAuditPayload,
   SPONSOR_ROLES,
+  summarizeSponsorPipeline,
 } from '../src/lib/sponsorEngine/index.js';
 
 test('sponsor company and domain normalization supports deduplication', () => {
@@ -100,4 +106,96 @@ test('sponsor admin navigation exposes only phase-ready routes', () => {
 
   assert.deepEqual(phaseOneRoutes, []);
   assert.deepEqual(phaseTwoRoutes.map((route) => route.id), ['overview', 'prospects']);
+});
+
+test('sponsor CSV import normalizes records and flags tier C categories for review', () => {
+  const csv = [
+    'companyName,website,industry,headquarters,sourceType,sourceUrl,publicContactName,publicContactRole,publicContactEmail,publicContactFormUrl,notes',
+    'Example Cards,https://www.examplecards.com,Playing cards,"Raleigh, NC",manual,https://examplecards.com/contact,,,,https://examplecards.com/contact,"A clean card brand"',
+    'FastBet,https://fastbet.example,Sportsbook,Charlotte,manual,https://fastbet.example/contact,,,,,"casino betting category"',
+  ].join('\n');
+
+  const result = parseSponsorCsv(csv);
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.prospects.length, 2);
+  assert.equal(result.prospects[0].domain, 'examplecards.com');
+  assert.equal(result.prospects[0].brandSafetyStatus, 'CLEAR');
+  assert.equal(result.prospects[1].status, 'RESEARCHED');
+  assert.equal(result.prospects[1].brandSafetyStatus, 'NEEDS_REVIEW');
+  assert.equal(result.prospects[1].legalRiskStatus, 'NEEDS_REVIEW');
+  assert.equal(result.prospects[1].gamblingRelated, true);
+});
+
+test('sponsor CSV import rejects missing required columns', () => {
+  const result = parseSponsorCsv('companyName,industry\nExample Cards,Playing cards');
+
+  assert.deepEqual(result.prospects, []);
+  assert.deepEqual(result.errors, ['Missing required column: website']);
+});
+
+test('duplicate sponsor prospects are paused for data-quality review', () => {
+  const existing = [
+    createEmptySponsorProspect({
+      id: 'existing-1',
+      companyName: 'Example Cards',
+      website: 'https://examplecards.com',
+    }),
+  ];
+  const duplicate = createEmptySponsorProspect({
+    id: 'new-1',
+    companyName: 'Example Cards LLC',
+    website: 'https://www.examplecards.com/contact',
+  });
+
+  const [marked] = markDuplicateProspects([duplicate], existing);
+
+  assert.equal(marked.duplicateOfId, 'existing-1');
+  assert.equal(marked.status, 'PAUSED');
+  assert.equal(marked.dataQualityStatus, 'DUPLICATE_REVIEW');
+});
+
+test('sponsor CRM filters, groups, summarizes, and exports preview prospects', () => {
+  const prospects = [
+    createEmptySponsorProspect({
+      id: 'p1',
+      companyName: 'Example Cards',
+      website: 'https://examplecards.com',
+      industry: 'Playing cards',
+      publicContactEmail: 'partners@examplecards.com',
+      status: 'QUALIFIED',
+      dataQualityStatus: 'VERIFIED',
+      brandSafetyStatus: 'CLEAR',
+      legalRiskStatus: 'CLEAR',
+      sourceUrls: [{ url: 'https://examplecards.com/contact', sourceType: 'manual' }],
+    }),
+    createEmptySponsorProspect({
+      id: 'p2',
+      companyName: 'Stream Rig Co.',
+      website: 'https://streamrig.example',
+      industry: 'Streaming hardware',
+      status: 'DRAFT_READY',
+      dataQualityStatus: 'NEEDS_REVIEW',
+      brandSafetyStatus: 'CLEAR',
+      legalRiskStatus: 'CLEAR',
+    }),
+  ];
+
+  assert.deepEqual(filterSponsorProspects(prospects, { query: 'partners@' }).map((prospect) => prospect.id), ['p1']);
+  assert.deepEqual(filterSponsorProspects(prospects, { status: 'DRAFT_READY' }).map((prospect) => prospect.id), ['p2']);
+
+  const groups = groupProspectsByStage(prospects);
+  assert.deepEqual(groups.QUALIFIED.map((prospect) => prospect.id), ['p1']);
+  assert.deepEqual(groups.DRAFT_READY.map((prospect) => prospect.id), ['p2']);
+
+  const summary = summarizeSponsorPipeline(prospects);
+  assert.equal(summary.totalProspects, 2);
+  assert.equal(summary.qualifiedProspects, 2);
+  assert.equal(summary.draftsAwaitingReview, 1);
+  assert.equal(summary.dataQualityAlerts, 1);
+
+  const exported = exportSponsorProspectsCsv(prospects);
+  assert.match(exported, /^companyName,website,industry,headquarters,sourceType,sourceUrl/);
+  assert.match(exported, /Example Cards,https:\/\/examplecards\.com,Playing cards/);
+  assert.match(exported, /https:\/\/examplecards\.com\/contact/);
 });
