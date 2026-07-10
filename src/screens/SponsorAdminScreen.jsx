@@ -366,8 +366,11 @@ function DraftReviewCard({ draft, onApprove, onArchive, onPrepareFollowUp, onSav
             value={subject}
           />
           <Text style={styles.researchMeta}>
-            {draft.recipient || 'No recipient route'} | Quality {draft.qualityScore}/100
+            {draft.recipient || 'No recipient route'} | Quality {draft.qualityScore}/100 | Revision {draft.revision || 1}
           </Text>
+          {draft.revisionHistory?.length ? (
+            <Text style={styles.researchMeta}>{draft.revisionHistory.length} saved prior version(s)</Text>
+          ) : null}
         </View>
         <Badge tone={draft.status === 'APPROVED' ? 'green' : draft.status === 'NEEDS_REVIEW' ? 'blue' : 'accent'}>
           {draft.status}
@@ -470,7 +473,12 @@ function ProposalCard({ onArchive, onSaveEdit, proposal }) {
       <View style={styles.researchCardHeader}>
         <View style={styles.researchCardCopy}>
           <Text style={styles.researchCompany}>{proposal.prospectName}</Text>
-          <Text style={styles.researchMeta}>{proposal.packageName} | {proposal.status}</Text>
+          <Text style={styles.researchMeta}>
+            {proposal.packageName} | {proposal.status} | Revision {proposal.revision || 1}
+          </Text>
+          {proposal.revisionHistory?.length ? (
+            <Text style={styles.researchMeta}>{proposal.revisionHistory.length} saved prior version(s)</Text>
+          ) : null}
         </View>
         <Badge tone="blue">Review</Badge>
       </View>

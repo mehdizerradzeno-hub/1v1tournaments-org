@@ -119,6 +119,8 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorCollateralSource, /requireTournamentAdmin/);
   assert.match(sponsorCollateralSource, /sponsor-outreach-drafts/);
   assert.match(sponsorCollateralSource, /sponsor-deals/);
+  assert.match(sponsorCollateralSource, /revisionHistory/);
+  assert.match(sponsorCollateralSource, /MAX_REVISION_HISTORY/);
   assert.match(sponsorCollateralSource, /archive/);
 });
 

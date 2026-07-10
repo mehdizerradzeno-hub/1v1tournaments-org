@@ -15,6 +15,7 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 - Saved drafts and proposal previews can be archived without deleting their history.
 - Saved outreach drafts and proposal previews can be edited and saved before any manual follow-up.
 - Editing an approved draft returns it to `NEEDS_REVIEW` so changed copy is reviewed again.
+- Saved edits keep a short revision history on the draft or proposal record.
 - No research jobs are active.
 - No email provider is enabled.
 - No external sponsor contact is possible.

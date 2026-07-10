@@ -7,6 +7,7 @@ import { SPONSOR_STORE_NAMES } from '../../src/lib/sponsorEngine/index.js';
 const DRAFT_STORE = SPONSOR_STORE_NAMES.outreachDrafts || 'sponsor-outreach-drafts';
 const PROPOSAL_STORE = SPONSOR_STORE_NAMES.deals || 'sponsor-deals';
 const MAX_BATCH_SIZE = 100;
+const MAX_REVISION_HISTORY = 10;
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -46,14 +47,62 @@ async function listRecords(type) {
     .sort((left, right) => String(right.updatedAt || right.createdAt || '').localeCompare(String(left.updatedAt || left.createdAt || '')));
 }
 
-function normalizeRecord(record, { account, type }) {
+async function readRecord(type, id) {
+  if (!id) return null;
+
+  const store = storeForType(type);
+
+  try {
+    return await store.get(`${id}.json`, { type: 'json' });
+  } catch {
+    return null;
+  }
+}
+
+function revisionSnapshot(record = {}, { account, savedAt }) {
+  return {
+    body: record.body || '',
+    changedBy: record.savedBy || account?.id || account?.email || 'host',
+    notes: record.notes || '',
+    reviewNotice: record.reviewNotice || '',
+    revision: Number.isFinite(record.revision) ? record.revision : 1,
+    savedAt: record.updatedAt || record.createdAt || savedAt,
+    status: record.status || '',
+    subject: record.subject || '',
+  };
+}
+
+function normalizeHistory(record, existing, { account, timestamp }) {
+  let currentHistory = [];
+
+  if (Array.isArray(existing?.revisionHistory)) {
+    currentHistory = existing.revisionHistory;
+  } else if (Array.isArray(record?.revisionHistory)) {
+    currentHistory = record.revisionHistory;
+  }
+
+  if (!existing) {
+    return currentHistory.slice(-MAX_REVISION_HISTORY);
+  }
+
+  return [
+    ...currentHistory,
+    revisionSnapshot(existing, { account, savedAt: timestamp }),
+  ].slice(-MAX_REVISION_HISTORY);
+}
+
+function normalizeRecord(record, { account, type, existing = null }) {
   const timestamp = nowIso();
   const fallbackPrefix = type === 'proposal' ? 'proposal' : 'draft';
   const id = String(record?.id || `${fallbackPrefix}-${timestamp}`).trim();
+  const existingRevision = Number.isFinite(existing?.revision) ? existing.revision : 0;
+  const revision = existing ? existingRevision + 1 : Number.isFinite(record?.revision) ? record.revision : 1;
 
   return {
     ...record,
     id,
+    revision,
+    revisionHistory: normalizeHistory(record, existing, { account, timestamp }),
     savedBy: record?.savedBy || account?.id || account?.email || 'host',
     createdAt: record?.createdAt || timestamp,
     updatedAt: timestamp,
@@ -141,8 +190,12 @@ export async function handler(event) {
     }
 
     if (action === 'save-one') {
-      const record = normalizeRecord(payload.record || payload, {
+      const rawRecord = payload.record || payload;
+      const existingId = String(rawRecord?.id || '').trim();
+      const existing = await readRecord(type, existingId);
+      const record = normalizeRecord(rawRecord, {
         account: adminCheck.account,
+        existing,
         type,
       });
 
@@ -175,6 +228,7 @@ export async function handler(event) {
         archivedBy: adminCheck.account?.id || adminCheck.account?.email || 'host',
       }, {
         account: adminCheck.account,
+        existing,
         type,
       });
 
