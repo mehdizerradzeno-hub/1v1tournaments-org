@@ -15,6 +15,7 @@ import {
   filterSponsorProspects,
   groupProspectsByStage,
   parseSponsorCsv,
+  runResearchPreparation,
   SPONSOR_PIPELINE_COLUMNS,
   summarizeSponsorPipeline,
 } from '../lib/sponsorEngine/index.js';
@@ -166,6 +167,70 @@ function PipelineBoard({ prospects }) {
   );
 }
 
+function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
+  return (
+    <Surface style={styles.researchPanel}>
+      <View style={styles.researchHeader}>
+        <View style={styles.researchCopy}>
+          <Text style={styles.researchTitle}>Mock-safe research preparation</Text>
+          <Text style={styles.researchBody}>
+            Bounded provider run. No live crawling, no contact attempts, and every material fact keeps a source.
+          </Text>
+        </View>
+        <ActionButton disabled={loading} onPress={onPrepare}>
+          {loading ? 'Preparing...' : 'Prepare queue'}
+        </ActionButton>
+      </View>
+
+      {candidates.length ? (
+        <View style={styles.researchList}>
+          {candidates.map((candidate) => (
+            <View key={candidate.id} style={styles.researchCard}>
+              <View style={styles.researchCardHeader}>
+                <View style={styles.researchCardCopy}>
+                  <Text style={styles.researchCompany}>{candidate.prospect.companyName}</Text>
+                  <Text style={styles.researchMeta}>
+                    {candidate.prospect.domain || 'No domain'} | Fit {candidate.prospect.fitScore}/100
+                  </Text>
+                </View>
+                <Badge tone={candidate.prospect.legalRiskStatus === 'NEEDS_REVIEW' ? 'accent' : 'green'}>
+                  {candidate.status}
+                </Badge>
+              </View>
+              <Text style={styles.researchExplanation}>{candidate.prospect.fitExplanation}</Text>
+              {candidate.scoreBreakdown.risk.flags.length ? (
+                <View style={styles.riskList}>
+                  {candidate.scoreBreakdown.risk.flags.map((flag) => (
+                    <Text key={flag} style={styles.riskText}>{flag}</Text>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.factList}>
+                {candidate.facts.map((fact) => (
+                  <Text key={`${candidate.id}-${fact.label}`} selectable style={styles.factText}>
+                    {fact.label}: {fact.value} Source: {fact.source.url || 'Not yet provided'}
+                  </Text>
+                ))}
+              </View>
+              <ActionButton
+                disabled={Boolean(candidate.prospect.duplicateOfId) || candidate.prospect.legalRiskStatus === 'NEEDS_REVIEW'}
+                onPress={() => onAccept(candidate)}
+                variant="secondary">
+                Accept into CRM preview
+              </ActionButton>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <EmptyState
+          body="Run the mock-safe preparation step to review example sponsor candidates with provenance and score breakdowns."
+          title="No research candidates prepared"
+        />
+      )}
+    </Surface>
+  );
+}
+
 export default function SponsorAdminScreen() {
   const hostState = useHostAccount();
   const [prospects, setProspects] = useState([]);
@@ -173,6 +238,8 @@ export default function SponsorAdminScreen() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [csvText, setCsvText] = useState(EMPTY_IMPORT);
+  const [researchRun, setResearchRun] = useState(null);
+  const [researchLoading, setResearchLoading] = useState(false);
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
@@ -187,6 +254,39 @@ export default function SponsorAdminScreen() {
 
     setProspects(nextProspects);
     setSelectedId(nextProspects[0]?.id || '');
+  }
+
+  async function prepareResearchQueue() {
+    setResearchLoading(true);
+
+    try {
+      const nextRun = await runResearchPreparation({
+        query: 'cards streaming raleigh',
+        existingProspects: prospects,
+        limit: 5,
+      });
+
+      setResearchRun(nextRun);
+    } finally {
+      setResearchLoading(false);
+    }
+  }
+
+  function acceptResearchCandidate(candidate) {
+    const accepted = {
+      ...candidate.prospect,
+      id: `research-${Date.now()}`,
+    };
+
+    setProspects((currentProspects) => [accepted, ...currentProspects]);
+    setSelectedId(accepted.id);
+    setResearchRun((currentRun) => currentRun
+      ? {
+        ...currentRun,
+        candidatesAccepted: currentRun.candidatesAccepted + 1,
+        candidates: currentRun.candidates.filter((item) => item.id !== candidate.id),
+      }
+      : currentRun);
   }
 
   return (
@@ -285,6 +385,17 @@ export default function SponsorAdminScreen() {
               </Surface>
               <ProspectDetail prospect={selectedProspect} />
             </View>
+          </Section>
+
+          <Section
+            description="Prepare sponsor candidates from approved mock providers. Live search providers can be added later behind the same interface."
+            title="Research queue">
+            <ResearchQueue
+              candidates={researchRun?.candidates || []}
+              loading={researchLoading}
+              onAccept={acceptResearchCandidate}
+              onPrepare={prepareResearchQueue}
+            />
           </Section>
 
           <Section
@@ -520,6 +631,99 @@ const styles = StyleSheet.create({
   },
   prospectRowSelected: {
     borderColor: theme.colors.accent,
+  },
+  factList: {
+    gap: 6,
+    marginTop: 10,
+  },
+  factText: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  researchBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  researchCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  researchCardCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+  researchCardHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  researchCompany: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  researchCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+  researchExplanation: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  researchHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  researchList: {
+    gap: 12,
+    marginTop: 14,
+  },
+  researchMeta: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  researchPanel: {
+    borderColor: theme.colors.line,
+  },
+  researchTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  riskList: {
+    backgroundColor: 'rgba(255, 199, 77, 0.08)',
+    borderColor: 'rgba(255, 199, 77, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    padding: 10,
+  },
+  riskText: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
   },
   sourceBlock: {
     borderColor: theme.colors.line,
