@@ -158,6 +158,11 @@ function placePlayerInMatch(bracket, matchId, slot, player) {
 }
 
 export function setMatchWinner(bracket, match, player) {
+  if (bracket.format === 'three-player-two-life') {
+    setThreePlayerTwoLifeMatchWinner(bracket, match, player);
+    return;
+  }
+
   const winnerSlot = match.players.findIndex((candidate) => candidate?.id === player.id);
   const loser = match.players.find((candidate) => candidate && candidate.id !== player.id) || null;
 
@@ -186,6 +191,78 @@ export function setMatchWinner(bracket, match, player) {
       name: getPlayerName(player),
     };
   }
+}
+
+function getThreePlayerStandings(bracket) {
+  if (Array.isArray(bracket.standings) && bracket.standings.length) {
+    return bracket.standings;
+  }
+
+  bracket.standings = bracket.participants.map((participant) => ({
+    id: participant.id,
+    name: getPlayerName(participant),
+    lives: 2,
+    status: 'alive',
+  }));
+
+  return bracket.standings;
+}
+
+function setThreePlayerTwoLifeMatchWinner(bracket, match, player) {
+  const loser = match.players.find((candidate) => candidate && candidate.id !== player.id) || null;
+  const standings = getThreePlayerStandings(bracket);
+  const loserStanding = standings.find((standing) => standing.id === loser?.id);
+
+  match.winnerId = player.id;
+  match.winnerName = getPlayerName(player);
+  match.loserId = loser?.id || null;
+  match.loserName = loser ? getPlayerName(loser) : '';
+  match.status = 'final';
+
+  if (loserStanding) {
+    loserStanding.lives = Math.max(loserStanding.lives - 1, 0);
+    loserStanding.status = loserStanding.lives > 0 ? 'alive' : 'out';
+  }
+
+  bracket.standings = standings.sort((left, right) => {
+    if (right.lives !== left.lives) return right.lives - left.lives;
+    return left.name.localeCompare(right.name);
+  });
+
+  const alivePlayers = bracket.participants.filter((participant) =>
+    standings.some((standing) => standing.id === participant.id && standing.lives > 0),
+  );
+
+  if (alivePlayers.length === 1) {
+    bracket.status = 'complete';
+    bracket.winner = {
+      id: alivePlayers[0].id,
+      name: getPlayerName(alivePlayers[0]),
+    };
+    return;
+  }
+
+  const nextMatch = bracket.rounds
+    .flatMap((round) => round.matches)
+    .find((candidate) => candidate.status === 'pending' && candidate.players.every((candidatePlayer) => !candidatePlayer));
+
+  if (!nextMatch) {
+    return;
+  }
+
+  const sittingPlayer = alivePlayers.find((participant) =>
+    !match.players.some((matchPlayer) => matchPlayer?.id === participant.id),
+  );
+  const opponent = sittingPlayer
+    ? (loser && loserStanding?.lives > 0 ? loser : player)
+    : alivePlayers[0];
+  const firstPlayer = sittingPlayer || alivePlayers[0];
+  const secondPlayer = opponent?.id === firstPlayer?.id
+    ? alivePlayers.find((participant) => participant.id !== firstPlayer.id)
+    : opponent;
+
+  nextMatch.players = [firstPlayer || null, secondPlayer || null];
+  markReadyIfFilled(nextMatch);
 }
 
 function initializeByes(bracket) {
@@ -403,6 +480,108 @@ export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signup
     matchBaseUrl: SPADES_MATCH_BASE_URL,
     participantCount: participants.length,
     participants,
+    rounds,
+    winner: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+  const sortedSignups = [...signups].sort((left, right) => {
+    const leftDate = new Date(left.createdAt || 0).getTime();
+    const rightDate = new Date(right.createdAt || 0).getTime();
+    return leftDate - rightDate;
+  });
+  const participants = sortedSignups.slice(0, 3).map(includeAdminFields ? adminParticipant : publicParticipant);
+
+  if (participants.length !== 3) {
+    throw new Error('3-Man Two-Life requires exactly three registered players.');
+  }
+
+  const match = ({ id, label, roundIndex, matchIndex, players = [null, null] }) => ({
+    id,
+    label,
+    roundIndex,
+    matchIndex,
+    status: players.filter(Boolean).length === 2 ? 'ready' : 'pending',
+    players,
+    winnerId: null,
+    winnerName: '',
+    loserId: null,
+    loserName: '',
+    nextMatchId: null,
+    nextSlot: null,
+    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex),
+  });
+
+  const rounds = [
+    {
+      index: 1,
+      title: 'Opening Rotation',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r1-m1`,
+          label: 'Match 1',
+          roundIndex: 1,
+          matchIndex: 1,
+          players: [participants[0], participants[1]],
+        }),
+        match({
+          id: `${tournamentSlug}-r1-m2`,
+          label: 'Match 2',
+          roundIndex: 1,
+          matchIndex: 2,
+        }),
+      ],
+    },
+    {
+      index: 2,
+      title: 'Lives Round',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r2-m1`,
+          label: 'Match 3',
+          roundIndex: 2,
+          matchIndex: 1,
+        }),
+        match({
+          id: `${tournamentSlug}-r2-m2`,
+          label: 'Match 4',
+          roundIndex: 2,
+          matchIndex: 2,
+        }),
+      ],
+    },
+    {
+      index: 3,
+      title: 'Last Life Final',
+      matches: [
+        match({
+          id: `${tournamentSlug}-r3-m1`,
+          label: 'Match 5',
+          roundIndex: 3,
+          matchIndex: 1,
+        }),
+      ],
+    },
+  ];
+  const now = new Date().toISOString();
+
+  return {
+    tournamentSlug,
+    status: 'published',
+    format: 'three-player-two-life',
+    gameSlug: 'spades',
+    matchBaseUrl: SPADES_MATCH_BASE_URL,
+    participantCount: participants.length,
+    participants,
+    standings: participants.map((participant) => ({
+      id: participant.id,
+      name: getPlayerName(participant),
+      lives: 2,
+      status: 'alive',
+    })),
     rounds,
     winner: null,
     createdAt: now,
@@ -692,6 +871,12 @@ export async function handler(event) {
         });
       }
 
+      if (tournamentMode.value === 'three-player-two-life' && signups.length !== 3) {
+        return json(400, {
+          error: '3-Man Two-Life requires exactly three registered players before generating a bracket.',
+        });
+      }
+
       if (!canGenerateTournamentMode(tournamentMode.value)) {
         return json(400, {
           error: `${tournamentMode.label} is saved for this event, but bracket generation for that mode is not wired yet.`,
@@ -700,7 +885,9 @@ export async function handler(event) {
 
       const bracket = tournamentMode.value === 'four-player-double-elimination'
         ? buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields: true })
-        : buildBracket({ tournamentSlug, signups, includeAdminFields: true });
+        : tournamentMode.value === 'three-player-two-life'
+          ? buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields: true })
+          : buildBracket({ tournamentSlug, signups, includeAdminFields: true });
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });

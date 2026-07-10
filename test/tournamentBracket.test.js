@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildFourPlayerDoubleEliminationBracket,
+  buildThreePlayerTwoLifeBracket,
   findMatch,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
@@ -111,4 +112,60 @@ test('4-player double-elimination completes without reset when winners-side play
   assert.equal(bracket.status, 'complete');
   assert.equal(bracket.winner.id, alex.id);
   assert.equal(findMatch(bracket, 'friends-clean-final-r5-m1').status, 'pending');
+});
+
+test('3-player two-life bracket requires exactly three players', () => {
+  assert.throws(() => buildThreePlayerTwoLifeBracket({
+    tournamentSlug: 'three-life-short',
+    signups: [signup(1, 'One'), signup(2, 'Two')],
+  }), /exactly three registered players/);
+});
+
+test('3-player two-life bracket rotates waiting player and tracks lives', () => {
+  const bracket = buildThreePlayerTwoLifeBracket({
+    tournamentSlug: 'three-life',
+    signups: [
+      signup(1, 'Alex'),
+      signup(2, 'Blake'),
+      signup(3, 'Casey'),
+    ],
+  });
+
+  assert.equal(bracket.format, 'three-player-two-life');
+  assert.equal(bracket.participantCount, 3);
+  assert.equal(bracket.standings.length, 3);
+  assert.equal(findMatch(bracket, 'three-life-r1-m1').status, 'ready');
+  assert.equal(findMatch(bracket, 'three-life-r1-m2').status, 'pending');
+
+  winner(bracket, 'three-life-r1-m1', 0);
+
+  const match2 = findMatch(bracket, 'three-life-r1-m2');
+  assert.equal(match2.status, 'ready');
+  assert.deepEqual(match2.players.map((player) => player?.name), ['Casey', 'Blake']);
+  assert.equal(bracket.standings.find((standing) => standing.name.startsWith('Blake')).lives, 1);
+
+  winner(bracket, 'three-life-r1-m2', 1);
+
+  const match3 = findMatch(bracket, 'three-life-r2-m1');
+  assert.equal(match3.status, 'ready');
+  assert.deepEqual(match3.players.map((player) => player?.name), ['Alex', 'Casey']);
+
+  winner(bracket, 'three-life-r2-m1', 0);
+
+  const match4 = findMatch(bracket, 'three-life-r2-m2');
+  assert.equal(match4.status, 'ready');
+  assert.deepEqual(match4.players.map((player) => player?.name), ['Blake', 'Alex']);
+  assert.equal(bracket.standings.find((standing) => standing.name.startsWith('Casey')).status, 'out');
+
+  winner(bracket, 'three-life-r2-m2', 0);
+
+  const match5 = findMatch(bracket, 'three-life-r3-m1');
+  assert.equal(match5.status, 'ready');
+  assert.deepEqual(match5.players.map((player) => player?.name), ['Alex', 'Blake']);
+
+  winner(bracket, 'three-life-r3-m1', 0);
+
+  assert.equal(bracket.status, 'complete');
+  assert.equal(bracket.winner.name, 'Alex (p1)');
+  assert.equal(bracket.standings.find((standing) => standing.name.startsWith('Blake')).status, 'out');
 });

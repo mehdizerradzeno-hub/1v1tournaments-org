@@ -135,14 +135,45 @@ function getBracketPreviewLabel(signupCount, tournament) {
   return `${signupCount} signed up, over target`;
 }
 
+function getRosterPolicyLabel(tournament, mode) {
+  if (mode?.value === 'four-player-double-elimination') {
+    return 'Exactly 4 players enter. Lose twice and you are out.';
+  }
+
+  if (mode?.value === 'three-player-two-life') {
+    return 'Exactly 3 players enter. Everyone starts with two lives.';
+  }
+
+  const rosterCap = tournament?.rosterCap || 'an open';
+  const minimumPlayers = tournament?.minimumPlayers || mode?.minimumPlayers || 2;
+  return `Advertise ${rosterCap}-player seats, run with ${minimumPlayers}+ players, and let the actual bracket flex to the roster that shows up.`;
+}
+
+function canGenerateWithSignupCount(mode, signupCount) {
+  if (mode?.value === 'four-player-double-elimination') {
+    return signupCount === 4;
+  }
+
+  if (mode?.value === 'three-player-two-life') {
+    return signupCount === 3;
+  }
+
+  return signupCount >= (mode?.minimumPlayers || 2);
+}
+
 function getBracketReadiness({ bracket, hasHostCredential, selectedMode, selectedRoster, signupCount }) {
   const modeCanGenerate = canGenerateTournamentMode(selectedMode.value);
   const needsExactFour = selectedMode.value === 'four-player-double-elimination';
+  const needsExactThree = selectedMode.value === 'three-player-two-life';
   const playerReady = needsExactFour
     ? signupCount === 4
+    : needsExactThree
+      ? signupCount === 3
     : signupCount >= selectedMode.minimumPlayers;
   const playerRequirement = needsExactFour
     ? 'Exactly 4 players'
+    : needsExactThree
+      ? 'Exactly 3 players'
     : `${selectedMode.minimumPlayers}+ players`;
   const checks = [
     {
@@ -165,6 +196,8 @@ function getBracketReadiness({ bracket, hasHostCredential, selectedMode, selecte
       ready: playerReady,
       body: needsExactFour
         ? `${signupCount}/4 registered. Double elimination needs exactly four.`
+        : needsExactThree
+          ? `${signupCount}/3 registered. Two-life needs exactly three.`
         : `${signupCount}/${selectedMode.minimumPlayers} minimum registered.`,
     },
   ];
@@ -943,9 +976,10 @@ export default function AdminScreen() {
     const bracketLabel = bracket?.participantCount
       ? `${bracket.participantCount} seeded`
       : getBracketPreviewLabel(signupCount, tournament);
+    const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, signupCount);
     const nextHostAction = !hasHostCredential
       ? 'Confirm host access first.'
-      : signupCount < minimumPlayers
+      : !playerCountReady
         ? 'Post the event, then share the signup link.'
         : bracket
           ? 'Send players to My Match and monitor results.'
@@ -976,7 +1010,7 @@ export default function AdminScreen() {
               <Text style={styles.publisherTitle}>{tournament?.title || rosterSlug}</Text>
               <Text style={styles.publisherDate}>{formatHostDateTime(tournament)}</Text>
               <Text style={styles.copy}>
-                Advertise {rosterCap || 'an open'}-player seats, run with {minimumPlayers}+ players, and let the actual bracket flex to the roster that shows up.
+                {getRosterPolicyLabel(tournament, activeTournamentMode)}
               </Text>
             </View>
 
@@ -1224,7 +1258,7 @@ export default function AdminScreen() {
             <ActionButton href={tournamentPath} variant="secondary">
               Open tournament page
             </ActionButton>
-            <ActionButton disabled={!hasHostCredential || signupCount < minimumPlayers || bracketLoading} onPress={handleGenerateBracket} variant="secondary">
+            <ActionButton disabled={!hasHostCredential || !playerCountReady || bracketLoading} onPress={handleGenerateBracket} variant="secondary">
               {bracketLoading ? 'Generating...' : 'Generate bracket'}
             </ActionButton>
             <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleResetScheduleSettings} variant="ghost">
