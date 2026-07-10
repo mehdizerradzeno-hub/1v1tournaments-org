@@ -9,11 +9,17 @@ import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHost
 import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
 import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 
-const PRIMARY_CHECK_IN_PATH = getCheckInPath(siteData.site.primaryTournamentSlug);
-const PRIMARY_SIGN_IN_PATH = `${PRIMARY_CHECK_IN_PATH}?mode=signin`;
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
 function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
+  if (!slug) {
+    return {
+      tournamentPath: '/next',
+      checkInPath: '/next',
+      matchPath: '/next',
+    };
+  }
+
   const tournamentPath = getTournamentPath(slug);
   const checkInPath = getCheckInPath(slug);
 
@@ -42,29 +48,27 @@ function getNextNavTournamentSlug(hostedTournaments = []) {
 
 function getNavItems(paths) {
   return [
-    { label: 'Home', href: '/' },
-    { label: 'Check Match', href: paths.matchPath, activePath: paths.tournamentPath },
-    { label: 'Tournament', href: paths.tournamentPath },
-    { label: 'Stream', href: '/stream' },
-    { label: 'Leaderboard', href: '/leaderboard' },
-    { label: 'Join Tournament', href: paths.checkInPath },
+    { label: 'Join', href: paths.checkInPath },
+    { label: 'My Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Event', href: paths.tournamentPath },
+    { label: 'Watch', href: '/stream' },
     { label: 'Rules', href: '/rules' },
   ];
 }
 
 function getMobileNavItems(paths) {
   return [
-    { label: 'Home', href: '/' },
+    { label: 'Join', href: paths.checkInPath },
     { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
-    { label: 'Tourney', href: paths.tournamentPath },
-    { label: 'Ranks', href: '/leaderboard' },
+    { label: 'Event', href: paths.tournamentPath },
+    { label: 'Watch', href: '/stream' },
   ];
 }
 
 function getStickyActionItems(paths) {
   return [
     { label: 'Join', href: paths.checkInPath, tone: 'primary' },
-    { label: 'Match', href: paths.matchPath, tone: 'secondary', activePath: paths.tournamentPath },
+    { label: 'My Match', href: paths.matchPath, tone: 'secondary', activePath: paths.tournamentPath },
     { label: 'Watch', href: '/stream', tone: 'secondary' },
   ];
 }
@@ -168,7 +172,7 @@ export function Surface({ children, style }) {
   return <View style={[styles.surface, style]}>{children}</View>;
 }
 
-export function PlayerRouteStrip({ title = 'Player route', body = 'Start with the next event, then jump to your match or the live table.' }) {
+export function PlayerRouteStrip({ title = 'Player path', body = 'Join first, then use My Match after the bracket is live.' }) {
   const paths = buildPrimaryPaths();
 
   return (
@@ -178,9 +182,9 @@ export function PlayerRouteStrip({ title = 'Player route', body = 'Start with th
         <Text style={styles.playerRouteBody}>{body}</Text>
       </View>
       <View style={styles.playerRouteActions}>
-        <ActionButton href={paths.tournamentPath}>Next tournament</ActionButton>
-        <ActionButton href={paths.matchPath} variant="secondary">Check Match Status</ActionButton>
-        <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton>
+        <ActionButton href={paths.tournamentPath}>Event</ActionButton>
+        <ActionButton href={paths.matchPath} variant="secondary">My Match</ActionButton>
+        <ActionButton href="/stream" variant="secondary">Watch</ActionButton>
       </View>
     </Surface>
   );
@@ -227,7 +231,7 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
   );
 }
 
-function HeaderAccountChip({ account, loading }) {
+function HeaderAccountChip({ account, loading, href }) {
   const signedIn = Boolean(account);
   const accountName = shortAccountName(account);
   const label = loading ? 'Checking' : signedIn ? 'Signed in' : 'Account';
@@ -236,7 +240,7 @@ function HeaderAccountChip({ account, loading }) {
   return (
     <LinkShell
       accessibilityLabel={signedIn ? `Signed in as ${accountName}. Switch account.` : 'Sign in to your tournament account'}
-      href={PRIMARY_SIGN_IN_PATH}
+      href={href}
       style={styles.accountChipShell}
       variant={signedIn ? 'secondary' : 'primary'}>
       <View style={[styles.accountChip, signedIn ? styles.accountChipSignedIn : styles.accountChipSignedOut]}>
@@ -564,7 +568,7 @@ export function CheckInPanel({
       <View style={styles.checkInActions}>
         {checkInPath ? (
           <ActionButton disabled={!signupEnabled} href={checkInPath}>
-            {signupEnabled ? 'Join Tournament' : registrationMeta?.label || 'Registration closed'}
+            {signupEnabled ? 'Join' : registrationMeta?.label || 'Registration closed'}
           </ActionButton>
         ) : null}
         <ActionButton href="/rules" variant="secondary">
@@ -635,6 +639,7 @@ export function HubScreen({
   footerNote,
   forceTopNav = false,
   showHero = true,
+  showHeader = true,
   showNavigation = true,
   heroVariant = 'default',
   stickyActions = true,
@@ -643,8 +648,9 @@ export function HubScreen({
   const { width } = useWindowDimensions();
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
-  const [navTournamentSlug, setNavTournamentSlug] = useState(siteData.site.primaryTournamentSlug);
+  const [navTournamentSlug, setNavTournamentSlug] = useState(null);
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
+  const accountPath = navTournamentSlug ? `${primaryPaths.checkInPath}?mode=signin` : '/next';
   const navItems = getNavItems(primaryPaths);
   const mobileNavItems = getMobileNavItems(primaryPaths);
   const stickyActionItems = getStickyActionItems(primaryPaths);
@@ -742,27 +748,29 @@ export function HubScreen({
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
-            <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
-              <Link href="/" asChild>
-                <Pressable accessibilityRole="link" style={showTinyHeader ? styles.brandLinkTiny : styles.brandLink}>
-                  <View style={styles.brandMark}>
-                    <Text style={styles.brandMarkText}>1v1</Text>
-                  </View>
-                  <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
-                    <Text style={styles.brandTitle}>1v1 Tournaments</Text>
-                    <Text style={styles.brandDomain}>Free-entry Spades events</Text>
-                  </View>
-                </Pressable>
-              </Link>
-              <View style={styles.brandUtility}>
-                {playerAccount?.hostApproved ? (
-                  <ActionButton href="/admin" variant="secondary" style={styles.brandButton}>
-                    Admin
-                  </ActionButton>
-                ) : null}
-                <HeaderAccountChip account={playerAccount} loading={playerAccountLoading} />
+            {showHeader ? (
+              <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
+                <Link href="/" asChild>
+                  <Pressable accessibilityRole="link" style={showTinyHeader ? styles.brandLinkTiny : styles.brandLink}>
+                    <View style={styles.brandMark}>
+                      <Text style={styles.brandMarkText}>1v1</Text>
+                    </View>
+                    <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
+                      <Text style={styles.brandTitle}>1v1 Tournaments</Text>
+                      <Text style={styles.brandDomain}>Free-entry Spades events</Text>
+                    </View>
+                  </Pressable>
+                </Link>
+                <View style={styles.brandUtility}>
+                  {playerAccount?.hostApproved ? (
+                    <ActionButton href="/admin" variant="secondary" style={styles.brandButton}>
+                      Admin
+                    </ActionButton>
+                  ) : null}
+                  <HeaderAccountChip account={playerAccount} href={accountPath} loading={playerAccountLoading} />
+                </View>
               </View>
-            </View>
+            ) : null}
 
             {showTopNav ? (
               <View style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
@@ -899,7 +907,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 260,
-    backgroundColor: 'rgba(108, 199, 255, 0.04)',
+    backgroundColor: 'rgba(94, 127, 163, 0.04)',
   },
   scrollContent: {
     flexGrow: 1,
@@ -1026,8 +1034,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   accountChipSignedIn: {
-    backgroundColor: 'rgba(97, 210, 145, 0.12)',
-    borderColor: 'rgba(97, 210, 145, 0.62)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.62)',
   },
   accountChipSignedOut: {
     backgroundColor: theme.colors.accent,
@@ -1359,8 +1367,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.lineStrong,
   },
   actionButtonInnerDanger: {
-    backgroundColor: 'rgba(224, 106, 92, 0.16)',
-    borderColor: 'rgba(224, 106, 92, 0.72)',
+    backgroundColor: 'rgba(143, 29, 44, 0.16)',
+    borderColor: 'rgba(143, 29, 44, 0.72)',
   },
   actionButtonInnerDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -1894,7 +1902,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   checkInCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   checkInCopy: {
     color: theme.colors.muted,

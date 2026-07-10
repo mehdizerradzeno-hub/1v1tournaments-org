@@ -72,8 +72,8 @@ export default function GameScreen({ gameSlug }) {
 
   const actions = [];
   if (featuredTournament) {
-    actions.push({ label: 'Open featured event', href: getTournamentPath(featuredTournament.slug) });
-    actions.push({ label: 'Join Tournament', href: getCheckInPath(featuredTournament.slug), variant: 'secondary' });
+    actions.push({ label: 'Event', href: getTournamentPath(featuredTournament.slug) });
+    actions.push({ label: 'Join', href: getCheckInPath(featuredTournament.slug), variant: 'secondary' });
   }
   actions.push({ label: 'Rules', href: '/rules', variant: 'secondary' });
   actions.push({ label: 'Results', href: '/results', variant: 'ghost' });
@@ -122,12 +122,12 @@ export default function GameScreen({ gameSlug }) {
             {featuredTournament.callout ? <Text style={styles.featuredCallout}>{featuredTournament.callout}</Text> : null}
             <BulletList items={featuredTournament.highlights} tone="accent" />
             <View style={styles.featuredActions}>
-              <ActionButton href={getTournamentPath(featuredTournament.slug)}>Open tournament</ActionButton>
+              <ActionButton href={getTournamentPath(featuredTournament.slug)}>Event</ActionButton>
               <ActionButton href={getCheckInPath(featuredTournament.slug)} variant="secondary">
-                Join Tournament
+                Join
               </ActionButton>
               <ActionButton href="/stream" variant="secondary">
-                Watch Tournament
+                Watch
               </ActionButton>
             </View>
           </Surface>
@@ -240,13 +240,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   featuredLead: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
   },
   featuredMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '800',

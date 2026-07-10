@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -32,6 +32,70 @@ const NEXT_CHAT_COMMANDS = [
   { command: '!rules', label: 'Rules' },
   { command: '!discord', label: 'Discord' },
 ];
+const NEXT_MOTION_CSS = `
+@keyframes nextCountdownTick {
+  0% { opacity: .70; transform: translateY(-6px) scale(.985); filter: blur(.5px); }
+  42% { opacity: 1; transform: translateY(1px) scale(1.006); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes nextProgressSheen {
+  0% { opacity: 0; transform: translateX(-120%); }
+  16% { opacity: .46; }
+  56% { opacity: .20; }
+  100% { opacity: 0; transform: translateX(220%); }
+}
+
+@keyframes nextCtaBreath {
+  0%, 100% { box-shadow: 0 0 0 rgba(214, 162, 78, 0); transform: translateY(0); }
+  45% { box-shadow: 0 18px 40px rgba(214, 162, 78, .18); transform: translateY(-1px); }
+}
+
+@keyframes nextCtaSweep {
+  0% { opacity: 0; transform: translateX(-140%) skewX(-18deg); }
+  18% { opacity: .44; }
+  42% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
+  100% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
+}
+
+[data-next-motion="countdown"] {
+  animation: nextCountdownTick 420ms cubic-bezier(.2, .86, .22, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+[data-next-motion="progress"] {
+  position: relative;
+}
+
+[data-next-motion="progress"]::after {
+  animation: nextProgressSheen 3.8s cubic-bezier(.2, .8, .2, 1) infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 239, 184, .64), transparent);
+  border-radius: 999px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 42%;
+}
+
+[data-next-motion="cta"] {
+  animation: nextCtaBreath 4.8s ease-in-out infinite;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+[data-next-motion="cta"]::after {
+  animation: nextCtaSweep 5.6s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 247, 214, .38), transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 52%;
+  z-index: 2;
+}
+`;
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -62,14 +126,18 @@ function getCountdownLabel(tournament, nowMs) {
     return 'Date TBA';
   }
 
-  const remainingMinutes = Math.max(Math.floor((startMs - nowMs) / 60000), 0);
-  const days = Math.floor(remainingMinutes / 1440);
-  const hours = Math.floor((remainingMinutes % 1440) / 60);
-  const minutes = remainingMinutes % 60;
+  const totalSeconds = Math.max(Math.ceil((startMs - nowMs) / 1000), 0);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const hourLabel = String(hours).padStart(2, '0');
+  const minuteLabel = String(minutes).padStart(2, '0');
+  const secondLabel = String(seconds).padStart(2, '0');
 
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (days > 0) return `${days}d ${hourLabel}:${minuteLabel}:${secondLabel}`;
+  if (hours > 0) return `${hours}:${minuteLabel}:${secondLabel}`;
+  return `${minutes}:${secondLabel}`;
 }
 
 function getSignupCount(signupSummary) {
@@ -78,6 +146,42 @@ function getSignupCount(signupSummary) {
 
 function getRosterCap(tournament) {
   return parsePositiveInt(tournament?.rosterCap, DEFAULT_ROSTER_CAP);
+}
+
+function getRegistrationPercent(signupCount, rosterCap) {
+  if (!rosterCap) {
+    return 0;
+  }
+
+  return Math.min(Math.round((signupCount / rosterCap) * 100), 100);
+}
+
+function getSeatsMessage(openSeats, signupCount, rosterCap) {
+  if (rosterCap && signupCount >= rosterCap) {
+    return 'Tournament is full';
+  }
+
+  if (openSeats === 1) {
+    return 'Only 1 seat left';
+  }
+
+  return `Only ${openSeats} seats left`;
+}
+
+function getDurationLabel(tournament) {
+  return tournament?.duration || tournament?.durationLabel || '45-60 min';
+}
+
+function getMotionDataSet(value) {
+  return Platform.OS === 'web' ? { nextMotion: value } : undefined;
+}
+
+function NextMotionStyles() {
+  if (Platform.OS !== 'web') {
+    return null;
+  }
+
+  return <style dangerouslySetInnerHTML={{ __html: NEXT_MOTION_CSS }} />;
 }
 
 function absoluteTournamentUrl(path) {
@@ -112,10 +216,13 @@ function getNextMatchLabel(bracket) {
 export default function NextScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
+  const [hostedTournamentsLoaded, setHostedTournamentsLoaded] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const upcoming = useMemo(
-    () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
-    [hostedTournaments],
+    () => hostedTournamentsLoaded
+      ? mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming')
+      : [],
+    [hostedTournaments, hostedTournamentsLoaded],
   );
   const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
   const hydratedUpcoming = sortTournamentsByDate(
@@ -145,10 +252,12 @@ export default function NextScreen() {
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
+          setHostedTournamentsLoaded(true);
         }
       } catch {
         if (active) {
           setHostedTournaments([]);
+          setHostedTournamentsLoaded(true);
         }
       }
     }
@@ -224,12 +333,32 @@ export default function NextScreen() {
   useEffect(() => {
     const timer = setInterval(() => {
       setNowMs(Date.now());
-    }, 15000);
+    }, 1000);
 
     return () => {
       clearInterval(timer);
     };
   }, []);
+
+  if (!hostedTournamentsLoaded) {
+    return (
+      <HubScreen
+        actions={[{ label: 'Home', href: '/' }]}
+        eyebrow="Next"
+        lead="Loading the live tournament schedule."
+        showHeader={false}
+        showNavigation={false}
+        stickyActions={false}
+        subtitle="Checking events"
+        title="Next tournament">
+        <Surface style={styles.loadingLobby}>
+          <Text style={styles.loadingLabel}>Checking schedule</Text>
+          <Text style={styles.loadingTitle}>Finding the next live event...</Text>
+          <Text style={styles.loadingText}>One moment while the current tournament list loads.</Text>
+        </Surface>
+      </HubScreen>
+    );
+  }
 
   if (!tournament) {
     return (
@@ -237,6 +366,9 @@ export default function NextScreen() {
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Next"
         lead="The next public event will appear here when it is scheduled."
+        showHeader={false}
+        showNavigation={false}
+        stickyActions={false}
         subtitle="No upcoming tournament is published yet"
         title="Next tournament">
         <EmptyState
@@ -251,9 +383,9 @@ export default function NextScreen() {
   return (
     <HubScreen
       actions={[
-        { label: registrationMeta.value === 'open' ? 'Join Tournament' : 'View Tournament', href: registrationMeta.value === 'open' ? checkInPath : tournamentPath },
-        { label: 'View Tournament', href: tournamentPath, variant: 'secondary' },
-        hasTwitch ? { label: 'Watch Tournament', href: '/stream', variant: 'secondary' } : null,
+        { label: registrationMeta.value === 'open' ? 'Join' : 'Event', href: registrationMeta.value === 'open' ? checkInPath : tournamentPath },
+        { label: 'Event', href: tournamentPath, variant: 'secondary' },
+        hasTwitch ? { label: 'Watch', href: '/stream', variant: 'secondary' } : null,
         { label: 'Rules', href: '/rules', variant: 'ghost' },
       ].filter(Boolean)}
       eyebrow="Next event"
@@ -261,6 +393,7 @@ export default function NextScreen() {
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
       showHero={false}
+      showHeader={false}
       showNavigation={false}
       subtitle={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
       stickyActions={false}
@@ -300,64 +433,100 @@ function NextLobbyHero({
   const signups = signupSummary.signups || [];
   const signedUpValue = signupSummary.loading ? '--' : `${signupCount}/${rosterCap}`;
   const openSeatsValue = signupSummary.loading ? '--' : openSeats;
+  const registrationPercent = signupSummary.loading ? 0 : getRegistrationPercent(signupCount, rosterCap);
+  const urgencyCopy = signupSummary.loading
+    ? 'Checking available seats'
+    : getSeatsMessage(openSeats, signupCount, rosterCap);
+  const primaryHref = registrationMeta.value === 'open' ? checkInPath : tournamentPath;
+  const primaryLabel = registrationMeta.value === 'open' ? 'Join Tournament' : 'View Event';
 
   return (
     <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
+      <NextMotionStyles />
+      <View style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
+        <View style={[styles.countdownCopy, isPhone && styles.countdownCopyPhone]}>
+          <Text style={styles.countdownLabel}>Starts in</Text>
+          <Text
+            dataSet={getMotionDataSet('countdown')}
+            key={countdownLabel}
+            style={[styles.countdownValue, isPhone && styles.countdownValuePhone]}>
+            {countdownLabel}
+          </Text>
+          <Text style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>{tournament.title}</Text>
+          <View style={styles.heroFacts}>
+            <Text style={styles.heroFact}>Free Entry</Text>
+            <Text style={styles.heroFactDivider}>/</Text>
+            <Text style={styles.heroFact}>{tournament.format}</Text>
+            <Text style={styles.heroFactDivider}>/</Text>
+            <Text style={styles.heroFact}>{getDurationLabel(tournament)}</Text>
+          </View>
+
+          {isPhone ? (
+            <View dataSet={getMotionDataSet('cta')} style={[styles.primaryCtaMotion, styles.mobileHeroCta]}>
+              <ActionButton href={primaryHref} style={styles.primaryCtaButton}>{primaryLabel}</ActionButton>
+            </View>
+          ) : (
+            <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
+          )}
+
+          <View style={styles.heroUrgencyCard}>
+            <View style={[styles.urgencyTopRow, isPhone && styles.urgencyTopRowPhone]}>
+              <Text style={styles.urgencyLabel}>{registrationMeta.label}</Text>
+              <Text style={[styles.urgencyValue, isPhone && styles.urgencyValuePhone]}>{urgencyCopy}</Text>
+            </View>
+            <View
+              accessibilityLabel={`${signupCount} of ${rosterCap} players registered`}
+              accessibilityRole="progressbar"
+              dataSet={getMotionDataSet('progress')}
+              style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${registrationPercent}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {signupSummary.loading ? 'Loading registration' : `${signedUpValue} players registered / ${registrationPercent}% filled`}
+            </Text>
+          </View>
+
+          {isPhone ? <Text style={[styles.heroText, styles.heroTextPhone]}>{tournament.summary}</Text> : null}
+        </View>
+
+        <View style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}>
+          <View style={styles.eventPanelHeader}>
+            <Text style={styles.eventPanelLabel}>Tournament status</Text>
+            <Text style={styles.eventPanelMeta}>{tournament.location}</Text>
+          </View>
+
+          <View style={styles.statusRows}>
+            <StatusRow label="Status" value={bracket ? 'Bracket live' : 'Online'} />
+            <StatusRow label="Players registered" value={signedUpValue} />
+            <StatusRow label="Open seats" value={String(openSeatsValue)} emphasis />
+            <StatusRow label="Estimated start" value={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)} />
+            <StatusRow label="Bracket type" value={tournament.format} />
+          </View>
+
+          <View style={styles.matchFocus}>
+            <Text style={styles.metricLabel}>Next match</Text>
+            <Text numberOfLines={2} style={styles.matchFocusText}>{getNextMatchLabel(bracket)}</Text>
+          </View>
+
+          <View style={[styles.heroActions, isPhone && styles.heroActionsPhone]}>
+            {isPhone ? null : (
+              <View dataSet={getMotionDataSet('cta')} style={styles.primaryCtaMotion}>
+                <ActionButton href={primaryHref} style={styles.primaryCtaButton}>{primaryLabel}</ActionButton>
+              </View>
+            )}
+            <View style={styles.secondaryActionRow}>
+              <ActionButton href={`${tournamentPath}#my-match`} style={styles.secondaryCtaButton} variant="ghost">My Match</ActionButton>
+              <ActionButton href={tournamentPath} style={styles.secondaryCtaButton} variant="ghost">Event</ActionButton>
+            </View>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.heroBadgeRow}>
         <Badge tone={bracket ? 'green' : registrationMeta.tone}>
           {bracket ? 'Bracket live' : registrationMeta.label}
         </Badge>
         <Text style={styles.heroDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
-      </View>
-
-      <View style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
-        <View style={styles.countdownCopy}>
-          <Text style={styles.countdownLabel}>Starts in</Text>
-          <Text style={[styles.countdownValue, isPhone && styles.countdownValuePhone]}>{countdownLabel}</Text>
-          <Text style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>Next tournament lobby</Text>
-          <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
-        </View>
-        <View style={[styles.heroActions, isPhone && styles.heroActionsPhone]}>
-          <ActionButton href={registrationMeta.value === 'open' ? checkInPath : tournamentPath}>
-            {registrationMeta.value === 'open' ? 'Join Tournament' : 'View Tournament'}
-          </ActionButton>
-          <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">Check Match Status</ActionButton>
-          <ActionButton href={tournamentPath} variant="secondary">View Tournament</ActionButton>
-        </View>
-      </View>
-
-      <View style={[styles.metricGrid, isPhone && styles.metricGridPhone]}>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Players</Text>
-          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{signedUpValue}</Text>
-        </View>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Open seats</Text>
-          <Text style={[styles.metricValue, isPhone && styles.metricValuePhone]}>{openSeatsValue}</Text>
-        </View>
-        <View style={styles.metricTile}>
-          <Text style={styles.metricLabel}>Registration</Text>
-          <Text numberOfLines={1} style={styles.metricLink}>{registrationMeta.label}</Text>
-        </View>
-        <View style={[styles.metricTile, styles.metricWide]}>
-          <Text style={styles.metricLabel}>Next match</Text>
-          <Text numberOfLines={1} style={styles.metricLink}>{getNextMatchLabel(bracket)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.shortcutStrip}>
-        <View style={styles.shortcutCopy}>
-          <Text style={styles.shortcutLabel}>Twitch viewer shortcut</Text>
-          <Text style={styles.shortcutTitle}>Join, check your match, or grab links from chat.</Text>
-        </View>
-        <View style={styles.shortcutCommands}>
-          {NEXT_CHAT_COMMANDS.map((item) => (
-            <View key={item.command} style={styles.shortcutCommand}>
-              <Text selectable style={styles.shortcutCommandText}>{item.command}</Text>
-              <Text style={styles.shortcutCommandLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       <View style={styles.lobbyBottom}>
@@ -381,23 +550,60 @@ function NextLobbyHero({
             {signups.length > 10 ? <Text style={styles.playerMore}>+{signups.length - 10} more</Text> : null}
           </View>
         </View>
-        <View style={styles.qrWrap}>
-          <Image
-            accessibilityLabel="QR code for the next tournament signup"
-            resizeMode="contain"
-            source={{ uri: getQrUrl(joinUrl) }}
-            style={styles.qr}
-          />
+
+        <View style={styles.lobbySideRail}>
+          <View style={styles.shortcutStrip}>
+            <View style={styles.shortcutCopy}>
+              <Text style={styles.shortcutLabel}>Twitch commands</Text>
+              <Text style={styles.shortcutTitle}>Say it once on stream. Chat can handle the rest.</Text>
+            </View>
+            <View style={styles.shortcutCommands}>
+              {NEXT_CHAT_COMMANDS.map((item) => (
+                <View key={item.command} style={styles.shortcutCommand}>
+                  <Text selectable style={styles.shortcutCommandText}>{item.command}</Text>
+                  <Text style={styles.shortcutCommandLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.qrPanel}>
+            <View style={styles.qrCopy}>
+              <Text style={styles.qrLabel}>Scan to join</Text>
+              <Text numberOfLines={1} style={styles.qrUrl}>{joinUrl}</Text>
+            </View>
+            <View style={styles.qrWrap}>
+              <Image
+                accessibilityLabel="QR code for the next tournament signup"
+                resizeMode="contain"
+                source={{ uri: getQrUrl(joinUrl) }}
+                style={styles.qr}
+              />
+            </View>
+          </View>
         </View>
       </View>
     </Surface>
   );
 }
 
+function StatusRow({ label, value, emphasis = false }) {
+  return (
+    <View style={styles.statusRow}>
+      <Text style={styles.statusLabel}>{label}</Text>
+      <Text numberOfLines={2} style={[styles.statusValue, emphasis && styles.statusValueEmphasis]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   countdownCopy: {
-    flex: 1.3,
-    minWidth: 240,
+    flex: 1.45,
+    minWidth: 280,
+  },
+  countdownCopyPhone: {
+    flexBasis: '100%',
+    minWidth: 0,
   },
   countdownLabel: {
     color: '#D6A24E',
@@ -408,39 +614,41 @@ const styles = StyleSheet.create({
   },
   countdownPanel: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(5, 11, 10, 0.72)',
-    borderColor: 'rgba(214, 162, 78, 0.20)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(5, 5, 5, 0.94)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
+    borderRadius: 18,
     borderWidth: 1,
+    boxShadow: '0 28px 80px rgba(0, 0, 0, 0.42), 0 0 42px rgba(214, 162, 78, 0.08)',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 24,
+    gap: 40,
     justifyContent: 'space-between',
-    padding: 24,
+    padding: 40,
   },
   countdownPanelPhone: {
-    gap: 16,
-    padding: 16,
+    gap: 24,
+    padding: 24,
   },
   countdownValue: {
     color: '#F4EFE6',
-    fontSize: 64,
+    fontSize: 88,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 70,
-    marginTop: 8,
+    lineHeight: 92,
+    marginTop: 12,
+    textShadowColor: 'rgba(214, 162, 78, 0.22)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
   },
   countdownValuePhone: {
-    fontSize: 46,
-    lineHeight: 52,
+    fontSize: 54,
+    lineHeight: 58,
   },
   heroActions: {
     alignContent: 'flex-start',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'flex-end',
-    minWidth: 220,
+    flexDirection: 'column',
+    gap: 10,
+    justifyContent: 'flex-start',
   },
   heroActionsPhone: {
     flexBasis: '100%',
@@ -452,7 +660,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginTop: 16,
   },
   heroDate: {
     color: '#D6A24E',
@@ -462,11 +670,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   heroText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
-    lineHeight: 23,
-    marginTop: 8,
+    lineHeight: 24,
+    marginTop: 16,
+    maxWidth: 620,
   },
   heroTextPhone: {
     fontSize: 14,
@@ -474,23 +683,68 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#F4EFE6',
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 34,
-    marginTop: 4,
+    lineHeight: 42,
+    marginTop: 12,
   },
   heroTitlePhone: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 30,
+    lineHeight: 36,
+  },
+  heroFacts: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 18,
+  },
+  heroFact: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    lineHeight: 17,
+    textTransform: 'uppercase',
+  },
+  heroFactDivider: {
+    color: 'rgba(244, 239, 230, 0.28)',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
   },
   lobbyHero: {
-    borderColor: 'rgba(244, 239, 230, 0.12)',
-    marginBottom: 24,
+    backgroundColor: 'rgba(17, 17, 17, 0.78)',
+    borderColor: 'rgba(214, 162, 78, 0.14)',
+    marginBottom: 32,
     overflow: 'hidden',
   },
   lobbyHeroPhone: {
     marginBottom: 18,
+  },
+  loadingLabel: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  loadingLobby: {
+    borderColor: 'rgba(214, 162, 78, 0.18)',
+    gap: 10,
+  },
+  loadingText: {
+    color: '#A7A29A',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
+  },
+  loadingTitle: {
+    color: '#F4EFE6',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
   },
   lobbyBottom: {
     alignItems: 'stretch',
@@ -498,6 +752,43 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
     marginTop: 16,
+  },
+  eventMetric: {
+    flex: 1,
+    minWidth: 110,
+  },
+  eventMetricRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  eventPanel: {
+    backgroundColor: 'rgba(17, 17, 17, 0.96)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    boxShadow: '0 18px 44px rgba(0, 0, 0, 0.28)',
+    flex: 0.9,
+    gap: 20,
+    minWidth: 304,
+    padding: 24,
+  },
+  eventPanelHeader: {
+    gap: 4,
+  },
+  eventPanelLabel: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+  },
+  eventPanelMeta: {
+    color: '#A7A29A',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  eventPanelPhone: {
+    flexBasis: '100%',
   },
   metricGrid: {
     flexDirection: 'row',
@@ -509,7 +800,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metricLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -546,6 +837,22 @@ const styles = StyleSheet.create({
   metricWide: {
     flexBasis: 260,
   },
+  matchFocus: {
+    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 18,
+  },
+  matchFocusText: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  mobileHeroCta: {
+    alignSelf: 'stretch',
+    marginTop: 20,
+  },
   playerChip: {
     backgroundColor: 'rgba(214, 162, 78, 0.12)',
     borderColor: 'rgba(214, 162, 78, 0.24)',
@@ -566,20 +873,76 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   playerEmpty: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '800',
     lineHeight: 20,
   },
   playerMore: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '900',
     paddingVertical: 8,
   },
+  primaryCtaMotion: {
+    alignSelf: 'stretch',
+  },
+  primaryCtaButton: {
+    alignSelf: 'stretch',
+    marginBottom: 0,
+    marginRight: 0,
+  },
+  progressFill: {
+    backgroundColor: '#D6A24E',
+    borderRadius: 999,
+    height: '100%',
+    minWidth: 2,
+  },
+  progressText: {
+    color: '#A7A29A',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  progressTrack: {
+    backgroundColor: 'rgba(244, 239, 230, 0.08)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 12,
+    overflow: 'hidden',
+  },
   qr: {
-    height: 118,
-    width: 118,
+    height: 96,
+    width: 96,
+  },
+  qrCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  qrLabel: {
+    color: '#F4EFE6',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  qrPanel: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 16,
+    padding: 12,
+  },
+  qrUrl: {
+    color: '#A7A29A',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   qrWrap: {
     alignSelf: 'flex-start',
@@ -587,14 +950,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
+  lobbySideRail: {
+    flexBasis: 330,
+    flexGrow: 1,
+    gap: 12,
+  },
   rosterPreview: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
-    flexBasis: 285,
-    flexGrow: 1,
-    padding: 14,
+    flexBasis: 360,
+    flexGrow: 1.4,
+    padding: 16,
   },
   rosterPreviewHead: {
     alignItems: 'center',
@@ -627,17 +995,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   shortcutCommandLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '800',
     marginTop: 3,
   },
   shortcutCommands: {
-    flex: 1.1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    minWidth: 230,
   },
   shortcutCommandText: {
     color: '#D6A24E',
@@ -646,8 +1012,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   shortcutCopy: {
-    flex: 1,
-    minWidth: 210,
+    gap: 4,
   },
   shortcutLabel: {
     color: '#D6A24E',
@@ -657,16 +1022,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   shortcutStrip: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: 'rgba(255, 255, 255, 0.025)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 12,
-    marginTop: 16,
-    padding: 12,
+    padding: 14,
   },
   shortcutTitle: {
     color: '#F4EFE6',
@@ -674,5 +1037,85 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 23,
     marginTop: 4,
+  },
+  secondaryActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  secondaryCtaButton: {
+    marginBottom: 0,
+    marginRight: 0,
+  },
+  statusLabel: {
+    color: '#A7A29A',
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+    lineHeight: 16,
+    minWidth: 116,
+    textTransform: 'uppercase',
+  },
+  statusRow: {
+    alignItems: 'flex-start',
+    borderBottomColor: 'rgba(244, 239, 230, 0.08)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 10,
+  },
+  statusRows: {
+    gap: 10,
+  },
+  statusValue: {
+    color: '#F4EFE6',
+    flex: 1.2,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  statusValueEmphasis: {
+    color: '#D6A24E',
+    fontSize: 16,
+  },
+  urgencyLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  urgencyTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  urgencyTopRowPhone: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  urgencyValue: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  urgencyValuePhone: {
+    textAlign: 'left',
+  },
+  heroUrgencyCard: {
+    backgroundColor: 'rgba(214, 162, 78, 0.075)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 24,
+    maxWidth: 560,
+    padding: 16,
   },
 });

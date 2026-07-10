@@ -134,7 +134,7 @@ export const siteData = {
       shortPath: '/euchre',
       summary: 'A coming-soon banner only. Current tournament operations are Spades-only.',
       heroCopy: 'Euchre is coming soon. There are no Euchre signups, brackets, or public events yet.',
-      accent: '#6CC7FF',
+      accent: '#5E7FA3',
       featuredTournamentSlug: null,
       quickFacts: [
         { label: 'Entry', value: 'Free' },

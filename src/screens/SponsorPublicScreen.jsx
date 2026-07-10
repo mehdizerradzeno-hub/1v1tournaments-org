@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   mediaCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   mediaCopy: {
     flex: 1,

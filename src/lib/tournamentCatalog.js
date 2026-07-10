@@ -104,9 +104,9 @@ function normalizeLinks(links, slug) {
   }
 
   return [
-    { label: 'View Tournament', href: `/tournaments/${slug}` },
+    { label: 'Event', href: `/tournaments/${slug}` },
     { label: 'Rules', href: '/rules' },
-    { label: 'Watch Tournament', href: '/stream' },
+    { label: 'Watch', href: '/stream' },
   ];
 }
 

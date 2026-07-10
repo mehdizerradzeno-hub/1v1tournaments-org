@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   checklistCard: {
-    borderColor: 'rgba(97, 210, 145, 0.28)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
   },
   checklistCopy: {
     flex: 1,
@@ -1015,8 +1015,8 @@ const styles = StyleSheet.create({
     width: 14,
   },
   checklistDotReady: {
-    backgroundColor: '#61D291',
-    borderColor: 'rgba(97, 210, 145, 0.72)',
+    backgroundColor: '#D6A24E',
+    borderColor: 'rgba(214, 162, 78, 0.72)',
   },
   checklistGrid: {
     flexDirection: 'row',
@@ -1036,18 +1036,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   checklistItemReady: {
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.22)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
   },
   checklistLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   checklistNote: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -1061,10 +1061,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checklistValueReady: {
-    color: '#61D291',
+    color: '#D6A24E',
   },
   chatCommandCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
     flexBasis: 250,
     flexGrow: 1,
   },
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   chatCommandName: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 26,
@@ -1101,11 +1101,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   commandPreviewChip: {
-    backgroundColor: 'rgba(97, 210, 145, 0.12)',
-    borderColor: 'rgba(97, 210, 145, 0.24)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 13,
     fontWeight: '900',
     paddingHorizontal: 10,
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   healthMiniText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 17,
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   commandBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1149,11 +1149,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   commandCardBlue: {
-    borderColor: 'rgba(108, 199, 255, 0.28)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
   },
   commandCardRose: {
     backgroundColor: 'rgba(23, 11, 12, 0.78)',
-    borderColor: 'rgba(224, 106, 92, 0.44)',
+    borderColor: 'rgba(143, 29, 44, 0.44)',
   },
   commandGrid: {
     flexDirection: 'row',
@@ -1186,7 +1186,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   cockpitBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -1202,16 +1202,16 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   cockpitCardBlue: {
-    backgroundColor: 'rgba(108, 199, 255, 0.08)',
-    borderColor: 'rgba(108, 199, 255, 0.22)',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.22)',
   },
   cockpitCardGreen: {
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.24)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   cockpitCardPrimary: {
-    backgroundColor: 'rgba(224, 106, 92, 0.10)',
-    borderColor: 'rgba(224, 106, 92, 0.34)',
+    backgroundColor: 'rgba(143, 29, 44, 0.10)',
+    borderColor: 'rgba(143, 29, 44, 0.34)',
   },
   cockpitGrid: {
     flexDirection: 'row',
@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   discordCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1286,28 +1286,28 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   discordFeedback: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 19,
     marginTop: 10,
   },
   discordMeta: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   discordPanel: {
-    borderColor: 'rgba(108, 199, 255, 0.28)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
     flexBasis: 280,
     flexGrow: 1,
     minWidth: 0,
   },
   discordStep: {
-    backgroundColor: 'rgba(108, 199, 255, 0.08)',
-    borderColor: 'rgba(108, 199, 255, 0.20)',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.20)',
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 180,
@@ -1316,7 +1316,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   discordStepLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -1339,7 +1339,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   discordTokenHelp: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 18,
@@ -1347,7 +1347,7 @@ const styles = StyleSheet.create({
   },
   discordTokenInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
     borderRadius: 8,
     borderWidth: 1,
     color: '#F4EFE6',
@@ -1359,7 +1359,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   discordTokenLabel: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -1379,10 +1379,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   noteCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   noteCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   presentationBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1474,21 +1474,21 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   liveConfigNote: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 18,
     marginTop: 10,
   },
   liveCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 23,
     marginTop: 8,
   },
   liveDot: {
-    backgroundColor: '#E06A5C',
+    backgroundColor: '#8F1D2C',
     borderColor: 'rgba(255, 255, 255, 0.72)',
     borderRadius: 999,
     borderWidth: 2,
@@ -1504,7 +1504,7 @@ const styles = StyleSheet.create({
   },
   livePanel: {
     backgroundColor: 'rgba(23, 11, 12, 0.82)',
-    borderColor: 'rgba(224, 106, 92, 0.42)',
+    borderColor: 'rgba(143, 29, 44, 0.42)',
     overflow: 'hidden',
   },
   livePanelTopRow: {
@@ -1540,7 +1540,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   liveTabCommandBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1553,11 +1553,11 @@ const styles = StyleSheet.create({
   },
   liveTabCommandCardBlue: {
     backgroundColor: 'rgba(9, 24, 34, 0.82)',
-    borderColor: 'rgba(108, 199, 255, 0.30)',
+    borderColor: 'rgba(94, 127, 163, 0.30)',
   },
   liveTabCommandCardRose: {
     backgroundColor: 'rgba(23, 11, 12, 0.82)',
-    borderColor: 'rgba(224, 106, 92, 0.38)',
+    borderColor: 'rgba(143, 29, 44, 0.38)',
   },
   liveTabCommandCopy: {
     flex: 1,
@@ -1580,7 +1580,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   liveTabCommandStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -1646,7 +1646,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   nextEventMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 19,
@@ -1660,7 +1660,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   overlayBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1668,7 +1668,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   overlayCard: {
-    borderColor: 'rgba(97, 210, 145, 0.24)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
     flexBasis: 245,
     flexGrow: 1,
   },
@@ -1692,7 +1692,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   overlayUrlLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -1742,7 +1742,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   runStepDot: {
-    backgroundColor: '#61D291',
+    backgroundColor: '#D6A24E',
     borderRadius: 999,
     height: 7,
     marginTop: 7,
@@ -1753,7 +1753,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   runStepText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
@@ -1767,7 +1767,7 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   sceneCard: {
-    borderColor: 'rgba(97, 210, 145, 0.22)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
     flexBasis: 245,
     flexGrow: 1,
   },
@@ -1777,14 +1777,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sceneLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   sceneSize: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 17,

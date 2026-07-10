@@ -63,10 +63,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   noteCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   noteCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,

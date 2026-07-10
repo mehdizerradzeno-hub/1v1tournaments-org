@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   aboutCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   aboutDomain: {
     color: '#D6A24E',
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   noteCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,

@@ -191,10 +191,10 @@ function heroSignupAction(status, checkInPath, tournamentPath) {
   }
 
   if (status.value === 'open') {
-    return { label: 'Join Tournament', href: checkInPath };
+    return { label: 'Join', href: checkInPath };
   }
 
-  return { label: 'View Roster', href: `${tournamentPath}#registered-players` };
+  return { label: 'Roster', href: `${tournamentPath}#registered-players` };
 }
 
 function tabFromHash(hash) {
@@ -630,7 +630,7 @@ export default function TournamentScreen({ slug }) {
     : 'Bracket preview';
 
   const playerMatchAction = {
-    label: playerHasReadyMatch ? 'Open My Match' : 'Check Match Status',
+    label: playerHasReadyMatch ? 'Open My Match' : 'My Match',
     href: matchStatusPath,
     variant: isBracketLive ? 'primary' : 'secondary',
   };
@@ -641,7 +641,7 @@ export default function TournamentScreen({ slug }) {
   const heroActions = [
     isBracketLive ? playerMatchAction : tournamentAction,
     isBracketLive ? tournamentAction : playerMatchAction,
-    streams.length ? { label: 'Watch Tournament', href: '/stream', variant: 'secondary' } : null,
+    streams.length ? { label: 'Watch', href: '/stream', variant: 'secondary' } : null,
     { label: 'Rules', href: '/rules', variant: 'secondary' },
   ].filter(Boolean);
 
@@ -776,8 +776,8 @@ export default function TournamentScreen({ slug }) {
                 ? 'Confirm who made the published bracket, then jump to your match or the live view.'
                 : 'Use this roster to confirm signups before the host seeds the bracket.'
             }
-            primary={{ label: registrationMeta.value === 'open' ? 'Join Tournament' : 'View Registration', href: checkInPath }}
-            secondary={{ label: 'Check Match Status', href: matchStatusPath }}
+            primary={{ label: registrationMeta.value === 'open' ? 'Join' : 'Registration', href: checkInPath }}
+            secondary={{ label: 'My Match', href: matchStatusPath }}
             stats={[
               { label: 'Registered', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(rosterBracketSize) },
@@ -831,8 +831,8 @@ export default function TournamentScreen({ slug }) {
                 ? 'Follow the active match flow, table links, winners, and bracket status.'
                 : 'Bracket preview is ready. Live table links appear after the host publishes the bracket.'
             }
-            primary={{ label: playerHasReadyMatch ? 'Open My Match' : 'Check Match Status', href: matchStatusPath }}
-            secondary={streams.length ? { label: 'Watch Tournament', href: '/stream' } : { label: 'View Roster', href: `${tournamentPath}#registered-players` }}
+            primary={{ label: playerHasReadyMatch ? 'Open My Match' : 'My Match', href: matchStatusPath }}
+            secondary={streams.length ? { label: 'Watch', href: '/stream' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
             stats={[
               { label: 'Bracket', value: liveBracket ? 'Live' : 'Preview' },
               { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
@@ -876,7 +876,7 @@ export default function TournamentScreen({ slug }) {
                 />
               ) : null}
               <QuickActionCard
-                actionLabel={playerHasReadyMatch ? 'Open My Match' : 'Check Match Status'}
+                actionLabel={playerHasReadyMatch ? 'Open My Match' : 'My Match'}
                 body={
                   isBracketLive
                     ? 'Open your assigned table from your signed-in tournament account.'
@@ -939,9 +939,9 @@ export default function TournamentScreen({ slug }) {
                   The hub checks your player account, creates the match ticket, and then sends you to the Spades table.
                 </Text>
                 <View style={styles.launchActions}>
-                  <ActionButton href={matchStatusPath}>Check Match Status</ActionButton>
+                  <ActionButton href={matchStatusPath}>My Match</ActionButton>
                   <ActionButton href="/stream" variant="secondary">
-                    Watch Tournament
+                    Watch
                   </ActionButton>
                 </View>
               </Surface>
@@ -972,7 +972,7 @@ export default function TournamentScreen({ slug }) {
             ))}
             {!streams.length ? (
               <EmptyState
-                action={<ActionButton href="/stream">Watch Tournament</ActionButton>}
+                action={<ActionButton href="/stream">Watch</ActionButton>}
                 body="Add a stream slug to the tournament record and the cards will appear here."
                 title="No live links are assigned yet"
               />
@@ -1025,7 +1025,7 @@ function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
         <ActionButton external={Boolean(downloadLinks.discord)} href={discordHref} variant="secondary">
           Discord
         </ActionButton>
-        <ActionButton href="/stream">Watch Tournament</ActionButton>
+        <ActionButton href="/stream">Watch</ActionButton>
       </View>
     </Surface>
   );
@@ -1152,10 +1152,10 @@ function TournamentArrivalRail({
   const primaryAction = playerHasReadyMatch
     ? { label: 'Open My Match', href: matchStatusPath }
     : isBracketLive
-      ? { label: 'Check Match Status', href: matchStatusPath }
+      ? { label: 'My Match', href: matchStatusPath }
       : registrationMeta.value === 'open'
-        ? { label: 'Join Tournament', href: checkInPath }
-        : { label: 'View Roster', href: `${tournamentPath}#registered-players` };
+        ? { label: 'Join', href: checkInPath }
+        : { label: 'Roster', href: `${tournamentPath}#registered-players` };
 
   return (
     <Surface style={styles.arrivalRail}>
@@ -1166,7 +1166,7 @@ function TournamentArrivalRail({
         </View>
         <View style={styles.arrivalActions}>
           <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
-          <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton>
+          <ActionButton href="/stream" variant="secondary">Watch</ActionButton>
         </View>
       </View>
 
@@ -1213,10 +1213,10 @@ function TournamentLobbyHero({
   const primaryAction = playerHasReadyMatch
     ? { label: 'Open My Match', href: matchStatusPath }
     : isBracketLive
-      ? { label: 'Check Match Status', href: matchStatusPath }
+      ? { label: 'My Match', href: matchStatusPath }
       : registrationMeta.value === 'open'
-        ? { label: 'Join Tournament', href: checkInPath }
-        : { label: 'View Tournament', href: tournamentPath };
+        ? { label: 'Join', href: checkInPath }
+        : { label: 'Event', href: tournamentPath };
 
   return (
     <Surface style={styles.lobbyCard}>
@@ -1240,8 +1240,8 @@ function TournamentLobbyHero({
         </View>
         <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
           <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
-          <ActionButton href={matchStatusPath} variant="secondary">Check Match Status</ActionButton>
-          {streams.length ? <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton> : null}
+          <ActionButton href={matchStatusPath} variant="secondary">My Match</ActionButton>
+          {streams.length ? <ActionButton href="/stream" variant="secondary">Watch</ActionButton> : null}
         </View>
       </View>
 
@@ -1339,10 +1339,10 @@ function TournamentDashboard({
   const primaryAction = currentMatch
     ? { label: 'Open My Match', href: matchStatusPath }
     : isBracketLive
-      ? { label: 'Check Match Status', href: matchStatusPath }
+      ? { label: 'My Match', href: matchStatusPath }
       : registrationMeta.value === 'open'
-        ? { label: data?.signup ? 'Check Match Status' : 'Create account and join', href: data?.signup ? matchStatusPath : checkInPath }
-        : { label: 'View Roster', href: `${tournamentPath}#registered-players` };
+        ? { label: data?.signup ? 'My Match' : 'Create account and join', href: data?.signup ? matchStatusPath : checkInPath }
+        : { label: 'Roster', href: `${tournamentPath}#registered-players` };
 
   return (
     <Surface style={styles.dashboardCard}>
@@ -1362,11 +1362,11 @@ function TournamentDashboard({
         <View style={styles.dashboardActions}>
           <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
           <ActionButton href={`${tournamentPath}${isBracketLive ? '#live-bracket' : '#registered-players'}`} variant="secondary">
-            {isBracketLive ? 'View Bracket' : 'View Roster'}
+            {isBracketLive ? 'Bracket' : 'Roster'}
           </ActionButton>
           {streams.length ? (
             <ActionButton href="/stream" variant="secondary">
-              Watch Tournament
+              Watch
             </ActionButton>
           ) : null}
         </View>
@@ -1519,8 +1519,8 @@ function statusBadgeLabel(nextStep) {
 function playerStatusActionLabel(data, currentMatch) {
   if (currentMatch) return 'Open My Match';
   if (!data?.account) return 'Sign in';
-  if (!data?.signup) return 'Join Tournament';
-  return 'Check Match Status';
+  if (!data?.signup) return 'Join';
+  return 'My Match';
 }
 
 function PlayerTournamentStatus({ checkInPath, playerStatus, slug }) {
@@ -1854,18 +1854,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   arrivalCommandChip: {
-    backgroundColor: 'rgba(108, 199, 255, 0.10)',
-    borderColor: 'rgba(108, 199, 255, 0.22)',
+    backgroundColor: 'rgba(94, 127, 163, 0.10)',
+    borderColor: 'rgba(94, 127, 163, 0.22)',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 13,
     fontWeight: '900',
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   arrivalCommandLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -1908,7 +1908,7 @@ const styles = StyleSheet.create({
   },
   arrivalRail: {
     backgroundColor: 'rgba(8, 25, 21, 0.96)',
-    borderColor: 'rgba(108, 199, 255, 0.26)',
+    borderColor: 'rgba(94, 127, 163, 0.26)',
     marginBottom: 16,
   },
   arrivalStep: {
@@ -1922,14 +1922,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   arrivalStepBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
     marginTop: 5,
   },
   arrivalStepLabel: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -2016,7 +2016,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   lobbySummary: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 23,
@@ -2055,7 +2055,7 @@ const styles = StyleSheet.create({
     flexBasis: 260,
   },
   lobbyMetricLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0,
@@ -2070,7 +2070,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   lobbyMetricSub: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 16,
   },
   lobbyMatchText: {
@@ -2127,13 +2127,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   lobbyEmpty: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '800',
     lineHeight: 20,
   },
   lobbyMore: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '900',
     paddingVertical: 8,
@@ -2224,15 +2224,15 @@ const styles = StyleSheet.create({
     width: 34,
   },
   timelineMarkerDone: {
-    backgroundColor: 'rgba(97, 210, 145, 0.12)',
-    borderColor: 'rgba(97, 210, 145, 0.42)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
   },
   timelineMarkerActive: {
     backgroundColor: 'rgba(214, 162, 78, 0.18)',
     borderColor: 'rgba(214, 162, 78, 0.62)',
   },
   timelineMarkerText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 17,
@@ -2245,7 +2245,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   timelineLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -2262,7 +2262,7 @@ const styles = StyleSheet.create({
     color: '#D6A24E',
   },
   timelineValueDone: {
-    color: '#61D291',
+    color: '#D6A24E',
   },
   eventConsole: {
     backgroundColor: 'rgba(17, 29, 26, 0.90)',
@@ -2278,7 +2278,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   eventConsoleBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '800',
     lineHeight: 20,
@@ -2325,11 +2325,11 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   eventSignalReady: {
-    backgroundColor: 'rgba(97, 210, 145, 0.09)',
-    borderColor: 'rgba(97, 210, 145, 0.24)',
+    backgroundColor: 'rgba(214, 162, 78, 0.09)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   eventSignalLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -2343,7 +2343,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   eventSignalValueReady: {
-    color: '#61D291',
+    color: '#D6A24E',
   },
   tournamentTabBar: {
     flexDirection: 'row',
@@ -2379,7 +2379,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   dashboardText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 23,
@@ -2408,7 +2408,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   dashboardTileLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.9,
@@ -2478,7 +2478,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   formatBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
@@ -2501,7 +2501,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   formatStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -2565,7 +2565,7 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   tabCommandBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '800',
     lineHeight: 20,
@@ -2598,7 +2598,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   tabCommandStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -2642,7 +2642,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.3)',
   },
   launchCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
@@ -2680,13 +2680,13 @@ const styles = StyleSheet.create({
     marginRight: -12,
   },
   bracketLoadNote: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 19,
     marginTop: 10,
   },
   rosterCard: {
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   rosterHeroRow: {
     flexDirection: 'row',
@@ -2695,8 +2695,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterHeroTile: {
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
     borderRadius: 16,
     borderWidth: 1,
     flexGrow: 1,
@@ -2704,7 +2704,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   rosterHeroLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -2718,11 +2718,11 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   rosterHeroSubValue: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 18,
   },
   rosterHeroMeta: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
@@ -2736,7 +2736,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterCapacity: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
@@ -2751,12 +2751,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   rosterEmptyText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     lineHeight: 22,
   },
   rosterNote: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
@@ -2801,13 +2801,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   rosterRowCurrent: {
-    backgroundColor: 'rgba(97, 210, 145, 0.11)',
-    borderColor: 'rgba(97, 210, 145, 0.44)',
+    backgroundColor: 'rgba(214, 162, 78, 0.11)',
+    borderColor: 'rgba(214, 162, 78, 0.44)',
   },
   rosterRank: {
     alignItems: 'center',
-    backgroundColor: 'rgba(97, 210, 145, 0.14)',
-    borderColor: 'rgba(97, 210, 145, 0.42)',
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
     borderRadius: 999,
     borderWidth: 1,
     height: 34,
@@ -2820,7 +2820,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.60)',
   },
   rosterRankText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontFamily: 'monospace',
     fontSize: 13,
     fontWeight: '900',
@@ -2846,7 +2846,7 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   rosterPlayerMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -2857,7 +2857,7 @@ const styles = StyleSheet.create({
   },
   playerStatusCardReady: {
     backgroundColor: 'rgba(12, 36, 28, 0.96)',
-    borderColor: 'rgba(97, 210, 145, 0.58)',
+    borderColor: 'rgba(214, 162, 78, 0.58)',
   },
   playerStatusTopRow: {
     alignItems: 'center',
@@ -2867,7 +2867,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   playerStatusMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
@@ -2880,7 +2880,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   playerStatusCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
@@ -2902,22 +2902,22 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   playerStatusStepDone: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.38)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
   },
   playerStatusStepReady: {
     backgroundColor: 'rgba(214, 162, 78, 0.12)',
     borderColor: 'rgba(214, 162, 78, 0.52)',
   },
   playerStatusStepLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   playerStatusStepLabelDone: {
-    color: '#61D291',
+    color: '#D6A24E',
   },
   playerStatusStepLabelReady: {
     color: '#D6A24E',
@@ -2965,7 +2965,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   liveBracketCard: {
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   liveBracketHeader: {
     alignItems: 'flex-start',
@@ -2987,7 +2987,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   liveBracketMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
@@ -3013,7 +3013,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   liveBracketStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -3021,7 +3021,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   liveBracketWinner: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 22,
@@ -3093,8 +3093,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.34)',
   },
   liveMatchFinal: {
-    backgroundColor: 'rgba(97, 210, 145, 0.07)',
-    borderColor: 'rgba(97, 210, 145, 0.28)',
+    backgroundColor: 'rgba(214, 162, 78, 0.07)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
   },
   liveMatchTopRow: {
     alignItems: 'center',
@@ -3103,7 +3103,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   liveMatchLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
@@ -3125,8 +3125,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   liveMatchPlayerWinner: {
-    backgroundColor: 'rgba(97, 210, 145, 0.11)',
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    backgroundColor: 'rgba(214, 162, 78, 0.11)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   liveMatchSeed: {
     alignItems: 'center',
@@ -3137,7 +3137,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   liveMatchSeedText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 14,
@@ -3150,10 +3150,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   liveMatchPlayerNameWinner: {
-    color: '#61D291',
+    color: '#D6A24E',
   },
   liveMatchWinnerChip: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -3172,7 +3172,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   liveMatchLocked: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 18,
@@ -3189,7 +3189,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   snapshotCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
   },

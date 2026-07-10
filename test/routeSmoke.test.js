@@ -142,8 +142,8 @@ test('homepage stays focused on the stream-day front door', () => {
   assert.match(homeScreenSource, /HomepageFrontDoor/);
   assert.match(homeScreenSource, /Choose your next move/);
   assert.match(homeScreenSource, /Next tournament/);
-  assert.match(homeScreenSource, /Watch Tournament/);
-  assert.match(homeScreenSource, /Join Tournament/);
+  assert.match(homeScreenSource, /My Match/);
+  assert.match(homeScreenSource, /Join/);
   assert.match(homeScreenSource, /Compact lobby/);
   assert.match(homeScreenSource, /TwitchTournamentBoard/);
 });
@@ -161,8 +161,8 @@ test('public support pages keep players routed back to active tournament flow', 
 
   assert.match(hubUiSource, /PlayerRouteStrip/);
   assert.match(hubUiSource, /getNextNavTournamentSlug/);
-  assert.match(hubUiSource, /Check Match Status/);
-  assert.match(hubUiSource, /Watch Tournament/);
+  assert.match(hubUiSource, /My Match/);
+  assert.match(hubUiSource, /Player path/);
   assert.match(resultsScreenSource, /PlayerRouteStrip/);
   assert.match(leaderboardScreenSource, /PlayerRouteStrip/);
   assert.match(rulesScreenSource, /PlayerRouteStrip/);
@@ -185,12 +185,13 @@ test('/next stays wired to the public next-event lobby', () => {
 
   assert.match(nextRouteSource, /NextScreen/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
-  assert.match(nextScreenSource, /Next tournament lobby/);
+  assert.match(nextScreenSource, /Tournament status/);
   assert.match(nextScreenSource, /heroVariant="compact"/);
   assert.match(nextScreenSource, /stickyActions=\{false\}/);
   assert.match(nextScreenSource, /Starts in/);
   assert.match(nextScreenSource, /Signed up players/);
-  assert.match(nextScreenSource, /Twitch viewer shortcut/);
+  assert.match(nextScreenSource, /Twitch commands/);
+  assert.match(nextScreenSource, /Scan to join/);
   assert.match(nextScreenSource, /NEXT_CHAT_COMMANDS/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
@@ -320,6 +321,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(hubUiFile));
   assert.ok(existsSync(homeScreenFile));
   assert.ok(existsSync(leaderboardScreenFile));
+  assert.ok(existsSync(nextScreenFile));
   assert.ok(existsSync(checkInScreenFile));
   assert.ok(existsSync(tournamentScreenFile));
   assert.ok(existsSync(hostingClientFile));
@@ -341,6 +343,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const hubUiSource = readFileSync(hubUiFile, 'utf8');
   const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
   const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
+  const nextScreenSource = readFileSync(nextScreenFile, 'utf8');
   const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
   const tournamentScreenSource = readFileSync(tournamentScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
@@ -409,17 +412,23 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
   assert.match(hubUiSource, /getMobileNavItems/);
-  assert.match(hubUiSource, /Check Match/);
-  assert.match(hubUiSource, /Leaderboard/);
-  assert.match(hubUiSource, /Ranks/);
+  assert.match(hubUiSource, /My Match/);
+  assert.match(hubUiSource, /Event/);
+  assert.match(hubUiSource, /Watch/);
+  assert.doesNotMatch(hubUiSource, /label: 'Ranks'/);
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
-  assert.match(homeScreenSource, /Check Match Status/);
+  assert.match(homeScreenSource, /My Match/);
   assert.match(homeScreenSource, /Tournament leaderboard/);
   assert.match(homeScreenSource, /mergeTournamentSettings/);
   assert.match(homeScreenSource, /fetchTournamentEvents/);
   assert.match(homeScreenSource, /mergeTournamentLists/);
+  assert.match(nextScreenSource, /showHeader=\{false\}/);
+  assert.ok(
+    nextScreenSource.indexOf('styles.countdownPanel') < nextScreenSource.indexOf('styles.heroBadgeRow'),
+    '/next must keep the countdown panel above supporting event badges',
+  );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Overall standings/);
   assert.doesNotMatch(homeScreenSource, /Host admin/);

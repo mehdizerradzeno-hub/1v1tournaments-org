@@ -1480,7 +1480,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   proposalPanel: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   factList: {
     gap: 6,

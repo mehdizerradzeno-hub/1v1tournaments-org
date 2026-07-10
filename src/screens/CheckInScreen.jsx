@@ -401,7 +401,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setAccountMessage(`Account created. ${savedSignup.playerName} is signed up for this tournament.`);
         } catch (signupError) {
           setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament to reserve your spot.');
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join to reserve your spot.');
         }
       } else {
         setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
@@ -444,7 +444,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setAccountMessage(`Signed in. ${savedSignup.playerName} is on the tournament roster.`);
         } catch (signupError) {
           setAccountMessage(`Signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament to reserve your spot.');
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join to reserve your spot.');
         }
       } else {
         setAccountMessage(`Signed in as ${accountDisplayName}.`);
@@ -527,7 +527,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'Account ready. Join this event.'
       : 'Create account and join in one step';
   const mainCopy = hasSignupConfirmation
-    ? 'You are registered. Come back here or use Check Match Status when the bracket is published.'
+    ? 'You are registered. Use My Match when the bracket is published.'
     : wantsAccountSwitch
       ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
@@ -544,9 +544,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   return (
     <HubScreen
       actions={[
-        { label: 'View Tournament', href: getTournamentPath(visibleTournament.slug) },
+        { label: 'Event', href: getTournamentPath(visibleTournament.slug) },
         { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Watch Tournament', href: '/stream', variant: 'ghost' },
+        { label: 'Watch', href: '/stream', variant: 'ghost' },
       ]}
       eyebrow="Tournament registration"
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
@@ -580,7 +580,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         />
       </Section>
 
-      <Section description="One clear path: account first, roster second, match link after the bracket goes live." title="Join this tournament">
+      <Section
+        description={hasSignupConfirmation
+          ? 'Your seat is saved. The next useful action is My Match after seeding.'
+          : 'One clear path: account first, roster second, match link after the bracket goes live.'}
+        title={hasSignupConfirmation ? 'You are in' : 'Join this tournament'}>
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
@@ -611,8 +615,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             <View style={styles.flowStep}>
               <Badge tone="blue">3</Badge>
               <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Match</Text>
-                <Text style={styles.flowStepText}>Open when bracket is live</Text>
+                <Text style={styles.flowStepTitle}>My Match</Text>
+                <Text style={styles.flowStepText}>Opens when bracket is live</Text>
               </View>
             </View>
           </View>
@@ -670,16 +674,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <View style={styles.buttonRow}>
                 {wantsAccountSwitch ? null : hasSignupConfirmation ? (
                   <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
-                    Check Match Status
+                    My Match
                   </ActionButton>
                 ) : (
                   <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                    {registrationOpen ? (submitting ? 'Saving...' : 'Join Tournament') : registrationMeta.label}
+                    {registrationOpen ? (submitting ? 'Saving...' : 'Join') : registrationMeta.label}
                   </ActionButton>
                 )}
                 {wantsAccountSwitch ? null : (
                   <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
-                    View Tournament
+                    Event
                   </ActionButton>
                 )}
                 {wantsAccountSwitch ? null : (
@@ -839,7 +843,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           steps={[
             { title: 'Join tournament', body: 'Your account becomes the tournament identity for this event.' },
             { title: 'Wait for bracket', body: 'The host publishes match IDs from the live signup roster near start time.' },
-            { title: 'Open match link', body: 'Your match card opens the Spades room when the bracket is ready.' },
+            { title: 'Open My Match', body: 'Your match card opens the Spades room when the bracket is ready.' },
           ]}
         />
       </Section>
@@ -956,16 +960,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   backCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 12,
   },
   signupCard: {
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   rosterCard: {
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   formatPanel: {
     backgroundColor: 'rgba(8, 25, 21, 0.90)',
@@ -988,7 +992,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   formatBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1011,7 +1015,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   formatStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 10,
     fontWeight: '900',
     lineHeight: 14,
@@ -1043,8 +1047,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterHeroTile: {
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
     borderRadius: 16,
     borderWidth: 1,
     flexGrow: 1,
@@ -1056,7 +1060,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.50)',
   },
   rosterHeroLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '900',
     lineHeight: 15,
@@ -1077,7 +1081,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   rosterHeroMeta: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
@@ -1091,7 +1095,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterHeaderText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
@@ -1106,7 +1110,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   rosterEmptyText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
@@ -1124,13 +1128,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   rosterRowCurrent: {
-    backgroundColor: 'rgba(97, 210, 145, 0.11)',
-    borderColor: 'rgba(97, 210, 145, 0.44)',
+    backgroundColor: 'rgba(214, 162, 78, 0.11)',
+    borderColor: 'rgba(214, 162, 78, 0.44)',
   },
   rosterRank: {
     alignItems: 'center',
-    backgroundColor: 'rgba(97, 210, 145, 0.14)',
-    borderColor: 'rgba(97, 210, 145, 0.42)',
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
     borderRadius: 999,
     borderWidth: 1,
     height: 36,
@@ -1143,7 +1147,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.60)',
   },
   rosterRankText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontFamily: 'monospace',
     fontSize: 13,
     fontWeight: '900',
@@ -1169,7 +1173,7 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   rosterPlayerMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -1194,8 +1198,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   flowStepComplete: {
-    backgroundColor: 'rgba(97, 210, 145, 0.09)',
-    borderColor: 'rgba(97, 210, 145, 0.34)',
+    backgroundColor: 'rgba(214, 162, 78, 0.09)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
   },
   flowStepCopy: {
     flex: 1,
@@ -1208,7 +1212,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   flowStepText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -1243,9 +1247,9 @@ const styles = StyleSheet.create({
   },
   accountPanel: {
     borderWidth: 1,
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
     borderRadius: 18,
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
     marginTop: 16,
     padding: 14,
   },
@@ -1254,7 +1258,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(214, 162, 78, 0.08)',
   },
   accountEmail: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 12,
     fontWeight: '800',
     flexShrink: 1,
@@ -1267,14 +1271,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   accountStatusCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
     marginTop: 8,
   },
   errorText: {
-    color: '#E06A5C',
+    color: '#8F1D2C',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
@@ -1315,9 +1319,9 @@ const styles = StyleSheet.create({
   },
   passwordRequirements: {
     borderWidth: 1,
-    borderColor: 'rgba(108, 199, 255, 0.26)',
+    borderColor: 'rgba(94, 127, 163, 0.26)',
     borderRadius: 16,
-    backgroundColor: 'rgba(108, 199, 255, 0.08)',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
     marginTop: 12,
     padding: 12,
   },
@@ -1339,7 +1343,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   requirementTitle: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -1359,13 +1363,13 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   summaryCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
   },
   timelineCopy: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 20,
@@ -1392,7 +1396,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryWindow: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -1403,15 +1407,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   successText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
     fontWeight: '700',
   },
   confirmationPanel: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.36)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 14,
@@ -1425,7 +1429,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   confirmationCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,

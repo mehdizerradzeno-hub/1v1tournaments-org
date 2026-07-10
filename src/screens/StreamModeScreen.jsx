@@ -355,10 +355,10 @@ export default function StreamModeScreen() {
                   {registrationMeta.value === 'open' ? 'Join tournament' : 'View tournament'}
                 </ActionButton>
                 <ActionButton href={matchStatusPath} variant="secondary">
-                  Check Match Status
+                  My Match
                 </ActionButton>
                 <ActionButton href="/stream" variant="secondary">
-                  Watch Tournament
+                  Watch
                 </ActionButton>
               </View>
             </Surface>
@@ -484,7 +484,7 @@ export default function StreamModeScreen() {
                 <Text style={styles.qrTitle}>Join the next tournament</Text>
                 <Text style={styles.qrUrl}>{joinUrl}</Text>
                 <View style={styles.qrActions}>
-                  <ActionButton href={signupPath}>Join Tournament</ActionButton>
+                  <ActionButton href={signupPath}>Join</ActionButton>
                   <ActionButton href="/next" variant="secondary">Short link</ActionButton>
                 </View>
               </View>
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   chatCard: {
-    borderColor: 'rgba(108, 199, 255, 0.28)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
     flex: 0.92,
   },
   nextStepBody: {
@@ -775,11 +775,11 @@ const styles = StyleSheet.create({
   },
   statusChipBlue: {
     backgroundColor: theme.colors.blueSoft,
-    borderColor: 'rgba(108, 199, 255, 0.28)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
   },
   statusChipGreen: {
     backgroundColor: theme.colors.greenSoft,
-    borderColor: 'rgba(97, 210, 145, 0.28)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
   },
   statusChipNeutral: {
     backgroundColor: 'rgba(244, 239, 230, 0.08)',
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   },
   statusChipRose: {
     backgroundColor: theme.colors.roseSoft,
-    borderColor: 'rgba(224, 106, 92, 0.32)',
+    borderColor: 'rgba(143, 29, 44, 0.32)',
   },
   statusChipText: {
     color: theme.colors.text,
@@ -836,8 +836,8 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   matchFocus: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.22)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 14,
@@ -983,8 +983,8 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   viewerCommandChip: {
-    backgroundColor: 'rgba(108, 199, 255, 0.08)',
-    borderColor: 'rgba(108, 199, 255, 0.20)',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.20)',
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 142,

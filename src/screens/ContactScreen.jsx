@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   contactCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 12,

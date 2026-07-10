@@ -363,7 +363,7 @@ export default function HomeScreen() {
             <View style={styles.spadesActions}>
               <ActionButton href={getGamePath(spades.slug)}>Open Spades</ActionButton>
               <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
-                View Tournament
+                Event
               </ActionButton>
             </View>
           </Surface>
@@ -519,13 +519,13 @@ function PremiumCountdownHero({
 
       <View style={styles.heroActionRowSecondary}>
         <ActionButton href={matchStatusPath} style={styles.heroActionButton}>
-          Check Match Status
+          My Match
         </ActionButton>
         <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
           View bracket
         </ActionButton>
         <ActionButton href="/stream" variant="secondary">
-          Watch Tournament
+          Watch
         </ActionButton>
       </View>
 
@@ -563,7 +563,7 @@ function PremiumDownloadSection() {
       body: 'Euchre is wired for the same 1v1 family experience. The App Store badge appears automatically when its URL is configured.',
       appStoreUrl: downloadLinks.appStoreEuchre,
       webUrl: downloadLinks.webEuchre,
-      accent: '#6CC7FF',
+      accent: '#5E7FA3',
     },
   ];
 
@@ -630,7 +630,7 @@ function HomepageFrontDoor({
   const registrationOpen = registrationMeta.value === 'open';
   const bracketLive = Boolean(bracket);
   const joinHref = registrationOpen ? signupPath : tournamentPath;
-  const joinLabel = registrationOpen ? 'Join Tournament' : 'View Tournament';
+  const joinLabel = registrationOpen ? 'Join' : 'Event';
   const joinBody = registrationOpen
     ? 'Create or open your tournament account and reserve your seat.'
     : 'Registration is not open, but the event page still shows schedule, roster, and rules.';
@@ -663,7 +663,7 @@ function HomepageFrontDoor({
 
         <View style={styles.frontDoorGrid}>
           <FrontDoorCard
-            actionLabel="View Tournament"
+            actionLabel="Event"
             body="See time, roster, bracket, rules, results, and match status in one event page."
             href={tournamentPath}
             meta="Next"
@@ -671,7 +671,7 @@ function HomepageFrontDoor({
             tone="accent"
           />
           <FrontDoorCard
-            actionLabel="Watch Tournament"
+            actionLabel="Watch"
             body="Open the public stream page with Twitch, roster, and stream-day links."
             href="/stream"
             meta="Stream"
@@ -690,7 +690,7 @@ function HomepageFrontDoor({
 
         <View style={styles.frontDoorSecondaryRow}>
           <ActionButton href={matchStatusPath} variant="secondary">
-            Check Match Status
+            My Match
           </ActionButton>
           <ActionButton href="/next" variant="secondary">
             Compact lobby
@@ -766,13 +766,13 @@ function TwitchTournamentBoard({
             </Text>
             <View style={styles.twitchActions}>
               <ActionButton href={registrationOpen ? signupPath : tournamentPath}>
-                {registrationOpen ? 'Join Tournament' : 'View Tournament'}
+                {registrationOpen ? 'Join' : 'Event'}
               </ActionButton>
               <ActionButton href={matchStatusPath} variant="secondary">
-                Check Match Status
+                My Match
               </ActionButton>
               <ActionButton href="/stream" variant="secondary">
-                Watch Tournament
+                Watch
               </ActionButton>
               {isConfiguredUrl(downloadLinks.twitch) ? (
                 <ActionButton external href={downloadLinks.twitch} variant="secondary">
@@ -1032,10 +1032,10 @@ function UpcomingTournamentList({
             </View>
             <View style={styles.upcomingActions}>
               <ActionButton href={registrationIsOpen ? signupPath : tournamentPath}>
-                {registrationIsOpen ? 'Join Tournament' : 'View Tournament'}
+                {registrationIsOpen ? 'Join' : 'Event'}
               </ActionButton>
               <ActionButton href={matchPath} variant="secondary">
-                Check Match Status
+                My Match
               </ActionButton>
             </View>
           </Surface>
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   frontDoorCountLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '900',
@@ -1171,12 +1171,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.42)',
   },
   frontDoorCardBlue: {
-    backgroundColor: 'rgba(108, 199, 255, 0.10)',
-    borderColor: 'rgba(108, 199, 255, 0.36)',
+    backgroundColor: 'rgba(94, 127, 163, 0.10)',
+    borderColor: 'rgba(94, 127, 163, 0.36)',
   },
   frontDoorCardGreen: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.36)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
   },
   frontDoorCardMeta: {
     color: '#D6A24E',
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   frontDoorCardBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -1304,7 +1304,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   twitchScoreLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '900',
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
     lineHeight: 27,
   },
   twitchRosterMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '900',
@@ -1364,7 +1364,7 @@ const styles = StyleSheet.create({
   twitchRosterRow: {
     alignItems: 'center',
     backgroundColor: 'rgba(23, 38, 34, 0.82)',
-    borderColor: 'rgba(97, 210, 145, 0.28)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
     borderRadius: 16,
     borderWidth: 1,
     flexBasis: 230,
@@ -1376,8 +1376,8 @@ const styles = StyleSheet.create({
   },
   twitchRosterRank: {
     alignItems: 'center',
-    backgroundColor: 'rgba(97, 210, 145, 0.14)',
-    borderColor: 'rgba(97, 210, 145, 0.38)',
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
     borderRadius: 999,
     borderWidth: 1,
     height: 42,
@@ -1386,7 +1386,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   twitchRosterRankText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontFamily: 'monospace',
     fontSize: 16,
     fontWeight: '900',
@@ -1403,7 +1403,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   twitchRosterHandle: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -1431,7 +1431,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   twitchRosterEmpty: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
@@ -1471,7 +1471,7 @@ const styles = StyleSheet.create({
     lineHeight: 33,
   },
   downloadGameBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 21,
@@ -1529,7 +1529,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   premiumLinkButtonTextDisabled: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
   },
   downloadHover: {
     transform: [{ translateY: -2 }],
@@ -1561,12 +1561,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.42)',
   },
   tournamentLinkPanelGreen: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.36)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
   },
   tournamentLinkPanelBlue: {
-    backgroundColor: 'rgba(108, 199, 255, 0.10)',
-    borderColor: 'rgba(108, 199, 255, 0.36)',
+    backgroundColor: 'rgba(94, 127, 163, 0.10)',
+    borderColor: 'rgba(94, 127, 163, 0.36)',
   },
   tournamentLinkLabel: {
     color: '#F4EFE6',
@@ -1577,7 +1577,7 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   tournamentLinkBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 19,
@@ -1640,7 +1640,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 260,
     borderRadius: 999,
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
   },
   premiumHeroTopRow: {
     alignItems: 'center',
@@ -1651,7 +1651,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   premiumHeroDomain: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     flexShrink: 1,
     fontFamily: 'monospace',
     fontSize: 12,
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
     lineHeight: 39,
   },
   countdownLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '800',
@@ -1866,15 +1866,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(214, 162, 78, 0.12)',
   },
   heroInfoBlue: {
-    borderColor: 'rgba(108, 199, 255, 0.38)',
-    backgroundColor: 'rgba(108, 199, 255, 0.10)',
+    borderColor: 'rgba(94, 127, 163, 0.38)',
+    backgroundColor: 'rgba(94, 127, 163, 0.10)',
   },
   heroInfoGreen: {
-    borderColor: 'rgba(97, 210, 145, 0.42)',
-    backgroundColor: 'rgba(97, 210, 145, 0.11)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: 'rgba(214, 162, 78, 0.11)',
   },
   heroInfoLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '900',
@@ -1910,7 +1910,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.42)',
   },
   scheduleSummaryLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '900',
@@ -1936,14 +1936,14 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   upcomingRowNext: {
-    borderColor: 'rgba(97, 210, 145, 0.34)',
-    backgroundColor: 'rgba(97, 210, 145, 0.06)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: 'rgba(214, 162, 78, 0.06)',
   },
   upcomingRank: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(97, 210, 145, 0.12)',
-    borderColor: 'rgba(97, 210, 145, 0.34)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
     borderRadius: 999,
     borderWidth: 1,
     height: 44,
@@ -1951,7 +1951,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   upcomingRankText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontFamily: 'monospace',
     fontSize: 18,
     fontWeight: '900',
@@ -1969,7 +1969,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   upcomingGame: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '800',
@@ -1992,7 +1992,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   upcomingSummary: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
@@ -2021,8 +2021,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   upcomingRosterChip: {
-    backgroundColor: 'rgba(97, 210, 145, 0.12)',
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
     borderRadius: 999,
     borderWidth: 1,
     maxWidth: 180,
@@ -2036,7 +2036,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   upcomingRosterEmpty: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,

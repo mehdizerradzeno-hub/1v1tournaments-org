@@ -552,8 +552,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   matchCard: {
-    backgroundColor: 'rgba(97, 210, 145, 0.10)',
-    borderColor: 'rgba(97, 210, 145, 0.26)',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.26)',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,

@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   archiveCount: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '800',
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   archiveSummary: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
   },
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   archiveDetail: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 19,
     marginTop: 4,

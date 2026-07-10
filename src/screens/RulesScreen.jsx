@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   gameStatus: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '800',
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   gameSummary: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,

@@ -2662,7 +2662,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   copy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 21,
   },
@@ -2695,7 +2695,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   editorCard: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   eventEditorPanel: {
     backgroundColor: 'rgba(214, 162, 78, 0.06)',
@@ -2720,7 +2720,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   errorText: {
-    color: '#E06A5C',
+    color: '#8F1D2C',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
@@ -2771,7 +2771,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   metaText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 19,
     flex: 1,
@@ -2803,21 +2803,21 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   panel: {
-    borderColor: 'rgba(108, 199, 255, 0.24)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
   },
   rosterPanel: {
-    borderColor: 'rgba(97, 210, 145, 0.30)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
   },
   hostAccountPanel: {
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.24)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 14,
     padding: 12,
   },
   hostAccountCopy: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -2825,8 +2825,8 @@ const styles = StyleSheet.create({
   },
   hostReadyPanel: {
     alignItems: 'center',
-    backgroundColor: 'rgba(97, 210, 145, 0.08)',
-    borderColor: 'rgba(97, 210, 145, 0.18)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.18)',
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2908,16 +2908,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.42)',
   },
   publisherStatBlue: {
-    borderColor: 'rgba(108, 199, 255, 0.32)',
+    borderColor: 'rgba(94, 127, 163, 0.32)',
   },
   publisherStatGreen: {
-    borderColor: 'rgba(97, 210, 145, 0.38)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
   },
   publisherStatRose: {
-    borderColor: 'rgba(224, 106, 92, 0.36)',
+    borderColor: 'rgba(143, 29, 44, 0.36)',
   },
   publisherStatLabel: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -2957,7 +2957,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   schedulePanel: {
-    borderColor: 'rgba(108, 199, 255, 0.26)',
+    borderColor: 'rgba(94, 127, 163, 0.26)',
   },
   scheduleGrid: {
     flexDirection: 'row',
@@ -3005,14 +3005,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   runStatusBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 12,
     lineHeight: 18,
     marginTop: 8,
   },
   resetDangerPanel: {
-    backgroundColor: 'rgba(224, 106, 92, 0.08)',
-    borderColor: 'rgba(224, 106, 92, 0.30)',
+    backgroundColor: 'rgba(143, 29, 44, 0.08)',
+    borderColor: 'rgba(143, 29, 44, 0.30)',
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 18,
@@ -3043,7 +3043,7 @@ const styles = StyleSheet.create({
   },
   resetConfirmPanel: {
     backgroundColor: 'rgba(0, 0, 0, 0.18)',
-    borderColor: 'rgba(224, 106, 92, 0.26)',
+    borderColor: 'rgba(143, 29, 44, 0.26)',
     borderRadius: 14,
     borderWidth: 1,
     marginTop: 12,
@@ -3077,7 +3077,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   callbackText: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontFamily: CODE_FONT,
     fontSize: 12,
     lineHeight: 18,
@@ -3107,7 +3107,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   readinessBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -3139,12 +3139,12 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   readinessCheckBody: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 18,
   },
   refreshText: {
-    color: '#6CC7FF',
+    color: '#5E7FA3',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 19,
@@ -3157,7 +3157,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   signupMeta: {
-    color: '#AAB4AE',
+    color: '#A7A29A',
     fontSize: 13,
     lineHeight: 19,
     marginTop: 3,
@@ -3199,7 +3199,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   successText: {
-    color: '#61D291',
+    color: '#D6A24E',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
