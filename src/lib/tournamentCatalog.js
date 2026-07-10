@@ -185,12 +185,27 @@ export function createTournamentRecord(payload = {}) {
 
 export function mergeTournamentLists(baseTournaments = [], hostedTournaments = []) {
   const lookup = new Map();
+  const deletedSlugs = new Set(
+    hostedTournaments
+      .filter((tournament) => tournament?.deleted)
+      .map((tournament) => tournament.slug)
+      .filter(Boolean),
+  );
 
   baseTournaments.filter(Boolean).forEach((tournament) => {
+    if (deletedSlugs.has(tournament.slug)) {
+      return;
+    }
+
     lookup.set(tournament.slug, tournament);
   });
 
   hostedTournaments.filter(Boolean).forEach((tournament) => {
+    if (tournament.deleted) {
+      lookup.delete(tournament.slug);
+      return;
+    }
+
     const normalized = createTournamentRecord(tournament);
     const existing = lookup.get(normalized.slug) || {};
     lookup.set(normalized.slug, {

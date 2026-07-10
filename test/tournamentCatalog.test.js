@@ -75,6 +75,38 @@ test('hosted tournaments merge over seeded tournaments by slug', () => {
   assert.equal(merged[1].rosterCap, 16);
 });
 
+test('deleted hosted tournament tombstones hide seeded defaults', () => {
+  const merged = mergeTournamentLists(
+    [
+      createTournamentRecord({
+        title: 'Spades Summer Series',
+        slug: 'spades-summer-series',
+        date: '2026-07-18T18:00:00-04:00',
+      }),
+      createTournamentRecord({
+        title: '10 PM 4-Man Spades Test',
+        slug: '10-pm-4-man-spades-test',
+        date: '2026-07-10T22:00:00-04:00',
+        rosterCap: 4,
+        minimumPlayers: 4,
+        mode: 'four-player-double-elimination',
+      }),
+    ],
+    [
+      {
+        slug: 'spades-summer-series',
+        deleted: true,
+        status: 'deleted',
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    merged.map((tournament) => tournament.slug),
+    ['10-pm-4-man-spades-test'],
+  );
+});
+
 test('tournament slugs stay URL safe', () => {
   assert.equal(slugifyTournamentTitle('Friday Night: Spades & Chill!'), 'friday-night-spades-and-chill');
 });
