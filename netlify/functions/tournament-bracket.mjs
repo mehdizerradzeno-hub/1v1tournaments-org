@@ -8,6 +8,7 @@ import {
 import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
+import { normalizeCheckInLeadMinutes } from '../../src/lib/tournamentSettings.js';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
@@ -725,6 +726,41 @@ async function loadTournamentMode(tournamentSlug) {
   return getTournamentMode(hostedTournament?.mode || seededTournament?.mode);
 }
 
+async function loadTournamentForBracket(tournamentSlug) {
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug) || null;
+
+  return hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament;
+}
+
+function checkInOpenStatus(tournament, now = new Date()) {
+  const startDate = new Date(tournament?.date);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return { open: true };
+  }
+
+  const leadMinutes = normalizeCheckInLeadMinutes(tournament?.checkInLeadMinutes);
+  const opensAt = new Date(startDate.getTime() - leadMinutes * 60 * 1000);
+
+  if (opensAt.getTime() <= now.getTime()) {
+    return { open: true, opensAt };
+  }
+
+  return {
+    open: false,
+    opensAt,
+    error: `Check-in has not opened yet. Bracket generation opens at ${opensAt.toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      month: 'short',
+      day: 'numeric',
+      timeZone: tournament?.timeZone || 'America/New_York',
+      timeZoneName: 'short',
+    })}.`,
+  };
+}
+
 async function deleteBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
   await store.delete(`${tournamentSlug}.json`);
@@ -855,6 +891,16 @@ export async function handler(event) {
 
       if (adminCheck.error) {
         return adminCheck.error;
+      }
+
+      const tournament = await loadTournamentForBracket(tournamentSlug);
+      const checkInStatus = checkInOpenStatus(tournament);
+
+      if (!checkInStatus.open) {
+        return json(403, {
+          error: checkInStatus.error,
+          opensAt: checkInStatus.opensAt?.toISOString(),
+        });
       }
 
       const signups = await loadTournamentSignups(tournamentSlug);
