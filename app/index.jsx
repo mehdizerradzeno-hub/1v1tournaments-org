@@ -1,1 +1,1 @@
-export { default } from '../src/screens/HomeScreen.jsx';
+export { default } from '../src/screens/NextScreen.jsx';

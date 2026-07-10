@@ -27,7 +27,7 @@ const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
-const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
+const indexRouteFile = fileURLToPath(new URL('../app/index.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
 const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
 const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
@@ -134,18 +134,14 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
   assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
 });
 
-test('homepage stays focused on the stream-day front door', () => {
-  assert.ok(existsSync(homeScreenFile));
+test('homepage is the public next-event lobby for stream traffic', () => {
+  assert.ok(existsSync(indexRouteFile));
+  assert.ok(existsSync(nextScreenFile));
 
-  const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
+  const indexRouteSource = readFileSync(indexRouteFile, 'utf8');
 
-  assert.match(homeScreenSource, /HomepageFrontDoor/);
-  assert.match(homeScreenSource, /Choose your next move/);
-  assert.match(homeScreenSource, /Next tournament/);
-  assert.match(homeScreenSource, /My Match/);
-  assert.match(homeScreenSource, /Join/);
-  assert.match(homeScreenSource, /Compact lobby/);
-  assert.match(homeScreenSource, /TwitchTournamentBoard/);
+  assert.match(indexRouteSource, /NextScreen/);
+  assert.doesNotMatch(indexRouteSource, /HomeScreen/);
 });
 
 test('public support pages keep players routed back to active tournament flow', () => {
@@ -319,7 +315,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.ok(existsSync(tournamentEventsFunctionFile));
   assert.ok(existsSync(tournamentEventsUtilsFile));
   assert.ok(existsSync(hubUiFile));
-  assert.ok(existsSync(homeScreenFile));
+  assert.ok(existsSync(indexRouteFile));
   assert.ok(existsSync(leaderboardScreenFile));
   assert.ok(existsSync(nextScreenFile));
   assert.ok(existsSync(checkInScreenFile));
@@ -341,7 +337,6 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   const tournamentEventsSource = readFileSync(tournamentEventsFunctionFile, 'utf8');
   const tournamentEventsUtilsSource = readFileSync(tournamentEventsUtilsFile, 'utf8');
   const hubUiSource = readFileSync(hubUiFile, 'utf8');
-  const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
   const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
   const nextScreenSource = readFileSync(nextScreenFile, 'utf8');
   const checkInScreenSource = readFileSync(checkInScreenFile, 'utf8');
@@ -419,11 +414,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
-  assert.match(homeScreenSource, /My Match/);
-  assert.match(homeScreenSource, /Tournament leaderboard/);
-  assert.match(homeScreenSource, /mergeTournamentSettings/);
-  assert.match(homeScreenSource, /fetchTournamentEvents/);
-  assert.match(homeScreenSource, /mergeTournamentLists/);
+  assert.match(nextScreenSource, /My Match/);
+  assert.match(nextScreenSource, /mergeTournamentSettings/);
+  assert.match(nextScreenSource, /fetchTournamentEvents/);
+  assert.match(nextScreenSource, /mergeTournamentLists/);
   assert.match(nextScreenSource, /showHeader=\{false\}/);
   assert.ok(
     nextScreenSource.indexOf('styles.countdownPanel') < nextScreenSource.indexOf('styles.heroBadgeRow'),
@@ -431,7 +425,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Overall standings/);
-  assert.doesNotMatch(homeScreenSource, /Host admin/);
+  assert.doesNotMatch(nextScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /TOURNAMENT_TABS/);
