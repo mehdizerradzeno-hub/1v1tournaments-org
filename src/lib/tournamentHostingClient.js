@@ -10,6 +10,7 @@ const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
 const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
 const HEALTH_ENDPOINT = '/.netlify/functions/health';
 const SPONSOR_INQUIRIES_ENDPOINT = '/.netlify/functions/sponsor-inquiries';
+const SPONSOR_PROSPECTS_ENDPOINT = '/.netlify/functions/sponsor-prospects';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 
 function isLocalStaticPreview() {
@@ -562,6 +563,62 @@ export async function updateSponsorInquiryStatus({ token, inquiryId, status }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Sponsor inquiry could not be updated.');
+  }
+
+  return result;
+}
+
+export async function fetchSponsorProspects({ token } = {}) {
+  const response = await fetch(SPONSOR_PROSPECTS_ENDPOINT, {
+    credentials: 'include',
+    headers: adminHeaders(token),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor prospects could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function saveSponsorProspects({ token, prospects }) {
+  const response = await fetch(SPONSOR_PROSPECTS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'upsert-many',
+      prospects,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor prospects could not be saved.');
+  }
+
+  return result;
+}
+
+export async function saveSponsorProspect({ token, prospect }) {
+  const response = await fetch(SPONSOR_PROSPECTS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'upsert-one',
+      prospect,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor prospect could not be saved.');
   }
 
   return result;

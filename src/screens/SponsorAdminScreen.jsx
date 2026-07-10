@@ -12,6 +12,9 @@ import {
 import {
   fetchPlayerAccount,
   fetchSponsorInquiries,
+  fetchSponsorProspects,
+  saveSponsorProspect,
+  saveSponsorProspects,
   updateSponsorInquiryStatus,
 } from '../lib/tournamentHostingClient.js';
 import {
@@ -428,6 +431,7 @@ export default function SponsorAdminScreen() {
   const [outreachDrafts, setOutreachDrafts] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [inquiryState, setInquiryState] = useState({ loading: false, error: '', inquiries: [] });
+  const [prospectState, setProspectState] = useState({ loading: false, error: '', message: '' });
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
@@ -474,20 +478,59 @@ export default function SponsorAdminScreen() {
     }
   }
 
+  async function loadSponsorProspects() {
+    setProspectState({ loading: true, error: '', message: 'Loading saved sponsor prospects...' });
+
+    try {
+      const result = await fetchSponsorProspects();
+      const nextProspects = result.prospects || [];
+
+      setProspects(nextProspects);
+      setSelectedId(nextProspects[0]?.id || '');
+      setProspectState({
+        loading: false,
+        error: '',
+        message: nextProspects.length
+          ? `Loaded ${nextProspects.length} saved sponsor prospect${nextProspects.length === 1 ? '' : 's'}.`
+          : 'No saved sponsor prospects yet.',
+      });
+    } catch (error) {
+      setProspectState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor prospects could not be loaded.',
+        message: '',
+      });
+    }
+  }
+
   useEffect(() => {
     if (canUseAdmin) {
       loadSponsorInquiries();
+      loadSponsorProspects();
     }
   }, [canUseAdmin]);
 
-  function acceptPreview() {
-    const nextProspects = importPreview.prospects.map((prospect, index) => ({
-      ...prospect,
-      id: `local-${Date.now()}-${index}`,
-    }));
+  async function acceptPreview() {
+    setProspectState({ loading: true, error: '', message: '' });
 
-    setProspects(nextProspects);
-    setSelectedId(nextProspects[0]?.id || '');
+    try {
+      const result = await saveSponsorProspects({ prospects: importPreview.prospects });
+      const nextProspects = result.prospects || [];
+
+      setProspects(nextProspects);
+      setSelectedId(nextProspects[0]?.id || '');
+      setProspectState({
+        loading: false,
+        error: '',
+        message: `Saved ${result.savedCount || importPreview.prospects.length} sponsor prospect${(result.savedCount || importPreview.prospects.length) === 1 ? '' : 's'} to the host CRM.`,
+      });
+    } catch (error) {
+      setProspectState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor prospects could not be saved.',
+        message: '',
+      });
+    }
   }
 
   async function prepareResearchQueue() {
@@ -506,21 +549,39 @@ export default function SponsorAdminScreen() {
     }
   }
 
-  function acceptResearchCandidate(candidate) {
+  async function acceptResearchCandidate(candidate) {
     const accepted = {
       ...candidate.prospect,
-      id: `research-${Date.now()}`,
+      id: '',
     };
 
-    setProspects((currentProspects) => [accepted, ...currentProspects]);
-    setSelectedId(accepted.id);
-    setResearchRun((currentRun) => currentRun
-      ? {
-        ...currentRun,
-        candidatesAccepted: currentRun.candidatesAccepted + 1,
-        candidates: currentRun.candidates.filter((item) => item.id !== candidate.id),
-      }
-      : currentRun);
+    setProspectState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await saveSponsorProspect({ prospect: accepted });
+      const saved = result.prospect;
+
+      setProspects(result.prospects || [saved, ...prospects]);
+      setSelectedId(saved?.id || '');
+      setResearchRun((currentRun) => currentRun
+        ? {
+          ...currentRun,
+          candidatesAccepted: currentRun.candidatesAccepted + 1,
+          candidates: currentRun.candidates.filter((item) => item.id !== candidate.id),
+        }
+        : currentRun);
+      setProspectState({
+        loading: false,
+        error: '',
+        message: `${saved?.companyName || 'Sponsor prospect'} saved to the host CRM.`,
+      });
+    } catch (error) {
+      setProspectState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Research candidate could not be saved.',
+        message: '',
+      });
+    }
   }
 
   function generateOutreachDraft() {
@@ -574,8 +635,8 @@ export default function SponsorAdminScreen() {
         { label: 'Public site', href: '/', variant: 'ghost' },
       ]}
       eyebrow="Sponsor Engine"
-      footerNote="Sponsor CRM changes in this phase are local preview only. No external messages are sent."
-      lead="Phase 2 sponsor CRM workspace for prospects, pipeline review, CSV preview, and data-quality checks."
+      footerNote="Sponsor prospects and inquiries persist for host review. No external messages are sent."
+      lead="Sponsor CRM workspace for saved prospects, inquiry review, pipeline preview, CSV import, and data-quality checks."
       stickyActions={false}
       title="Sponsor CRM">
       {!canUseAdmin ? (
@@ -598,6 +659,13 @@ export default function SponsorAdminScreen() {
               <StatTile label="Data-quality alerts" value={summary.dataQualityAlerts} />
               <StatTile label="Do not contact" value={summary.doNotContact} />
             </View>
+            <View style={styles.buttonRow}>
+              <ActionButton disabled={prospectState.loading} onPress={loadSponsorProspects} variant="secondary">
+                {prospectState.loading ? 'Loading...' : 'Refresh prospects'}
+              </ActionButton>
+            </View>
+            {prospectState.error ? <Text style={styles.errorText}>{prospectState.error}</Text> : null}
+            {prospectState.message ? <Text style={styles.successText}>{prospectState.message}</Text> : null}
           </Section>
 
           <Section
@@ -613,7 +681,7 @@ export default function SponsorAdminScreen() {
           </Section>
 
           <Section
-            description="Paste CSV data to preview normalized prospects. Accepting preview only updates this local admin session in Phase 2."
+            description="Paste CSV data to preview normalized prospects. Saving preview stores host-reviewed records in the sponsor CRM."
             title="CSV import preview">
             <Surface style={styles.importPanel}>
               <TextInput
@@ -630,8 +698,8 @@ export default function SponsorAdminScreen() {
                     {importPreview.errors.length ? importPreview.errors.join(' ') : 'No structural CSV errors found.'}
                   </Text>
                 </View>
-                <ActionButton disabled={Boolean(importPreview.errors.length)} onPress={acceptPreview}>
-                  Load preview
+                <ActionButton disabled={Boolean(importPreview.errors.length) || prospectState.loading} onPress={acceptPreview}>
+                  {prospectState.loading ? 'Saving...' : 'Save preview'}
                 </ActionButton>
               </View>
             </Surface>
@@ -711,13 +779,13 @@ export default function SponsorAdminScreen() {
           </Section>
 
           <Section
-            description="Pipeline columns are populated by the local preview records. Drag-and-drop comes after persistence is wired."
+            description="Pipeline columns are populated by saved sponsor prospect records. Drag-and-drop comes after stage updates are wired."
             title="Pipeline board">
             <PipelineBoard prospects={prospects} />
           </Section>
 
           <Section
-            description="Exports only the local preview data in this phase."
+            description="Exports the currently loaded sponsor prospect records."
             title="CSV export">
             <Surface style={styles.exportPanel}>
               <Text selectable style={styles.exportText}>{exportSponsorProspectsCsv(prospects)}</Text>

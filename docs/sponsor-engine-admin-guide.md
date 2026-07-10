@@ -1,6 +1,6 @@
 # Sponsor Engine Administrator Guide
 
-This guide covers the current sponsor tools. Public sponsor inquiry intake is live, while CRM persistence and outbound contact remain mock-safe/manual.
+This guide covers the current sponsor tools. Public sponsor inquiry intake and host-reviewed prospect persistence are live, while outbound contact remains mock-safe/manual.
 
 ## Current State
 
@@ -8,7 +8,8 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake is li
 - `/sponsors` is the public sponsor intake page.
 - Public sponsor inquiries are stored server-side through Netlify Blobs.
 - The inquiry inbox supports refresh, mark reviewed, and archive.
-- Prospect CRM work is still preview/local until persistence is approved.
+- Sponsor prospects from CSV preview and accepted research candidates are stored server-side through Netlify Blobs.
+- Outreach drafts and proposal previews are still review/local until persistence is approved.
 - No research jobs are active.
 - No email provider is enabled.
 - No external sponsor contact is possible.
@@ -29,7 +30,8 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake is li
 2. Review source-backed research.
 3. Confirm duplicate detection.
 4. Review fit score and risk flags.
-5. Generate a draft.
-6. Validate claims and provenance.
-7. Approve or reject.
-8. Perform a separate explicit send action only when sending is intentionally enabled.
+5. Save host-reviewed prospects into the CRM.
+6. Generate a draft.
+7. Validate claims and provenance.
+8. Approve or reject.
+9. Perform a separate explicit send action only when sending is intentionally enabled.

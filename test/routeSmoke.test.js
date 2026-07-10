@@ -54,6 +54,7 @@ const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/dis
 const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
 const healthFunctionFile = fileURLToPath(new URL('../netlify/functions/health.mjs', import.meta.url));
 const sponsorInquiriesFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-inquiries.mjs', import.meta.url));
+const sponsorProspectsFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-prospects.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
@@ -87,9 +88,11 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.ok(existsSync(mediaKitRouteFile));
   assert.ok(existsSync(sponsorPublicScreenFile));
   assert.ok(existsSync(sponsorInquiriesFunctionFile));
+  assert.ok(existsSync(sponsorProspectsFunctionFile));
 
   const sponsorScreenSource = readFileSync(sponsorPublicScreenFile, 'utf8');
   const sponsorInquiriesSource = readFileSync(sponsorInquiriesFunctionFile, 'utf8');
+  const sponsorProspectsSource = readFileSync(sponsorProspectsFunctionFile, 'utf8');
 
   assert.match(sponsorScreenSource, /Reach a Competitive Card-Game Community/);
   assert.match(sponsorScreenSource, /Audience metrics are omitted publicly until verified/);
@@ -98,6 +101,9 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorInquiriesSource, /requireTournamentAdmin/);
   assert.match(sponsorInquiriesSource, /RATE_LIMIT_MAX/);
   assert.match(sponsorInquiriesSource, /sponsor-inquiries/);
+  assert.match(sponsorProspectsSource, /requireTournamentAdmin/);
+  assert.match(sponsorProspectsSource, /sponsor-prospects/);
+  assert.match(sponsorProspectsSource, /upsert-many/);
 });
 
 test('/leaderboard stays wired to tournament-only rankings', () => {
