@@ -14,6 +14,7 @@
     "admin:server": "node ./server/adminServer.mjs",
     "lint": "eslint .",
     "test": "node --test",
+    "smoke:prod": "node scripts/production-smoke.mjs",
     "capacity": "node scripts/capacity-check.mjs",
     "capacity:hosted": "node scripts/hosted-capacity-smoke.mjs",
     "bot:twitch": "node scripts/twitch-chat-bot.mjs",
