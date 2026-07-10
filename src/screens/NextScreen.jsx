@@ -34,9 +34,20 @@ const NEXT_CHAT_COMMANDS = [
 ];
 const NEXT_MOTION_CSS = `
 @keyframes nextCountdownTick {
-  0% { opacity: .70; transform: translateY(-6px) scale(.985); filter: blur(.5px); }
-  42% { opacity: 1; transform: translateY(1px) scale(1.006); filter: blur(0); }
+  0% { opacity: .72; transform: translateY(-5px) scale(.99); filter: blur(.4px); }
+  42% { opacity: 1; transform: translateY(1px) scale(1.004); filter: blur(0); }
   100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes nextTitleBreath {
+  0%, 100% {
+    text-shadow: 0 0 0 rgba(214, 162, 78, 0);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 18px rgba(214, 162, 78, .20), 0 0 34px rgba(214, 162, 78, .08);
+    transform: scale(1.024);
+  }
 }
 
 @keyframes nextProgressSheen {
@@ -47,8 +58,8 @@ const NEXT_MOTION_CSS = `
 }
 
 @keyframes nextCtaBreath {
-  0%, 100% { box-shadow: 0 0 0 rgba(214, 162, 78, 0); transform: translateY(0); }
-  45% { box-shadow: 0 18px 40px rgba(214, 162, 78, .18); transform: translateY(-1px); }
+  0%, 100% { box-shadow: 0 12px 28px rgba(214, 162, 78, .14); transform: translateY(0); }
+  45% { box-shadow: 0 18px 44px rgba(214, 162, 78, .24); transform: translateY(-1px); }
 }
 
 @keyframes nextCtaSweep {
@@ -59,8 +70,15 @@ const NEXT_MOTION_CSS = `
 }
 
 [data-next-motion="countdown"] {
-  animation: nextCountdownTick 420ms cubic-bezier(.2, .86, .22, 1) both;
+  animation: nextCountdownTick 440ms cubic-bezier(.2, .86, .22, 1) both;
   will-change: transform, opacity, filter;
+}
+
+[data-next-motion="title"] {
+  animation: nextTitleBreath 3.1s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: left center;
+  will-change: transform, text-shadow;
 }
 
 [data-next-motion="progress"] {
@@ -78,11 +96,17 @@ const NEXT_MOTION_CSS = `
   width: 42%;
 }
 
+[data-next-motion="progress-fill"] {
+  transition: width 780ms cubic-bezier(.2, .8, .2, 1);
+  will-change: width;
+}
+
 [data-next-motion="cta"] {
   animation: nextCtaBreath 4.8s ease-in-out infinite;
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  transition: filter 180ms ease, transform 180ms ease;
 }
 
 [data-next-motion="cta"]::after {
@@ -94,6 +118,36 @@ const NEXT_MOTION_CSS = `
   position: absolute;
   width: 52%;
   z-index: 2;
+}
+
+[data-next-motion="cta"] a > div,
+[data-next-motion="cta"] [role="link"] > div,
+[data-next-motion="cta"] [role="button"] > div {
+  background: linear-gradient(135deg, #F0C86A 0%, #D6A24E 46%, #9F6B24 100%);
+  border-color: rgba(255, 236, 181, .56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+[data-next-motion="cta"]:hover {
+  filter: saturate(1.05);
+  transform: translateY(-2px);
+}
+
+[data-next-motion="cta"]:active {
+  filter: saturate(.98);
+  transform: translateY(1px);
+}
+
+[data-next-motion="panel"],
+[data-next-motion="card"] {
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
+}
+
+[data-next-motion="panel"]:hover,
+[data-next-motion="card"]:hover {
+  border-color: rgba(214, 162, 78, .24);
+  box-shadow: 0 24px 62px rgba(0, 0, 0, .30), 0 0 34px rgba(214, 162, 78, .07);
+  transform: translateY(-1px);
 }
 `;
 
@@ -170,6 +224,19 @@ function getSeatsMessage(openSeats, signupCount, rosterCap) {
 
 function getDurationLabel(tournament) {
   return tournament?.duration || tournament?.durationLabel || '45-60 min';
+}
+
+function getTournamentSponsor(tournament) {
+  const sponsor = tournament?.sponsor || tournament?.presentingSponsor || null;
+
+  if (!sponsor?.name) {
+    return null;
+  }
+
+  return {
+    logoUrl: sponsor.logoUrl || sponsor.logo || '',
+    name: sponsor.name,
+  };
 }
 
 function getMotionDataSet(value) {
@@ -439,11 +506,14 @@ function NextLobbyHero({
     : getSeatsMessage(openSeats, signupCount, rosterCap);
   const primaryHref = registrationMeta.value === 'open' ? checkInPath : tournamentPath;
   const primaryLabel = registrationMeta.value === 'open' ? 'Join Tournament' : 'View Event';
+  const sponsor = getTournamentSponsor(tournament);
 
   return (
     <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
       <NextMotionStyles />
-      <View style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
+      <View
+        dataSet={getMotionDataSet('panel')}
+        style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
         <View style={[styles.countdownCopy, isPhone && styles.countdownCopyPhone]}>
           <Text style={styles.countdownLabel}>Starts in</Text>
           <Text
@@ -452,7 +522,12 @@ function NextLobbyHero({
             style={[styles.countdownValue, isPhone && styles.countdownValuePhone]}>
             {countdownLabel}
           </Text>
-          <Text style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>{tournament.title}</Text>
+          <Text
+            dataSet={getMotionDataSet('title')}
+            style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>
+            {tournament.title}
+          </Text>
+          <PresentedBy sponsor={sponsor} />
           <View style={styles.heroFacts}>
             <Text style={styles.heroFact}>Free Entry</Text>
             <Text style={styles.heroFactDivider}>/</Text>
@@ -479,7 +554,10 @@ function NextLobbyHero({
               accessibilityRole="progressbar"
               dataSet={getMotionDataSet('progress')}
               style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${registrationPercent}%` }]} />
+              <View
+                dataSet={getMotionDataSet('progress-fill')}
+                style={[styles.progressFill, { width: `${registrationPercent}%` }]}
+              />
             </View>
             <Text style={styles.progressText}>
               {signupSummary.loading ? 'Loading registration' : `${signedUpValue} players registered / ${registrationPercent}% filled`}
@@ -489,7 +567,7 @@ function NextLobbyHero({
           {isPhone ? <Text style={[styles.heroText, styles.heroTextPhone]}>{tournament.summary}</Text> : null}
         </View>
 
-        <View style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}>
+        <View dataSet={getMotionDataSet('card')} style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}>
           <View style={styles.eventPanelHeader}>
             <Text style={styles.eventPanelLabel}>Tournament status</Text>
             <Text style={styles.eventPanelMeta}>{tournament.location}</Text>
@@ -530,7 +608,7 @@ function NextLobbyHero({
       </View>
 
       <View style={styles.lobbyBottom}>
-        <View style={styles.rosterPreview}>
+        <View dataSet={getMotionDataSet('card')} style={styles.rosterPreview}>
           <View style={styles.rosterPreviewHead}>
             <Text style={styles.rosterPreviewTitle}>Signed up players</Text>
             <Text style={styles.rosterPreviewMeta}>{signupSummary.loading ? 'Loading' : `${signups.length} visible`}</Text>
@@ -552,7 +630,7 @@ function NextLobbyHero({
         </View>
 
         <View style={styles.lobbySideRail}>
-          <View style={styles.shortcutStrip}>
+          <View dataSet={getMotionDataSet('card')} style={styles.shortcutStrip}>
             <View style={styles.shortcutCopy}>
               <Text style={styles.shortcutLabel}>Twitch commands</Text>
               <Text style={styles.shortcutTitle}>Say it once on stream. Chat can handle the rest.</Text>
@@ -567,7 +645,7 @@ function NextLobbyHero({
             </View>
           </View>
 
-          <View style={styles.qrPanel}>
+          <View dataSet={getMotionDataSet('card')} style={styles.qrPanel}>
             <View style={styles.qrCopy}>
               <Text style={styles.qrLabel}>Scan to join</Text>
               <Text numberOfLines={1} style={styles.qrUrl}>{joinUrl}</Text>
@@ -584,6 +662,29 @@ function NextLobbyHero({
         </View>
       </View>
     </Surface>
+  );
+}
+
+function PresentedBy({ sponsor }) {
+  if (!sponsor) {
+    return null;
+  }
+
+  return (
+    <View style={styles.presentedBy}>
+      {sponsor.logoUrl ? (
+        <Image
+          accessibilityLabel={`${sponsor.name} sponsor logo`}
+          resizeMode="contain"
+          source={{ uri: sponsor.logoUrl }}
+          style={styles.presentedByLogo}
+        />
+      ) : null}
+      <View style={styles.presentedByCopy}>
+        <Text style={styles.presentedByLabel}>Presented by</Text>
+        <Text numberOfLines={1} style={styles.presentedByName}>{sponsor.name}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -618,10 +719,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.22)',
     borderRadius: 18,
     borderWidth: 1,
-    boxShadow: '0 28px 80px rgba(0, 0, 0, 0.42), 0 0 42px rgba(214, 162, 78, 0.08)',
+    boxShadow: '0 30px 88px rgba(0, 0, 0, 0.44), 0 0 44px rgba(214, 162, 78, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 40,
+    gap: 32,
     justifyContent: 'space-between',
     padding: 40,
   },
@@ -674,7 +775,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 24,
-    marginTop: 16,
+    marginTop: 20,
     maxWidth: 620,
   },
   heroTextPhone: {
@@ -687,7 +788,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
     lineHeight: 42,
-    marginTop: 12,
+    marginTop: 14,
   },
   heroTitlePhone: {
     fontSize: 30,
@@ -698,7 +799,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 18,
+    marginTop: 16,
   },
   heroFact: {
     color: '#D6A24E',
@@ -762,11 +863,11 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   eventPanel: {
-    backgroundColor: 'rgba(17, 17, 17, 0.96)',
+    backgroundColor: 'rgba(18, 18, 18, 0.88)',
     borderColor: 'rgba(244, 239, 230, 0.12)',
     borderRadius: 14,
     borderWidth: 1,
-    boxShadow: '0 18px 44px rgba(0, 0, 0, 0.28)',
+    boxShadow: '0 20px 54px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.035)',
     flex: 0.9,
     gap: 20,
     minWidth: 304,
@@ -889,12 +990,14 @@ const styles = StyleSheet.create({
   },
   primaryCtaButton: {
     alignSelf: 'stretch',
+    boxShadow: '0 16px 36px rgba(214, 162, 78, 0.18)',
     marginBottom: 0,
     marginRight: 0,
   },
   progressFill: {
     backgroundColor: '#D6A24E',
     borderRadius: 999,
+    boxShadow: '0 0 18px rgba(214, 162, 78, 0.26)',
     height: '100%',
     minWidth: 2,
   },
@@ -930,7 +1033,7 @@ const styles = StyleSheet.create({
   },
   qrPanel: {
     alignItems: 'center',
-    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    backgroundColor: 'rgba(244, 239, 230, 0.04)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 8,
     borderWidth: 1,
@@ -956,10 +1059,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rosterPreview: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 14,
     borderWidth: 1,
+    boxShadow: '0 18px 48px rgba(0, 0, 0, 0.20)',
     flexBasis: 360,
     flexGrow: 1.4,
     padding: 16,
@@ -1023,10 +1127,11 @@ const styles = StyleSheet.create({
   },
   shortcutStrip: {
     alignItems: 'stretch',
-    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
     borderColor: 'rgba(244, 239, 230, 0.10)',
     borderRadius: 14,
     borderWidth: 1,
+    boxShadow: '0 18px 48px rgba(0, 0, 0, 0.20)',
     flexDirection: 'column',
     gap: 12,
     padding: 14,
@@ -1110,12 +1215,49 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   heroUrgencyCard: {
-    backgroundColor: 'rgba(214, 162, 78, 0.075)',
+    backgroundColor: 'rgba(214, 162, 78, 0.085)',
     borderColor: 'rgba(214, 162, 78, 0.22)',
     borderRadius: 14,
     borderWidth: 1,
+    boxShadow: '0 16px 44px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.035)',
     marginTop: 24,
     maxWidth: 560,
     padding: 16,
+  },
+  presentedBy: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(244, 239, 230, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  presentedByCopy: {
+    gap: 1,
+    minWidth: 0,
+  },
+  presentedByLabel: {
+    color: '#A7A29A',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 13,
+    textTransform: 'uppercase',
+  },
+  presentedByLogo: {
+    borderRadius: 999,
+    height: 28,
+    width: 28,
+  },
+  presentedByName: {
+    color: '#F4EFE6',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+    maxWidth: 240,
   },
 });
