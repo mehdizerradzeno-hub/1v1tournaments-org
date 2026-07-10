@@ -813,6 +813,7 @@ export default function AdminScreen() {
     const minimumPlayers = Math.min(numberField(eventMinimumPlayers, selectedTournament?.minimumPlayers || 2), rosterCap);
     const tournamentPayload = createTournamentRecord({
       ...(selectedTournament || {}),
+      bracketFlexPolicy: '',
       slug,
       title,
       mode: selectedMode.value,
