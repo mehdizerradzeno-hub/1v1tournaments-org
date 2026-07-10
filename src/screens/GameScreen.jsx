@@ -73,7 +73,7 @@ export default function GameScreen({ gameSlug }) {
   const actions = [];
   if (featuredTournament) {
     actions.push({ label: 'Open featured event', href: getTournamentPath(featuredTournament.slug) });
-    actions.push({ label: 'Sign up', href: getCheckInPath(featuredTournament.slug), variant: 'secondary' });
+    actions.push({ label: 'Join Tournament', href: getCheckInPath(featuredTournament.slug), variant: 'secondary' });
   }
   actions.push({ label: 'Rules', href: '/rules', variant: 'secondary' });
   actions.push({ label: 'Results', href: '/results', variant: 'ghost' });
@@ -124,10 +124,10 @@ export default function GameScreen({ gameSlug }) {
             <View style={styles.featuredActions}>
               <ActionButton href={getTournamentPath(featuredTournament.slug)}>Open tournament</ActionButton>
               <ActionButton href={getCheckInPath(featuredTournament.slug)} variant="secondary">
-                Sign up
+                Join Tournament
               </ActionButton>
-              <ActionButton href="/live" variant="secondary">
-                Watch live
+              <ActionButton href="/stream" variant="secondary">
+                Watch Tournament
               </ActionButton>
             </View>
           </Surface>

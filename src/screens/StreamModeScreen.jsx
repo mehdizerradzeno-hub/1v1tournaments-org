@@ -165,7 +165,7 @@ function getBracketMatchSummary(bracket) {
 function getViewerNextSteps(registrationMeta, featuredBracket) {
   if (featuredBracket) {
     return [
-      { label: 'Playing', title: 'Find your match', body: 'Open My match or use !match in Twitch chat.' },
+      { label: 'Playing', title: 'Check match status', body: 'Open Match Status or use !match in Twitch chat.' },
       { label: 'Watching', title: 'Follow the bracket', body: 'Use the tournament page for the live bracket and roster.' },
       { label: 'Chat', title: 'Ask for links', body: 'Type !live, !rules, or !discord in Twitch chat.' },
     ];
@@ -175,7 +175,7 @@ function getViewerNextSteps(registrationMeta, featuredBracket) {
     return [
       { label: 'Step 1', title: 'Join the bracket', body: 'Use the join button or type !join in Twitch chat.' },
       { label: 'Step 2', title: 'Watch the roster', body: 'Your public player name appears in the signup list.' },
-      { label: 'Step 3', title: 'Come back for match time', body: 'Use My match when the host publishes the bracket.' },
+      { label: 'Step 3', title: 'Come back for match time', body: 'Use Match Status when the host publishes the bracket.' },
     ];
   }
 
@@ -355,10 +355,10 @@ export default function StreamModeScreen() {
                   {registrationMeta.value === 'open' ? 'Join tournament' : 'View tournament'}
                 </ActionButton>
                 <ActionButton href={matchStatusPath} variant="secondary">
-                  My match
+                  Check Match Status
                 </ActionButton>
-                <ActionButton href="/live" variant="secondary">
-                  Watch live
+                <ActionButton href="/stream" variant="secondary">
+                  Watch Tournament
                 </ActionButton>
               </View>
             </Surface>
@@ -484,7 +484,7 @@ export default function StreamModeScreen() {
                 <Text style={styles.qrTitle}>Join the next tournament</Text>
                 <Text style={styles.qrUrl}>{joinUrl}</Text>
                 <View style={styles.qrActions}>
-                  <ActionButton href={signupPath}>Open signup</ActionButton>
+                  <ActionButton href={signupPath}>Join Tournament</ActionButton>
                   <ActionButton href="/next" variant="secondary">Short link</ActionButton>
                 </View>
               </View>

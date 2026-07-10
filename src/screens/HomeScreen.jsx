@@ -363,7 +363,7 @@ export default function HomeScreen() {
             <View style={styles.spadesActions}>
               <ActionButton href={getGamePath(spades.slug)}>Open Spades</ActionButton>
               <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
-                Tournament page
+                View Tournament
               </ActionButton>
             </View>
           </Surface>
@@ -519,13 +519,13 @@ function PremiumCountdownHero({
 
       <View style={styles.heroActionRowSecondary}>
         <ActionButton href={matchStatusPath} style={styles.heroActionButton}>
-          Find my match
+          Check Match Status
         </ActionButton>
         <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
           View bracket
         </ActionButton>
-        <ActionButton href="/live" variant="secondary">
-          Watch live
+        <ActionButton href="/stream" variant="secondary">
+          Watch Tournament
         </ActionButton>
       </View>
 
@@ -630,7 +630,7 @@ function HomepageFrontDoor({
   const registrationOpen = registrationMeta.value === 'open';
   const bracketLive = Boolean(bracket);
   const joinHref = registrationOpen ? signupPath : tournamentPath;
-  const joinLabel = registrationOpen ? 'Join now' : 'View event';
+  const joinLabel = registrationOpen ? 'Join Tournament' : 'View Tournament';
   const joinBody = registrationOpen
     ? 'Create or open your tournament account and reserve your seat.'
     : 'Registration is not open, but the event page still shows schedule, roster, and rules.';
@@ -663,7 +663,7 @@ function HomepageFrontDoor({
 
         <View style={styles.frontDoorGrid}>
           <FrontDoorCard
-            actionLabel="Open next tournament"
+            actionLabel="View Tournament"
             body="See time, roster, bracket, rules, results, and match status in one event page."
             href={tournamentPath}
             meta="Next"
@@ -671,11 +671,11 @@ function HomepageFrontDoor({
             tone="accent"
           />
           <FrontDoorCard
-            actionLabel="Watch live"
-            body="Open the live command page with the spectator table, Twitch link, and stream-day links."
-            href="/live"
+            actionLabel="Watch Tournament"
+            body="Open the public stream page with Twitch, roster, and stream-day links."
+            href="/stream"
             meta="Stream"
-            title="Watch live"
+            title="Watch Tournament"
             tone="blue"
           />
           <FrontDoorCard
@@ -690,7 +690,7 @@ function HomepageFrontDoor({
 
         <View style={styles.frontDoorSecondaryRow}>
           <ActionButton href={matchStatusPath} variant="secondary">
-            My match
+            Check Match Status
           </ActionButton>
           <ActionButton href="/next" variant="secondary">
             Compact lobby
@@ -766,13 +766,13 @@ function TwitchTournamentBoard({
             </Text>
             <View style={styles.twitchActions}>
               <ActionButton href={registrationOpen ? signupPath : tournamentPath}>
-                {registrationOpen ? 'Join this tournament' : 'View tournament'}
+                {registrationOpen ? 'Join Tournament' : 'View Tournament'}
               </ActionButton>
               <ActionButton href={matchStatusPath} variant="secondary">
-                My match
+                Check Match Status
               </ActionButton>
-              <ActionButton href="/live" variant="secondary">
-                Watch live
+              <ActionButton href="/stream" variant="secondary">
+                Watch Tournament
               </ActionButton>
               {isConfiguredUrl(downloadLinks.twitch) ? (
                 <ActionButton external href={downloadLinks.twitch} variant="secondary">
@@ -831,7 +831,7 @@ function TwitchTournamentBoard({
             </View>
           ) : (
             <Text style={styles.twitchRosterEmpty}>
-              No public signups yet. Send viewers to Join this tournament to get the roster started.
+              No public signups yet. Send viewers to Join Tournament to get the roster started.
             </Text>
           )}
         </View>
@@ -1032,10 +1032,10 @@ function UpcomingTournamentList({
             </View>
             <View style={styles.upcomingActions}>
               <ActionButton href={registrationIsOpen ? signupPath : tournamentPath}>
-                {registrationIsOpen ? 'Sign up' : 'Details'}
+                {registrationIsOpen ? 'Join Tournament' : 'View Tournament'}
               </ActionButton>
               <ActionButton href={matchPath} variant="secondary">
-                My match
+                Check Match Status
               </ActionButton>
             </View>
           </Surface>

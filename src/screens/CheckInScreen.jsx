@@ -401,7 +401,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setAccountMessage(`Account created. ${savedSignup.playerName} is signed up for this tournament.`);
         } catch (signupError) {
           setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Sign up to reserve your spot.');
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament to reserve your spot.');
         }
       } else {
         setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
@@ -444,7 +444,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setAccountMessage(`Signed in. ${savedSignup.playerName} is on the tournament roster.`);
         } catch (signupError) {
           setAccountMessage(`Signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Sign up to reserve your spot.');
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament to reserve your spot.');
         }
       } else {
         setAccountMessage(`Signed in as ${accountDisplayName}.`);
@@ -520,14 +520,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const hasSignupConfirmation = Boolean(signup);
   const wantsAccountSwitch = Boolean(account && accountMode === 'login');
   const mainTitle = hasSignupConfirmation
-    ? 'You are on the roster'
+    ? 'You are registered'
     : wantsAccountSwitch
       ? 'This browser is already signed in.'
     : account
       ? 'Account ready. Join this event.'
       : 'Create account and join in one step';
   const mainCopy = hasSignupConfirmation
-    ? 'You are signed up. Come back here or use My Match when the bracket is published.'
+    ? 'You are registered. Come back here or use Check Match Status when the bracket is published.'
     : wantsAccountSwitch
       ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
@@ -535,20 +535,20 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       : 'New players create an account once. If registration is open, this also reserves the tournament spot.';
   const authActionLabel = accountMode === 'create'
     ? registrationOpen
-      ? 'Create account + join tournament'
+      ? 'Create account and join'
       : 'Create account'
     : registrationOpen
-      ? 'Sign in + join tournament'
+      ? 'Sign in and join'
       : 'Sign in';
 
   return (
     <HubScreen
       actions={[
-        { label: 'Tournament page', href: getTournamentPath(visibleTournament.slug) },
+        { label: 'View Tournament', href: getTournamentPath(visibleTournament.slug) },
         { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Live', href: '/live', variant: 'ghost' },
+        { label: 'Watch Tournament', href: '/stream', variant: 'ghost' },
       ]}
-      eyebrow="Tournament signup"
+      eyebrow="Tournament registration"
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
       lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
       stats={[
@@ -560,7 +560,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
-      title={`Sign up for ${visibleTournament.title}`}>
+      title={`Join ${visibleTournament.title}`}>
       <Section
         description="Public roster names appear here as soon as signups are saved. Signed-in players see themselves marked."
         title="Current roster">
@@ -604,7 +604,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             <View style={[styles.flowStep, hasSignupConfirmation && styles.flowStepComplete]}>
               <Badge tone={hasSignupConfirmation ? 'green' : account ? 'accent' : 'blue'}>2</Badge>
               <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Roster</Text>
+                <Text style={styles.flowStepTitle}>Registration</Text>
                 <Text style={styles.flowStepText}>{hasSignupConfirmation ? 'Spot reserved' : 'Join tournament'}</Text>
               </View>
             </View>
@@ -670,16 +670,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <View style={styles.buttonRow}>
                 {wantsAccountSwitch ? null : hasSignupConfirmation ? (
                   <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
-                    Find my match
+                    Check Match Status
                   </ActionButton>
                 ) : (
                   <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                    {registrationOpen ? (submitting ? 'Saving...' : 'Join tournament roster') : registrationMeta.label}
+                    {registrationOpen ? (submitting ? 'Saving...' : 'Join Tournament') : registrationMeta.label}
                   </ActionButton>
                 )}
                 {wantsAccountSwitch ? null : (
                   <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
-                    Tournament page
+                    View Tournament
                   </ActionButton>
                 )}
                 {wantsAccountSwitch ? null : (
@@ -825,7 +825,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
           {signup ? (
             <View style={styles.confirmationPanel}>
-              <Badge tone="green">Signup saved</Badge>
+              <Badge tone="green">Registration saved</Badge>
               <Text style={styles.confirmationTitle}>{signup.playerName} is registered.</Text>
               <Text style={styles.confirmationCopy}>Confirmation ID: {signup.id}</Text>
             </View>
@@ -834,10 +834,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         </Surface>
       </Section>
 
-      <Section description="What happens after your signup is saved." title="What happens next">
+      <Section description="What happens after your registration is saved." title="What happens next">
         <StepStrip
           steps={[
-            { title: 'Join roster', body: 'Your account becomes the tournament identity for this event.' },
+            { title: 'Join tournament', body: 'Your account becomes the tournament identity for this event.' },
             { title: 'Wait for bracket', body: 'The host publishes match IDs from the live signup roster near start time.' },
             { title: 'Open match link', body: 'Your match card opens the Spades room when the bracket is ready.' },
           ]}

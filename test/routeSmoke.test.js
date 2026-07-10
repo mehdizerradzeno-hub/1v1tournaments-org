@@ -111,8 +111,8 @@ test('homepage stays focused on the stream-day front door', () => {
   assert.match(homeScreenSource, /HomepageFrontDoor/);
   assert.match(homeScreenSource, /Choose your next move/);
   assert.match(homeScreenSource, /Next tournament/);
-  assert.match(homeScreenSource, /Watch live/);
-  assert.match(homeScreenSource, /Join tournament/);
+  assert.match(homeScreenSource, /Watch Tournament/);
+  assert.match(homeScreenSource, /Join Tournament/);
   assert.match(homeScreenSource, /Compact lobby/);
   assert.match(homeScreenSource, /TwitchTournamentBoard/);
 });
@@ -129,8 +129,9 @@ test('public support pages keep players routed back to active tournament flow', 
   const rulesScreenSource = readFileSync(rulesScreenFile, 'utf8');
 
   assert.match(hubUiSource, /PlayerRouteStrip/);
-  assert.match(hubUiSource, /PRIMARY_TOURNAMENT_PATH/);
-  assert.match(hubUiSource, /PRIMARY_MATCH_PATH/);
+  assert.match(hubUiSource, /getNextNavTournamentSlug/);
+  assert.match(hubUiSource, /Check Match Status/);
+  assert.match(hubUiSource, /Watch Tournament/);
   assert.match(resultsScreenSource, /PlayerRouteStrip/);
   assert.match(leaderboardScreenSource, /PlayerRouteStrip/);
   assert.match(rulesScreenSource, /PlayerRouteStrip/);
@@ -357,6 +358,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
   assert.match(tournamentPlayerStatusSource, /signupMatchesAccount/);
+  assert.match(tournamentPlayerStatusSource, /isPlayerEliminated/);
+  assert.match(tournamentPlayerStatusSource, /three-player-two-life/);
+  assert.match(tournamentPlayerStatusSource, /four-player-double-elimination/);
   assert.match(tournamentPlayerStatusSource, /contactEmail/);
   assert.match(tournamentSettingsSource, /requireTournamentAdmin/);
   assert.match(tournamentSettingsSource, /saveTournamentSettings/);
@@ -368,14 +372,14 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
-  assert.match(hubUiSource, /MOBILE_NAV_ITEMS/);
-  assert.match(hubUiSource, /My match/);
+  assert.match(hubUiSource, /getMobileNavItems/);
+  assert.match(hubUiSource, /Check Match/);
   assert.match(hubUiSource, /Leaderboard/);
   assert.match(hubUiSource, /Ranks/);
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /showMobileNav/);
-  assert.match(homeScreenSource, /My match/);
+  assert.match(homeScreenSource, /Check Match Status/);
   assert.match(homeScreenSource, /Tournament leaderboard/);
   assert.match(homeScreenSource, /mergeTournamentSettings/);
   assert.match(homeScreenSource, /fetchTournamentEvents/);
@@ -401,8 +405,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /Roster control/);
   assert.match(tournamentScreenSource, /Bracket control/);
   assert.match(tournamentScreenSource, /heroVariant="compact"/);
-  assert.match(tournamentScreenSource, /stickyActions=\{false\}/);
-  assert.match(tournamentScreenSource, /title="My match"/);
+  assert.match(tournamentScreenSource, /stickyActions/);
+  assert.match(tournamentScreenSource, /title="Match status"/);
   assert.match(tournamentScreenSource, /fetchTournamentEvent/);
   assert.match(tournamentScreenSource, /mergeTournamentSettings/);
   assert.match(tournamentScreenSource, /getEffectiveRegistrationStatus/);

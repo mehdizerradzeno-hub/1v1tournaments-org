@@ -65,6 +65,73 @@ function publicMatch(round, match) {
   };
 }
 
+function playerMatchesSignup(player, signup) {
+  if (!player || !signup) return false;
+
+  return Boolean(
+    (player.accountId && signup.accountId && player.accountId === signup.accountId)
+      || player.id === signup.id
+      || (player.signupId && player.signupId === signup.id),
+  );
+}
+
+function getMatchLoser(match) {
+  if (!match?.winnerId) return null;
+
+  if (match.loserId) {
+    return match.players.find((player) => playerMatchesSignup(player, { id: match.loserId, accountId: match.loserAccountId })) || {
+      id: match.loserId,
+      accountId: match.loserAccountId || '',
+    };
+  }
+
+  return match.players.find((player) => player && player.id !== match.winnerId) || null;
+}
+
+function playerLostMatch(match, signup) {
+  if (!match || match.status !== 'final' || !match.winnerId || !signup) {
+    return false;
+  }
+
+  const loser = getMatchLoser(match);
+
+  return playerMatchesSignup(loser, signup);
+}
+
+function countPlayerLosses(playerMatches, signup) {
+  return playerMatches.filter(({ match }) => playerLostMatch(match, signup)).length;
+}
+
+function getTwoLifeStanding(bracket, signup) {
+  return (bracket?.standings || []).find((standing) => {
+    return standing.id === signup?.id || standing.accountId === signup?.accountId;
+  }) || null;
+}
+
+function isPlayerEliminated(bracket, playerMatches, signup) {
+  if (!bracket || !signup) return false;
+
+  if (bracket.winner?.id === signup.id) {
+    return false;
+  }
+
+  if (bracket.status === 'complete') {
+    return true;
+  }
+
+  if (bracket.format === 'three-player-two-life') {
+    const standing = getTwoLifeStanding(bracket, signup);
+
+    return Boolean(standing && (standing.status === 'out' || Number(standing.lives) <= 0));
+  }
+
+  if (bracket.format === 'four-player-double-elimination') {
+    return countPlayerLosses(playerMatches, signup) >= 2;
+  }
+
+  return playerMatches.some(({ match }) => playerLostMatch(match, signup));
+}
+
 async function loadTournamentSignups(tournamentSlug) {
   const store = getStoreWithFallback('tournament-signups');
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
@@ -99,7 +166,7 @@ function signupMatchesAccount(signup, account) {
   );
 }
 
-function findPlayerMatchStatus(bracket, signup) {
+export function findPlayerMatchStatus(bracket, signup) {
   if (!bracket || !signup) {
     return {
       currentMatch: null,
@@ -113,7 +180,7 @@ function findPlayerMatchStatus(bracket, signup) {
 
   for (const round of bracket.rounds || []) {
     for (const match of round.matches || []) {
-      const seatIndex = match.players.findIndex((player) => player?.accountId === signup.accountId || player?.id === signup.id);
+      const seatIndex = match.players.findIndex((player) => playerMatchesSignup(player, signup));
 
       if (seatIndex !== -1) {
         playerMatches.push({ round, match, seatIndex });
@@ -141,12 +208,13 @@ function findPlayerMatchStatus(bracket, signup) {
     };
   }
 
-  const lostMatch = playerMatches.find(({ match }) => match.status === 'final' && match.winnerId && match.winnerId !== signup.id);
-  if (lostMatch) {
+  if (isPlayerEliminated(bracket, playerMatches, signup)) {
+    const lostMatch = [...playerMatches].reverse().find(({ match }) => playerLostMatch(match, signup));
+
     return {
       currentMatch: null,
       waitingMatch: null,
-      finalMatch: publicMatch(lostMatch.round, lostMatch.match),
+      finalMatch: lostMatch ? publicMatch(lostMatch.round, lostMatch.match) : null,
       nextStep: 'eliminated',
     };
   }

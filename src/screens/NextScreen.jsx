@@ -251,9 +251,9 @@ export default function NextScreen() {
   return (
     <HubScreen
       actions={[
-        { label: registrationMeta.value === 'open' ? 'Join now' : 'View event', href: checkInPath },
-        { label: 'Tournament page', href: tournamentPath, variant: 'secondary' },
-        hasTwitch ? { label: 'Watch live', href: '/live', variant: 'secondary' } : null,
+        { label: registrationMeta.value === 'open' ? 'Join Tournament' : 'View Tournament', href: registrationMeta.value === 'open' ? checkInPath : tournamentPath },
+        { label: 'View Tournament', href: tournamentPath, variant: 'secondary' },
+        hasTwitch ? { label: 'Watch Tournament', href: '/stream', variant: 'secondary' } : null,
         { label: 'Rules', href: '/rules', variant: 'ghost' },
       ].filter(Boolean)}
       eyebrow="Next event"
@@ -318,9 +318,11 @@ function NextLobbyHero({
           <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
         </View>
         <View style={[styles.heroActions, isPhone && styles.heroActionsPhone]}>
-          <ActionButton href={checkInPath}>{registrationMeta.value === 'open' ? 'Join now' : 'Open signup'}</ActionButton>
-          <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">My match</ActionButton>
-          <ActionButton href={tournamentPath} variant="secondary">Details</ActionButton>
+          <ActionButton href={registrationMeta.value === 'open' ? checkInPath : tournamentPath}>
+            {registrationMeta.value === 'open' ? 'Join Tournament' : 'View Tournament'}
+          </ActionButton>
+          <ActionButton href={`${tournamentPath}#my-match`} variant="secondary">Check Match Status</ActionButton>
+          <ActionButton href={tournamentPath} variant="secondary">View Tournament</ActionButton>
         </View>
       </View>
 

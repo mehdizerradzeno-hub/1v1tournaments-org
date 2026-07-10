@@ -5,37 +5,69 @@ import { Link, usePathname } from 'expo-router';
 
 import { theme } from '../lib/theme.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
-import { fetchPlayerAccount } from '../lib/tournamentHostingClient.js';
-import { getCheckInPath, getTournamentPath, siteData } from '../lib/siteData.js';
+import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
+import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 
-const PRIMARY_TOURNAMENT_PATH = getTournamentPath(siteData.site.primaryTournamentSlug);
 const PRIMARY_CHECK_IN_PATH = getCheckInPath(siteData.site.primaryTournamentSlug);
 const PRIMARY_SIGN_IN_PATH = `${PRIMARY_CHECK_IN_PATH}?mode=signin`;
-const PRIMARY_MATCH_PATH = `${PRIMARY_TOURNAMENT_PATH}#my-match`;
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
-const NAV_ITEMS = [
-  { label: 'Home', href: '/' },
-  { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Tournament', href: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Stream', href: '/stream' },
-  { label: 'Leaderboard', href: '/leaderboard' },
-  { label: 'Sign up', href: PRIMARY_CHECK_IN_PATH },
-  { label: 'Rules', href: '/rules' },
-];
+function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
+  const tournamentPath = getTournamentPath(slug);
+  const checkInPath = getCheckInPath(slug);
 
-const MOBILE_NAV_ITEMS = [
-  { label: 'Home', href: '/' },
-  { label: 'My match', href: PRIMARY_MATCH_PATH, activePath: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Tourney', href: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Ranks', href: '/leaderboard' },
-];
+  return {
+    tournamentPath,
+    checkInPath,
+    matchPath: `${tournamentPath}#my-match`,
+  };
+}
 
-const STICKY_ACTION_ITEMS = [
-  { label: 'Join', href: PRIMARY_CHECK_IN_PATH, tone: 'primary' },
-  { label: 'My match', href: PRIMARY_MATCH_PATH, tone: 'secondary', activePath: PRIMARY_TOURNAMENT_PATH },
-  { label: 'Watch', href: '/live', tone: 'secondary' },
-];
+function getNextNavTournamentSlug(hostedTournaments = []) {
+  const tournaments = mergeTournamentLists(getUpcomingTournaments(), hostedTournaments)
+    .filter((tournament) => tournament.status === 'upcoming')
+    .map((tournament) => ({
+      slug: tournament.slug,
+      startMs: new Date(tournament.date).getTime(),
+    }))
+    .filter((item) => item.slug && Number.isFinite(item.startMs))
+    .sort((left, right) => left.startMs - right.startMs);
+  const nowMs = Date.now();
+
+  return tournaments.find((item) => item.startMs > nowMs)?.slug
+    || tournaments[0]?.slug
+    || siteData.site.primaryTournamentSlug;
+}
+
+function getNavItems(paths) {
+  return [
+    { label: 'Home', href: '/' },
+    { label: 'Check Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Tournament', href: paths.tournamentPath },
+    { label: 'Stream', href: '/stream' },
+    { label: 'Leaderboard', href: '/leaderboard' },
+    { label: 'Join Tournament', href: paths.checkInPath },
+    { label: 'Rules', href: '/rules' },
+  ];
+}
+
+function getMobileNavItems(paths) {
+  return [
+    { label: 'Home', href: '/' },
+    { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Tourney', href: paths.tournamentPath },
+    { label: 'Ranks', href: '/leaderboard' },
+  ];
+}
+
+function getStickyActionItems(paths) {
+  return [
+    { label: 'Join', href: paths.checkInPath, tone: 'primary' },
+    { label: 'Match', href: paths.matchPath, tone: 'secondary', activePath: paths.tournamentPath },
+    { label: 'Watch', href: '/stream', tone: 'secondary' },
+  ];
+}
 
 const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
@@ -137,6 +169,8 @@ export function Surface({ children, style }) {
 }
 
 export function PlayerRouteStrip({ title = 'Player route', body = 'Start with the next event, then jump to your match or the live table.' }) {
+  const paths = buildPrimaryPaths();
+
   return (
     <Surface style={styles.playerRouteStrip}>
       <View style={styles.playerRouteCopy}>
@@ -144,9 +178,9 @@ export function PlayerRouteStrip({ title = 'Player route', body = 'Start with th
         <Text style={styles.playerRouteBody}>{body}</Text>
       </View>
       <View style={styles.playerRouteActions}>
-        <ActionButton href={PRIMARY_TOURNAMENT_PATH}>Next tournament</ActionButton>
-        <ActionButton href={PRIMARY_MATCH_PATH} variant="secondary">My match</ActionButton>
-        <ActionButton href="/live" variant="secondary">Watch live</ActionButton>
+        <ActionButton href={paths.tournamentPath}>Next tournament</ActionButton>
+        <ActionButton href={paths.matchPath} variant="secondary">Check Match Status</ActionButton>
+        <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton>
       </View>
     </Surface>
   );
@@ -217,10 +251,10 @@ function HeaderAccountChip({ account, loading }) {
   );
 }
 
-function MobileNav({ pathname, style }) {
+function MobileNav({ items, pathname, style }) {
   return (
     <View style={style}>
-      {MOBILE_NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = isNavItemActive(pathname, item);
 
         return (
@@ -530,7 +564,7 @@ export function CheckInPanel({
       <View style={styles.checkInActions}>
         {checkInPath ? (
           <ActionButton disabled={!signupEnabled} href={checkInPath}>
-            {signupEnabled ? 'Sign up now' : registrationMeta?.label || 'Registration closed'}
+            {signupEnabled ? 'Join Tournament' : registrationMeta?.label || 'Registration closed'}
           </ActionButton>
         ) : null}
         <ActionButton href="/rules" variant="secondary">
@@ -609,6 +643,11 @@ export function HubScreen({
   const { width } = useWindowDimensions();
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
+  const [navTournamentSlug, setNavTournamentSlug] = useState(siteData.site.primaryTournamentSlug);
+  const primaryPaths = buildPrimaryPaths(navTournamentSlug);
+  const navItems = getNavItems(primaryPaths);
+  const mobileNavItems = getMobileNavItems(primaryPaths);
+  const stickyActionItems = getStickyActionItems(primaryPaths);
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = showNavigation && (forceTopNav || !showMobileNav);
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
@@ -663,6 +702,30 @@ export function HubScreen({
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadNavTournament() {
+      try {
+        const result = await fetchTournamentEvents();
+
+        if (active) {
+          setNavTournamentSlug(getNextNavTournamentSlug(result.tournaments || []));
+        }
+      } catch {
+        if (active) {
+          setNavTournamentSlug(getNextNavTournamentSlug([]));
+        }
+      }
+    }
+
+    loadNavTournament();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <View style={styles.root}>
       <View pointerEvents="none" style={styles.backdrop}>
@@ -703,7 +766,7 @@ export function HubScreen({
 
             {showTopNav ? (
               <View style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
-                {NAV_ITEMS.map((item) => {
+                {navItems.map((item) => {
                   const active = isNavItemActive(pathname, item);
                   return (
                     <LinkShell key={`${item.label}-${item.href}`} href={item.href} style={styles.navWrap} variant={active ? 'primary' : 'secondary'}>
@@ -717,7 +780,7 @@ export function HubScreen({
             ) : null}
 
             {showInlineMobileNav ? (
-              <MobileNav pathname={pathname} style={styles.mobileInlineNav} />
+              <MobileNav items={mobileNavItems} pathname={pathname} style={styles.mobileInlineNav} />
             ) : null}
 
             {showHero ? (
@@ -766,7 +829,7 @@ export function HubScreen({
           </View>
         </ScrollView>
       </SafeAreaView>
-      {showDockedMobileNav ? <MobileNav pathname={pathname} style={styles.mobileBottomNav} /> : null}
+      {showDockedMobileNav ? <MobileNav items={mobileNavItems} pathname={pathname} style={styles.mobileBottomNav} /> : null}
       {showStickyActions ? (
         <View style={[styles.stickyActionBar, showDockedMobileNav && styles.stickyActionBarWithMobileNav]}>
           {showStickyActionCopy ? (
@@ -776,7 +839,7 @@ export function HubScreen({
             </View>
           ) : null}
           <View style={styles.stickyActionButtons}>
-            {STICKY_ACTION_ITEMS.map((item) => {
+            {stickyActionItems.map((item) => {
               const active = isNavItemActive(pathname, item);
 
               return (
