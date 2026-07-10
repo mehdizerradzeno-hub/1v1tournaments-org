@@ -11,6 +11,7 @@ const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
 const HEALTH_ENDPOINT = '/.netlify/functions/health';
 const SPONSOR_INQUIRIES_ENDPOINT = '/.netlify/functions/sponsor-inquiries';
 const SPONSOR_PROSPECTS_ENDPOINT = '/.netlify/functions/sponsor-prospects';
+const SPONSOR_COLLATERAL_ENDPOINT = '/.netlify/functions/sponsor-collateral';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 
 function isLocalStaticPreview() {
@@ -641,6 +642,42 @@ export async function updateSponsorProspectStatus({ token, prospectId, status })
 
   if (!response.ok) {
     throw new Error(result?.error || 'Sponsor prospect status could not be updated.');
+  }
+
+  return result;
+}
+
+export async function fetchSponsorCollateral({ token } = {}) {
+  const response = await fetch(SPONSOR_COLLATERAL_ENDPOINT, {
+    credentials: 'include',
+    headers: adminHeaders(token),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor drafts and proposals could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function saveSponsorCollateral({ token, type, record }) {
+  const response = await fetch(SPONSOR_COLLATERAL_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'save-one',
+      type,
+      record,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor draft or proposal could not be saved.');
   }
 
   return result;

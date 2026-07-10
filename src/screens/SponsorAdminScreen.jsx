@@ -10,9 +10,11 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import {
+  fetchSponsorCollateral,
   fetchPlayerAccount,
   fetchSponsorInquiries,
   fetchSponsorProspects,
+  saveSponsorCollateral,
   saveSponsorProspect,
   saveSponsorProspects,
   updateSponsorProspectStatus,
@@ -473,6 +475,7 @@ export default function SponsorAdminScreen() {
   const [proposals, setProposals] = useState([]);
   const [inquiryState, setInquiryState] = useState({ loading: false, error: '', inquiries: [] });
   const [prospectState, setProspectState] = useState({ loading: false, error: '', message: '' });
+  const [collateralState, setCollateralState] = useState({ loading: false, error: '', message: '' });
   const [activeTab, setActiveTab] = useState('inbox');
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
@@ -545,10 +548,35 @@ export default function SponsorAdminScreen() {
     }
   }
 
+  async function loadSponsorCollateral() {
+    setCollateralState({ loading: true, error: '', message: 'Loading saved drafts and proposals...' });
+
+    try {
+      const result = await fetchSponsorCollateral();
+      const nextDrafts = result.drafts || [];
+      const nextProposals = result.proposals || [];
+
+      setOutreachDrafts(nextDrafts);
+      setProposals(nextProposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: `Loaded ${nextDrafts.length} draft${nextDrafts.length === 1 ? '' : 's'} and ${nextProposals.length} proposal${nextProposals.length === 1 ? '' : 's'}.`,
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor drafts and proposals could not be loaded.',
+        message: '',
+      });
+    }
+  }
+
   useEffect(() => {
     if (canUseAdmin) {
       loadSponsorInquiries();
       loadSponsorProspects();
+      loadSponsorCollateral();
     }
   }, [canUseAdmin]);
 
@@ -649,7 +677,7 @@ export default function SponsorAdminScreen() {
     }
   }
 
-  function generateOutreachDraft() {
+  async function generateOutreachDraft() {
     if (!selectedProspect) return;
 
     const draft = createOutreachDraft({
@@ -659,29 +687,83 @@ export default function SponsorAdminScreen() {
         : 'initial-introduction',
     });
 
-    setOutreachDrafts((currentDrafts) => [draft, ...currentDrafts]);
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await saveSponsorCollateral({ type: 'draft', record: draft });
+
+      setOutreachDrafts(result.drafts || [draft, ...outreachDrafts]);
+      setProposals(result.proposals || proposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Draft saved for review. No message was sent.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Draft could not be saved.',
+        message: '',
+      });
+    }
   }
 
-  function approveDraft(draft) {
+  async function approveDraft(draft) {
     const result = approveOutreachDraft(draft, { approvedBy: hostState.account?.id || 'local-host' });
 
     if (result.errors.length) return;
 
-    setOutreachDrafts((currentDrafts) => currentDrafts.map((item) => (
-      item.id === draft.id ? result.draft : item
-    )));
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const saveResult = await saveSponsorCollateral({ type: 'draft', record: result.draft });
+
+      setOutreachDrafts(saveResult.drafts || outreachDrafts.map((item) => (
+        item.id === draft.id ? result.draft : item
+      )));
+      setProposals(saveResult.proposals || proposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Draft approval saved. No message was sent.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Draft approval could not be saved.',
+        message: '',
+      });
+    }
   }
 
-  function prepareFollowUp(draft) {
+  async function prepareFollowUp(draft) {
     const prospect = prospects.find((item) => item.id === draft.prospectId) || selectedProspect || {};
     const result = prepareFollowUpDraft({ prospect, parentDraft: draft });
 
     if (!result.draft) return;
 
-    setOutreachDrafts((currentDrafts) => [result.draft, ...currentDrafts]);
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const saveResult = await saveSponsorCollateral({ type: 'draft', record: result.draft });
+
+      setOutreachDrafts(saveResult.drafts || [result.draft, ...outreachDrafts]);
+      setProposals(saveResult.proposals || proposals);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Follow-up draft saved for review. No message was sent.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Follow-up draft could not be saved.',
+        message: '',
+      });
+    }
   }
 
-  function generateProposal() {
+  async function generateProposal() {
     if (!selectedProspect) return;
 
     const proposal = createSponsorProposal({
@@ -690,7 +772,25 @@ export default function SponsorAdminScreen() {
       campaignDates: 'Next available public tournament window',
     });
 
-    setProposals((currentProposals) => [proposal, ...currentProposals]);
+    setCollateralState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await saveSponsorCollateral({ type: 'proposal', record: proposal });
+
+      setOutreachDrafts(result.drafts || outreachDrafts);
+      setProposals(result.proposals || [proposal, ...proposals]);
+      setCollateralState({
+        loading: false,
+        error: '',
+        message: 'Proposal preview saved. No sponsor was contacted.',
+      });
+    } catch (error) {
+      setCollateralState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Proposal preview could not be saved.',
+        message: '',
+      });
+    }
   }
 
   return (
@@ -728,9 +828,14 @@ export default function SponsorAdminScreen() {
               <ActionButton disabled={prospectState.loading} onPress={loadSponsorProspects} variant="secondary">
                 {prospectState.loading ? 'Loading...' : 'Refresh prospects'}
               </ActionButton>
+              <ActionButton disabled={collateralState.loading} onPress={loadSponsorCollateral} variant="secondary">
+                {collateralState.loading ? 'Loading...' : 'Refresh drafts'}
+              </ActionButton>
             </View>
             {prospectState.error ? <Text style={styles.errorText}>{prospectState.error}</Text> : null}
             {prospectState.message ? <Text style={styles.successText}>{prospectState.message}</Text> : null}
+            {collateralState.error ? <Text style={styles.errorText}>{collateralState.error}</Text> : null}
+            {collateralState.message ? <Text style={styles.successText}>{collateralState.message}</Text> : null}
           </Section>
 
           <Section

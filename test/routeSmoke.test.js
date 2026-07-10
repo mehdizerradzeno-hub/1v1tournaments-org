@@ -56,6 +56,7 @@ const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/s
 const healthFunctionFile = fileURLToPath(new URL('../netlify/functions/health.mjs', import.meta.url));
 const sponsorInquiriesFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-inquiries.mjs', import.meta.url));
 const sponsorProspectsFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-prospects.mjs', import.meta.url));
+const sponsorCollateralFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-collateral.mjs', import.meta.url));
 const hostingClientFile = fileURLToPath(new URL('../src/lib/tournamentHostingClient.js', import.meta.url));
 const streamCommandsClientFile = fileURLToPath(new URL('../src/lib/streamCommands.js', import.meta.url));
 const twitchBotScriptFile = fileURLToPath(new URL('../scripts/twitch-chat-bot.mjs', import.meta.url));
@@ -91,11 +92,13 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.ok(existsSync(sponsorAdminScreenFile));
   assert.ok(existsSync(sponsorInquiriesFunctionFile));
   assert.ok(existsSync(sponsorProspectsFunctionFile));
+  assert.ok(existsSync(sponsorCollateralFunctionFile));
 
   const sponsorScreenSource = readFileSync(sponsorPublicScreenFile, 'utf8');
   const sponsorAdminScreenSource = readFileSync(sponsorAdminScreenFile, 'utf8');
   const sponsorInquiriesSource = readFileSync(sponsorInquiriesFunctionFile, 'utf8');
   const sponsorProspectsSource = readFileSync(sponsorProspectsFunctionFile, 'utf8');
+  const sponsorCollateralSource = readFileSync(sponsorCollateralFunctionFile, 'utf8');
 
   assert.match(sponsorScreenSource, /Reach a Competitive Card-Game Community/);
   assert.match(sponsorScreenSource, /Audience metrics are omitted publicly until verified/);
@@ -110,6 +113,9 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorProspectsSource, /sponsor-prospects/);
   assert.match(sponsorProspectsSource, /upsert-many/);
   assert.match(sponsorProspectsSource, /update-status/);
+  assert.match(sponsorCollateralSource, /requireTournamentAdmin/);
+  assert.match(sponsorCollateralSource, /sponsor-outreach-drafts/);
+  assert.match(sponsorCollateralSource, /sponsor-deals/);
 });
 
 test('/leaderboard stays wired to tournament-only rankings', () => {

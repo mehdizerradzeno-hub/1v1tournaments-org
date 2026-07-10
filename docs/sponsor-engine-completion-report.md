@@ -21,6 +21,7 @@ No deployment, production write, external outreach, email send, post, merge, or 
 - Host-only sponsor prospect persistence for CSV imports and accepted research candidates through Netlify Blobs.
 - Manual sponsor prospect stage/status controls, including `DO_NOT_CONTACT`, with host-protected persistence.
 - Focused sponsor admin workspace tabs for Inbox, Prospects, Research, Drafts, Pipeline, and Export.
+- Host-only outreach draft and proposal-preview persistence through Netlify Blobs.
 - Public `/media-kit` page with brand/product overview and no fabricated audience statistics.
 - Proposal/deal generator with review-only proposal copy and print-safe HTML export helper.
 - Scheduled automation helpers for research preparation, follow-up preparation, weekly pipeline review, and monthly data hygiene.
@@ -51,7 +52,7 @@ Generated `dist/` files were not committed.
 
 ## Database migrations
 
-No production database migration was applied. Public sponsor inquiries are stored through Netlify Blobs by `/.netlify/functions/sponsor-inquiries`. Host-reviewed sponsor prospects are stored through Netlify Blobs by `/.netlify/functions/sponsor-prospects`. Outreach drafts, proposal previews, and provider integrations still use local/domain modules and mock-safe flows. The model plan is documented in `docs/sponsor-engine-architecture.md` and can be expanded after explicit approval.
+No production database migration was applied. Public sponsor inquiries are stored through Netlify Blobs by `/.netlify/functions/sponsor-inquiries`. Host-reviewed sponsor prospects are stored through Netlify Blobs by `/.netlify/functions/sponsor-prospects`. Outreach drafts and proposal previews are stored through Netlify Blobs by `/.netlify/functions/sponsor-collateral`. Provider integrations still use local/domain modules and mock-safe flows. The model plan is documented in `docs/sponsor-engine-architecture.md` and can be expanded after explicit approval.
 
 ## Commands run
 
@@ -92,7 +93,7 @@ npm run build:web
 
 ## Known limitations
 
-- Outreach draft and proposal persistence is not yet wired to Netlify Blobs or another database.
+- Outreach draft and proposal editing is not yet wired; saved records are generated previews.
 - Drag-and-drop Kanban is not implemented yet. Stage changes use explicit manual buttons.
 - Live search/fetch providers are mocked.
 - Email/calendar/file-storage integrations are mocked.
@@ -164,7 +165,7 @@ Deployment was not performed. When approved:
 
 ## Recommended next actions
 
-1. Add persistent storage for outreach drafts and proposal previews.
+1. Add edit/archive actions for saved outreach drafts and proposal previews.
 2. Promote sponsor workspace tabs into sub-routes if volume or team access grows.
 3. Add CAPTCHA or a third-party bot-defense provider if inquiry spam becomes a problem.
 4. Add authenticated admin sub-routes for prospects, research, approvals, packages, proposals, and settings.

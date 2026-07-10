@@ -19,13 +19,13 @@
 
 Early phases use Netlify Blobs because that is the current production stack. Each aggregate has a primary record and explicit index records. Future relational migration remains possible after volume and reporting needs are proven.
 
-Public sponsor inquiries are persisted by `/.netlify/functions/sponsor-inquiries` in the `sponsor-inquiries` Blob store. Client rate-limit counters use the `sponsor-inquiry-rate-limits` Blob store and hash the request address before storage. Host-reviewed sponsor prospects are persisted by `/.netlify/functions/sponsor-prospects` in the `sponsor-prospects` Blob store. Outreach drafts, proposals, and provider integrations remain mock-safe/local until their own persistence pass is approved.
+Public sponsor inquiries are persisted by `/.netlify/functions/sponsor-inquiries` in the `sponsor-inquiries` Blob store. Client rate-limit counters use the `sponsor-inquiry-rate-limits` Blob store and hash the request address before storage. Host-reviewed sponsor prospects are persisted by `/.netlify/functions/sponsor-prospects` in the `sponsor-prospects` Blob store. Outreach drafts and proposal previews are persisted by `/.netlify/functions/sponsor-collateral` in the `sponsor-outreach-drafts` and `sponsor-deals` Blob stores. Provider integrations remain mock-safe/local until their own approved integration pass.
 
 ## Server Boundary
 
 All private sponsor reads/writes must pass through Netlify Functions and `requireTournamentAdmin`. Public sponsor pages can read only public packages, public assets, and approved/verified metrics.
 
-The sponsor inquiry function exposes a public POST for new inquiries and host-protected GET/status-update actions for the inbox. The sponsor prospect function exposes host-protected GET, upsert, and manual status-update actions for reviewed CRM records. No endpoint sends email, creates outbound messages, or contacts sponsors automatically.
+The sponsor inquiry function exposes a public POST for new inquiries and host-protected GET/status-update actions for the inbox. The sponsor prospect function exposes host-protected GET, upsert, and manual status-update actions for reviewed CRM records. The sponsor collateral function exposes host-protected GET/save actions for drafts and proposal previews. No endpoint sends email, creates outbound messages, or contacts sponsors automatically.
 
 ## Draft-Only Communication Boundary
 
