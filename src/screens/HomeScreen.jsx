@@ -551,7 +551,7 @@ function PremiumDownloadSection() {
       key: 'spades',
       title: '1v1 Spades',
       eyebrow: 'Live now',
-      body: 'Open the competitive Spades app, play on web, or install from the App Store once your public listing URL is set.',
+      body: 'Open the competitive Spades app, play on web, or install from the App Store.',
       appStoreUrl: downloadLinks.appStoreSpades,
       webUrl: downloadLinks.webSpades,
       accent: '#D6A24E',
