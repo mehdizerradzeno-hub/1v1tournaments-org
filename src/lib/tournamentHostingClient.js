@@ -623,3 +623,25 @@ export async function saveSponsorProspect({ token, prospect }) {
 
   return result;
 }
+
+export async function updateSponsorProspectStatus({ token, prospectId, status }) {
+  const response = await fetch(SPONSOR_PROSPECTS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({
+      action: 'update-status',
+      prospectId,
+      status,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Sponsor prospect status could not be updated.');
+  }
+
+  return result;
+}

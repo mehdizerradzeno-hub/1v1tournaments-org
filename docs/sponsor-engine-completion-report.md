@@ -19,6 +19,7 @@ No deployment, production write, external outreach, email send, post, merge, or 
 - Public `/sponsors` page with sponsorship package cards, verified-only metric handling, sponsor inquiry validation, and server-side inquiry intake.
 - Host-only sponsor inquiry inbox with manual review/archive actions, Netlify Blob persistence, and hashed client rate limiting.
 - Host-only sponsor prospect persistence for CSV imports and accepted research candidates through Netlify Blobs.
+- Manual sponsor prospect stage/status controls, including `DO_NOT_CONTACT`, with host-protected persistence.
 - Public `/media-kit` page with brand/product overview and no fabricated audience statistics.
 - Proposal/deal generator with review-only proposal copy and print-safe HTML export helper.
 - Scheduled automation helpers for research preparation, follow-up preparation, weekly pipeline review, and monthly data hygiene.
@@ -91,7 +92,7 @@ npm run build:web
 ## Known limitations
 
 - Outreach draft and proposal persistence is not yet wired to Netlify Blobs or another database.
-- Drag-and-drop Kanban is not implemented yet.
+- Drag-and-drop Kanban is not implemented yet. Stage changes use explicit manual buttons.
 - Live search/fetch providers are mocked.
 - Email/calendar/file-storage integrations are mocked.
 - Public sponsor inquiries now persist through a Netlify Function with hashed rate limiting. CAPTCHA or a third-party bot-defense provider is not wired yet.
@@ -162,8 +163,8 @@ Deployment was not performed. When approved:
 
 ## Recommended next actions
 
-1. Add stage/status update actions for saved sponsor prospects.
-2. Add persistent storage for outreach drafts and proposal previews.
+1. Add persistent storage for outreach drafts and proposal previews.
+2. Split sponsor admin into focused tabs or sub-routes as volume grows.
 3. Add CAPTCHA or a third-party bot-defense provider if inquiry spam becomes a problem.
 4. Add authenticated admin sub-routes for prospects, research, approvals, packages, proposals, and settings.
 5. Add real provider adapters one at a time behind explicit credentials and approval gates.

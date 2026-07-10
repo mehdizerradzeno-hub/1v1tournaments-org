@@ -6,6 +6,7 @@ import { getStoreWithFallback } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
 import {
   createEmptySponsorProspect,
+  isAllowedProspectStatus,
   markDuplicateProspects,
   SPONSOR_STORE_NAMES,
 } from '../../src/lib/sponsorEngine/index.js';
@@ -157,6 +158,39 @@ export async function handler(event) {
       return json(200, {
         ok: true,
         prospect,
+        prospects: await listProspects(),
+      });
+    }
+
+    if (action === 'update-status') {
+      const prospectId = String(payload.prospectId || '').trim();
+      const status = String(payload.status || '').trim();
+      const existing = existingProspects.find((prospect) => prospect.id === prospectId);
+
+      if (!prospectId || !isAllowedProspectStatus(status)) {
+        return json(400, { error: 'Choose a sponsor prospect and a supported pipeline status.' });
+      }
+
+      if (!existing) {
+        return json(404, { error: 'Sponsor prospect was not found.' });
+      }
+
+      const updated = normalizeProspect({
+        ...existing,
+        status,
+        nextAction: payload.nextAction || existing.nextAction,
+        nextActionAt: payload.nextActionAt || existing.nextActionAt,
+        updatedBy: adminCheck.account?.id || adminCheck.account?.email || 'host',
+      }, {
+        account: adminCheck.account,
+        existingProspects,
+      });
+
+      await saveProspects([updated]);
+
+      return json(200, {
+        ok: true,
+        prospect: updated,
         prospects: await listProspects(),
       });
     }

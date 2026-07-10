@@ -9,6 +9,7 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 - Public sponsor inquiries are stored server-side through Netlify Blobs.
 - The inquiry inbox supports refresh, mark reviewed, and archive.
 - Sponsor prospects from CSV preview and accepted research candidates are stored server-side through Netlify Blobs.
+- Saved sponsor prospects can be moved manually through pipeline stages, including `DO_NOT_CONTACT`.
 - Outreach drafts and proposal previews are still review/local until persistence is approved.
 - No research jobs are active.
 - No email provider is enabled.
@@ -31,7 +32,9 @@ This guide covers the current sponsor tools. Public sponsor inquiry intake and h
 3. Confirm duplicate detection.
 4. Review fit score and risk flags.
 5. Save host-reviewed prospects into the CRM.
-6. Generate a draft.
-7. Validate claims and provenance.
-8. Approve or reject.
-9. Perform a separate explicit send action only when sending is intentionally enabled.
+6. Move prospects manually through the pipeline.
+7. Mark restricted or opted-out records as `DO_NOT_CONTACT`.
+8. Generate a draft.
+9. Validate claims and provenance.
+10. Approve or reject.
+11. Perform a separate explicit send action only when sending is intentionally enabled.

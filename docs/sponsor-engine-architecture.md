@@ -25,7 +25,7 @@ Public sponsor inquiries are persisted by `/.netlify/functions/sponsor-inquiries
 
 All private sponsor reads/writes must pass through Netlify Functions and `requireTournamentAdmin`. Public sponsor pages can read only public packages, public assets, and approved/verified metrics.
 
-The sponsor inquiry function exposes a public POST for new inquiries and host-protected GET/status-update actions for the inbox. The sponsor prospect function exposes host-protected GET and upsert actions for reviewed CRM records. No endpoint sends email, creates outbound messages, or contacts sponsors automatically.
+The sponsor inquiry function exposes a public POST for new inquiries and host-protected GET/status-update actions for the inbox. The sponsor prospect function exposes host-protected GET, upsert, and manual status-update actions for reviewed CRM records. No endpoint sends email, creates outbound messages, or contacts sponsors automatically.
 
 ## Draft-Only Communication Boundary
 

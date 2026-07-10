@@ -15,6 +15,7 @@ import {
   fetchSponsorProspects,
   saveSponsorProspect,
   saveSponsorProspects,
+  updateSponsorProspectStatus,
   updateSponsorInquiryStatus,
 } from '../lib/tournamentHostingClient.js';
 import {
@@ -27,6 +28,7 @@ import {
   parseSponsorCsv,
   prepareFollowUpDraft,
   proposalToPlainText,
+  PROSPECT_STATUSES,
   runResearchPreparation,
   SPONSOR_PIPELINE_COLUMNS,
   summarizeSponsorPipeline,
@@ -102,7 +104,19 @@ function ProspectRow({ prospect, selected, onSelect }) {
   );
 }
 
-function ProspectDetail({ prospect }) {
+const PRIMARY_PROSPECT_STATUSES = [
+  'NEW',
+  'RESEARCHED',
+  'QUALIFIED',
+  'DRAFT_READY',
+  'PROPOSAL',
+  'WON',
+  'LOST',
+  'PAUSED',
+  'DO_NOT_CONTACT',
+];
+
+function ProspectDetail({ loading, onUpdateStatus, prospect }) {
   if (!prospect) {
     return (
       <Surface style={styles.detailPanel}>
@@ -145,6 +159,24 @@ function ProspectDetail({ prospect }) {
         )) : (
           <Text style={styles.sourceEmpty}>No source URLs yet. This prospect cannot move to outreach review.</Text>
         )}
+      </View>
+
+      <View style={styles.sourceBlock}>
+        <Text style={styles.sourceTitle}>Pipeline stage</Text>
+        <Text style={styles.sourceEmpty}>
+          Move saved prospects manually. This never sends outreach or contacts the company.
+        </Text>
+        <View style={styles.approvalActions}>
+          {PRIMARY_PROSPECT_STATUSES.map((status) => (
+            <ActionButton
+              key={status}
+              disabled={loading || prospect.status === status || !PROSPECT_STATUSES.includes(status)}
+              onPress={() => onUpdateStatus(prospect.id, status)}
+              variant={prospect.status === status ? 'primary' : status === 'DO_NOT_CONTACT' ? 'ghost' : 'secondary'}>
+              {status.replace(/_/g, ' ')}
+            </ActionButton>
+          ))}
+        </View>
       </View>
     </Surface>
   );
@@ -584,6 +616,29 @@ export default function SponsorAdminScreen() {
     }
   }
 
+  async function changeProspectStatus(prospectId, status) {
+    setProspectState({ loading: true, error: '', message: '' });
+
+    try {
+      const result = await updateSponsorProspectStatus({ prospectId, status });
+      const nextProspects = result.prospects || [];
+
+      setProspects(nextProspects);
+      setSelectedId(result.prospect?.id || prospectId);
+      setProspectState({
+        loading: false,
+        error: '',
+        message: `${result.prospect?.companyName || 'Sponsor prospect'} moved to ${status.replace(/_/g, ' ')}.`,
+      });
+    } catch (error) {
+      setProspectState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Sponsor prospect status could not be updated.',
+        message: '',
+      });
+    }
+  }
+
   function generateOutreachDraft() {
     if (!selectedProspect) return;
 
@@ -741,7 +796,11 @@ export default function SponsorAdminScreen() {
                   />
                 )}
               </Surface>
-              <ProspectDetail prospect={selectedProspect} />
+              <ProspectDetail
+                loading={prospectState.loading}
+                onUpdateStatus={changeProspectStatus}
+                prospect={selectedProspect}
+              />
             </View>
           </Section>
 
