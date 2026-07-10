@@ -7,7 +7,9 @@ import {
   createMockResearchProvider,
   createOutreachDraft,
   createResearchCandidate,
+  createSponsorProposal,
   createSponsorInquiryRecord,
+  createSponsorshipDeal,
   exportSponsorProspectsCsv,
   filterSponsorProspects,
   groupProspectsByStage,
@@ -20,6 +22,8 @@ import {
   normalizeDomain,
   parseSponsorCsv,
   prepareFollowUpDraft,
+  proposalToPlainText,
+  proposalToPrintHtml,
   prospectDeduplicationKey,
   redactSponsorAuditPayload,
   runResearchPreparation,
@@ -449,4 +453,53 @@ test('accepted sponsor inquiries create privacy-safe audit records', () => {
     company: 'Example Cards',
     sponsorshipInterest: 'Product partnership',
   });
+});
+
+test('sponsorship deals clamp stage and probability safely', () => {
+  const deal = createSponsorshipDeal({
+    prospectId: 'prospect-1',
+    packageId: 'tournament-sponsor',
+    stage: 'WON',
+    probability: 120,
+    deliverables: ['Named tournament'],
+    createdAt: '2026-07-10T00:00:00.000Z',
+  });
+  const fallback = createSponsorshipDeal({
+    prospectId: 'prospect-2',
+    stage: 'BAD_STAGE',
+    probability: -20,
+  });
+
+  assert.equal(deal.stage, 'WON');
+  assert.equal(deal.probability, 100);
+  assert.equal(fallback.stage, 'DISCOVERY');
+  assert.equal(fallback.probability, 0);
+});
+
+test('proposal generator creates review-only proposal copy and print-safe html', () => {
+  const prospect = createEmptySponsorProspect({
+    id: 'prospect-proposal',
+    companyName: '<Example Cards>',
+    website: 'https://examplecards.com',
+    fitExplanation: 'Score 82/100 based on card-game relevance and public partnership route.',
+  });
+  const proposal = createSponsorProposal({
+    prospect,
+    packageId: 'tournament-sponsor',
+    customPrice: 750,
+    campaignDates: 'August tournament window',
+    paymentTerms: 'Invoice after agreement.',
+    optionalExclusivity: 'No category exclusivity.',
+    createdAt: '2026-07-10T00:00:00.000Z',
+  });
+  const text = proposalToPlainText(proposal);
+  const html = proposalToPrintHtml(proposal);
+
+  assert.equal(proposal.status, 'DRAFT');
+  assert.equal(proposal.investment, 750);
+  assert.match(proposal.reviewNotice, /legal review/);
+  assert.match(text, /Tournament Sponsor/);
+  assert.match(text, /August tournament window/);
+  assert.match(html, /&lt;Example Cards&gt;/);
+  assert.doesNotMatch(html, /<Example Cards>/);
 });

@@ -4,5 +4,6 @@ export * from './crm.js';
 export * from './inquiry.js';
 export * from './outreach.js';
 export * from './permissions.js';
+export * from './proposals.js';
 export * from './research.js';
 export * from './schema.js';

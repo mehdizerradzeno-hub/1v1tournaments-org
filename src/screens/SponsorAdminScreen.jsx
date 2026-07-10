@@ -16,8 +16,10 @@ import {
   groupProspectsByStage,
   approveOutreachDraft,
   createOutreachDraft,
+  createSponsorProposal,
   parseSponsorCsv,
   prepareFollowUpDraft,
+  proposalToPlainText,
   runResearchPreparation,
   SPONSOR_PIPELINE_COLUMNS,
   summarizeSponsorPipeline,
@@ -306,6 +308,47 @@ function ApprovalQueue({ drafts, selectedProspect, onGenerate, onApprove, onPrep
   );
 }
 
+function ProposalPreview({ proposals, selectedProspect, onGenerate }) {
+  return (
+    <Surface style={styles.proposalPanel}>
+      <View style={styles.researchHeader}>
+        <View style={styles.researchCopy}>
+          <Text style={styles.researchTitle}>Proposal generator</Text>
+          <Text style={styles.researchBody}>
+            Creates editable proposal previews with legal-review notice and verified-only reporting language.
+          </Text>
+        </View>
+        <ActionButton disabled={!selectedProspect} onPress={onGenerate}>
+          Generate proposal
+        </ActionButton>
+      </View>
+
+      {proposals.length ? (
+        <View style={styles.researchList}>
+          {proposals.map((proposal) => (
+            <View key={proposal.id} style={styles.approvalCard}>
+              <View style={styles.researchCardHeader}>
+                <View style={styles.researchCardCopy}>
+                  <Text style={styles.researchCompany}>{proposal.prospectName}</Text>
+                  <Text style={styles.researchMeta}>{proposal.packageName} | {proposal.status}</Text>
+                </View>
+                <Badge tone="blue">Review</Badge>
+              </View>
+              <Text style={styles.proposalNotice}>{proposal.reviewNotice}</Text>
+              <Text selectable style={styles.draftBody}>{proposalToPlainText(proposal)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <EmptyState
+          body="Select a prospect and generate a proposal preview. Export/delivery comes after review."
+          title="No proposals prepared"
+        />
+      )}
+    </Surface>
+  );
+}
+
 export default function SponsorAdminScreen() {
   const hostState = useHostAccount();
   const [prospects, setProspects] = useState([]);
@@ -316,6 +359,7 @@ export default function SponsorAdminScreen() {
   const [researchRun, setResearchRun] = useState(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [outreachDrafts, setOutreachDrafts] = useState([]);
+  const [proposals, setProposals] = useState([]);
   const importPreview = useMemo(() => parseSponsorCsv(csvText), [csvText]);
   const filteredProspects = filterSponsorProspects(prospects, { query, status: statusFilter });
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
@@ -395,6 +439,18 @@ export default function SponsorAdminScreen() {
     if (!result.draft) return;
 
     setOutreachDrafts((currentDrafts) => [result.draft, ...currentDrafts]);
+  }
+
+  function generateProposal() {
+    if (!selectedProspect) return;
+
+    const proposal = createSponsorProposal({
+      prospect: selectedProspect,
+      packageId: selectedProspect.fitScore >= 75 ? 'tournament-sponsor' : 'community-supporter',
+      campaignDates: 'Next available public tournament window',
+    });
+
+    setProposals((currentProposals) => [proposal, ...currentProposals]);
   }
 
   return (
@@ -514,6 +570,16 @@ export default function SponsorAdminScreen() {
               onApprove={approveDraft}
               onGenerate={generateOutreachDraft}
               onPrepareFollowUp={prepareFollowUp}
+              selectedProspect={selectedProspect}
+            />
+          </Section>
+
+          <Section
+            description="Generate proposal previews from selected prospects and starter package definitions."
+            title="Proposals">
+            <ProposalPreview
+              onGenerate={generateProposal}
+              proposals={proposals}
               selectedProspect={selectedProspect}
             />
           </Section>
@@ -778,6 +844,15 @@ const styles = StyleSheet.create({
   },
   prospectRowSelected: {
     borderColor: theme.colors.accent,
+  },
+  proposalNotice: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  proposalPanel: {
+    borderColor: 'rgba(108, 199, 255, 0.24)',
   },
   factList: {
     gap: 6,
