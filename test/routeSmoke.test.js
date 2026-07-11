@@ -428,6 +428,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.doesNotMatch(nextScreenSource, /Host admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
+  assert.match(tournamentScreenSource, /getSignInPath/);
+  assert.match(tournamentScreenSource, /mode=signin/);
   assert.match(tournamentScreenSource, /TOURNAMENT_TABS/);
   assert.match(tournamentScreenSource, /TournamentTabs/);
   assert.match(tournamentScreenSource, /TournamentEventConsole/);
