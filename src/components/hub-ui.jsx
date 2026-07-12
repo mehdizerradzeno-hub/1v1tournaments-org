@@ -6,7 +6,7 @@ import { Link, usePathname } from 'expo-router';
 import { theme } from '../lib/theme.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
 import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
-import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import { getNextFutureTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
 import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
@@ -32,18 +32,9 @@ function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
 
 function getNextNavTournamentSlug(hostedTournaments = []) {
   const tournaments = mergeTournamentLists(getUpcomingTournaments(), hostedTournaments)
-    .filter((tournament) => tournament.status === 'upcoming')
-    .map((tournament) => ({
-      slug: tournament.slug,
-      startMs: new Date(tournament.date).getTime(),
-    }))
-    .filter((item) => item.slug && Number.isFinite(item.startMs))
-    .sort((left, right) => left.startMs - right.startMs);
-  const nowMs = Date.now();
+    .filter((tournament) => tournament.status === 'upcoming');
 
-  return tournaments.find((item) => item.startMs > nowMs)?.slug
-    || tournaments[0]?.slug
-    || siteData.site.primaryTournamentSlug;
+  return getNextFutureTournament(tournaments)?.slug || null;
 }
 
 function getNavItems(paths) {

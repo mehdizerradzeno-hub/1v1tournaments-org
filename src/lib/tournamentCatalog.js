@@ -71,6 +71,25 @@ function positiveInteger(value, fallback, min = 1, max = 128) {
   return Math.min(Math.max(parsed, min), max);
 }
 
+function defaultBracketFlexPolicy(rosterCap, minimumPlayers) {
+  return `Advertised ${rosterCap}-player bracket. Actual bracket flexes to the checked-in roster: runs with ${minimumPlayers}+ players and fills open seats with byes.`;
+}
+
+function isGeneratedBracketFlexPolicy(value) {
+  return /^Advertised \d+-player bracket\. Actual bracket flexes to the checked-in roster: runs with \d+\+ players and fills open seats with byes\.$/.test(value);
+}
+
+function normalizeBracketFlexPolicy(value, rosterCap, minimumPlayers) {
+  const text = cleanText(value);
+  const fallback = defaultBracketFlexPolicy(rosterCap, minimumPlayers);
+
+  if (!text || isGeneratedBracketFlexPolicy(text)) {
+    return fallback;
+  }
+
+  return text;
+}
+
 function cleanDate(value, fallback = '') {
   const raw = cleanText(value, fallback);
   const parsed = new Date(raw);
@@ -155,10 +174,7 @@ export function createTournamentRecord(payload = {}) {
     format: cleanShortText(payload.format, mode.format),
     rosterCap,
     minimumPlayers,
-    bracketFlexPolicy: cleanText(
-      payload.bracketFlexPolicy,
-      `Advertised ${rosterCap}-player bracket. Actual bracket flexes to the checked-in roster: runs with ${minimumPlayers}+ players and fills open seats with byes.`,
-    ).slice(0, 500),
+    bracketFlexPolicy: normalizeBracketFlexPolicy(payload.bracketFlexPolicy, rosterCap, minimumPlayers).slice(0, 500),
     entryLine: cleanShortText(payload.entryLine, 'Free entry, no buy-in, no wagering.'),
     summary,
     detail,
@@ -181,6 +197,60 @@ export function createTournamentRecord(payload = {}) {
     links: normalizeLinks(payload.links, slug),
     hosted: Boolean(payload.hosted ?? true),
   };
+}
+
+export function getTournamentStartMs(tournament) {
+  const startMs = new Date(tournament?.date).getTime();
+
+  return Number.isFinite(startMs) ? startMs : null;
+}
+
+export function isFutureTournament(tournament, nowMs = Date.now()) {
+  const startMs = getTournamentStartMs(tournament);
+
+  return startMs !== null && startMs > nowMs;
+}
+
+function isLiveBracket(bracket) {
+  return Boolean(bracket) && bracket.status !== 'complete';
+}
+
+function hasLiveBracket(tournament, eventDataBySlug = {}) {
+  if (!tournament?.slug) {
+    return false;
+  }
+
+  return isLiveBracket(eventDataBySlug[tournament.slug]?.bracket);
+}
+
+export function getActiveOrFutureTournaments(tournaments = [], eventDataBySlug = {}, nowMs = Date.now()) {
+  return [...tournaments]
+    .filter((tournament) => hasLiveBracket(tournament, eventDataBySlug) || isFutureTournament(tournament, nowMs))
+    .sort((left, right) => {
+      const leftLive = hasLiveBracket(left, eventDataBySlug);
+      const rightLive = hasLiveBracket(right, eventDataBySlug);
+
+      if (leftLive && !rightLive) return -1;
+      if (!leftLive && rightLive) return 1;
+
+      const leftTime = getTournamentStartMs(left);
+      const rightTime = getTournamentStartMs(right);
+
+      if (leftTime === null && rightTime === null) return 0;
+      if (leftTime === null) return 1;
+      if (rightTime === null) return -1;
+      return leftTime - rightTime;
+    });
+}
+
+export function getNextPublicTournament(tournaments = [], eventDataBySlug = {}, nowMs = Date.now()) {
+  return getActiveOrFutureTournaments(tournaments, eventDataBySlug, nowMs)[0] || null;
+}
+
+export function getNextFutureTournament(tournaments = [], nowMs = Date.now()) {
+  return [...tournaments]
+    .filter((tournament) => isFutureTournament(tournament, nowMs))
+    .sort((left, right) => getTournamentStartMs(left) - getTournamentStartMs(right))[0] || null;
 }
 
 export function mergeTournamentLists(baseTournaments = [], hostedTournaments = []) {

@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   createTournamentRecord,
+  getActiveOrFutureTournaments,
+  getNextFutureTournament,
+  getNextPublicTournament,
   mergeTournamentLists,
   slugifyTournamentTitle,
 } from '../src/lib/tournamentCatalog.js';
@@ -24,6 +27,34 @@ test('hosted tournament records get the full public page shape from simple input
   assert.equal(tournament.status, 'upcoming');
   assert.equal(tournament.links[0].href, '/tournaments/spades-friday-night-cup');
   assert.match(tournament.bracketFlexPolicy, /Advertised 16-player bracket/);
+});
+
+test('generated bracket policy copy updates when hosted event capacity changes', () => {
+  const tournament = createTournamentRecord({
+    title: 'Four Player Spades',
+    date: '2026-07-24T20:00:00-04:00',
+    rosterCap: 4,
+    minimumPlayers: 4,
+    mode: 'four-player-double-elimination',
+    bracketFlexPolicy: 'Advertised 8-player bracket. Actual bracket flexes to the checked-in roster: runs with 2+ players and fills open seats with byes.',
+  });
+
+  assert.equal(tournament.rosterCap, 4);
+  assert.equal(tournament.minimumPlayers, 4);
+  assert.match(tournament.bracketFlexPolicy, /Advertised 4-player bracket/);
+  assert.match(tournament.bracketFlexPolicy, /runs with 4\+ players/);
+});
+
+test('custom bracket policy copy is preserved', () => {
+  const tournament = createTournamentRecord({
+    title: 'Custom Copy Cup',
+    date: '2026-07-24T20:00:00-04:00',
+    rosterCap: 4,
+    minimumPlayers: 4,
+    bracketFlexPolicy: 'Bring exactly four players. The host may add alternates manually.',
+  });
+
+  assert.equal(tournament.bracketFlexPolicy, 'Bring exactly four players. The host may add alternates manually.');
 });
 
 test('recommended tournament modes expose wired and planned generation state', () => {
@@ -111,6 +142,83 @@ test('deleted hosted tournament tombstones hide seeded defaults', () => {
     merged.map((tournament) => tournament.slug),
     ['10-pm-4-man-spades-test'],
   );
+});
+
+test('public tournament selection ignores expired events without a live bracket', () => {
+  const tournaments = [
+    createTournamentRecord({
+      title: 'Past Test',
+      slug: 'past-test',
+      date: '2026-07-10T20:00:00-04:00',
+    }),
+    createTournamentRecord({
+      title: 'Future Cup',
+      slug: 'future-cup',
+      date: '2026-07-24T20:00:00-04:00',
+    }),
+  ];
+  const nowMs = new Date('2026-07-12T12:00:00-04:00').getTime();
+
+  assert.deepEqual(
+    getActiveOrFutureTournaments(tournaments, {}, nowMs).map((tournament) => tournament.slug),
+    ['future-cup'],
+  );
+  assert.equal(getNextPublicTournament(tournaments, {}, nowMs)?.slug, 'future-cup');
+  assert.equal(getNextFutureTournament(tournaments, nowMs)?.slug, 'future-cup');
+});
+
+test('public tournament selection keeps expired events only while their bracket is live', () => {
+  const tournaments = [
+    createTournamentRecord({
+      title: 'Live Past Test',
+      slug: 'live-past-test',
+      date: '2026-07-10T20:00:00-04:00',
+    }),
+    createTournamentRecord({
+      title: 'Future Cup',
+      slug: 'future-cup',
+      date: '2026-07-24T20:00:00-04:00',
+    }),
+  ];
+  const nowMs = new Date('2026-07-12T12:00:00-04:00').getTime();
+
+  assert.deepEqual(
+    getActiveOrFutureTournaments(
+      tournaments,
+      {
+        'live-past-test': {
+          bracket: { status: 'published' },
+        },
+      },
+      nowMs,
+    ).map((tournament) => tournament.slug),
+    ['live-past-test', 'future-cup'],
+  );
+});
+
+test('completed expired brackets are not treated as upcoming', () => {
+  const tournaments = [
+    createTournamentRecord({
+      title: 'Complete Past Test',
+      slug: 'complete-past-test',
+      date: '2026-07-10T20:00:00-04:00',
+    }),
+  ];
+  const nowMs = new Date('2026-07-12T12:00:00-04:00').getTime();
+
+  assert.deepEqual(
+    getActiveOrFutureTournaments(
+      tournaments,
+      {
+        'complete-past-test': {
+          bracket: { status: 'complete' },
+        },
+      },
+      nowMs,
+    ),
+    [],
+  );
+  assert.equal(getNextPublicTournament(tournaments, {}, nowMs), null);
 });
 
 test('tournament slugs stay URL safe', () => {

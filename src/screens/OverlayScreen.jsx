@@ -8,7 +8,7 @@ import {
   getUpcomingTournaments,
 } from '../lib/siteData.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
-import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import { getNextPublicTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
@@ -32,19 +32,6 @@ function getRosterCap(tournament) {
 
 function sortTournamentsByDate(tournaments) {
   return [...tournaments].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
-}
-
-function getNextUpcomingTournament(tournaments, nowMs) {
-  const datedTournaments = tournaments
-    .map((tournament) => ({
-      tournament,
-      startMs: new Date(tournament?.date).getTime(),
-    }))
-    .filter((item) => Number.isFinite(item.startMs))
-    .sort((left, right) => left.startMs - right.startMs);
-  const futureTournament = datedTournaments.find((item) => item.startMs > nowMs);
-
-  return futureTournament?.tournament || datedTournaments[0]?.tournament || tournaments[0] || null;
 }
 
 function getCountdownLabel(tournament, nowMs) {
@@ -129,7 +116,7 @@ export default function OverlayScreen({ variant = 'full' }) {
   const hydratedUpcoming = sortTournamentsByDate(
     upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
   );
-  const featuredTournament = getNextUpcomingTournament(hydratedUpcoming, nowMs);
+  const featuredTournament = getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
   const featuredSlug = featuredTournament?.slug || '';
   const featuredData = eventDataBySlug[featuredSlug] || {};
   const signupSummary = featuredData.signupSummary || { count: 0, signups: [], loading: Boolean(featuredTournament) };

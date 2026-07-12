@@ -29,7 +29,11 @@ import {
   mergeResults,
   siteData,
 } from '../lib/siteData.js';
-import { mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import {
+  getActiveOrFutureTournaments,
+  getNextPublicTournament,
+  mergeTournamentLists,
+} from '../lib/tournamentCatalog.js';
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
@@ -141,19 +145,6 @@ function getCountdownState(tournament, nowMs) {
   };
 }
 
-function getNextUpcomingTournament(tournaments, nowMs) {
-  const datedTournaments = tournaments
-    .map((tournament) => ({
-      tournament,
-      startMs: new Date(tournament?.date).getTime(),
-    }))
-    .filter((item) => Number.isFinite(item.startMs))
-    .sort((left, right) => left.startMs - right.startMs);
-  const futureTournament = datedTournaments.find((item) => item.startMs > nowMs);
-
-  return futureTournament?.tournament || datedTournaments[0]?.tournament || tournaments[0] || null;
-}
-
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
 }
@@ -182,7 +173,8 @@ export default function HomeScreen() {
   const hydratedUpcoming = sortTournamentsByDate(
     upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
   );
-  const featuredTournament = getNextUpcomingTournament(hydratedUpcoming, nowMs);
+  const visibleUpcoming = getActiveOrFutureTournaments(hydratedUpcoming, eventDataBySlug, nowMs);
+  const featuredTournament = getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
   const seededFeaturedSlug = featuredTournament?.slug || '';
   const featuredEventData = eventDataBySlug[seededFeaturedSlug] || {};
   const featuredBracket = featuredEventData.bracket || null;
@@ -303,7 +295,7 @@ export default function HomeScreen() {
       <PremiumCountdownHero
         bracket={featuredBracket}
         countdown={featuredCountdown}
-        eventCount={upcoming.length}
+        eventCount={visibleUpcoming.length}
         gameCount={games.length}
         matchStatusPath={featuredMatchStatusPath}
         registrationMeta={featuredRegistrationMeta}
@@ -325,21 +317,21 @@ export default function HomeScreen() {
       <PremiumDownloadSection />
 
       <Section
-        action={<ActionButton href={featuredTournamentPath}>Open next event</ActionButton>}
+        action={featuredTournament ? <ActionButton href={featuredTournamentPath}>Open next event</ActionButton> : null}
         description="Live, tonight, and upcoming public tournaments appear here, soonest first."
         nativeID="next-tournaments"
         title="All upcoming tournaments">
         <ScheduleSummaryBar
           eventDataBySlug={eventDataBySlug}
           nowMs={nowMs}
-          tournaments={hydratedUpcoming}
+          tournaments={visibleUpcoming}
         />
         <UpcomingTournamentList
           featuredTournament={featuredTournament}
           eventDataBySlug={eventDataBySlug}
           gameLookup={gameLookup}
           nowMs={nowMs}
-          tournaments={hydratedUpcoming}
+          tournaments={visibleUpcoming}
         />
       </Section>
 
