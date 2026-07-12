@@ -316,6 +316,8 @@ export default function AdminScreen() {
   const [streamCommandLoading, setStreamCommandLoading] = useState(false);
   const [streamCommandMessage, setStreamCommandMessage] = useState('');
   const [streamCommandError, setStreamCommandError] = useState('');
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiveLoading, setArchiveLoading] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
   const [playerAccount, setPlayerAccount] = useState(null);
@@ -966,8 +968,90 @@ export default function AdminScreen() {
     }
   }
 
+  function handleRequestArchiveTournament() {
+    if (!hasHostCredential) {
+      setHostFeedback('', 'Sign in with a host-approved account or enter the fallback token before archiving a tournament.');
+      return;
+    }
+
+    setArchiveConfirmOpen(true);
+    setHostFeedback('', '');
+  }
+
+  function handleCancelArchiveTournament() {
+    setArchiveConfirmOpen(false);
+    setHostFeedback('', '');
+  }
+
+  async function handleArchiveTournament() {
+    const token = rosterToken.trim();
+    const tournament = liveTournament || selectedTournament;
+
+    if (archiveLoading) {
+      return;
+    }
+
+    if (!hasHostCredential) {
+      setHostFeedback('', 'Sign in with a host-approved account or enter the fallback token before archiving a tournament.');
+      return;
+    }
+
+    if (!tournament?.slug) {
+      setHostFeedback('', 'Choose a tournament before archiving it.');
+      return;
+    }
+
+    setArchiveLoading(true);
+    setHostFeedback('', '');
+    setEventFeedback('', '');
+    setScheduleFeedback('', '');
+
+    try {
+      const archivedTournament = createTournamentRecord({
+        ...tournament,
+        status: 'archived',
+        registrationStatus: 'closed',
+      });
+      const [eventResult, settingsResult] = await Promise.all([
+        saveTournamentEvent({
+          token,
+          tournament: archivedTournament,
+        }),
+        saveTournamentSettings({
+          token,
+          slug: archivedTournament.slug,
+          settings: {
+            tournamentSlug: archivedTournament.slug,
+            date: archivedTournament.date,
+            timeZone: archivedTournament.timeZone,
+            timeZoneLabel: archivedTournament.timeZoneLabel,
+            registrationStatus: 'closed',
+            checkInLeadMinutes: archivedTournament.checkInLeadMinutes,
+          },
+        }),
+      ]);
+      const savedTournament = eventResult.tournament || archivedTournament;
+
+      setHostedTournaments(eventResult.tournaments || [savedTournament]);
+      setRosterSlug(savedTournament.slug);
+      setEventSlug(savedTournament.slug);
+      setScheduleSettings(settingsResult.settings || null);
+      applyEventFields(savedTournament);
+      applyScheduleFields(savedTournament, settingsResult.settings || null);
+      setArchiveConfirmOpen(false);
+      setEventFeedback(`${savedTournament.title} is archived and hidden from upcoming tournament surfaces.`, '');
+      setScheduleFeedback('Registration is closed for the archived event.', '');
+      setHostFeedback('Tournament archived. Roster, bracket, results, and player accounts were kept.', '');
+    } catch (archiveError) {
+      setHostFeedback('', archiveError instanceof Error ? archiveError.message : 'Could not archive this tournament.');
+    } finally {
+      setArchiveLoading(false);
+    }
+  }
+
   function renderScheduleSection() {
     const tournament = liveTournament || selectedTournament;
+    const isArchived = tournament?.status === 'archived';
     const signupCount = activeSignupCount;
     const rosterCap = tournament?.rosterCap || 0;
     const minimumPlayers = tournament?.minimumPlayers || 2;
@@ -979,6 +1063,8 @@ export default function AdminScreen() {
     const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, signupCount);
     const nextHostAction = !hasHostCredential
       ? 'Confirm host access first.'
+      : isArchived
+        ? 'Archived events are hidden from upcoming pages. Save event to publish it again.'
       : !playerCountReady
         ? 'Post the event, then share the signup link.'
         : bracket
@@ -991,6 +1077,7 @@ export default function AdminScreen() {
       { label: 'Registered', value: `${signupCount}${rosterCap ? ` / ${rosterCap}` : ''}`, tone: signupCount >= minimumPlayers ? 'green' : 'blue' },
       { label: 'Bracket', value: bracketLabel, tone: bracket ? 'green' : 'accent' },
       { label: 'Mode', value: activeTournamentMode.shortLabel, tone: canGenerateTournamentMode(activeTournamentMode.value) ? 'green' : 'accent' },
+      { label: 'Visibility', value: isArchived ? 'Archived' : 'Public', tone: isArchived ? 'rose' : 'green' },
       { label: 'Status', value: liveRegistrationMeta.label, tone: liveRegistrationMeta.tone },
       { label: 'Check-in', value: `${scheduleCheckInLeadMinutes || 30} min`, tone: 'blue' },
     ];
@@ -1264,6 +1351,45 @@ export default function AdminScreen() {
             <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleResetScheduleSettings} variant="ghost">
               Reset schedule
             </ActionButton>
+          </View>
+
+          <View style={styles.archivePanel}>
+            <View style={styles.archiveHeader}>
+              <Badge tone={isArchived ? 'rose' : 'blue'}>{isArchived ? 'Archived' : 'Finish event'}</Badge>
+              <View style={styles.archiveCopy}>
+                <Text style={styles.archiveTitle}>Archive this tournament</Text>
+                <Text style={styles.archiveBody}>
+                  Use this when an event is over or you no longer want it promoted. It closes registration and removes the event from Next Tournament/upcoming lists, but keeps the roster, bracket, results, and player accounts.
+                </Text>
+              </View>
+            </View>
+
+            {archiveConfirmOpen ? (
+              <View style={styles.archiveConfirmPanel}>
+                <Text style={styles.archiveBody}>
+                  Archive {tournament?.title || rosterSlug}? Players can still view direct links and results, but the event will stop appearing as upcoming.
+                </Text>
+                <View style={styles.buttonRow}>
+                  <ActionButton disabled={archiveLoading} onPress={handleArchiveTournament}>
+                    {archiveLoading ? 'Archiving...' : 'Yes, archive event'}
+                  </ActionButton>
+                  <ActionButton onPress={handleCancelArchiveTournament} variant="ghost">
+                    Cancel
+                  </ActionButton>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={!hasHostCredential || archiveLoading || isArchived} onPress={handleRequestArchiveTournament} variant="secondary">
+                  {isArchived ? 'Already archived' : 'Archive event'}
+                </ActionButton>
+                {isArchived ? (
+                  <ActionButton disabled={!hasHostCredential || eventSaving} onPress={handleSaveTournamentEvent} variant="secondary">
+                    Publish again
+                  </ActionButton>
+                ) : null}
+              </View>
+            )}
           </View>
 
           <View style={styles.resetDangerPanel}>
@@ -3009,6 +3135,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 8,
+  },
+  archivePanel: {
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 14,
+  },
+  archiveHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  archiveCopy: {
+    flex: 1,
+    minWidth: 240,
+  },
+  archiveTitle: {
+    color: '#F4EFE6',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  archiveBody: {
+    color: '#C8D8E8',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  archiveConfirmPanel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 12,
   },
   resetDangerPanel: {
     backgroundColor: 'rgba(143, 29, 44, 0.08)',
