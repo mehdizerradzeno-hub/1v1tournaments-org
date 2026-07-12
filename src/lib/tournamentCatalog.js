@@ -257,7 +257,7 @@ export function mergeTournamentLists(baseTournaments = [], hostedTournaments = [
   const lookup = new Map();
   const deletedSlugs = new Set(
     hostedTournaments
-      .filter((tournament) => tournament?.deleted)
+      .filter((tournament) => tournament?.deleted && tournament?.hideSeeded)
       .map((tournament) => tournament.slug)
       .filter(Boolean),
   );
@@ -272,7 +272,9 @@ export function mergeTournamentLists(baseTournaments = [], hostedTournaments = [
 
   hostedTournaments.filter(Boolean).forEach((tournament) => {
     if (tournament.deleted) {
-      lookup.delete(tournament.slug);
+      if (tournament.hideSeeded) {
+        lookup.delete(tournament.slug);
+      }
       return;
     }
 
