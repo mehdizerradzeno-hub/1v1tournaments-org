@@ -80,6 +80,46 @@ const PASSWORD_REQUIREMENT_ITEMS = [
     isMet: (value) => /[0-9\W_]/.test(value),
   },
 ];
+const SIGNUP_AUTH_RETRY_DELAY_MS = 450;
+
+function waitForSignupRetry() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, SIGNUP_AUTH_RETRY_DELAY_MS);
+  });
+}
+
+function isAuthSignupError(error) {
+  return error instanceof Error && /create or sign in to a player account/i.test(error.message);
+}
+
+function isSameSignup(left, right) {
+  if (!left || !right) return false;
+  if (left.id && right.id) return left.id === right.id;
+
+  const leftName = String(left.playerName || '').trim().toLowerCase();
+  const rightName = String(right.playerName || '').trim().toLowerCase();
+
+  return Boolean(leftName && rightName && leftName === rightName && left.tournamentSlug === right.tournamentSlug);
+}
+
+function includeConfirmedSignup(signups = [], confirmedSignup) {
+  const rows = Array.isArray(signups) ? [...signups] : [];
+
+  if (!confirmedSignup) {
+    return rows;
+  }
+
+  const confirmedRow = {
+    ...confirmedSignup,
+    currentPlayer: true,
+  };
+
+  if (rows.some((signup) => isSameSignup(signup, confirmedRow))) {
+    return rows.map((signup) => (isSameSignup(signup, confirmedRow) ? { ...signup, currentPlayer: true } : signup));
+  }
+
+  return [confirmedRow, ...rows];
+}
 
 function getPasswordRequirements(password, confirmPassword) {
   return [
@@ -392,15 +432,18 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   function applySignupResult(result) {
     setSignup(result.signup);
     setSignupSummary((current) => ({
-      count: result.summary?.signupCount || current.count + 1,
-      signups: result.summary?.signups || current.signups || [],
+      count: Math.max(
+        Number.isFinite(Number(result.summary?.signupCount)) ? Number(result.summary.signupCount) : current.count + 1,
+        includeConfirmedSignup(result.summary?.signups || current.signups || [], result.signup).length,
+      ),
+      signups: includeConfirmedSignup(result.summary?.signups || current.signups || [], result.signup),
       loading: false,
       error: '',
     }));
     setNotes('');
   }
 
-  async function saveSignupWithCurrentSession() {
+  async function saveSignupWithCurrentSession({ retryAuth = false } = {}) {
     if (!liveTournament) {
       throw new Error('Choose a valid tournament before signing up.');
     }
@@ -411,11 +454,26 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       throw new Error(effectiveRegistrationMeta.actionCopy);
     }
 
-    const result = await submitTournamentSignup({
-      tournamentSlug: liveTournament.slug,
-      tournamentDate: liveTournament.date,
-      notes,
-    });
+    let result;
+
+    try {
+      result = await submitTournamentSignup({
+        tournamentSlug: liveTournament.slug,
+        tournamentDate: liveTournament.date,
+        notes,
+      });
+    } catch (signupError) {
+      if (!retryAuth || !isAuthSignupError(signupError)) {
+        throw signupError;
+      }
+
+      await waitForSignupRetry();
+      result = await submitTournamentSignup({
+        tournamentSlug: liveTournament.slug,
+        tournamentDate: liveTournament.date,
+        notes,
+      });
+    }
 
     applySignupResult(result);
     return result.signup;
@@ -486,7 +544,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
       if (registrationOpen) {
         try {
-          const savedSignup = await saveSignupWithCurrentSession();
+          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true });
           setAccountMessage(`Account created. ${savedSignup.playerName} is signed up for this tournament.`);
         } catch (signupError) {
           setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
@@ -529,7 +587,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
       if (registrationOpen) {
         try {
-          const savedSignup = await saveSignupWithCurrentSession();
+          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true });
           setAccountMessage(`Signed in. ${savedSignup.playerName} is on the tournament roster.`);
         } catch (signupError) {
           setAccountMessage(`Signed in as ${accountDisplayName}.`);
@@ -1034,7 +1092,7 @@ function isOwnSignup(signup, account, latestSignup) {
 }
 
 function SignupRosterPanel({ account, latestSignup, signupSummary }) {
-  const signups = signupSummary.signups || [];
+  const signups = includeConfirmedSignup(signupSummary.signups || [], latestSignup);
   const ownSignup = signups.find((signupItem) => isOwnSignup(signupItem, account, latestSignup)) || latestSignup || null;
 
   return (
