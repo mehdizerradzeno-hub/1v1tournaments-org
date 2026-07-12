@@ -755,6 +755,15 @@ export default function TournamentScreen({ slug }) {
         tournamentPath={tournamentPath}
       />
 
+      <PlayerStatusSpotlight
+        isBracketLive={isBracketLive}
+        liveBracket={liveBracket}
+        playerStatus={playerStatus}
+        primaryAction={primaryPlayerAction}
+        registrationMeta={registrationMeta}
+        result={result}
+      />
+
       <TournamentArrivalRail
         checkInPath={checkInPath}
         isBracketLive={isBracketLive}
@@ -1616,6 +1625,118 @@ function statusBadgeLabel(nextStep) {
     default:
       return 'Checking';
   }
+}
+
+function playerSpotlightTitle(playerStatus, result) {
+  const data = playerStatus.data;
+
+  if (playerStatus.loading) return 'Checking your tournament status...';
+  if (data?.currentMatch) return 'Your match is ready.';
+  if (data?.nextStep === 'champion') return 'You are the champion.';
+  if (result || data?.nextStep === 'complete') return 'Tournament results are posted.';
+  if (data?.signup) return 'You are signed up.';
+  if (data?.account) return 'Join the roster to play.';
+  return 'Create an account to join.';
+}
+
+function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta) {
+  const data = playerStatus.data;
+  const accountName = data?.account?.playerName || '';
+  const signupName = data?.signup?.playerName || '';
+
+  if (playerStatus.loading) return 'One moment while we check this browser for a player account and roster seat.';
+  if (data?.currentMatch) return 'Open your assigned Spades table from My Match, then return here after the game.';
+  if (data?.nextStep === 'champion') return 'Nice. The bracket has you marked as tournament winner.';
+  if (data?.nextStep === 'complete') return 'This event is complete. You can review the final bracket and results.';
+  if (signupName) return `${signupName} is on the roster. The host will publish match links when the bracket is ready.`;
+  if (accountName && registrationMeta.value === 'open') return `${accountName} is signed in. Join this tournament to reserve a roster seat.`;
+  if (accountName && isBracketLive) return `${accountName} is signed in, but this bracket is already live. Check with the host if you expected a seat.`;
+  if (registrationMeta.value === 'open') return 'Sign in or create an account, then reserve your spot on the tournament roster.';
+  return registrationMeta.actionCopy || 'Registration is not open right now.';
+}
+
+function PlayerStatusSpotlight({
+  isBracketLive,
+  liveBracket,
+  playerStatus,
+  primaryAction,
+  registrationMeta,
+  result,
+}) {
+  const data = playerStatus.data || {};
+  const currentMatch = data.currentMatch || null;
+  const accountName = data.account?.playerName || '';
+  const signupName = data.signup?.playerName || '';
+  const steps = [
+    {
+      label: 'Account',
+      value: accountName || 'Needed',
+      tone: accountName ? 'green' : 'accent',
+      done: Boolean(accountName),
+    },
+    {
+      label: 'Roster',
+      value: signupName ? 'Signed up' : 'Not joined',
+      tone: signupName ? 'green' : accountName ? 'accent' : 'blue',
+      done: Boolean(signupName),
+    },
+    {
+      label: 'Bracket',
+      value: liveBracket ? 'Live' : 'Waiting',
+      tone: liveBracket ? 'green' : signupName ? 'accent' : 'blue',
+      done: Boolean(liveBracket),
+    },
+    {
+      label: 'Match',
+      value: currentMatch ? 'Ready' : 'Waiting',
+      tone: currentMatch ? 'green' : liveBracket ? 'accent' : 'blue',
+      done: Boolean(currentMatch),
+    },
+    {
+      label: 'Results',
+      value: result ? 'Posted' : 'After final',
+      tone: result ? 'green' : 'blue',
+      done: Boolean(result),
+    },
+  ];
+  const actionLabel = currentMatch ? 'Play My Match' : primaryAction?.label || 'Next Step';
+
+  return (
+    <Surface style={[styles.statusSpotlight, currentMatch && styles.statusSpotlightReady]}>
+      <View style={styles.statusSpotlightTopRow}>
+        <View style={styles.statusSpotlightCopy}>
+          <Badge tone={statusTone(data.nextStep)}>{statusBadgeLabel(data.nextStep)}</Badge>
+          <Text style={styles.statusSpotlightTitle}>{playerSpotlightTitle(playerStatus, result)}</Text>
+          <Text style={styles.statusSpotlightBody}>
+            {playerSpotlightBody(playerStatus, isBracketLive, registrationMeta)}
+          </Text>
+        </View>
+        <View style={styles.statusSpotlightAction}>
+          {primaryAction?.href ? <ActionButton href={primaryAction.href}>{actionLabel}</ActionButton> : null}
+          <ActionButton href="/rules" variant="secondary">Rules</ActionButton>
+        </View>
+      </View>
+      <View style={styles.statusSpotlightSteps}>
+        {steps.map((step, index) => (
+          <View
+            key={step.label}
+            style={[
+              styles.statusSpotlightStep,
+              step.done && styles.statusSpotlightStepDone,
+              currentMatch && step.label === 'Match' && styles.statusSpotlightStepReady,
+            ]}>
+            <Text style={[styles.statusSpotlightStepNumber, step.done && styles.statusSpotlightStepNumberDone]}>
+              {index + 1}
+            </Text>
+            <View style={styles.statusSpotlightStepCopy}>
+              <Text style={styles.statusSpotlightStepLabel}>{step.label}</Text>
+              <Text numberOfLines={1} style={styles.statusSpotlightStepValue}>{step.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </Surface>
+  );
 }
 
 function playerStatusActionLabel(data, currentMatch) {
@@ -2953,6 +3074,117 @@ const styles = StyleSheet.create({
     color: '#A7A29A',
     fontSize: 13,
     fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  statusSpotlight: {
+    backgroundColor: 'rgba(8, 25, 21, 0.94)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+    marginBottom: 18,
+  },
+  statusSpotlightReady: {
+    backgroundColor: 'rgba(20, 45, 32, 0.96)',
+    borderColor: 'rgba(77, 217, 133, 0.58)',
+    shadowColor: '#4DD985',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+  },
+  statusSpotlightTopRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  statusSpotlightCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  statusSpotlightAction: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'flex-end',
+    minWidth: 220,
+  },
+  statusSpotlightTitle: {
+    color: '#F4EFE6',
+    fontSize: 26,
+    fontWeight: '900',
+    lineHeight: 32,
+    marginTop: 12,
+  },
+  statusSpotlightBody: {
+    color: '#D4DDD7',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  statusSpotlightSteps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  statusSpotlightStep: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 150,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  statusSpotlightStepDone: {
+    backgroundColor: 'rgba(77, 217, 133, 0.09)',
+    borderColor: 'rgba(77, 217, 133, 0.34)',
+  },
+  statusSpotlightStepReady: {
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.58)',
+  },
+  statusSpotlightStepNumber: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.30)',
+    borderRadius: 999,
+    borderWidth: 1,
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '900',
+    height: 34,
+    lineHeight: 32,
+    textAlign: 'center',
+    width: 34,
+  },
+  statusSpotlightStepNumberDone: {
+    backgroundColor: 'rgba(77, 217, 133, 0.14)',
+    borderColor: 'rgba(77, 217, 133, 0.42)',
+    color: '#4DD985',
+  },
+  statusSpotlightStepCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusSpotlightStepLabel: {
+    color: '#A7A29A',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
+    textTransform: 'uppercase',
+  },
+  statusSpotlightStepValue: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
     lineHeight: 19,
     marginTop: 2,
   },

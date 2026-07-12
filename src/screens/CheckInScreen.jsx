@@ -118,12 +118,21 @@ function normalizeAccountMode(value) {
 
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
-function notifyPlayerAccountChanged() {
-  if (typeof globalThis.dispatchEvent !== 'function' || typeof globalThis.Event !== 'function') {
+function notifyPlayerAccountChanged(account) {
+  if (typeof globalThis.dispatchEvent !== 'function') {
     return;
   }
 
-  globalThis.dispatchEvent(new Event(PLAYER_ACCOUNT_CHANGED_EVENT));
+  if (typeof globalThis.CustomEvent === 'function') {
+    globalThis.dispatchEvent(new CustomEvent(PLAYER_ACCOUNT_CHANGED_EVENT, { detail: { account } }));
+    return;
+  }
+
+  if (typeof globalThis.Event === 'function') {
+    const event = new Event(PLAYER_ACCOUNT_CHANGED_EVENT);
+    event.detail = { account };
+    globalThis.dispatchEvent(event);
+  }
 }
 
 export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
@@ -213,7 +222,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           setAccount(nextAccount);
 
           if (nextAccount) {
-            notifyPlayerAccountChanged();
+            notifyPlayerAccountChanged(nextAccount);
           }
         }
       } catch (loadError) {
@@ -388,7 +397,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       const accountDisplayName = nextAccount?.playerName || result.account?.playerName || playerName || 'your account';
 
       setAccount(nextAccount);
-      notifyPlayerAccountChanged();
+      notifyPlayerAccountChanged(nextAccount);
       setPlayerName(nextAccount?.playerName || playerName);
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || playerHandle);
@@ -431,7 +440,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       const accountDisplayName = nextAccount?.playerName || result.account?.playerName || contactEmail || 'your account';
 
       setAccount(nextAccount);
-      notifyPlayerAccountChanged();
+      notifyPlayerAccountChanged(nextAccount);
       setPlayerName(nextAccount?.playerName || '');
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || '');
@@ -467,7 +476,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     try {
       await logoutPlayerAccount();
       setAccount(null);
-      notifyPlayerAccountChanged();
+      notifyPlayerAccountChanged(null);
       setAccountMessage('Signed out. Sign back in before joining another tournament.');
     } catch (logoutError) {
       setAccountError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');
@@ -517,28 +526,31 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
-  const hasSignupConfirmation = Boolean(signup);
+  const confirmedSignup = signup
+    || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
+    || null;
+  const hasSignupConfirmation = Boolean(confirmedSignup);
   const wantsAccountSwitch = Boolean(account && accountMode === 'login');
   const mainTitle = hasSignupConfirmation
-    ? 'You are registered'
+    ? 'You are on the roster'
     : wantsAccountSwitch
       ? 'This browser is already signed in.'
     : account
-      ? 'Account ready. Join this event.'
-      : 'Create account and join in one step';
+      ? 'Account ready. Join this tournament.'
+      : 'Create your player account';
   const mainCopy = hasSignupConfirmation
-    ? 'You are registered. Use My Match when the bracket is published.'
+    ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
     : wantsAccountSwitch
       ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
-      ? 'Your account is signed in. One more tap reserves your tournament spot.'
-      : 'New players create an account once. If registration is open, this also reserves the tournament spot.';
+      ? 'Your account is signed in. One clear tap reserves your tournament spot.'
+      : 'Enter your player name, email, and password. If registration is open, this also joins the tournament roster.';
   const authActionLabel = accountMode === 'create'
     ? registrationOpen
-      ? 'Create account and join'
+      ? 'Create Account & Join Tournament'
       : 'Create account'
     : registrationOpen
-      ? 'Sign in and join'
+      ? 'Sign In & Join Tournament'
       : 'Sign in';
 
   return (
@@ -562,29 +574,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
       title={`Join ${visibleTournament.title}`}>
       <Section
-        description="Public roster names appear here as soon as signups are saved. Signed-in players see themselves marked."
-        title="Current roster">
-        <SignupRosterPanel
-          account={account}
-          latestSignup={signup}
-          signupSummary={signupSummary}
-        />
-      </Section>
-
-      <Section description="Know the bracket style and player requirement before reserving a spot." title="Tournament format">
-        <SignupFormatPanel
-          formatDetails={formatDetails}
-          liveBracket={liveBracket}
-          signupSummary={signupSummary}
-          tournament={visibleTournament}
-        />
-      </Section>
-
-      <Section
         description={hasSignupConfirmation
-          ? 'Your seat is saved. The next useful action is My Match after seeding.'
-          : 'One clear path: account first, roster second, match link after the bracket goes live.'}
-        title={hasSignupConfirmation ? 'You are in' : 'Join this tournament'}>
+          ? 'Your seat is saved. The next useful action is My Match after the host seeds the bracket.'
+          : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
+        title={hasSignupConfirmation ? 'You are in' : 'Create account and join'}>
         <Surface style={styles.signupCard}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
@@ -601,22 +594,36 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             <View style={[styles.flowStep, (account || hasSignupConfirmation) && styles.flowStepComplete]}>
               <Badge tone={account || hasSignupConfirmation ? 'green' : 'accent'}>1</Badge>
               <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Account</Text>
+                <Text style={styles.flowStepTitle}>Create account</Text>
                 <Text style={styles.flowStepText}>{account ? account.playerName : 'Create or sign in'}</Text>
               </View>
             </View>
             <View style={[styles.flowStep, hasSignupConfirmation && styles.flowStepComplete]}>
               <Badge tone={hasSignupConfirmation ? 'green' : account ? 'accent' : 'blue'}>2</Badge>
               <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Registration</Text>
-                <Text style={styles.flowStepText}>{hasSignupConfirmation ? 'Spot reserved' : 'Join tournament'}</Text>
+                <Text style={styles.flowStepTitle}>Sign up</Text>
+                <Text style={styles.flowStepText}>{hasSignupConfirmation ? 'Spot reserved' : 'Join the roster'}</Text>
               </View>
             </View>
             <View style={styles.flowStep}>
-              <Badge tone="blue">3</Badge>
+              <Badge tone={liveBracket ? 'green' : 'blue'}>3</Badge>
+              <View style={styles.flowStepCopy}>
+                <Text style={styles.flowStepTitle}>Bracket</Text>
+                <Text style={styles.flowStepText}>{liveBracket ? 'Bracket is live' : 'Wait for seeding'}</Text>
+              </View>
+            </View>
+            <View style={[styles.flowStep, liveBracket && hasSignupConfirmation && styles.flowStepComplete]}>
+              <Badge tone={liveBracket && hasSignupConfirmation ? 'accent' : 'blue'}>4</Badge>
               <View style={styles.flowStepCopy}>
                 <Text style={styles.flowStepTitle}>My Match</Text>
-                <Text style={styles.flowStepText}>Opens when bracket is live</Text>
+                <Text style={styles.flowStepText}>Open your assigned table</Text>
+              </View>
+            </View>
+            <View style={styles.flowStep}>
+              <Badge tone="blue">5</Badge>
+              <View style={styles.flowStepCopy}>
+                <Text style={styles.flowStepTitle}>Results</Text>
+                <Text style={styles.flowStepText}>Return here after play</Text>
               </View>
             </View>
           </View>
@@ -678,7 +685,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   </ActionButton>
                 ) : (
                   <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                    {registrationOpen ? (submitting ? 'Saving...' : 'Join') : registrationMeta.label}
+                    {registrationOpen ? (submitting ? 'Saving...' : 'Join Tournament') : registrationMeta.label}
                   </ActionButton>
                 )}
                 {wantsAccountSwitch ? null : (
@@ -827,23 +834,44 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
           {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
           {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
-          {signup ? (
+          {confirmedSignup ? (
             <View style={styles.confirmationPanel}>
               <Badge tone="green">Registration saved</Badge>
-              <Text style={styles.confirmationTitle}>{signup.playerName} is registered.</Text>
-              <Text style={styles.confirmationCopy}>Confirmation ID: {signup.id}</Text>
+              <Text style={styles.confirmationTitle}>{confirmedSignup.playerName} is registered.</Text>
+              {confirmedSignup.id ? <Text style={styles.confirmationCopy}>Confirmation ID: {confirmedSignup.id}</Text> : null}
             </View>
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </Surface>
       </Section>
 
-      <Section description="What happens after your registration is saved." title="What happens next">
+      <Section
+        description="Public roster names appear here as soon as signups are saved. Signed-in players see themselves marked."
+        title="Current roster">
+        <SignupRosterPanel
+          account={account}
+          latestSignup={confirmedSignup}
+          signupSummary={signupSummary}
+        />
+      </Section>
+
+      <Section description="Know the bracket style and player requirement before reserving a spot." title="Tournament format">
+        <SignupFormatPanel
+          formatDetails={formatDetails}
+          liveBracket={liveBracket}
+          signupSummary={signupSummary}
+          tournament={visibleTournament}
+        />
+      </Section>
+
+      <Section description="What happens after your registration is saved." title="Player path">
         <StepStrip
           steps={[
-            { title: 'Join tournament', body: 'Your account becomes the tournament identity for this event.' },
-            { title: 'Wait for bracket', body: 'The host publishes match IDs from the live signup roster near start time.' },
-            { title: 'Open My Match', body: 'Your match card opens the Spades room when the bracket is ready.' },
+            { title: 'Create account', body: 'One account ties your signup and match seat to you.' },
+            { title: 'Sign up', body: 'Your name appears in the public tournament roster.' },
+            { title: 'Bracket opens', body: 'The host seeds the roster and match IDs appear.' },
+            { title: 'Play match', body: 'Use My Match to open your assigned Spades table.' },
+            { title: 'See results', body: 'Return to the hub for bracket and winner updates.' },
           ]}
         />
       </Section>

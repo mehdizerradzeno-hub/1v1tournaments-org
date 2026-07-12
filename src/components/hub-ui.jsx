@@ -676,8 +676,11 @@ export function HubScreen({
       }
     }
 
-    function refreshPlayerAccount() {
+    function refreshPlayerAccount(event) {
       if (active) {
+        if (event?.detail && Object.prototype.hasOwnProperty.call(event.detail, 'account')) {
+          setPlayerAccount(event.detail.account || null);
+        }
         setPlayerAccountLoading(true);
       }
 
