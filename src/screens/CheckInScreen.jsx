@@ -112,6 +112,86 @@ function getPasswordError(password, confirmPassword) {
   return '';
 }
 
+function getAccountFormStatus({
+  accountLoading,
+  accountMode,
+  accountSubmitting,
+  confirmPassword,
+  contactEmail,
+  password,
+  playerName,
+  registrationOpen,
+}) {
+  if (accountLoading) {
+    return {
+      body: 'Checking this browser for an existing player account.',
+      ready: false,
+      title: 'Checking account',
+      tone: 'blue',
+    };
+  }
+
+  if (accountSubmitting) {
+    return {
+      body: accountMode === 'create' ? 'Creating the account and saving the roster seat.' : 'Opening the account and checking the roster.',
+      ready: false,
+      title: 'Working...',
+      tone: 'blue',
+    };
+  }
+
+  const missingFields = [];
+
+  if (accountMode === 'create' && !playerName.trim()) {
+    missingFields.push('display name');
+  }
+
+  if (!contactEmail.trim()) {
+    missingFields.push('email');
+  }
+
+  if (!password) {
+    missingFields.push('password');
+  }
+
+  if (accountMode === 'create' && !confirmPassword) {
+    missingFields.push('confirm password');
+  }
+
+  if (missingFields.length) {
+    return {
+      body: `Finish: ${missingFields.join(', ')}.`,
+      ready: false,
+      title: 'Almost ready',
+      tone: 'accent',
+    };
+  }
+
+  if (accountMode === 'create') {
+    const passwordError = getPasswordError(password, confirmPassword);
+
+    if (passwordError) {
+      return {
+        body: passwordError,
+        ready: false,
+        title: 'Password needs attention',
+        tone: 'accent',
+      };
+    }
+  }
+
+  const actionCopy = accountMode === 'create' ? 'create your account' : 'sign you in';
+
+  return {
+    body: registrationOpen
+      ? `This will ${actionCopy} and reserve your roster spot.`
+      : `This will ${actionCopy}. Registration is not open right now.`,
+    ready: true,
+    title: registrationOpen ? 'Ready to join' : 'Ready for account',
+    tone: 'green',
+  };
+}
+
 function normalizeAccountMode(value) {
   return value === 'signin' || value === 'login' ? 'login' : 'create';
 }
@@ -552,6 +632,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     : registrationOpen
       ? 'Sign In & Join Tournament'
       : 'Sign in';
+  const accountFormStatus = getAccountFormStatus({
+    accountLoading,
+    accountMode,
+    accountSubmitting,
+    confirmPassword,
+    contactEmail,
+    password,
+    playerName,
+    registrationOpen,
+  });
 
   return (
     <HubScreen
@@ -733,15 +823,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Player name</Text>
+                  <Text style={styles.fieldLabel}>Tournament display name</Text>
                   <TextInput
                     autoCapitalize="words"
                     onChangeText={setPlayerName}
-                    placeholder="Your tournament name"
+                    placeholder="Name shown on roster and bracket"
                     placeholderTextColor="#6B766F"
                     style={styles.input}
                     value={playerName}
                   />
+                  <Text style={styles.fieldHint}>This is the public name people see in the roster, bracket, and results.</Text>
                 </View>
               ) : null}
 
@@ -757,6 +848,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   style={styles.input}
                   value={contactEmail}
                 />
+                <Text style={styles.fieldHint}>Used for sign-in. The public roster shows your display name, not your email.</Text>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -805,26 +897,35 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Player handle</Text>
+                  <Text style={styles.fieldLabel}>Optional handle</Text>
                   <TextInput
                     autoCapitalize="none"
                     autoCorrect={false}
                     onChangeText={setPlayerHandle}
-                    placeholder="Optional Spades name, Discord, or YouTube"
+                    placeholder="Discord or Spades name, if different"
                     placeholderTextColor="#6B766F"
                     style={styles.input}
                     value={playerHandle}
                   />
+                  <Text style={styles.fieldHint}>Skip this if your display name is enough. It is just extra context for the host.</Text>
                 </View>
               ) : null}
 
+              <View style={[styles.submitReadiness, accountFormStatus.ready && styles.submitReadinessReady]}>
+                <Badge tone={accountFormStatus.tone}>{accountFormStatus.ready ? 'Ready' : 'Next'}</Badge>
+                <View style={styles.submitReadinessCopy}>
+                  <Text style={styles.submitReadinessTitle}>{accountFormStatus.title}</Text>
+                  <Text style={styles.submitReadinessBody}>{accountFormStatus.body}</Text>
+                </View>
+              </View>
+
               <View style={styles.buttonRow}>
                 {accountMode === 'create' ? (
-                  <ActionButton disabled={accountSubmitting || accountLoading} onPress={handleCreateAccount}>
+                  <ActionButton disabled={!accountFormStatus.ready} onPress={handleCreateAccount}>
                     {accountSubmitting ? 'Creating...' : authActionLabel}
                   </ActionButton>
                 ) : (
-                  <ActionButton disabled={accountSubmitting || accountLoading} onPress={handleLoginAccount}>
+                  <ActionButton disabled={!accountFormStatus.ready} onPress={handleLoginAccount}>
                     {accountSubmitting ? 'Opening...' : authActionLabel}
                   </ActionButton>
                 )}
@@ -836,9 +937,23 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
           {confirmedSignup ? (
             <View style={styles.confirmationPanel}>
-              <Badge tone="green">Registration saved</Badge>
-              <Text style={styles.confirmationTitle}>{confirmedSignup.playerName} is registered.</Text>
-              {confirmedSignup.id ? <Text style={styles.confirmationCopy}>Confirmation ID: {confirmedSignup.id}</Text> : null}
+              <View style={styles.confirmationTopRow}>
+                <Badge tone="green">You are in</Badge>
+                <Text style={styles.confirmationKicker}>Roster spot saved</Text>
+              </View>
+              <Text style={styles.confirmationTitle}>Spot reserved for {confirmedSignup.playerName}.</Text>
+              <Text style={styles.confirmationCopy}>
+                Your name is in Current roster. When the bracket is published, use My Match to open your assigned table.
+              </Text>
+              {confirmedSignup.id ? <Text style={styles.confirmationMeta}>Confirmation ID: {confirmedSignup.id}</Text> : null}
+              <View style={styles.confirmationActions}>
+                <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
+                  My Match
+                </ActionButton>
+                <ActionButton href={`/check-in/${visibleTournament.slug}#registered-players`} variant="secondary">
+                  See Roster
+                </ActionButton>
+              </View>
             </View>
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -847,6 +962,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
       <Section
         description="Public roster names appear here as soon as signups are saved. Signed-in players see themselves marked."
+        nativeID="registered-players"
         title="Current roster">
         <SignupRosterPanel
           account={account}
@@ -1345,6 +1461,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
+  fieldHint: {
+    color: '#A7A29A',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 7,
+  },
   passwordRequirements: {
     borderWidth: 1,
     borderColor: 'rgba(94, 127, 163, 0.26)',
@@ -1389,6 +1512,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     textAlignVertical: 'top',
+  },
+  submitReadiness: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+    padding: 12,
+  },
+  submitReadinessReady: {
+    backgroundColor: 'rgba(77, 217, 133, 0.08)',
+    borderColor: 'rgba(77, 217, 133, 0.32)',
+  },
+  submitReadinessCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+  submitReadinessTitle: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
+  },
+  submitReadinessBody: {
+    color: '#D4DDD7',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 3,
   },
   summaryCopy: {
     color: '#A7A29A',
@@ -1442,25 +1598,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   confirmationPanel: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
+    backgroundColor: 'rgba(77, 217, 133, 0.09)',
+    borderColor: 'rgba(77, 217, 133, 0.46)',
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 14,
-    padding: 14,
+    padding: 16,
+  },
+  confirmationTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  confirmationKicker: {
+    color: '#4DD985',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   confirmationTitle: {
     color: '#F4EFE6',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
-    lineHeight: 24,
-    marginTop: 10,
+    lineHeight: 28,
+    marginTop: 12,
   },
   confirmationCopy: {
-    color: '#A7A29A',
-    fontSize: 13,
+    color: '#D4DDD7',
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 4,
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  confirmationMeta: {
+    color: '#A7A29A',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  confirmationActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
   },
 });

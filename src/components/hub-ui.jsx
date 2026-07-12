@@ -649,9 +649,9 @@ export function HubScreen({
   const showTopNav = showNavigation && (forceTopNav || !showMobileNav);
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
   const showTinyHeader = width > 0 && width < 390;
-  const showStickyActions = stickyActions && pathname !== '/admin';
-  const showDockedMobileNav = showNavigation && showMobileNav && showStickyActions;
-  const showInlineMobileNav = showNavigation && showMobileNav && !showStickyActions;
+  const showStickyActions = stickyActions && pathname !== '/admin' && !showMobileNav;
+  const showDockedMobileNav = showNavigation && showMobileNav;
+  const showInlineMobileNav = false;
   const showStickyActionCopy = width >= 430;
   const compactHero = heroVariant === 'compact';
 
@@ -1099,19 +1099,18 @@ const styles = StyleSheet.create({
   },
   mobileBottomNav: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    bottom: 8,
+    left: 14,
+    right: 14,
+    bottom: 10,
     zIndex: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 4,
-    borderRadius: 18,
-    backgroundColor: 'rgba(9, 19, 17, 0.96)',
+    padding: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(9, 19, 17, 0.88)',
     borderWidth: 1,
-    borderColor: theme.colors.lineStrong,
-    ...sharedCardShadow,
+    borderColor: 'rgba(244, 239, 230, 0.10)',
   },
   mobileInlineNav: {
     flexDirection: 'row',
@@ -1131,16 +1130,16 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavChip: {
     alignItems: 'center',
-    borderRadius: 14,
-    paddingVertical: 7,
+    borderRadius: 999,
+    paddingVertical: 6,
     paddingHorizontal: 4,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: 'transparent',
   },
   mobileBottomNavChipActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.58)',
   },
   mobileBottomNavText: {
     color: theme.colors.muted,

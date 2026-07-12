@@ -1700,6 +1700,7 @@ function PlayerStatusSpotlight({
     },
   ];
   const actionLabel = currentMatch ? 'Play My Match' : primaryAction?.label || 'Next Step';
+  const matchPlayers = currentMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
 
   return (
     <Surface style={[styles.statusSpotlight, currentMatch && styles.statusSpotlightReady]}>
@@ -1712,10 +1713,24 @@ function PlayerStatusSpotlight({
           </Text>
         </View>
         <View style={styles.statusSpotlightAction}>
-          {primaryAction?.href ? <ActionButton href={primaryAction.href}>{actionLabel}</ActionButton> : null}
+          {!currentMatch && primaryAction?.href ? <ActionButton href={primaryAction.href}>{actionLabel}</ActionButton> : null}
           <ActionButton href="/rules" variant="secondary">Rules</ActionButton>
         </View>
       </View>
+      {currentMatch && primaryAction?.href ? (
+        <View style={styles.statusSpotlightMatchCallout}>
+          <View style={styles.statusSpotlightMatchCopy}>
+            <Text style={styles.statusSpotlightMatchLabel}>Ready now</Text>
+            <Text style={styles.statusSpotlightMatchTitle}>
+              {currentMatch.round.title} • {currentMatch.label}
+            </Text>
+            <Text style={styles.statusSpotlightMatchPlayers}>{matchPlayers}</Text>
+          </View>
+          <ActionButton href={primaryAction.href} style={styles.statusSpotlightPlayButton}>
+            Play My Match
+          </ActionButton>
+        </View>
+      ) : null}
       <View style={styles.statusSpotlightSteps}>
         {steps.map((step, index) => (
           <View
@@ -3121,6 +3136,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 22,
     marginTop: 8,
+  },
+  statusSpotlightMatchCallout: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.58)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: 18,
+    padding: 16,
+  },
+  statusSpotlightMatchCopy: {
+    flex: 1,
+    minWidth: 230,
+  },
+  statusSpotlightMatchLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  statusSpotlightMatchTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+    marginTop: 5,
+  },
+  statusSpotlightMatchPlayers: {
+    color: '#D4DDD7',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  statusSpotlightPlayButton: {
+    flexGrow: 1,
+    marginBottom: 0,
+    marginRight: 0,
+    minWidth: 190,
   },
   statusSpotlightSteps: {
     flexDirection: 'row',
