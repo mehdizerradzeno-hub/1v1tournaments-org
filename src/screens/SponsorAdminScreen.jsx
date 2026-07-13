@@ -128,6 +128,67 @@ const SPONSOR_WORKSPACE_TABS = [
   { id: 'export', label: 'Export' },
 ];
 
+function getWorkspaceTabLabel(tab, counts) {
+  if (tab.id === 'inbox') return `${tab.label} ${counts.inquiries}`;
+  if (tab.id === 'prospects') return `${tab.label} ${counts.prospects}`;
+  if (tab.id === 'drafts') return `${tab.label} ${counts.drafts + counts.proposals}`;
+  return tab.label;
+}
+
+function CommandCard({ label, title, body, action, tone = 'neutral' }) {
+  return (
+    <Surface style={[styles.commandCard, tone === 'accent' && styles.commandCardAccent]}>
+      <Badge tone={tone}>{label}</Badge>
+      <Text style={styles.commandTitle}>{title}</Text>
+      <Text style={styles.commandBody}>{body}</Text>
+      {action ? <Text style={styles.commandAction}>{action}</Text> : null}
+    </Surface>
+  );
+}
+
+function SponsorCommandCenter({ counts, selectedProspect }) {
+  const nextProspect = selectedProspect?.companyName || 'Select a prospect';
+
+  return (
+    <Surface style={styles.commandCenter}>
+      <View style={styles.commandHeader}>
+        <View style={styles.commandHeaderCopy}>
+          <Badge tone="accent">Host workflow</Badge>
+          <Text style={styles.commandHeaderTitle}>Run one sponsor task at a time</Text>
+          <Text style={styles.commandHeaderBody}>
+            Review public inquiries, save real prospects, prepare drafts, and approve placements manually.
+          </Text>
+        </View>
+        <View style={styles.commandMiniStats}>
+          <StatTile label="Inquiries" value={counts.inquiries} />
+          <StatTile label="Saved prospects" value={counts.prospects} />
+        </View>
+      </View>
+      <View style={styles.commandGrid}>
+        <CommandCard
+          action="Start in Inbox"
+          body={`${counts.inquiries} public sponsor ${counts.inquiries === 1 ? 'inquiry is' : 'inquiries are'} ready for review.`}
+          label="1"
+          title="Review inbound interest"
+          tone={counts.inquiries ? 'accent' : 'neutral'}
+        />
+        <CommandCard
+          action="Use Prospects"
+          body="Import or save sponsor candidates only when you have a real public source or direct inquiry."
+          label="2"
+          title="Build a clean CRM"
+        />
+        <CommandCard
+          action="Use Drafts"
+          body={`${nextProspect} before generating a proposal or outreach draft. No message sends from this screen.`}
+          label="3"
+          title="Prepare review-only material"
+        />
+      </View>
+    </Surface>
+  );
+}
+
 function ProspectDetail({ loading, onUpdateStatus, prospect }) {
   if (!prospect) {
     return (
@@ -568,6 +629,12 @@ export default function SponsorAdminScreen() {
   const selectedProspect = prospects.find((prospect) => prospect.id === selectedId) || filteredProspects[0] || null;
   const summary = summarizeSponsorPipeline(prospects);
   const canUseAdmin = Boolean(hostState.account?.hostApproved);
+  const workspaceCounts = {
+    inquiries: inquiryState.inquiries.length,
+    prospects: prospects.length,
+    drafts: outreachDrafts.filter((draft) => draft.status !== 'ARCHIVED').length,
+    proposals: proposals.filter((proposal) => proposal.status !== 'ARCHIVED').length,
+  };
 
   async function loadSponsorInquiries() {
     setInquiryState((currentState) => ({ ...currentState, loading: true, error: '' }));
@@ -988,6 +1055,7 @@ export default function SponsorAdminScreen() {
           <Section
             description="Honest totals only. Empty values mean the CRM has not collected that data yet."
             title="Overview">
+            <SponsorCommandCenter counts={workspaceCounts} selectedProspect={selectedProspect} />
             <View style={styles.statGrid}>
               <StatTile label="Total prospects" value={summary.totalProspects} />
               <StatTile label="Qualified" value={summary.qualifiedProspects} />
@@ -1019,7 +1087,7 @@ export default function SponsorAdminScreen() {
                     key={tab.id}
                     onPress={() => setActiveTab(tab.id)}
                     variant={activeTab === tab.id ? 'primary' : 'secondary'}>
-                    {tab.label}
+                    {getWorkspaceTabLabel(tab, workspaceCounts)}
                   </ActionButton>
                 ))}
               </View>
@@ -1180,6 +1248,79 @@ export default function SponsorAdminScreen() {
 }
 
 const styles = StyleSheet.create({
+  commandAction: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+    marginTop: 12,
+    textTransform: 'uppercase',
+  },
+  commandBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  commandCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    flexBasis: 230,
+    flexGrow: 1,
+  },
+  commandCardAccent: {
+    borderColor: 'rgba(214, 162, 78, 0.36)',
+  },
+  commandCenter: {
+    borderColor: 'rgba(214, 162, 78, 0.32)',
+    gap: 16,
+    marginBottom: 14,
+  },
+  commandGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  commandHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
+  },
+  commandHeaderBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  commandHeaderCopy: {
+    flex: 1.2,
+    minWidth: 260,
+  },
+  commandHeaderTitle: {
+    color: theme.colors.text,
+    fontSize: 25,
+    fontWeight: '900',
+    lineHeight: 31,
+    marginTop: 10,
+  },
+  commandMiniStats: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    minWidth: 240,
+  },
+  commandTitle: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+    marginTop: 10,
+  },
   crmGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
