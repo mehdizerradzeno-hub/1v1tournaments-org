@@ -34,9 +34,9 @@ const NEXT_CHAT_COMMANDS = [
 ];
 const NEXT_MOTION_CSS = `
 @keyframes nextCountdownTick {
-  0% { opacity: .72; transform: translateY(-5px) scale(.99); filter: blur(.4px); }
-  42% { opacity: 1; transform: translateY(1px) scale(1.004); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  0% { opacity: .78; filter: blur(.35px) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
+  42% { opacity: 1; filter: blur(0) drop-shadow(0 0 14px rgba(214, 162, 78, .22)); }
+  100% { opacity: 1; filter: blur(0) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
 }
 
 @keyframes nextTitleBreath {
@@ -71,7 +71,16 @@ const NEXT_MOTION_CSS = `
 
 [data-next-motion="countdown"] {
   animation: nextCountdownTick 440ms cubic-bezier(.2, .86, .22, 1) both;
-  will-change: transform, opacity, filter;
+  will-change: opacity, filter;
+}
+
+[data-countdown-clock="true"] {
+  display: block;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 [data-next-motion="title"] {
@@ -161,11 +170,14 @@ function sortTournamentsByDate(tournaments) {
   return [...tournaments].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
 }
 
-function getCountdownLabel(tournament, nowMs) {
+function getCountdownParts(tournament, nowMs) {
   const startMs = new Date(tournament?.date).getTime();
 
   if (!Number.isFinite(startMs)) {
-    return 'Date TBA';
+    return {
+      clockLabel: 'Date TBA',
+      dayLabel: '',
+    };
   }
 
   const totalSeconds = Math.max(Math.ceil((startMs - nowMs) / 1000), 0);
@@ -177,9 +189,10 @@ function getCountdownLabel(tournament, nowMs) {
   const minuteLabel = String(minutes).padStart(2, '0');
   const secondLabel = String(seconds).padStart(2, '0');
 
-  if (days > 0) return `${days}d ${hourLabel}:${minuteLabel}:${secondLabel}`;
-  if (hours > 0) return `${hours}:${minuteLabel}:${secondLabel}`;
-  return `${minutes}:${secondLabel}`;
+  return {
+    clockLabel: `${hourLabel}:${minuteLabel}:${secondLabel}`,
+    dayLabel: days > 0 ? `${days}d` : '',
+  };
 }
 
 function getSignupCount(signupSummary) {
@@ -456,7 +469,7 @@ export default function NextScreen() {
       <NextLobbyHero
         bracket={bracket}
         checkInPath={checkInPath}
-        countdownLabel={getCountdownLabel(tournament, nowMs)}
+        countdownParts={getCountdownParts(tournament, nowMs)}
         joinUrl={joinUrl}
         openSeats={openSeats}
         registrationMeta={registrationMeta}
@@ -473,7 +486,7 @@ export default function NextScreen() {
 function NextLobbyHero({
   bracket,
   checkInPath,
-  countdownLabel,
+  countdownParts,
   joinUrl,
   openSeats,
   registrationMeta,
@@ -495,6 +508,7 @@ function NextLobbyHero({
   const primaryHref = registrationMeta.value === 'open' ? checkInPath : tournamentPath;
   const primaryLabel = registrationMeta.value === 'open' ? 'Join Tournament' : 'View Event';
   const sponsor = getTournamentSponsor(tournament);
+  const countdownKey = `${countdownParts.dayLabel}-${countdownParts.clockLabel}`;
 
   return (
     <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
@@ -504,12 +518,29 @@ function NextLobbyHero({
         style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}>
         <View style={[styles.countdownCopy, isPhone && styles.countdownCopyPhone]}>
           <Text style={styles.countdownLabel}>Starts in</Text>
-          <Text
+          <View
             dataSet={getMotionDataSet('countdown')}
-            key={countdownLabel}
-            style={[styles.countdownValue, isPhone && styles.countdownValuePhone]}>
-            {countdownLabel}
-          </Text>
+            key={countdownKey}
+            style={styles.countdownStack}>
+            {countdownParts.dayLabel ? (
+              <Text
+                numberOfLines={1}
+                style={[styles.countdownDays, isPhone && styles.countdownDaysPhone]}>
+                {countdownParts.dayLabel}
+              </Text>
+            ) : null}
+            <Text
+              dataSet={{ countdownClock: 'true' }}
+              numberOfLines={1}
+              style={[
+                styles.countdownClock,
+                isPhone && styles.countdownClockPhone,
+                !countdownParts.dayLabel && styles.countdownClockSolo,
+                isPhone && !countdownParts.dayLabel && styles.countdownClockSoloPhone,
+              ]}>
+              {countdownParts.clockLabel}
+            </Text>
+          </View>
           <Text
             dataSet={getMotionDataSet('title')}
             style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>
@@ -689,6 +720,7 @@ const styles = StyleSheet.create({
   countdownCopy: {
     flex: 1.45,
     minWidth: 280,
+    width: '100%',
   },
   countdownCopyPhone: {
     flexBasis: '100%',
@@ -712,26 +744,63 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 32,
     justifyContent: 'space-between',
+    minWidth: 0,
+    overflow: 'hidden',
     padding: 40,
+    width: '100%',
   },
   countdownPanelPhone: {
     gap: 24,
     padding: 24,
   },
-  countdownValue: {
+  countdownStack: {
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+    marginTop: 12,
+    minWidth: 0,
+    width: '100%',
+  },
+  countdownDays: {
     color: '#F4EFE6',
-    fontSize: 88,
+    fontSize: 'clamp(3.5rem, 10vw, 7.5rem)',
     fontWeight: '900',
     letterSpacing: 0,
-    lineHeight: 92,
-    marginTop: 12,
+    lineHeight: 'clamp(3.8rem, 10.4vw, 7.85rem)',
     textShadowColor: 'rgba(214, 162, 78, 0.22)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 18,
+    whiteSpace: 'nowrap',
+    width: '100%',
   },
-  countdownValuePhone: {
-    fontSize: 54,
-    lineHeight: 58,
+  countdownDaysPhone: {
+    fontSize: 'clamp(3.5rem, 16vw, 5.4rem)',
+    lineHeight: 'clamp(3.8rem, 16.8vw, 5.8rem)',
+  },
+  countdownClock: {
+    color: '#F4EFE6',
+    fontSize: 'clamp(2.7rem, 7.6vw, 5.7rem)',
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 'clamp(3rem, 8vw, 6rem)',
+    minWidth: 0,
+    textShadowColor: 'rgba(214, 162, 78, 0.22)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
+    whiteSpace: 'nowrap',
+    width: '100%',
+  },
+  countdownClockPhone: {
+    fontSize: 'clamp(2.35rem, 11.2vw, 3.9rem)',
+    lineHeight: 'clamp(2.7rem, 12vw, 4.25rem)',
+  },
+  countdownClockSolo: {
+    fontSize: 'clamp(3.1rem, 8.8vw, 6.35rem)',
+    lineHeight: 'clamp(3.45rem, 9.3vw, 6.7rem)',
+  },
+  countdownClockSoloPhone: {
+    fontSize: 'clamp(2.35rem, 11.2vw, 3.9rem)',
+    lineHeight: 'clamp(2.7rem, 12vw, 4.25rem)',
   },
   heroActions: {
     alignContent: 'flex-start',

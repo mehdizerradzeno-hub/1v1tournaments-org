@@ -7,7 +7,6 @@ import {
   EmptyState,
   HubScreen,
   Section,
-  StepStrip,
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
@@ -81,15 +80,37 @@ const PASSWORD_REQUIREMENT_ITEMS = [
   },
 ];
 const SIGNUP_AUTH_RETRY_DELAY_MS = 450;
+const SESSION_CONFIRM_RETRY_DELAYS_MS = [0, 300, 700, 1200, 1800];
+const SIGNUP_AUTH_RETRY_DELAYS_MS = [350, 800, 1400, 2200];
 
-function waitForSignupRetry() {
+function waitForSignupRetry(delay = SIGNUP_AUTH_RETRY_DELAY_MS) {
   return new Promise((resolve) => {
-    setTimeout(resolve, SIGNUP_AUTH_RETRY_DELAY_MS);
+    setTimeout(resolve, delay);
   });
 }
 
 function isAuthSignupError(error) {
   return error instanceof Error && /create or sign in to a player account/i.test(error.message);
+}
+
+function isExistingAccountError(error) {
+  return error instanceof Error && /already has a player account/i.test(error.message);
+}
+
+function accountsMatch(left, right) {
+  if (!left || !right) return false;
+
+  const leftId = String(left.id || '').trim();
+  const rightId = String(right.id || '').trim();
+
+  if (leftId && rightId && leftId === rightId) {
+    return true;
+  }
+
+  const leftEmail = String(left.email || '').trim().toLowerCase();
+  const rightEmail = String(right.email || '').trim().toLowerCase();
+
+  return Boolean(leftEmail && rightEmail && leftEmail === rightEmail);
 }
 
 function isSameSignup(left, right) {
@@ -232,6 +253,46 @@ function getAccountFormStatus({
   };
 }
 
+function getSignupProgressSteps({ account, confirmedSignup, liveBracket }) {
+  const signedUpName = confirmedSignup?.playerName || account?.playerName || 'Player';
+  const accountReady = Boolean(account || confirmedSignup);
+  const signedUp = Boolean(confirmedSignup);
+  const matchReady = Boolean(signedUp && liveBracket);
+
+  return [
+    {
+      body: accountReady ? `${signedUpName} is signed in.` : 'Create or sign in once.',
+      complete: accountReady,
+      current: !accountReady,
+      title: 'Account',
+    },
+    {
+      body: signedUp ? 'Roster spot saved.' : 'Join the tournament roster.',
+      complete: signedUp,
+      current: accountReady && !signedUp,
+      title: 'Signed Up',
+    },
+    {
+      body: matchReady ? 'Open your assigned table.' : 'Wait for the bracket to go live.',
+      complete: matchReady,
+      current: signedUp && !matchReady,
+      title: 'Match Ready',
+    },
+    {
+      body: 'Return here after the game.',
+      complete: false,
+      current: matchReady,
+      title: 'Results',
+    },
+  ];
+}
+
+function getSignupStepTone(step) {
+  if (step.complete) return 'green';
+  if (step.current) return 'accent';
+  return 'blue';
+}
+
 function normalizeAccountMode(value) {
   return value === 'signin' || value === 'login' ? 'login' : 'create';
 }
@@ -271,6 +332,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [notes, setNotes] = useState('');
+  const [showOptionalHandle, setShowOptionalHandle] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
@@ -443,7 +505,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     setNotes('');
   }
 
-  async function saveSignupWithCurrentSession({ retryAuth = false } = {}) {
+  async function saveSignupWithCurrentSession({ retryAuth = false, accountHint = null } = {}) {
     if (!liveTournament) {
       throw new Error('Choose a valid tournament before signing up.');
     }
@@ -454,29 +516,46 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       throw new Error(effectiveRegistrationMeta.actionCopy);
     }
 
-    let result;
-
     try {
-      result = await submitTournamentSignup({
+      const result = await submitTournamentSignup({
         tournamentSlug: liveTournament.slug,
         tournamentDate: liveTournament.date,
         notes,
       });
+
+      applySignupResult(result);
+      return result.signup;
     } catch (signupError) {
       if (!retryAuth || !isAuthSignupError(signupError)) {
         throw signupError;
       }
 
-      await waitForSignupRetry();
-      result = await submitTournamentSignup({
-        tournamentSlug: liveTournament.slug,
-        tournamentDate: liveTournament.date,
-        notes,
-      });
-    }
+      let lastAuthError = signupError;
 
-    applySignupResult(result);
-    return result.signup;
+      for (const delay of SIGNUP_AUTH_RETRY_DELAYS_MS) {
+        await waitForSignupRetry(delay);
+        await loadConfirmedAccount(accountHint);
+
+        try {
+          const retriedResult = await submitTournamentSignup({
+            tournamentSlug: liveTournament.slug,
+            tournamentDate: liveTournament.date,
+            notes,
+          });
+
+          applySignupResult(retriedResult);
+          return retriedResult.signup;
+        } catch (retryError) {
+          if (!isAuthSignupError(retryError)) {
+            throw retryError;
+          }
+
+          lastAuthError = retryError;
+        }
+      }
+
+      throw lastAuthError;
+    }
   }
 
   async function handleSubmitSignup() {
@@ -499,12 +578,26 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   }
 
   async function loadConfirmedAccount(fallbackAccount) {
-    try {
-      const refreshed = await fetchPlayerAccount();
-      return refreshed.account || fallbackAccount;
-    } catch {
-      return fallbackAccount;
+    let confirmedAccount = null;
+
+    for (const delay of SESSION_CONFIRM_RETRY_DELAYS_MS) {
+      if (delay) {
+        await waitForSignupRetry(delay);
+      }
+
+      try {
+        const refreshed = await fetchPlayerAccount();
+
+        if (refreshed.account && (!fallbackAccount || accountsMatch(refreshed.account, fallbackAccount))) {
+          confirmedAccount = refreshed.account;
+          break;
+        }
+      } catch {
+        // Keep trying briefly. Netlify Blob session writes can lag the account response by a moment.
+      }
     }
+
+    return confirmedAccount || fallbackAccount;
   }
 
   async function handleCreateAccount() {
@@ -539,22 +632,30 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPlayerName(nextAccount?.playerName || playerName);
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || playerHandle);
+      setShowOptionalHandle(false);
       setPassword('');
       setConfirmPassword('');
 
       if (registrationOpen) {
         try {
-          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true });
-          setAccountMessage(`Account created. ${savedSignup.playerName} is signed up for this tournament.`);
+          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true, accountHint: nextAccount || result.account });
+          setAccountMessage(`Account created and ${savedSignup.playerName} is signed up. Next: use My Match when the bracket is live.`);
         } catch (signupError) {
-          setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join to reserve your spot.');
+          setAccountMessage(`Account created for ${accountDisplayName}, but the roster seat still needs attention.`);
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament once to reserve your spot.');
         }
       } else {
         setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
       }
     } catch (createError) {
-      setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
+      if (isExistingAccountError(createError)) {
+        setAccountMode('login');
+        setConfirmPassword('');
+        setShowOptionalHandle(false);
+        setAccountError('That email already has an account. I switched this form to Sign in so you can continue.');
+      } else {
+        setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
+      }
     } finally {
       setAccountSubmitting(false);
       setAccountLoading(false);
@@ -582,16 +683,17 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPlayerName(nextAccount?.playerName || '');
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || '');
+      setShowOptionalHandle(false);
       setPassword('');
       setConfirmPassword('');
 
       if (registrationOpen) {
         try {
-          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true });
-          setAccountMessage(`Signed in. ${savedSignup.playerName} is on the tournament roster.`);
+          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true, accountHint: nextAccount || result.account });
+          setAccountMessage(`Signed in and ${savedSignup.playerName} is on the roster. Next: use My Match when the bracket is live.`);
         } catch (signupError) {
-          setAccountMessage(`Signed in as ${accountDisplayName}.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join to reserve your spot.');
+          setAccountMessage(`Signed in as ${accountDisplayName}, but the roster seat still needs attention.`);
+          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament once to reserve your spot.');
         }
       } else {
         setAccountMessage(`Signed in as ${accountDisplayName}.`);
@@ -668,6 +770,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
     || null;
   const hasSignupConfirmation = Boolean(confirmedSignup);
+  const isLoginMode = accountMode === 'login';
   const wantsAccountSwitch = Boolean(account && accountMode === 'login');
   const mainTitle = hasSignupConfirmation
     ? 'You are on the roster'
@@ -675,14 +778,18 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'This browser is already signed in.'
     : account
       ? 'Account ready. Join this tournament.'
-      : 'Create your player account';
+      : isLoginMode
+        ? 'Sign in and join this tournament.'
+        : 'Create your player account';
   const mainCopy = hasSignupConfirmation
     ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
     : wantsAccountSwitch
       ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
-      : 'Enter your player name, email, and password. If registration is open, this also joins the tournament roster.';
+      : isLoginMode
+        ? 'Use your account email and password. If registration is open, this also joins the tournament roster.'
+        : 'Enter your player name, email, and password. If registration is open, this also joins the tournament roster.';
   const authActionLabel = accountMode === 'create'
     ? registrationOpen
       ? 'Create Account & Join Tournament'
@@ -700,14 +807,25 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     playerName,
     registrationOpen,
   });
+  const tournamentPath = getTournamentPath(visibleTournament.slug);
+  const matchStatusPath = `${tournamentPath}#my-match`;
+  const rosterPath = `/check-in/${visibleTournament.slug}#registered-players`;
+  const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup, liveBracket });
+  const screenActions = hasSignupConfirmation
+    ? [
+        { label: 'My Match', href: matchStatusPath },
+        { label: 'Roster', href: rosterPath, variant: 'secondary' },
+        { label: 'Event', href: tournamentPath, variant: 'secondary' },
+      ]
+    : [
+        { label: 'Event', href: tournamentPath },
+        { label: 'Rules', href: '/rules', variant: 'secondary' },
+        { label: 'Watch', href: '/stream', variant: 'ghost' },
+      ];
 
   return (
     <HubScreen
-      actions={[
-        { label: 'Event', href: getTournamentPath(visibleTournament.slug) },
-        { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Watch', href: '/stream', variant: 'ghost' },
-      ]}
+      actions={screenActions}
       eyebrow="Tournament registration"
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
       lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
@@ -724,9 +842,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       <Section
         description={hasSignupConfirmation
           ? 'Your seat is saved. The next useful action is My Match after the host seeds the bracket.'
-          : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
-        title={hasSignupConfirmation ? 'You are in' : 'Create account and join'}>
-        <Surface style={styles.signupCard}>
+          : isLoginMode
+            ? 'Sign in once, join the roster, then use My Match when the bracket goes live.'
+            : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
+        title={hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in and join' : 'Create account and join'}>
+        <Surface style={[styles.signupCard, hasSignupConfirmation && styles.signupCardComplete]}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
             <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
@@ -738,47 +858,25 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           </Text>
           {signupSummary.error ? <Text style={styles.mutedWarning}>{signupSummary.error}</Text> : null}
 
-          <View style={styles.flowSteps}>
-            <View style={[styles.flowStep, (account || hasSignupConfirmation) && styles.flowStepComplete]}>
-              <Badge tone={account || hasSignupConfirmation ? 'green' : 'accent'}>1</Badge>
-              <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Create account</Text>
-                <Text style={styles.flowStepText}>{account ? account.playerName : 'Create or sign in'}</Text>
-              </View>
-            </View>
-            <View style={[styles.flowStep, hasSignupConfirmation && styles.flowStepComplete]}>
-              <Badge tone={hasSignupConfirmation ? 'green' : account ? 'accent' : 'blue'}>2</Badge>
-              <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Sign up</Text>
-                <Text style={styles.flowStepText}>{hasSignupConfirmation ? 'Spot reserved' : 'Join the roster'}</Text>
-              </View>
-            </View>
-            <View style={styles.flowStep}>
-              <Badge tone={liveBracket ? 'green' : 'blue'}>3</Badge>
-              <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Bracket</Text>
-                <Text style={styles.flowStepText}>{liveBracket ? 'Bracket is live' : 'Wait for seeding'}</Text>
-              </View>
-            </View>
-            <View style={[styles.flowStep, liveBracket && hasSignupConfirmation && styles.flowStepComplete]}>
-              <Badge tone={liveBracket && hasSignupConfirmation ? 'accent' : 'blue'}>4</Badge>
-              <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>My Match</Text>
-                <Text style={styles.flowStepText}>Open your assigned table</Text>
-              </View>
-            </View>
-            <View style={styles.flowStep}>
-              <Badge tone="blue">5</Badge>
-              <View style={styles.flowStepCopy}>
-                <Text style={styles.flowStepTitle}>Results</Text>
-                <Text style={styles.flowStepText}>Return here after play</Text>
-              </View>
-            </View>
-          </View>
+          <SignupProgressStrip steps={signupProgressSteps} />
 
           {accountLoading ? <Text style={styles.summaryCopy}>Checking account status...</Text> : null}
 
-          {account ? (
+          {hasSignupConfirmation ? (
+            <SignupCompleteState
+              account={account}
+              accountMessage={accountMessage}
+              accountSubmitting={accountSubmitting}
+              confirmedSignup={confirmedSignup}
+              error={error}
+              liveBracket={liveBracket}
+              matchStatusPath={matchStatusPath}
+              onLogout={handleLogoutAccount}
+              rosterPath={rosterPath}
+              tournament={visibleTournament}
+              tournamentPath={tournamentPath}
+            />
+          ) : account ? (
             <>
               {wantsAccountSwitch ? (
                 <View style={styles.switchAccountPanel}>
@@ -791,61 +889,63 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     <ActionButton onPress={handleLogoutAccount}>
                       {accountSubmitting ? 'Signing out...' : 'Sign out to switch'}
                     </ActionButton>
-                    <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
+                    <ActionButton href={tournamentPath} variant="secondary">
                       Continue as {account.playerName}
                     </ActionButton>
                   </View>
                 </View>
               ) : null}
 
-              <View style={[styles.accountPanel, hasSignupConfirmation && styles.accountPanelComplete]}>
+              {wantsAccountSwitch ? null : (
+                <View style={styles.joinActionPanel}>
+                  <View style={styles.summaryTopRow}>
+                    <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
+                    <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
+                  </View>
+                  <Text style={styles.joinActionTitle}>
+                    {registrationOpen ? `Reserve ${account.playerName}'s spot.` : 'Registration is not open right now.'}
+                  </Text>
+                  <Text style={styles.joinActionCopy}>
+                    {registrationOpen
+                      ? 'One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned Spades table.'
+                      : registrationMeta.actionCopy}
+                  </Text>
+                  <View style={styles.buttonRow}>
+                    <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
+                      {registrationOpen ? (submitting ? 'Saving spot...' : 'Join Tournament') : registrationMeta.label}
+                    </ActionButton>
+                    <ActionButton href={tournamentPath} variant="secondary">
+                      Event
+                    </ActionButton>
+                    <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                      {accountSubmitting ? 'Signing out...' : 'Sign out'}
+                    </ActionButton>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.accountPanel}>
                 <View style={styles.summaryTopRow}>
-                  <Badge tone="green">{hasSignupConfirmation ? 'Roster confirmed' : 'Account linked'}</Badge>
+                  <Badge tone="green">Account linked</Badge>
                   <Text style={styles.accountEmail}>{account.email}</Text>
                 </View>
                 <Text style={styles.accountName}>{account.playerName}</Text>
                 {account.playerHandle ? <Text style={styles.summaryCopy}>{account.playerHandle}</Text> : null}
                 <Text style={styles.accountStatusCopy}>
-                  {hasSignupConfirmation
-                    ? `Signed up for ${visibleTournament.title}.`
-                    : 'Your account is ready for this tournament roster.'}
+                  Your account is ready for this tournament roster.
                 </Text>
               </View>
 
-              {hasSignupConfirmation ? null : (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Notes</Text>
-                  <TextInput
-                    multiline
-                    onChangeText={setNotes}
-                    placeholder="Optional availability note"
-                    placeholderTextColor="#6B766F"
-                    style={styles.notesInput}
-                    value={notes}
-                  />
-                </View>
-              )}
-
-              <View style={styles.buttonRow}>
-                {wantsAccountSwitch ? null : hasSignupConfirmation ? (
-                  <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
-                    My Match
-                  </ActionButton>
-                ) : (
-                  <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                    {registrationOpen ? (submitting ? 'Saving...' : 'Join Tournament') : registrationMeta.label}
-                  </ActionButton>
-                )}
-                {wantsAccountSwitch ? null : (
-                  <ActionButton href={getTournamentPath(visibleTournament.slug)} variant="secondary">
-                    Event
-                  </ActionButton>
-                )}
-                {wantsAccountSwitch ? null : (
-                  <ActionButton onPress={handleLogoutAccount} variant="ghost">
-                    {accountSubmitting ? 'Signing out...' : 'Sign out'}
-                  </ActionButton>
-                )}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Notes</Text>
+                <TextInput
+                  multiline
+                  onChangeText={setNotes}
+                  placeholder="Optional availability note"
+                  placeholderTextColor="#6B766F"
+                  style={styles.notesInput}
+                  value={notes}
+                />
               </View>
             </>
           ) : (
@@ -857,6 +957,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     setAccountMode('create');
                     setAccountError('');
                     setAccountMessage('');
+                    setShowOptionalHandle(Boolean(playerHandle.trim()));
                   }}
                   variant={accountMode === 'create' ? 'primary' : 'secondary'}>
                   New player
@@ -868,6 +969,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     setConfirmPassword('');
                     setAccountError('');
                     setAccountMessage('');
+                    setShowOptionalHandle(false);
                   }}
                   variant={accountMode === 'login' ? 'primary' : 'secondary'}>
                   Already have account
@@ -953,7 +1055,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 </>
               ) : null}
 
-              {accountMode === 'create' ? (
+              {accountMode === 'create' && (showOptionalHandle || playerHandle.trim()) ? (
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Optional handle</Text>
                   <TextInput
@@ -966,6 +1068,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     value={playerHandle}
                   />
                   <Text style={styles.fieldHint}>Skip this if your display name is enough. It is just extra context for the host.</Text>
+                </View>
+              ) : accountMode === 'create' ? (
+                <View style={styles.optionalFieldPrompt}>
+                  <View style={styles.optionalFieldCopy}>
+                    <Text style={styles.optionalFieldTitle}>Handle is optional</Text>
+                    <Text style={styles.optionalFieldBody}>Most players can skip this. Use it only if your Discord or Spades name is different.</Text>
+                  </View>
+                  <ActionButton onPress={() => setShowOptionalHandle(true)} variant="ghost">
+                    Add handle
+                  </ActionButton>
                 </View>
               ) : null}
 
@@ -991,30 +1103,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             </>
           )}
 
-          {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
+          {!hasSignupConfirmation && accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
           {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
-          {confirmedSignup ? (
-            <View style={styles.confirmationPanel}>
-              <View style={styles.confirmationTopRow}>
-                <Badge tone="green">You are in</Badge>
-                <Text style={styles.confirmationKicker}>Roster spot saved</Text>
-              </View>
-              <Text style={styles.confirmationTitle}>Spot reserved for {confirmedSignup.playerName}.</Text>
-              <Text style={styles.confirmationCopy}>
-                Your name is in Current roster. When the bracket is published, use My Match to open your assigned table.
-              </Text>
-              {confirmedSignup.id ? <Text style={styles.confirmationMeta}>Confirmation ID: {confirmedSignup.id}</Text> : null}
-              <View style={styles.confirmationActions}>
-                <ActionButton href={`${getTournamentPath(visibleTournament.slug)}#my-match`}>
-                  My Match
-                </ActionButton>
-                <ActionButton href={`/check-in/${visibleTournament.slug}#registered-players`} variant="secondary">
-                  See Roster
-                </ActionButton>
-              </View>
-            </View>
-          ) : null}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {!hasSignupConfirmation && error ? <Text style={styles.errorText}>{error}</Text> : null}
         </Surface>
       </Section>
 
@@ -1038,17 +1129,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         />
       </Section>
 
-      <Section description="What happens after your registration is saved." title="Player path">
-        <StepStrip
-          steps={[
-            { title: 'Create account', body: 'One account ties your signup and match seat to you.' },
-            { title: 'Sign up', body: 'Your name appears in the public tournament roster.' },
-            { title: 'Bracket opens', body: 'The host seeds the roster and match IDs appear.' },
-            { title: 'Play match', body: 'Use My Match to open your assigned Spades table.' },
-            { title: 'See results', body: 'Return to the hub for bracket and winner updates.' },
-          ]}
-        />
-      </Section>
     </HubScreen>
   );
 }
@@ -1081,6 +1161,68 @@ function SignupFormatPanel({ formatDetails, liveBracket, signupSummary, tourname
   );
 }
 
+function SignupCompleteState({
+  account,
+  accountMessage,
+  accountSubmitting,
+  confirmedSignup,
+  error,
+  liveBracket,
+  matchStatusPath,
+  onLogout,
+  rosterPath,
+  tournament,
+  tournamentPath,
+}) {
+  const playerName = confirmedSignup?.playerName || account?.playerName || 'your player account';
+  const nextStep = liveBracket
+    ? 'Your match can be opened from My Match.'
+    : 'The host will publish the bracket, then My Match opens your table.';
+
+  return (
+    <View style={styles.confirmationState}>
+      <View style={styles.confirmationTopRow}>
+        <Badge tone="green">You are in</Badge>
+        <Text style={styles.confirmationKicker}>Roster spot saved</Text>
+      </View>
+      <Text style={styles.confirmationTitle}>You are signed up for {tournament.title}.</Text>
+      <Text style={styles.confirmationCopy}>
+        Signed up as {playerName}. Your name is in Current roster. Come back when the bracket is live, open My Match, play, then return here for results.
+      </Text>
+      {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <View style={styles.confirmationStatusGrid}>
+        <View style={styles.confirmationStatusItem}>
+          <Text style={styles.confirmationStatusLabel}>Account</Text>
+          <Text style={styles.confirmationStatusValue}>{account?.email || 'Signed in'}</Text>
+        </View>
+        <View style={styles.confirmationStatusItem}>
+          <Text style={styles.confirmationStatusLabel}>Roster</Text>
+          <Text style={styles.confirmationStatusValue}>Spot reserved</Text>
+        </View>
+        <View style={styles.confirmationStatusItem}>
+          <Text style={styles.confirmationStatusLabel}>Next step</Text>
+          <Text style={styles.confirmationStatusValue}>{nextStep}</Text>
+        </View>
+      </View>
+
+      {confirmedSignup?.id ? <Text style={styles.confirmationMeta}>Confirmation ID: {confirmedSignup.id}</Text> : null}
+
+      <View style={styles.confirmationActions}>
+        <ActionButton href={matchStatusPath}>My Match</ActionButton>
+        <ActionButton href={rosterPath} variant="secondary">See Roster</ActionButton>
+        <ActionButton href={tournamentPath} variant="secondary">Event Page</ActionButton>
+        {onLogout ? (
+          <ActionButton onPress={onLogout} variant="ghost">
+            {accountSubmitting ? 'Signing out...' : 'Sign out'}
+          </ActionButton>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 function isOwnSignup(signup, account, latestSignup) {
   if (!signup) return false;
   if (signup.currentPlayer) return true;
@@ -1089,6 +1231,28 @@ function isOwnSignup(signup, account, latestSignup) {
   const accountName = String(account?.playerName || '').trim().toLowerCase();
   const signupName = String(signup.playerName || '').trim().toLowerCase();
   return Boolean(accountName && signupName && accountName === signupName);
+}
+
+function SignupProgressStrip({ steps }) {
+  return (
+    <View style={styles.flowSteps}>
+      {steps.map((step, index) => (
+        <View
+          key={step.title}
+          style={[
+            styles.flowStep,
+            step.complete && styles.flowStepComplete,
+            step.current && styles.flowStepCurrent,
+          ]}>
+          <Badge tone={getSignupStepTone(step)}>{index + 1}</Badge>
+          <View style={styles.flowStepCopy}>
+            <Text style={styles.flowStepTitle}>{step.title}</Text>
+            <Text style={styles.flowStepText}>{step.body}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function SignupRosterPanel({ account, latestSignup, signupSummary }) {
@@ -1169,6 +1333,10 @@ const styles = StyleSheet.create({
   },
   signupCard: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  signupCardComplete: {
+    backgroundColor: 'rgba(9, 31, 25, 0.94)',
+    borderColor: 'rgba(77, 217, 133, 0.44)',
   },
   rosterCard: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
@@ -1403,6 +1571,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(214, 162, 78, 0.09)',
     borderColor: 'rgba(214, 162, 78, 0.34)',
   },
+  flowStepCurrent: {
+    backgroundColor: 'rgba(94, 127, 163, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
   flowStepCopy: {
     flex: 1,
     minWidth: 0,
@@ -1447,6 +1619,27 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 6,
   },
+  joinActionPanel: {
+    backgroundColor: 'rgba(77, 217, 133, 0.08)',
+    borderColor: 'rgba(77, 217, 133, 0.38)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  joinActionTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+  },
+  joinActionCopy: {
+    color: '#D4DDD7',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6,
+  },
   accountPanel: {
     borderWidth: 1,
     borderColor: 'rgba(214, 162, 78, 0.30)',
@@ -1454,10 +1647,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(214, 162, 78, 0.08)',
     marginTop: 16,
     padding: 14,
-  },
-  accountPanelComplete: {
-    borderColor: 'rgba(214, 162, 78, 0.44)',
-    backgroundColor: 'rgba(214, 162, 78, 0.08)',
   },
   accountEmail: {
     color: '#5E7FA3',
@@ -1525,6 +1714,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 18,
     marginTop: 7,
+  },
+  optionalFieldPrompt: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginTop: 14,
+    padding: 12,
+  },
+  optionalFieldCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+  optionalFieldTitle: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
+  },
+  optionalFieldBody: {
+    color: '#A7A29A',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 3,
   },
   passwordRequirements: {
     borderWidth: 1,
@@ -1655,13 +1874,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontWeight: '700',
   },
-  confirmationPanel: {
-    backgroundColor: 'rgba(77, 217, 133, 0.09)',
-    borderColor: 'rgba(77, 217, 133, 0.46)',
-    borderRadius: 18,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 16,
+  confirmationState: {
+    marginTop: 18,
   },
   confirmationTopRow: {
     alignItems: 'center',
@@ -1690,6 +1904,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
     marginTop: 6,
+  },
+  confirmationStatusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+  },
+  confirmationStatusItem: {
+    backgroundColor: 'rgba(244, 239, 230, 0.045)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexBasis: 180,
+    flexGrow: 1,
+    padding: 12,
+  },
+  confirmationStatusLabel: {
+    color: '#4DD985',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  confirmationStatusValue: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginTop: 5,
   },
   confirmationMeta: {
     color: '#A7A29A',

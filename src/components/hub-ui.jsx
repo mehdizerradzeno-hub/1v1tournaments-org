@@ -641,7 +641,11 @@ export function HubScreen({
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
-  const accountPath = navTournamentSlug ? `${primaryPaths.checkInPath}?mode=signin` : '/next';
+  const accountPath = navTournamentSlug
+    ? playerAccount
+      ? primaryPaths.checkInPath
+      : `${primaryPaths.checkInPath}?mode=signin`
+    : '/next';
   const navItems = getNavItems(primaryPaths);
   const mobileNavItems = getMobileNavItems(primaryPaths);
   const stickyActionItems = getStickyActionItems(primaryPaths);
@@ -658,16 +662,16 @@ export function HubScreen({
   useEffect(() => {
     let active = true;
 
-    async function loadPlayerAccount() {
+    async function loadPlayerAccount(fallbackAccount = null) {
       try {
         const result = await fetchPlayerAccount();
 
         if (active) {
-          setPlayerAccount(result.account || null);
+          setPlayerAccount(result.account || fallbackAccount);
         }
       } catch {
         if (active) {
-          setPlayerAccount(null);
+          setPlayerAccount(fallbackAccount || null);
         }
       } finally {
         if (active) {
@@ -677,14 +681,19 @@ export function HubScreen({
     }
 
     function refreshPlayerAccount(event) {
+      const hasAccountHint = event?.detail && Object.prototype.hasOwnProperty.call(event.detail, 'account');
+      const accountHint = hasAccountHint ? event.detail.account || null : null;
+
       if (active) {
-        if (event?.detail && Object.prototype.hasOwnProperty.call(event.detail, 'account')) {
-          setPlayerAccount(event.detail.account || null);
+        if (hasAccountHint) {
+          setPlayerAccount(accountHint);
+          setPlayerAccountLoading(false);
+        } else {
+          setPlayerAccountLoading(true);
         }
-        setPlayerAccountLoading(true);
       }
 
-      loadPlayerAccount();
+      loadPlayerAccount(accountHint);
     }
 
     loadPlayerAccount();
