@@ -82,6 +82,7 @@ const PASSWORD_REQUIREMENT_ITEMS = [
 const SIGNUP_AUTH_RETRY_DELAY_MS = 450;
 const SESSION_CONFIRM_RETRY_DELAYS_MS = [0, 300, 700, 1200, 1800];
 const SIGNUP_AUTH_RETRY_DELAYS_MS = [350, 800, 1400, 2200];
+const ACCOUNT_ACCESS_SECTION_ID = 'account-access';
 
 function waitForSignupRetry(delay = SIGNUP_AUTH_RETRY_DELAY_MS) {
   return new Promise((resolve) => {
@@ -349,6 +350,23 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     () => mergeTournamentSettings(tournament, tournamentSettings),
     [tournament, tournamentSettings],
   );
+
+  useEffect(() => {
+    if (typeof globalThis.document === 'undefined' || globalThis.location?.hash !== `#${ACCOUNT_ACCESS_SECTION_ID}`) {
+      return undefined;
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      globalThis.document?.getElementById(ACCOUNT_ACCESS_SECTION_ID)?.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      });
+    }, 80);
+
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+    };
+  }, [accountMode, initialAccountMode]);
 
   useEffect(() => {
     let active = true;
@@ -808,6 +826,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     registrationOpen,
   });
   const tournamentPath = getTournamentPath(visibleTournament.slug);
+  const accountAccessPath = account
+    ? `/check-in/${visibleTournament.slug}#${ACCOUNT_ACCESS_SECTION_ID}`
+    : `/check-in/${visibleTournament.slug}?mode=signin#${ACCOUNT_ACCESS_SECTION_ID}`;
   const matchStatusPath = `${tournamentPath}#my-match`;
   const rosterPath = `/check-in/${visibleTournament.slug}#registered-players`;
   const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup, liveBracket });
@@ -825,6 +846,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
   return (
     <HubScreen
+      accountHref={accountAccessPath}
       actions={screenActions}
       eyebrow="Tournament registration"
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
@@ -845,6 +867,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           : isLoginMode
             ? 'Sign in once, join the roster, then use My Match when the bracket goes live.'
             : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
+        nativeID={ACCOUNT_ACCESS_SECTION_ID}
         title={hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in and join' : 'Create account and join'}>
         <Surface style={[styles.signupCard, hasSignupConfirmation && styles.signupCardComplete]}>
           <View style={styles.summaryTopRow}>

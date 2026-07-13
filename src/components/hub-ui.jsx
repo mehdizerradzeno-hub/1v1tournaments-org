@@ -620,6 +620,7 @@ export function RuleBlock({ section }) {
 }
 
 export function HubScreen({
+  accountHref = null,
   eyebrow,
   title,
   subtitle,
@@ -641,11 +642,12 @@ export function HubScreen({
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
-  const accountPath = navTournamentSlug
+  const fallbackAccountPath = navTournamentSlug
     ? playerAccount
-      ? primaryPaths.checkInPath
-      : `${primaryPaths.checkInPath}?mode=signin`
+      ? `${primaryPaths.checkInPath}#account-access`
+      : `${primaryPaths.checkInPath}?mode=signin#account-access`
     : '/next';
+  const accountPath = accountHref || fallbackAccountPath;
   const navItems = getNavItems(primaryPaths);
   const mobileNavItems = getMobileNavItems(primaryPaths);
   const stickyActionItems = getStickyActionItems(primaryPaths);

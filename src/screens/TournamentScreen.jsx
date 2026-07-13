@@ -199,7 +199,7 @@ function heroSignupAction(status, checkInPath, tournamentPath) {
 }
 
 function getSignInPath(checkInPath) {
-  return `${checkInPath}?mode=signin`;
+  return `${checkInPath}?mode=signin#account-access`;
 }
 
 function getPlayerAccountState(playerStatus) {
