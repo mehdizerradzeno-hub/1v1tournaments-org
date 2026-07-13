@@ -558,13 +558,20 @@ function NextLobbyHero({
             <Text style={styles.heroFact}>{getDurationLabel(tournament)}</Text>
           </View>
 
-          {isPhone ? (
-            <View dataSet={getMotionDataSet('cta')} style={[styles.primaryCtaMotion, styles.mobileHeroCta]}>
-              <ActionButton href={primaryHref} style={styles.primaryCtaButton}>{primaryLabel}</ActionButton>
-            </View>
-          ) : (
-            <Text style={[styles.heroText, isPhone && styles.heroTextPhone]}>{tournament.summary}</Text>
-          )}
+          <View style={[styles.heroExitGrid, isPhone && styles.heroExitGridPhone]}>
+            <ActionButton href={primaryHref} style={styles.heroExitButton}>{primaryLabel}</ActionButton>
+            <ActionButton href={`${tournamentPath}#my-match`} style={styles.heroExitButton} variant="secondary">
+              Find My Match
+            </ActionButton>
+            <ActionButton href="/stream" style={styles.heroExitButton} variant="secondary">
+              Watch Live
+            </ActionButton>
+            <ActionButton href="/admin" style={styles.heroExitButton} variant="ghost">
+              Host Admin
+            </ActionButton>
+          </View>
+
+          {isPhone ? null : <Text style={styles.heroText}>{tournament.summary}</Text>}
 
           <View style={styles.heroUrgencyCard}>
             <View style={[styles.urgencyTopRow, isPhone && styles.urgencyTopRowPhone]}>
@@ -919,6 +926,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 17,
+  },
+  heroExitGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  heroExitGridPhone: {
+    gap: 8,
+  },
+  heroExitButton: {
+    minWidth: 150,
   },
   lobbyHero: {
     backgroundColor: 'rgba(17, 17, 17, 0.78)',

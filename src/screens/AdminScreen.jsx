@@ -1066,7 +1066,7 @@ export default function AdminScreen() {
       : isArchived
         ? 'Archived events are hidden from upcoming pages. Save event to publish it again.'
       : !playerCountReady
-        ? 'Post the event, then share the signup link.'
+        ? 'Edit the event, save it, then share the signup link.'
         : bracket
           ? 'Send players to My Match and monitor results.'
           : bracketReadiness.ready
@@ -1086,7 +1086,8 @@ export default function AdminScreen() {
       <Section
         action={<ActionButton href="/" variant="secondary">Home</ActionButton>}
         description="Pick the event, set the start time, open or close registration, then run the roster from the same screen."
-        title="Post tournament">
+        nativeID="edit-tournament"
+        title="Edit selected tournament">
         <Surface style={styles.publisherPanel}>
           <View style={styles.publisherHero}>
             <View style={styles.publisherCopy}>
@@ -1353,77 +1354,11 @@ export default function AdminScreen() {
             </ActionButton>
           </View>
 
-          <View style={styles.archivePanel}>
-            <View style={styles.archiveHeader}>
-              <Badge tone={isArchived ? 'rose' : 'blue'}>{isArchived ? 'Archived' : 'Finish event'}</Badge>
-              <View style={styles.archiveCopy}>
-                <Text style={styles.archiveTitle}>Archive this tournament</Text>
-                <Text style={styles.archiveBody}>
-                  Use this when an event is over or you no longer want it promoted. It closes registration and removes the event from Next Tournament/upcoming lists, but keeps the roster, bracket, results, and player accounts.
-                </Text>
-              </View>
-            </View>
-
-            {archiveConfirmOpen ? (
-              <View style={styles.archiveConfirmPanel}>
-                <Text style={styles.archiveBody}>
-                  Archive {tournament?.title || rosterSlug}? Players can still view direct links and results, but the event will stop appearing as upcoming.
-                </Text>
-                <View style={styles.buttonRow}>
-                  <ActionButton disabled={archiveLoading} onPress={handleArchiveTournament}>
-                    {archiveLoading ? 'Archiving...' : 'Yes, archive event'}
-                  </ActionButton>
-                  <ActionButton onPress={handleCancelArchiveTournament} variant="ghost">
-                    Cancel
-                  </ActionButton>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.buttonRow}>
-                <ActionButton disabled={!hasHostCredential || archiveLoading || isArchived} onPress={handleRequestArchiveTournament} variant="secondary">
-                  {isArchived ? 'Already archived' : 'Archive event'}
-                </ActionButton>
-                {isArchived ? (
-                  <ActionButton disabled={!hasHostCredential || eventSaving} onPress={handleSaveTournamentEvent} variant="secondary">
-                    Publish again
-                  </ActionButton>
-                ) : null}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.resetDangerPanel}>
-            <View style={styles.resetDangerHeader}>
-              <Badge tone="rose">Reset tournament</Badge>
-              <View style={styles.resetDangerCopy}>
-                <Text style={styles.resetDangerTitle}>Clear this tournament</Text>
-                <Text style={styles.resetDangerBody}>
-                  Use this when you want to remove a test event like tourney7. It deletes signups, bracket, schedule override, and any hosted event record. Player accounts are kept.
-                </Text>
-              </View>
-            </View>
-
-            {clearConfirmOpen ? (
-              <View style={styles.resetConfirmPanel}>
-                <Text style={styles.resetDangerBody}>
-                  Confirm reset for {tournament?.title || rosterSlug}. This deletes registered players from this tournament roster and removes the published bracket.
-                </Text>
-                <View style={styles.buttonRow}>
-                  <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                    {clearLoading ? 'Clearing...' : 'Yes, clear tournament'}
-                  </ActionButton>
-                  <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
-                    Cancel
-                  </ActionButton>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.buttonRow}>
-                <ActionButton disabled={!hasHostCredential || clearLoading} onPress={handleRequestClearTournamentData} variant="danger">
-                  Clear tournament
-                </ActionButton>
-              </View>
-            )}
+          <View style={styles.editorLifecycleNote}>
+            <Badge tone="blue">Lifecycle controls moved up</Badge>
+            <Text style={styles.editorLifecycleText}>
+              Archive, clear/delete, bracket generation, and roster refresh now live in Tournament controls at the top of this page.
+            </Text>
           </View>
         </Surface>
       </Section>
@@ -1656,6 +1591,175 @@ export default function AdminScreen() {
     } finally {
       setClearLoading(false);
     }
+  }
+
+  function renderHostQuickControls() {
+    if (showDraftTools) {
+      return null;
+    }
+
+    const tournament = liveTournament || selectedTournament;
+    const tournamentPath = getTournamentPath(rosterSlug);
+    const signupPath = getCheckInPath(rosterSlug);
+    const isArchived = tournament?.status === 'archived';
+    const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, activeSignupCount);
+    const nextHostMove = !hasHostCredential
+      ? 'Sign in as host to unlock editing, clearing, and bracket actions.'
+      : isArchived
+        ? 'This event is archived. Publish it again before promoting it.'
+      : bracket?.winner
+        ? `Winner posted: ${bracket.winner.name}. Archive the event when you are done.`
+        : bracket
+          ? 'Bracket is live. Send players to My Match and monitor results.'
+          : playerCountReady
+            ? 'Roster is ready. Generate the bracket when you want to start.'
+            : activeSignupCount
+              ? 'Keep signups open until the roster reaches the bracket minimum.'
+              : 'Save the event, then share the signup page.';
+    const quickStats = [
+      { label: 'Selected', value: tournament?.title || rosterSlug, tone: 'accent' },
+      { label: 'Start', value: getStartTimingLabel(tournament), tone: 'blue' },
+      { label: 'Roster', value: `${activeSignupCount}${tournament?.rosterCap ? ` / ${tournament.rosterCap}` : ''}`, tone: activeSignupCount ? 'green' : 'blue' },
+      { label: 'Bracket', value: bracket ? `${bracket.participantCount || 0} seeded` : 'Not generated', tone: bracket ? 'green' : 'accent' },
+      { label: 'Status', value: isArchived ? 'Archived' : liveRegistrationMeta.label, tone: isArchived ? 'rose' : liveRegistrationMeta.tone },
+    ];
+
+    return (
+      <Section
+        description="The host controls you need most are first: edit the event, open player pages, seed the bracket, archive, or clear test data."
+        nativeID="host-quick-controls"
+        title="Tournament controls">
+        <Surface style={styles.quickControlPanel}>
+          <View style={styles.quickControlHeader}>
+            <View style={styles.quickControlCopy}>
+              <Badge tone={hasHostCredential ? 'green' : 'accent'}>{hasHostCredential ? 'Host ready' : 'Host access needed'}</Badge>
+              <Text style={styles.quickControlTitle}>{tournament?.title || rosterSlug}</Text>
+              <Text style={styles.quickControlBody}>
+                {nextHostMove}
+              </Text>
+            </View>
+
+            <View style={styles.quickStatGrid}>
+              {quickStats.map((stat) => (
+                <View key={stat.label} style={[styles.quickStat, styles[`quickStat${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
+                  <Text style={styles.quickStatLabel}>{stat.label}</Text>
+                  <Text numberOfLines={2} style={styles.quickStatValue}>{stat.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.quickPickerBlock}>
+            <Text style={styles.quickPickerLabel}>Select tournament</Text>
+            <View style={styles.quickPickerRow}>
+              {adminTournaments.map((tournamentOption) => (
+                <ActionButton
+                  key={tournamentOption.slug}
+                  onPress={() => setRosterSlug(tournamentOption.slug)}
+                  style={styles.quickPickerButton}
+                  variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
+                  {tournamentOption.title}
+                </ActionButton>
+              ))}
+              <ActionButton onPress={handleNewTournamentDraft} style={styles.quickPickerButton} variant="secondary">
+                New tournament
+              </ActionButton>
+            </View>
+          </View>
+
+          <View style={styles.quickFlowStrip}>
+            <View style={styles.quickFlowStep}>
+              <Badge tone="accent">1</Badge>
+              <Text style={styles.quickFlowText}>Edit date and registration</Text>
+            </View>
+            <View style={styles.quickFlowStep}>
+              <Badge tone="blue">2</Badge>
+              <Text style={styles.quickFlowText}>Share signup and refresh roster</Text>
+            </View>
+            <View style={styles.quickFlowStep}>
+              <Badge tone="green">3</Badge>
+              <Text style={styles.quickFlowText}>Generate bracket and send My Match</Text>
+            </View>
+            <View style={styles.quickFlowStep}>
+              <Badge tone="green">4</Badge>
+              <Text style={styles.quickFlowText}>Review results or archive event</Text>
+            </View>
+          </View>
+
+          <View style={styles.quickActionGrid}>
+            <ActionButton href="/admin#edit-tournament" style={styles.quickActionButton}>
+              Edit selected event
+            </ActionButton>
+            <ActionButton href={tournamentPath} style={styles.quickActionButton} variant="secondary">
+              Open event page
+            </ActionButton>
+            <ActionButton href={signupPath} style={styles.quickActionButton} variant="secondary">
+              Open signup
+            </ActionButton>
+            <ActionButton
+              disabled={!hasHostCredential || !playerCountReady || bracketLoading}
+              onPress={handleGenerateBracket}
+              style={styles.quickActionButton}
+              variant="secondary">
+              {bracketLoading ? 'Generating...' : 'Generate bracket'}
+            </ActionButton>
+            <ActionButton onPress={handleLoadRoster} style={styles.quickActionButton} variant="secondary">
+              {rosterLoading ? 'Refreshing...' : 'Refresh roster'}
+            </ActionButton>
+            <ActionButton
+              disabled={!hasHostCredential || archiveLoading || isArchived}
+              onPress={handleRequestArchiveTournament}
+              style={styles.quickActionButton}
+              variant="secondary">
+              {isArchived ? 'Archived' : 'Archive event'}
+            </ActionButton>
+            <ActionButton
+              disabled={!hasHostCredential || clearLoading}
+              onPress={handleRequestClearTournamentData}
+              style={styles.quickActionButton}
+              variant="danger">
+              Clear/delete tournament
+            </ActionButton>
+          </View>
+
+          {archiveConfirmOpen ? (
+            <View style={styles.quickConfirmPanel}>
+              <Text style={styles.archiveBody}>
+                Archive {tournament?.title || rosterSlug}? It disappears from upcoming pages but keeps roster, bracket, results, and player accounts.
+              </Text>
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={archiveLoading} onPress={handleArchiveTournament}>
+                  {archiveLoading ? 'Archiving...' : 'Yes, archive event'}
+                </ActionButton>
+                <ActionButton onPress={handleCancelArchiveTournament} variant="ghost">
+                  Cancel
+                </ActionButton>
+              </View>
+            </View>
+          ) : null}
+
+          {clearConfirmOpen ? (
+            <View style={styles.quickDangerConfirmPanel}>
+              <View style={styles.quickDangerHeader}>
+                <Badge tone="rose">Deletes selected event data</Badge>
+                <Badge tone="green">Keeps player accounts</Badge>
+              </View>
+              <Text style={styles.resetDangerBody}>
+                Clear {tournament?.title || rosterSlug}? This deletes the tournament roster, bracket, schedule override, and hosted event record. Player accounts stay.
+              </Text>
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
+                  {clearLoading ? 'Clearing...' : 'Yes, clear tournament'}
+                </ActionButton>
+                <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
+                  Cancel
+                </ActionButton>
+              </View>
+            </View>
+          ) : null}
+        </Surface>
+      </Section>
+    );
   }
 
   async function handleReportWinner(match, player) {
@@ -2581,6 +2685,8 @@ export default function AdminScreen() {
       }
       subtitle={showDraftTools ? 'Draft tournament editor' : 'Tournament host dashboard'}
       title={showDraftTools ? 'Private admin console' : 'Host control center'}>
+      {renderHostQuickControls()}
+
       <Section
         action={
           <View style={styles.headerActions}>
@@ -3082,6 +3188,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  editorLifecycleNote: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+    padding: 12,
+  },
+  editorLifecycleText: {
+    color: '#C8D8E8',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+    minWidth: 220,
+  },
   schedulePanel: {
     borderColor: 'rgba(94, 127, 163, 0.26)',
   },
@@ -3136,29 +3262,158 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 8,
   },
-  archivePanel: {
-    backgroundColor: 'rgba(94, 127, 163, 0.08)',
-    borderColor: 'rgba(94, 127, 163, 0.28)',
-    borderRadius: 18,
+  quickControlPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.48)',
+    shadowColor: '#D6A24E',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+  },
+  quickControlHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  quickControlCopy: {
+    flex: 1.2,
+    minWidth: 260,
+  },
+  quickControlTitle: {
+    color: '#F4EFE6',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
+    marginTop: 12,
+  },
+  quickControlBody: {
+    color: '#D4DDD7',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  quickPickerBlock: {
+    backgroundColor: 'rgba(0, 0, 0, 0.14)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 16,
     borderWidth: 1,
     marginTop: 18,
     padding: 14,
   },
-  archiveHeader: {
-    alignItems: 'center',
+  quickPickerLabel: {
+    color: '#A7A29A',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 15,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  quickPickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
-  archiveCopy: {
+  quickPickerButton: {
+    minWidth: 170,
+  },
+  quickFlowStrip: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  quickFlowStep: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexBasis: 210,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    padding: 12,
+  },
+  quickFlowText: {
+    color: '#D4DDD7',
     flex: 1,
-    minWidth: 240,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
-  archiveTitle: {
+  quickStatGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    minWidth: 260,
+  },
+  quickStat: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexBasis: 130,
+    flexGrow: 1,
+    padding: 12,
+  },
+  quickStatAccent: {
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+  },
+  quickStatBlue: {
+    borderColor: 'rgba(94, 127, 163, 0.34)',
+  },
+  quickStatGreen: {
+    borderColor: 'rgba(76, 201, 127, 0.34)',
+  },
+  quickStatRose: {
+    borderColor: 'rgba(143, 29, 44, 0.42)',
+  },
+  quickStatLabel: {
+    color: '#A7A29A',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  quickStatValue: {
     color: '#F4EFE6',
     fontSize: 16,
     fontWeight: '900',
-    lineHeight: 22,
+    lineHeight: 21,
+    marginTop: 5,
+  },
+  quickActionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  quickActionButton: {
+    minWidth: 188,
+  },
+  quickConfirmPanel: {
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  quickDangerConfirmPanel: {
+    backgroundColor: 'rgba(143, 29, 44, 0.10)',
+    borderColor: 'rgba(143, 29, 44, 0.32)',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  quickDangerHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
   archiveBody: {
     color: '#C8D8E8',
@@ -3167,52 +3422,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 4,
   },
-  archiveConfirmPanel: {
-    backgroundColor: 'rgba(0, 0, 0, 0.18)',
-    borderColor: 'rgba(94, 127, 163, 0.28)',
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 12,
-    padding: 12,
-  },
-  resetDangerPanel: {
-    backgroundColor: 'rgba(143, 29, 44, 0.08)',
-    borderColor: 'rgba(143, 29, 44, 0.30)',
-    borderRadius: 18,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 14,
-  },
-  resetDangerHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  resetDangerCopy: {
-    flex: 1,
-    minWidth: 240,
-  },
-  resetDangerTitle: {
-    color: '#F4EFE6',
-    fontSize: 16,
-    fontWeight: '900',
-    lineHeight: 22,
-  },
   resetDangerBody: {
     color: '#E3B2A9',
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 20,
     marginTop: 4,
-  },
-  resetConfirmPanel: {
-    backgroundColor: 'rgba(0, 0, 0, 0.18)',
-    borderColor: 'rgba(143, 29, 44, 0.26)',
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 12,
-    padding: 12,
   },
   bracketRounds: {
     marginTop: 16,

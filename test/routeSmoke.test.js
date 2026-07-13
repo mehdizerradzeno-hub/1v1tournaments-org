@@ -433,7 +433,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Overall standings/);
-  assert.doesNotMatch(nextScreenSource, /Host admin/);
+  assert.match(nextScreenSource, /Find My Match/);
+  assert.match(nextScreenSource, /Host Admin/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /getSignInPath/);
@@ -558,11 +559,15 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /getBracketReadiness/);
   assert.match(adminScreenSource, /Exactly 4 players/);
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
-  assert.match(adminScreenSource, /Reset tournament/);
-  assert.match(adminScreenSource, /Clear tournament/);
+  assert.match(adminScreenSource, /Tournament controls/);
+  assert.match(adminScreenSource, /Edit selected event/);
+  assert.match(adminScreenSource, /Select tournament/);
+  assert.match(adminScreenSource, /Refresh roster/);
+  assert.match(adminScreenSource, /Clear\/delete tournament/);
+  assert.match(adminScreenSource, /Lifecycle controls moved up/);
   assert.match(adminScreenSource, /Yes, clear tournament/);
   assert.match(adminScreenSource, /deleteTournamentEvent/);
-  assert.match(adminScreenSource, /Post tournament/);
+  assert.match(adminScreenSource, /Edit selected tournament/);
   assert.match(adminScreenSource, /Tournament mode/);
   assert.match(adminScreenSource, /TOURNAMENT_MODES/);
   assert.match(adminScreenSource, /Save event/);

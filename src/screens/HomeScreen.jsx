@@ -299,6 +299,7 @@ export default function HomeScreen() {
         gameCount={games.length}
         matchStatusPath={featuredMatchStatusPath}
         registrationMeta={featuredRegistrationMeta}
+        signupPath={featuredSignupPath}
         signupSummary={featuredSignupSummary}
         tournament={featuredTournament}
         tournamentPath={featuredTournamentPath}
@@ -407,6 +408,7 @@ function PremiumCountdownHero({
   gameCount,
   matchStatusPath,
   registrationMeta,
+  signupPath,
   signupSummary,
   tournament,
   tournamentPath,
@@ -496,28 +498,27 @@ function PremiumCountdownHero({
         </View>
       </View>
 
-      <View style={styles.heroActionRow}>
-        <AppStoreBadgeButton
-          href={downloadLinks.appStoreSpades}
-          label="Download 1v1 Spades on the App Store"
-          large
-        />
-        <PremiumLinkButton href={downloadLinks.webSpades} label="Play on the Web" />
-        <PremiumLinkButton href={downloadLinks.tournaments} label="Join Tournaments" />
-        <PremiumLinkButton href={downloadLinks.twitch} label="Watch on Twitch" />
-        <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
-        <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
-      </View>
-
-      <View style={styles.heroActionRowSecondary}>
-        <ActionButton href={matchStatusPath} style={styles.heroActionButton}>
-          My Match
+      <View style={styles.heroPrimaryActions}>
+        <ActionButton href={signupPath} style={styles.heroActionButton}>
+          Join next tournament
+        </ActionButton>
+        <ActionButton href={matchStatusPath} style={styles.heroActionButton} variant="secondary">
+          Find my match
         </ActionButton>
         <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
           View bracket
         </ActionButton>
-        <ActionButton href="/stream" variant="secondary">
-          Watch
+        <ActionButton href="/#next-tournaments" style={styles.heroActionButton} variant="secondary">
+          All upcoming
+        </ActionButton>
+      </View>
+
+      <View style={styles.heroActionRowSecondary}>
+        <ActionButton href="/stream" style={styles.heroSecondaryButton} variant="secondary">
+          Watch live
+        </ActionButton>
+        <ActionButton href="/admin" style={styles.heroSecondaryButton} variant="ghost">
+          Host admin
         </ActionButton>
       </View>
 
@@ -532,6 +533,18 @@ function PremiumCountdownHero({
             <Text numberOfLines={1} style={styles.heroInfoValue}>{stat.value}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.heroActionRow}>
+        <AppStoreBadgeButton
+          href={downloadLinks.appStoreSpades}
+          label="Download 1v1 Spades on the App Store"
+          large
+        />
+        <PremiumLinkButton href={downloadLinks.webSpades} label="Play on the Web" />
+        <PremiumLinkButton href={downloadLinks.twitch} label="Twitch" />
+        <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
+        <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
       </View>
     </Surface>
   );
@@ -1806,14 +1819,25 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 10,
   },
+  heroPrimaryActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+    marginTop: 18,
+  },
   heroActionRowSecondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 10,
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   heroActionButton: {
-    minWidth: 190,
+    minWidth: 180,
+  },
+  heroSecondaryButton: {
+    minWidth: 150,
   },
   rosterPolicyBar: {
     alignSelf: 'center',
