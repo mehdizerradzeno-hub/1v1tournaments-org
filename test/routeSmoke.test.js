@@ -190,6 +190,8 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextScreenSource, /Scan to join/);
   assert.match(nextScreenSource, /NEXT_CHAT_COMMANDS/);
   assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
+  assert.match(nextScreenSource, /SponsorSoftwareShowcase/);
+  assert.match(nextScreenSource, /getSponsorSoftware/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
 });
 

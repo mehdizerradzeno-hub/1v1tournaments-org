@@ -23,6 +23,7 @@ import {
   getGameBySlug,
   getGamePath,
   getCheckInPath,
+  getSponsorSoftware,
   getResultByTournamentSlug,
   getResultsForGame,
   getStreamBySlug,
@@ -787,6 +788,8 @@ export default function TournamentScreen({ slug }) {
         signupSummary={signupSummary}
       />
 
+      <SponsorSoftwareStrip />
+
       {activeTab === 'play' ? (
         <>
           <LiveBroadcastStrip
@@ -1086,6 +1089,29 @@ export default function TournamentScreen({ slug }) {
         </>
       ) : null}
     </HubScreen>
+  );
+}
+
+function SponsorSoftwareStrip() {
+  const software = getSponsorSoftware();
+
+  if (!software) {
+    return null;
+  }
+
+  return (
+    <Surface style={styles.sponsorSoftwareStrip}>
+      <View style={styles.sponsorSoftwareCopy}>
+        <Badge tone="accent">{software.eyebrow}</Badge>
+        <Text style={styles.sponsorSoftwareTitle}>{software.title}</Text>
+        <Text style={styles.sponsorSoftwareBody}>{software.summary}</Text>
+      </View>
+      <View style={styles.sponsorSoftwareActions}>
+        <ActionButton href="/sponsors">Sponsor page</ActionButton>
+        <ActionButton href="/media-kit" variant="secondary">Media kit</ActionButton>
+        <ActionButton href="/admin/sponsors" variant="secondary">Host CRM</ActionButton>
+      </View>
+    </Surface>
   );
 }
 
@@ -3594,5 +3620,38 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 10,
     fontWeight: '700',
+  },
+  sponsorSoftwareActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sponsorSoftwareBody: {
+    color: '#A7A29A',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  sponsorSoftwareCopy: {
+    flex: 1,
+    minWidth: 250,
+  },
+  sponsorSoftwareStrip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(7, 17, 15, 0.94)',
+    borderColor: 'rgba(94, 205, 158, 0.22)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  sponsorSoftwareTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 8,
   },
 });

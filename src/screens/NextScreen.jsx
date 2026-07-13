@@ -4,6 +4,7 @@ import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from 're
 import {
   ActionButton,
   Badge,
+  BulletList,
   EmptyState,
   HubScreen,
   Surface,
@@ -12,6 +13,7 @@ import { formatDateLine } from '../lib/format.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
 import {
   getCheckInPath,
+  getSponsorSoftware,
   getTournamentPath,
   getUpcomingTournaments,
   siteData,
@@ -479,6 +481,7 @@ export default function NextScreen() {
         tournament={tournament}
         tournamentPath={tournamentPath}
       />
+      <SponsorSoftwareShowcase />
     </HubScreen>
   );
 }
@@ -704,6 +707,51 @@ function PresentedBy({ sponsor }) {
         <Text numberOfLines={1} style={styles.presentedByName}>{sponsor.name}</Text>
       </View>
     </View>
+  );
+}
+
+function SponsorSoftwareShowcase() {
+  const software = getSponsorSoftware();
+
+  if (!software) {
+    return null;
+  }
+
+  return (
+    <Surface style={styles.sponsorSoftwarePanel}>
+      <View style={styles.sponsorSoftwareGlow} pointerEvents="none" />
+      <View style={styles.sponsorSoftwareGrid}>
+        <View style={styles.sponsorSoftwareCopy}>
+          <Badge tone="accent">{software.eyebrow}</Badge>
+          <Text style={styles.sponsorSoftwareTitle}>{software.title}</Text>
+          <Text style={styles.sponsorSoftwareSummary}>{software.summary}</Text>
+          <BulletList compact items={software.highlights} tone="green" />
+        </View>
+        <View style={styles.sponsorSoftwareConsole}>
+          <Text style={styles.sponsorSoftwareConsoleLabel}>Sponsor stack</Text>
+          <View style={styles.sponsorSoftwareStats}>
+            {software.stats.map((stat) => (
+              <View key={stat.label} style={styles.sponsorSoftwareStat}>
+                <Text style={styles.sponsorSoftwareStatLabel}>{stat.label}</Text>
+                <Text style={styles.sponsorSoftwareStatValue}>{stat.value}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.sponsorSoftwareNote}>{software.note}</Text>
+          <View style={styles.sponsorSoftwareActions}>
+            {software.links.map((link, index) => (
+              <ActionButton
+                key={link.href}
+                href={link.href}
+                style={styles.sponsorSoftwareAction}
+                variant={index === 0 ? 'primary' : 'secondary'}>
+                {link.label}
+              </ActionButton>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Surface>
   );
 }
 
@@ -1208,6 +1256,110 @@ const styles = StyleSheet.create({
   secondaryCtaButton: {
     marginBottom: 0,
     marginRight: 0,
+  },
+  sponsorSoftwareAction: {
+    marginBottom: 0,
+    marginRight: 0,
+  },
+  sponsorSoftwareActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
+  sponsorSoftwareConsole: {
+    backgroundColor: 'rgba(5, 5, 5, 0.44)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 12,
+    minWidth: 280,
+    padding: 16,
+  },
+  sponsorSoftwareConsoleLabel: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  sponsorSoftwareCopy: {
+    flex: 1.4,
+    minWidth: 280,
+  },
+  sponsorSoftwareGlow: {
+    backgroundColor: 'rgba(94, 205, 158, 0.10)',
+    borderRadius: 999,
+    height: 220,
+    position: 'absolute',
+    right: -70,
+    top: -100,
+    width: 300,
+  },
+  sponsorSoftwareGrid: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  sponsorSoftwareNote: {
+    color: '#A7A29A',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  sponsorSoftwarePanel: {
+    backgroundColor: 'rgba(7, 17, 15, 0.94)',
+    borderColor: 'rgba(94, 205, 158, 0.22)',
+    marginBottom: 32,
+    overflow: 'hidden',
+  },
+  sponsorSoftwareStat: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: 86,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  sponsorSoftwareStatLabel: {
+    color: '#A7A29A',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 13,
+    textTransform: 'uppercase',
+  },
+  sponsorSoftwareStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sponsorSoftwareStatValue: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+    marginTop: 4,
+  },
+  sponsorSoftwareSummary: {
+    color: '#A7A29A',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
+    marginTop: 10,
+    maxWidth: 680,
+  },
+  sponsorSoftwareTitle: {
+    color: '#F4EFE6',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 36,
+    marginTop: 10,
   },
   statusLabel: {
     color: '#A7A29A',

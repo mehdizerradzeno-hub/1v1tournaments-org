@@ -10,6 +10,7 @@ import {
   getGamePath,
   getGames,
   getGeneralRules,
+  getSponsorSoftware,
   getStreams,
   getTournamentBySlug,
   getTournamentsForGame,
@@ -69,6 +70,18 @@ test('general rules keep the no-buy-in wording visible in one place', () => {
   assert.ok(sections.some((section) => section.items.some((item) => /no buy-in/i.test(item))));
   assert.ok(sections.some((section) => section.title === 'Platform note'));
   assert.ok(sections.some((section) => section.items.some((item) => /Apple is not a sponsor or involved/i.test(item))));
+});
+
+test('sponsor software is configured for public and host paths', () => {
+  const software = getSponsorSoftware();
+
+  assert.match(software.title, /Sponsor Software/i);
+  assert.ok(software.highlights.some((item) => /Public sponsor inquiry/i.test(item)));
+  assert.ok(software.highlights.some((item) => /Host CRM/i.test(item)));
+  assert.deepEqual(
+    software.links.map((link) => link.href),
+    ['/sponsors', '/media-kit', '/admin/sponsors'],
+  );
 });
 
 test('public tournaments expose the signup and bracket flow', () => {

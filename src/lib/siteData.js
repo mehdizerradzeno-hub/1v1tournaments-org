@@ -67,6 +67,27 @@ export const siteData = {
     contactEmail: 'hello@1v1tournaments.org',
     responseNote: 'Replies are handled manually for now.',
   },
+  sponsorSoftware: {
+    eyebrow: 'Sponsor software',
+    title: '1v1 Sponsor Software',
+    summary: 'A built-in sponsor workflow for public inquiries, media-kit links, prospect tracking, packages, proposals, and host review.',
+    note: 'Public sponsor claims stay off the site until the host approves them.',
+    highlights: [
+      'Public sponsor inquiry and media kit pages',
+      'Host CRM for prospects, packages, and proposal drafts',
+      'Manual approval before outreach or sponsor claims go public',
+    ],
+    stats: [
+      { label: 'Public pages', value: '2' },
+      { label: 'Host tools', value: 'CRM' },
+      { label: 'Approval', value: 'Manual' },
+    ],
+    links: [
+      { label: 'Sponsor page', href: '/sponsors' },
+      { label: 'Media kit', href: '/media-kit' },
+      { label: 'Host CRM', href: '/admin/sponsors' },
+    ],
+  },
   admin: {
     accessModel: 'browser-local passphrase fallback with server-side account allowlist',
     futureAccessModel: 'localhost allowlist server',
@@ -489,6 +510,10 @@ export function getStreamBySlug(slug) {
 
 export function getGeneralRules() {
   return siteData.rules.general;
+}
+
+export function getSponsorSoftware() {
+  return siteData.sponsorSoftware;
 }
 
 export function getAdminDraftTournaments() {
