@@ -479,6 +479,11 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(checkInScreenSource, /ACCOUNT_ACCESS_SECTION_ID/);
   assert.match(checkInScreenSource, /accountAccessPath/);
   assert.match(checkInScreenSource, /nativeID=\{ACCOUNT_ACCESS_SECTION_ID\}/);
+  assert.match(checkInScreenSource, /Join Tournament is the next separate step/);
+  assert.match(checkInScreenSource, /Create Account/);
+  assert.match(checkInScreenSource, /Sign In/);
+  assert.doesNotMatch(checkInScreenSource, /Sign In & Join Tournament/);
+  assert.doesNotMatch(checkInScreenSource, /Create Account & Join Tournament/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
   assert.match(hostingClientSource, /fetchSignupSummary/);

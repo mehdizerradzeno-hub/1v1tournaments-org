@@ -195,7 +195,7 @@ function getAccountFormStatus({
 
   if (accountSubmitting) {
     return {
-      body: accountMode === 'create' ? 'Creating the account and saving the roster seat.' : 'Opening the account and checking the roster.',
+      body: accountMode === 'create' ? 'Creating your player account.' : 'Opening your player account.',
       ready: false,
       title: 'Working...',
       tone: 'blue',
@@ -246,10 +246,10 @@ function getAccountFormStatus({
 
   return {
     body: registrationOpen
-      ? `This will ${actionCopy} and reserve your roster spot.`
+      ? `This will ${actionCopy}. Join Tournament is the next separate step.`
       : `This will ${actionCopy}. Registration is not open right now.`,
     ready: true,
-    title: registrationOpen ? 'Ready to join' : 'Ready for account',
+    title: accountMode === 'create' ? 'Ready to create account' : 'Ready to sign in',
     tone: 'green',
   };
 }
@@ -587,7 +587,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     setSignup(null);
 
     try {
-      await saveSignupWithCurrentSession();
+      await saveSignupWithCurrentSession({ retryAuth: true, accountHint: account });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Signup could not be saved.');
     } finally {
@@ -654,17 +654,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPassword('');
       setConfirmPassword('');
 
-      if (registrationOpen) {
-        try {
-          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true, accountHint: nextAccount || result.account });
-          setAccountMessage(`Account created and ${savedSignup.playerName} is signed up. Next: use My Match when the bracket is live.`);
-        } catch (signupError) {
-          setAccountMessage(`Account created for ${accountDisplayName}, but the roster seat still needs attention.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament once to reserve your spot.');
-        }
-      } else {
-        setAccountMessage(`Account created. You are signed in as ${accountDisplayName}.`);
-      }
+      setAccountMessage(
+        registrationOpen
+          ? `Account created for ${accountDisplayName}. Next: tap Join Tournament to reserve your roster spot.`
+          : `Account created. You are signed in as ${accountDisplayName}.`,
+      );
     } catch (createError) {
       if (isExistingAccountError(createError)) {
         setAccountMode('login');
@@ -705,17 +699,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPassword('');
       setConfirmPassword('');
 
-      if (registrationOpen) {
-        try {
-          const savedSignup = await saveSignupWithCurrentSession({ retryAuth: true, accountHint: nextAccount || result.account });
-          setAccountMessage(`Signed in and ${savedSignup.playerName} is on the roster. Next: use My Match when the bracket is live.`);
-        } catch (signupError) {
-          setAccountMessage(`Signed in as ${accountDisplayName}, but the roster seat still needs attention.`);
-          setError(signupError instanceof Error ? signupError.message : 'Tap Join Tournament once to reserve your spot.');
-        }
-      } else {
-        setAccountMessage(`Signed in as ${accountDisplayName}.`);
-      }
+      setAccountMessage(
+        registrationOpen
+          ? `Signed in as ${accountDisplayName}. Next: tap Join Tournament to reserve your roster spot.`
+          : `Signed in as ${accountDisplayName}.`,
+      );
     } catch (loginError) {
       setAccountError(loginError instanceof Error ? loginError.message : 'Player account could not be opened.');
     } finally {
@@ -796,8 +784,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'This browser is already signed in.'
     : account
       ? 'Account ready. Join this tournament.'
-      : isLoginMode
-        ? 'Sign in and join this tournament.'
+    : isLoginMode
+        ? 'Sign in to your player account.'
         : 'Create your player account';
   const mainCopy = hasSignupConfirmation
     ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
@@ -805,16 +793,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
-      : isLoginMode
-        ? 'Use your account email and password. If registration is open, this also joins the tournament roster.'
-        : 'Enter your player name, email, and password. If registration is open, this also joins the tournament roster.';
+    : isLoginMode
+        ? 'Use your account email and password. After sign-in, tap Join Tournament to reserve the roster spot.'
+        : 'Enter your player name, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
   const authActionLabel = accountMode === 'create'
-    ? registrationOpen
-      ? 'Create Account & Join Tournament'
-      : 'Create account'
-    : registrationOpen
-      ? 'Sign In & Join Tournament'
-      : 'Sign in';
+    ? 'Create Account'
+    : 'Sign In';
   const accountFormStatus = getAccountFormStatus({
     accountLoading,
     accountMode,
@@ -865,10 +849,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         description={hasSignupConfirmation
           ? 'Your seat is saved. The next useful action is My Match after the host seeds the bracket.'
           : isLoginMode
-            ? 'Sign in once, join the roster, then use My Match when the bracket goes live.'
+            ? 'Sign in first. Joining the roster is a separate button after the account opens.'
             : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
         nativeID={ACCOUNT_ACCESS_SECTION_ID}
-        title={hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in and join' : 'Create account and join'}>
+        title={hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in' : 'Create account'}>
         <Surface style={[styles.signupCard, hasSignupConfirmation && styles.signupCardComplete]}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
@@ -1000,8 +984,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               </View>
               <Text style={styles.modeHint}>
                 {accountMode === 'create'
-                  ? 'Create the player account once. The same button will try to reserve the tournament spot.'
-                  : 'Sign in with the account email and password, then we will try to reserve the spot.'}
+                  ? 'Create the player account first. Then use Join Tournament as a deliberate second step.'
+                  : 'Sign in with the account email and password first. Then choose whether to join the tournament.'}
               </Text>
 
               {accountMode === 'create' ? (
