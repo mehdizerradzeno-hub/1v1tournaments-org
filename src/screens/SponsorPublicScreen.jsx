@@ -69,6 +69,69 @@ const PACKAGE_FIT_COPY = {
   'in-kind-sponsor': 'Best for non-cash support such as equipment, food, or creator tools.',
 };
 
+const SPONSOR_READINESS_ITEMS = [
+  {
+    label: 'Audience context',
+    value: 'Player-first',
+    body: 'Sponsors sit near tournament signup, match, bracket, stream, and result moments instead of generic ad space.',
+  },
+  {
+    label: 'Inventory',
+    value: 'Reviewable',
+    body: 'Every placement can be reviewed before it goes live, so partner copy stays accurate and sponsor-safe.',
+  },
+  {
+    label: 'Operations',
+    value: 'Host controlled',
+    body: 'The sponsor CRM keeps inquiries, prospects, proposals, and approvals separate from public tournament pages.',
+  },
+];
+
+const SPONSOR_PLACEMENTS = [
+  {
+    label: 'Event page',
+    title: 'Presented-by tournament placement',
+    body: 'Sponsor mention near the event summary, signup path, bracket context, and player-facing tournament details.',
+  },
+  {
+    label: 'Stream night',
+    title: 'Live table and recap moments',
+    body: 'Optional sponsor copy around live coverage, Discord reminders, and post-match recap language after approval.',
+  },
+  {
+    label: 'Results archive',
+    title: 'Winner and result visibility',
+    body: 'Approved sponsor line can carry into result pages, winner posts, and replay/archive surfaces.',
+  },
+  {
+    label: 'Community',
+    title: 'Discord and email-ready copy',
+    body: 'Short sponsor-safe blurbs can support reminders and announcements without gambling or payout language.',
+  },
+];
+
+const SPONSOR_SAFETY_ITEMS = [
+  'Free-entry tournaments only; no wagering, deposits, or prize-value claims.',
+  'No sponsor logo, message, or claim appears publicly until the host approves it.',
+  'Audience and performance numbers stay private until they are verified.',
+  'High-risk categories are paused for extra review before outreach or placement.',
+];
+
+const SPONSOR_AFTER_SUBMIT_STEPS = [
+  {
+    title: 'Fit review',
+    body: 'The host reviews brand fit, category safety, timing, and the sponsorship goal.',
+  },
+  {
+    title: 'Placement plan',
+    body: 'You get a simple proposed package, surfaces, copy, and next tournament opportunity.',
+  },
+  {
+    title: 'Approval',
+    body: 'Nothing is published until both sides approve the placement details.',
+  },
+];
+
 function trimValue(value) {
   return String(value || '').trim();
 }
@@ -108,6 +171,40 @@ function ValueCard({ item }) {
       <Text style={styles.valueTitle}>{item.title}</Text>
       <Text style={styles.valueBody}>{item.body}</Text>
     </Surface>
+  );
+}
+
+function DecisionCard({ item }) {
+  return (
+    <Surface style={styles.decisionCard}>
+      <Text style={styles.decisionLabel}>{item.label}</Text>
+      <Text style={styles.decisionValue}>{item.value}</Text>
+      <Text style={styles.decisionBody}>{item.body}</Text>
+    </Surface>
+  );
+}
+
+function PlacementCard({ item }) {
+  return (
+    <Surface style={styles.placementCard}>
+      <Badge tone="accent">{item.label}</Badge>
+      <Text style={styles.placementTitle}>{item.title}</Text>
+      <Text style={styles.placementBody}>{item.body}</Text>
+    </Surface>
+  );
+}
+
+function AfterSubmitStep({ index, item }) {
+  return (
+    <View style={styles.afterStep}>
+      <View style={styles.afterStepNumber}>
+        <Text style={styles.afterStepNumberText}>{index + 1}</Text>
+      </View>
+      <View style={styles.afterStepCopy}>
+        <Text style={styles.afterStepTitle}>{item.title}</Text>
+        <Text style={styles.afterStepBody}>{item.body}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -180,6 +277,7 @@ function SponsorInquiryForm() {
   const requirements = useMemo(() => getInquiryRequirements(form), [form]);
   const completeCount = requirements.filter((item) => item.complete).length;
   const remainingCount = requirements.length - completeCount;
+  const progressPercent = `${Math.round((completeCount / requirements.length) * 100)}%`;
   const hasStartedInquiry = Boolean(
     trimValue(form.name)
       || trimValue(form.company)
@@ -235,6 +333,12 @@ function SponsorInquiryForm() {
           <Text style={styles.formTitle}>Start a sponsor conversation</Text>
           <Text style={styles.formBody}>
             A short inquiry is enough. We will review fit, confirm details, and keep sponsor claims private until approved.
+          </Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: progressPercent }]} />
+          </View>
+          <Text style={styles.progressText}>
+            {completeCount} of {requirements.length} sponsor details ready.
           </Text>
         </View>
         <View style={styles.requirementPanel}>
@@ -336,7 +440,7 @@ function SponsorInquiryForm() {
       <ActionButton
         onPress={() => updateField('consent', !form.consent)}
         variant={form.consent ? 'primary' : 'secondary'}>
-        {form.consent ? '[x] Consent confirmed' : '[ ] I agree to be contacted about sponsorship'}
+        {form.consent ? '[x] Consent confirmed' : '[ ] Contact me about sponsorship'}
       </ActionButton>
 
       {validation.errors.length && hasStartedInquiry ? (
@@ -349,10 +453,10 @@ function SponsorInquiryForm() {
 
       <View style={styles.formFooter}>
         <ActionButton disabled={!validation.accepted || submitState.submitting} onPress={submit}>
-          {submitState.submitting ? 'Submitting...' : validation.accepted ? 'Submit inquiry' : 'Complete form to submit'}
+          {submitState.submitting ? 'Submitting...' : validation.accepted ? 'Send sponsor inquiry' : 'Complete details to send'}
         </ActionButton>
         <Text style={styles.privacyText}>
-          Manual review only. No public placement, sponsor claim, or outreach is created from this form.
+          Manual review only. No public placement, sponsor claim, invoice, or outreach is created from this form.
         </Text>
       </View>
       {submitState.error ? <Text style={styles.errorText}>{submitState.error}</Text> : null}
@@ -388,7 +492,35 @@ function MediaKitSection() {
       <Text style={styles.metricNote}>
         Audience metrics stay private until verified. Sponsorships are reviewed manually and no outcomes are guaranteed.
       </Text>
+      <View style={styles.mediaDeliverables}>
+        <View style={styles.mediaDeliverable}>
+          <Text style={styles.mediaDeliverableLabel}>Sponsor page</Text>
+          <Text style={styles.mediaDeliverableBody}>Public inquiry and packages.</Text>
+        </View>
+        <View style={styles.mediaDeliverable}>
+          <Text style={styles.mediaDeliverableLabel}>Event surfaces</Text>
+          <Text style={styles.mediaDeliverableBody}>Tournament, stream, and result placements.</Text>
+        </View>
+        <View style={styles.mediaDeliverable}>
+          <Text style={styles.mediaDeliverableLabel}>Host review</Text>
+          <Text style={styles.mediaDeliverableBody}>Manual approval before anything public.</Text>
+        </View>
+      </View>
     </Surface>
+  );
+}
+
+function SponsorReadinessSection() {
+  return (
+    <Section
+      description="The sponsor offer is intentionally simple: visible tournament moments, clean category rules, and host approval before anything goes public."
+      title="Sponsor readiness">
+      <View style={styles.decisionGrid}>
+        {SPONSOR_READINESS_ITEMS.map((item) => (
+          <DecisionCard key={item.label} item={item} />
+        ))}
+      </View>
+    </Section>
   );
 }
 
@@ -408,6 +540,20 @@ function SponsorFlowSection() {
   );
 }
 
+function SponsorPlacementSection() {
+  return (
+    <Section
+      description="Sponsors can start with one tournament surface and expand after the first event proves the fit."
+      title="Placement map">
+      <View style={styles.placementGrid}>
+        {SPONSOR_PLACEMENTS.map((item) => (
+          <PlacementCard key={item.label} item={item} />
+        ))}
+      </View>
+    </Section>
+  );
+}
+
 function SponsorValueSection() {
   return (
     <Section
@@ -419,6 +565,59 @@ function SponsorValueSection() {
         ))}
       </View>
     </Section>
+  );
+}
+
+function SponsorSafetySection() {
+  return (
+    <Section
+      description="Production sponsor pages need trust. These rules keep the offer clean for players, partners, and app-store review."
+      title="Brand safety standard">
+      <Surface style={styles.safetyPanel}>
+        <View style={styles.safetyCopy}>
+          <Badge tone="green">Manual approval</Badge>
+          <Text style={styles.safetyTitle}>No public sponsor claim without review.</Text>
+          <Text style={styles.safetyBody}>
+            This page is built for legitimate sponsorship conversations. It avoids inflated metrics, gambling language, and automatic sponsor publication.
+          </Text>
+        </View>
+        <View style={styles.safetyList}>
+          <BulletList items={SPONSOR_SAFETY_ITEMS} tone="green" />
+        </View>
+      </Surface>
+    </Section>
+  );
+}
+
+function SponsorAfterSubmitSection() {
+  return (
+    <Section
+      description="Sponsors should know what happens after they send the form."
+      title="After you send an inquiry">
+      <Surface style={styles.afterPanel}>
+        {SPONSOR_AFTER_SUBMIT_STEPS.map((item, index) => (
+          <AfterSubmitStep key={item.title} index={index} item={item} />
+        ))}
+      </Surface>
+    </Section>
+  );
+}
+
+function SponsorFinalCta({ mediaKitOnly }) {
+  return (
+    <Surface style={styles.finalCta}>
+      <View style={styles.finalCtaCopy}>
+        <Badge tone="accent">{mediaKitOnly ? 'Next step' : 'Ready when you are'}</Badge>
+        <Text style={styles.finalCtaTitle}>{mediaKitOnly ? 'Turn the media kit into a sponsor inquiry.' : 'Start with one clean sponsorship conversation.'}</Text>
+        <Text style={styles.finalCtaBody}>
+          Keep the first partnership small, reviewable, and tied to a real tournament night. Scale only after the placement works.
+        </Text>
+      </View>
+      <View style={styles.finalCtaActions}>
+        <ActionButton href="/sponsors">Sponsor inquiry</ActionButton>
+        <ActionButton href="/media-kit" variant="secondary">Media kit</ActionButton>
+      </View>
+    </Surface>
   );
 }
 
@@ -442,13 +641,19 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
       ]}
       subtitle="Sponsor software"
       title={mediaKitOnly ? 'Media Kit' : 'Sponsor 1v1 Tournaments'}>
+      <SponsorReadinessSection />
+
       <SponsorFlowSection />
 
       <Section description="Clear product facts only. No inflated audience claims." title="Brand overview">
         <MediaKitSection />
       </Section>
 
+      <SponsorPlacementSection />
+
       <SponsorValueSection />
+
+      <SponsorSafetySection />
 
       <Section description="Starter packages are configurable and require sponsor review before any agreement." title="Sponsorship opportunities">
         <View style={styles.packageGrid}>
@@ -463,11 +668,94 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
           <SponsorInquiryForm />
         </Section>
       ) : null}
+
+      <SponsorAfterSubmitSection />
+
+      <SponsorFinalCta mediaKitOnly={mediaKitOnly} />
     </HubScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  afterPanel: {
+    borderColor: 'rgba(214, 162, 78, 0.26)',
+    gap: 12,
+  },
+  afterStep: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  afterStepBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  afterStepCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  afterStepNumber: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: theme.colors.accent,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  afterStepNumberText: {
+    color: theme.colors.accent,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  afterStepTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+  },
+  decisionBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  decisionCard: {
+    borderColor: 'rgba(94, 127, 163, 0.26)',
+    flexBasis: 250,
+    flexGrow: 1,
+  },
+  decisionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  decisionLabel: {
+    color: theme.colors.blue,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  decisionValue: {
+    color: theme.colors.text,
+    fontSize: 25,
+    fontWeight: '900',
+    lineHeight: 31,
+    marginTop: 8,
+  },
   errorBox: {
     backgroundColor: 'rgba(255, 199, 77, 0.08)',
     borderColor: 'rgba(255, 199, 77, 0.24)',
@@ -565,6 +853,37 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 12,
   },
+  finalCta: {
+    alignItems: 'center',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    justifyContent: 'space-between',
+  },
+  finalCtaActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  finalCtaBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  finalCtaCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  finalCtaTitle: {
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 10,
+  },
   formBody: {
     color: theme.colors.muted,
     fontSize: 14,
@@ -647,6 +966,34 @@ const styles = StyleSheet.create({
   mediaCopy: {
     flex: 1,
     minWidth: 260,
+  },
+  mediaDeliverable: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 190,
+    flexGrow: 1,
+    padding: 12,
+  },
+  mediaDeliverableBody: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  mediaDeliverableLabel: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  mediaDeliverables: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
   },
   mediaFacts: {
     flexBasis: 260,
@@ -747,6 +1094,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  placementBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  placementCard: {
+    flexBasis: 240,
+    flexGrow: 1,
+  },
+  placementGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  placementTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+    marginTop: 10,
+  },
   privacyText: {
     color: theme.colors.muted,
     flex: 1,
@@ -801,6 +1171,56 @@ const styles = StyleSheet.create({
   },
   requirementTextComplete: {
     color: theme.colors.text,
+  },
+  progressFill: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 999,
+    height: '100%',
+  },
+  progressText: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    marginTop: 7,
+  },
+  progressTrack: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 10,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  safetyBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  safetyCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  safetyList: {
+    flex: 1,
+    minWidth: 260,
+  },
+  safetyPanel: {
+    alignItems: 'flex-start',
+    borderColor: 'rgba(78, 201, 140, 0.3)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+  },
+  safetyTitle: {
+    color: theme.colors.text,
+    fontSize: 25,
+    fontWeight: '900',
+    lineHeight: 31,
+    marginTop: 10,
   },
   successText: {
     color: theme.colors.green,

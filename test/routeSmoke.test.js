@@ -101,7 +101,11 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   const sponsorCollateralSource = readFileSync(sponsorCollateralFunctionFile, 'utf8');
 
   assert.match(sponsorScreenSource, /Sponsor 1v1 Tournaments/);
+  assert.match(sponsorScreenSource, /Sponsor readiness/);
   assert.match(sponsorScreenSource, /How sponsorship works/);
+  assert.match(sponsorScreenSource, /Placement map/);
+  assert.match(sponsorScreenSource, /Brand safety standard/);
+  assert.match(sponsorScreenSource, /After you send an inquiry/);
   assert.match(sponsorScreenSource, /Audience metrics stay private until verified/);
   assert.match(sponsorScreenSource, /Manual review only/);
   assert.match(sponsorScreenSource, /submitSponsorInquiry/);
