@@ -777,23 +777,19 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     || null;
   const hasSignupConfirmation = Boolean(confirmedSignup);
   const isLoginMode = accountMode === 'login';
-  const wantsAccountSwitch = Boolean(account && accountMode === 'login');
+  const arrivedFromSignInLink = Boolean(account && accountMode === 'login' && !hasSignupConfirmation);
   const mainTitle = hasSignupConfirmation
     ? 'You are on the roster'
-    : wantsAccountSwitch
-      ? 'This browser is already signed in.'
     : account
       ? 'Account ready. Join this tournament.'
-    : isLoginMode
+      : isLoginMode
         ? 'Sign in to your player account.'
         : 'Create your player account';
   const mainCopy = hasSignupConfirmation
     ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
-    : wantsAccountSwitch
-      ? 'If this is not the player who is joining, sign out first, then sign in with the correct account.'
     : account
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
-    : isLoginMode
+      : isLoginMode
         ? 'Use your account email and password. After sign-in, tap Join Tournament to reserve the roster spot.'
         : 'Enter your player name, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
   const authActionLabel = accountMode === 'create'
@@ -885,51 +881,49 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             />
           ) : account ? (
             <>
-              {wantsAccountSwitch ? (
+              {arrivedFromSignInLink ? (
                 <View style={styles.switchAccountPanel}>
                   <Badge tone="accent">Signed in</Badge>
-                  <Text style={styles.switchAccountTitle}>{account.playerName}</Text>
+                  <Text style={styles.switchAccountTitle}>Already signed in as {account.playerName}</Text>
                   <Text style={styles.switchAccountCopy}>
-                    This is the active account in this browser. Sign out before another player signs in on this device.
+                    Join this tournament as {account.playerName}, or sign out first if another player is using this device.
                   </Text>
                   <View style={styles.buttonRow}>
                     <ActionButton onPress={handleLogoutAccount}>
                       {accountSubmitting ? 'Signing out...' : 'Sign out to switch'}
                     </ActionButton>
                     <ActionButton href={tournamentPath} variant="secondary">
-                      Continue as {account.playerName}
+                      Event
                     </ActionButton>
                   </View>
                 </View>
               ) : null}
 
-              {wantsAccountSwitch ? null : (
-                <View style={styles.joinActionPanel}>
-                  <View style={styles.summaryTopRow}>
-                    <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
-                    <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
-                  </View>
-                  <Text style={styles.joinActionTitle}>
-                    {registrationOpen ? `Reserve ${account.playerName}'s spot.` : 'Registration is not open right now.'}
-                  </Text>
-                  <Text style={styles.joinActionCopy}>
-                    {registrationOpen
-                      ? 'One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned Spades table.'
-                      : registrationMeta.actionCopy}
-                  </Text>
-                  <View style={styles.buttonRow}>
-                    <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                      {registrationOpen ? (submitting ? 'Saving spot...' : 'Join Tournament') : registrationMeta.label}
-                    </ActionButton>
-                    <ActionButton href={tournamentPath} variant="secondary">
-                      Event
-                    </ActionButton>
-                    <ActionButton onPress={handleLogoutAccount} variant="ghost">
-                      {accountSubmitting ? 'Signing out...' : 'Sign out'}
-                    </ActionButton>
-                  </View>
+              <View style={styles.joinActionPanel}>
+                <View style={styles.summaryTopRow}>
+                  <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
+                  <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
                 </View>
-              )}
+                <Text style={styles.joinActionTitle}>
+                  {registrationOpen ? `Reserve ${account.playerName}'s spot.` : 'Registration is not open right now.'}
+                </Text>
+                <Text style={styles.joinActionCopy}>
+                  {registrationOpen
+                    ? 'One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned Spades table.'
+                    : registrationMeta.actionCopy}
+                </Text>
+                <View style={styles.buttonRow}>
+                  <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
+                    {registrationOpen ? (submitting ? 'Saving spot...' : 'Join Tournament') : registrationMeta.label}
+                  </ActionButton>
+                  <ActionButton href={tournamentPath} variant="secondary">
+                    Event
+                  </ActionButton>
+                  <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                    {accountSubmitting ? 'Signing out...' : 'Sign out'}
+                  </ActionButton>
+                </View>
+              </View>
 
               <View style={styles.accountPanel}>
                 <View style={styles.summaryTopRow}>
