@@ -11,12 +11,15 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatResultDate } from '../lib/format.js';
-import { getGames, getGamePath, getResults, siteData } from '../lib/siteData.js';
+import { getGames, getGamePath, getResults, getTournamentPath, siteData } from '../lib/siteData.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
 
 export default function ResultsScreen() {
   const games = getGames();
-  const results = useMergedLiveResults(getResults(), siteData.site.primaryTournamentSlug);
+  const results = useMergedLiveResults(getResults());
+  const latestTournamentPath = results[0]?.tournamentSlug
+    ? getTournamentPath(results[0].tournamentSlug)
+    : '/next';
 
   return (
     <HubScreen
@@ -36,7 +39,7 @@ export default function ResultsScreen() {
       />
 
       <Section
-        action={<ActionButton href="/tournaments/spades-summer-series">Open tournament</ActionButton>}
+        action={<ActionButton href={latestTournamentPath}>Open latest tournament</ActionButton>}
         description="Completed finals, placements, and posting notes appear here in newest-first order."
         nativeID="recent-results"
         title="Recent results">

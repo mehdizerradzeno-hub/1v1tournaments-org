@@ -2409,6 +2409,16 @@ export default function AdminScreen() {
                 {bracket.winner ? <Badge tone="green">Winner: {bracket.winner.name}</Badge> : null}
               </View>
 
+              {bracket.winner ? (
+                <View style={styles.bracketChampionPanel}>
+                  <Text style={styles.bracketChampionLabel}>Tournament complete</Text>
+                  <Text style={styles.bracketChampionName}>{bracket.winner.name}</Text>
+                  <Text style={styles.bracketChampionBody}>
+                    Results are ready for the public results page. Clear the tournament only when you want to reset this event for a fresh roster.
+                  </Text>
+                </View>
+              ) : null}
+
               <View style={styles.bracketRounds}>
                 {bracket.rounds.map((round) => (
                   <View key={round.index} style={styles.bracketRound}>
@@ -3081,6 +3091,37 @@ const styles = StyleSheet.create({
   },
   bracketPanel: {
     borderColor: 'rgba(214, 162, 78, 0.30)',
+  },
+  bracketChampionPanel: {
+    backgroundColor: 'rgba(64, 181, 111, 0.10)',
+    borderColor: 'rgba(64, 181, 111, 0.34)',
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  bracketChampionLabel: {
+    color: '#40B56F',
+    fontFamily: CODE_FONT,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  bracketChampionName: {
+    color: '#F4EFE6',
+    fontSize: 26,
+    fontWeight: '900',
+    lineHeight: 32,
+    marginTop: 5,
+  },
+  bracketChampionBody: {
+    color: '#A7A29A',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
   },
   publisherPanel: {
     borderColor: 'rgba(214, 162, 78, 0.42)',

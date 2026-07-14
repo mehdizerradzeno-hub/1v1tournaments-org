@@ -683,6 +683,7 @@ export default function TournamentScreen({ slug }) {
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
   const playerHasReadyMatch = Boolean(playerStatus.data?.currentMatch);
   const isBracketLive = registrationMeta.reason === 'bracket-live' || Boolean(liveBracket);
+  const isBracketComplete = liveBracket?.status === 'complete' || Boolean(result);
   const showSignupSection = !isBracketLive;
   const bracketSectionTitle = liveBracket
     ? liveBracket.status === 'complete'
@@ -749,6 +750,7 @@ export default function TournamentScreen({ slug }) {
         matchStatusPath={matchStatusPath}
         playerStatus={playerStatus}
         registrationMeta={registrationMeta}
+        result={result}
         signInPath={signInPath}
         signupSummary={signupSummary}
         streams={streams}
@@ -922,7 +924,7 @@ export default function TournamentScreen({ slug }) {
             primary={primaryPlayerAction.href === matchStatusPath ? primaryPlayerAction : { label: 'My Match', href: matchStatusPath }}
             secondary={streams.length ? { label: 'Watch', href: '/stream' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
             stats={[
-              { label: 'Bracket', value: liveBracket ? 'Live' : 'Preview' },
+              { label: 'Bracket', value: isBracketComplete ? 'Complete' : liveBracket ? 'Live' : 'Preview' },
               { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Next', value: getNextPublicMatch(liveBracket)?.label || 'After seed' },
             ]}
@@ -1316,6 +1318,7 @@ function TournamentLobbyHero({
   matchStatusPath,
   playerStatus,
   registrationMeta,
+  result,
   signInPath,
   signupSummary,
   streams,
@@ -1328,6 +1331,8 @@ function TournamentLobbyHero({
   const signupCount = signupSummary.loading ? '--' : `${signupSummary.count}/${advertisedRosterCap}`;
   const openSeats = signupSummary.loading ? '--' : String(getOpenSeats(signupSummary.count, advertisedRosterCap));
   const nextMatch = getNextPublicMatch(liveBracket);
+  const isComplete = liveBracket?.status === 'complete' || Boolean(result);
+  const championName = liveBracket?.winner?.name || result?.winner || '';
   const primaryAction = getPlayerPrimaryAction({
     checkInPath,
     isBracketLive,
@@ -1342,8 +1347,8 @@ function TournamentLobbyHero({
   return (
     <Surface style={styles.lobbyCard}>
       <View style={styles.lobbyBadgeRow}>
-        <Badge tone={liveBracket ? 'green' : registrationMeta.tone}>
-          {liveBracket ? 'Bracket live' : registrationMeta.label}
+        <Badge tone={isComplete ? 'green' : liveBracket ? 'green' : registrationMeta.tone}>
+          {isComplete ? 'Complete' : liveBracket ? 'Bracket live' : registrationMeta.label}
         </Badge>
         <Text style={styles.lobbyDate}>
           {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
@@ -1352,15 +1357,21 @@ function TournamentLobbyHero({
 
       <View style={[styles.lobbyCountdownPanel, isPhone && styles.lobbyCountdownPanelPhone]}>
         <View style={styles.lobbyCopy}>
-          <Text style={styles.lobbyCountdownLabel}>Starts in</Text>
-          <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>{countdownLabel}</Text>
-          <Text style={styles.lobbyTitle}>Tournament lobby</Text>
+          <Text style={styles.lobbyCountdownLabel}>{isComplete ? 'Champion' : 'Starts in'}</Text>
+          <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>
+            {isComplete ? championName || 'Results posted' : countdownLabel}
+          </Text>
+          <Text style={styles.lobbyTitle}>{isComplete ? 'Tournament complete' : 'Tournament lobby'}</Text>
           <Text style={styles.lobbySummary}>
-            {tournament.format} | {tournament.location} | {tournament.entryLine}
+            {isComplete
+              ? result?.summary || 'Final results are posted for this tournament.'
+              : `${tournament.format} | ${tournament.location} | ${tournament.entryLine}`}
           </Text>
         </View>
         <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
-          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
+          <ActionButton href={isComplete ? '/results' : primaryAction.href}>
+            {isComplete ? 'View Results' : primaryAction.label}
+          </ActionButton>
           {primaryAction.href !== matchStatusPath ? <ActionButton href={matchStatusPath} variant="secondary">My Match</ActionButton> : null}
           {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
           {streams.length ? <ActionButton href="/stream" variant="secondary">Watch</ActionButton> : null}
@@ -1379,9 +1390,9 @@ function TournamentLobbyHero({
           <Text style={styles.lobbyMetricValue}>{openSeats}</Text>
         </View>
         <View style={[styles.lobbyMetric, styles.lobbyMatchMetric]}>
-          <Text style={styles.lobbyMetricLabel}>{nextMatch ? nextMatch.label || 'Up next' : 'Match focus'}</Text>
+          <Text style={styles.lobbyMetricLabel}>{isComplete ? 'Final status' : nextMatch ? nextMatch.label || 'Up next' : 'Match focus'}</Text>
           <Text numberOfLines={1} style={styles.lobbyMatchText}>
-            {nextMatch ? matchPlayersLabel(nextMatch) : 'Waiting for seeding'}
+            {isComplete ? 'Results posted' : nextMatch ? matchPlayersLabel(nextMatch) : 'Waiting for seeding'}
           </Text>
         </View>
       </View>
@@ -2045,7 +2056,15 @@ function LiveBracketBoard({ bracket }) {
           </View>
         </View>
       </View>
-      {bracket.winner ? <Text style={styles.liveBracketWinner}>Champion: {bracket.winner.name}</Text> : null}
+      {bracket.winner ? (
+        <View style={styles.liveBracketChampionPanel}>
+          <Text style={styles.liveBracketChampionLabel}>Champion</Text>
+          <Text style={styles.liveBracketChampionName}>{bracket.winner.name}</Text>
+          <Text style={styles.liveBracketChampionBody}>
+            Final results are posted from this completed tournament bracket.
+          </Text>
+        </View>
+      ) : null}
       {accessError ? <Text style={styles.liveBracketError}>{accessError}</Text> : null}
 
       {nextMatch ? (
@@ -3441,12 +3460,36 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
   },
-  liveBracketWinner: {
-    color: '#D6A24E',
-    fontSize: 15,
-    fontWeight: '800',
-    lineHeight: 22,
+  liveBracketChampionPanel: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.36)',
+    borderRadius: 18,
+    borderWidth: 1,
     marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  liveBracketChampionLabel: {
+    color: '#D6A24E',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  liveBracketChampionName: {
+    color: '#F4EFE6',
+    fontSize: 26,
+    fontWeight: '900',
+    lineHeight: 32,
+    marginTop: 5,
+  },
+  liveBracketChampionBody: {
+    color: '#A7A29A',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
   },
   liveBracketError: {
     color: '#FFB4A8',

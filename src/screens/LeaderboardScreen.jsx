@@ -12,14 +12,14 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatPlacement, formatResultDate } from '../lib/format.js';
-import { getGames, getGamePath, getResults, siteData } from '../lib/siteData.js';
+import { getGames, getGamePath, getResults } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
 import { buildTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
 
 export default function LeaderboardScreen() {
   const games = getGames();
-  const results = useMergedLiveResults(getResults(), siteData.site.primaryTournamentSlug);
+  const results = useMergedLiveResults(getResults());
   const entries = useMemo(() => buildTournamentLeaderboard(results), [results]);
   const leader = entries[0] || null;
 
