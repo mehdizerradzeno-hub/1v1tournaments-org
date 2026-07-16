@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   createSignedSessionToken,
+  getSessionId,
   parseSignedSessionToken,
 } from '../netlify/functions/_account-utils.mjs';
 
@@ -43,6 +44,31 @@ test('signed player sessions round-trip trusted account claims', () => {
   assert.equal(parsed?.accountId, account.id);
   assert.equal(parsed?.accountEmail, account.email);
   assert.equal(parsed?.playerName, account.playerName);
+});
+
+test('session cookies preserve signed tokens longer than generic form fields', () => {
+  process.env.TOURNAMENT_SESSION_SECRET = TEST_SESSION_SECRET;
+  const token = createSignedSessionToken({
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    id: 'session-long-token',
+  }, {
+    createdAt: new Date().toISOString(),
+    email: 'long-token@example.com',
+    emailVerified: true,
+    id: 'account-long-token',
+    playerHandle: `@${'handle'.repeat(60)}`,
+    playerName: 'Long Token Player',
+  });
+  const event = {
+    headers: {
+      cookie: `other_cookie=1; one_v_one_player_session=${encodeURIComponent(token)}`,
+    },
+  };
+
+  assert.ok(token.length > 500);
+  assert.equal(getSessionId(event), token);
+  assert.equal(parseSignedSessionToken(getSessionId(event))?.sessionId, 'session-long-token');
 });
 
 test('signed player sessions reject tampering and expiration', () => {

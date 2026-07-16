@@ -14,6 +14,7 @@ export const PLAYER_SESSION_COOKIE = 'one_v_one_player_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const SESSION_PROPAGATION_GRACE_MS = 5 * 60 * 1000;
 const SESSION_TOKEN_PREFIX = 'v1';
+const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
@@ -166,7 +167,7 @@ export function parseCookies(cookieHeader = '') {
 
 export function getSessionId(event) {
   const cookies = parseCookies(event.headers.cookie || event.headers.Cookie || '');
-  return cleanText(cookies[PLAYER_SESSION_COOKIE]);
+  return String(cookies[PLAYER_SESSION_COOKIE] || '').trim().slice(0, MAX_SESSION_TOKEN_LENGTH);
 }
 
 export function sessionCookie(sessionId) {
