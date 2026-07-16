@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "test": "node --test",
     "smoke:prod": "node scripts/production-smoke.mjs",
+    "smoke:tournament-integration": "node scripts/tournament-integration-smoke.mjs",
     "capacity": "node scripts/capacity-check.mjs",
     "capacity:hosted": "node scripts/hosted-capacity-smoke.mjs",
     "bot:twitch": "node scripts/twitch-chat-bot.mjs",

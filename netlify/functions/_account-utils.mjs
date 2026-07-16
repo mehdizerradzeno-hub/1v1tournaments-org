@@ -137,7 +137,10 @@ export function publicAccount(account) {
 
 export async function getAccountByEmail(email) {
   const accountStore = getStoreWithFallback('player-accounts');
-  return accountStore.get(accountKey(email), { type: 'json' });
+  return accountStore.get(accountKey(email), {
+    consistency: 'strong',
+    type: 'json',
+  });
 }
 
 export async function saveAccount(account, options = {}) {
@@ -183,7 +186,10 @@ export async function getAccountFromEvent(event) {
   }
 
   const sessionStore = getStoreWithFallback('player-sessions');
-  const session = await sessionStore.get(sessionKey(sessionId), { type: 'json' });
+  const session = await sessionStore.get(sessionKey(sessionId), {
+    consistency: 'strong',
+    type: 'json',
+  });
 
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
     await deleteSession(sessionId);

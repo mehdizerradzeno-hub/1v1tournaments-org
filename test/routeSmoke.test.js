@@ -402,6 +402,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.doesNotMatch(backupSource, /snapshotStore\('player-accounts'\)/);
   assert.match(accountUtilsSource, /player-accounts/);
   assert.match(accountUtilsSource, /player-sessions/);
+  assert.match(accountUtilsSource, /consistency: 'strong'/);
   assert.match(hostAuthSource, /TOURNAMENT_HOST_ACCOUNT_EMAILS/);
   assert.match(hostAuthSource, /requireTournamentAdmin/);
   assert.match(adminRosterSource, /@netlify\/blobs/);
@@ -426,6 +427,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentMatchAccessSource, /findSignupForAccount/);
   assert.match(tournamentMatchAccessSource, /ticketMatchesPlayer/);
   assert.match(tournamentMatchAccessSource, /signupId/);
+  assert.match(tournamentMatchAccessSource, /consistency: 'strong'/);
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
   assert.match(tournamentPlayerStatusSource, /currentMatch/);
   assert.match(tournamentPlayerStatusSource, /ready-match/);
