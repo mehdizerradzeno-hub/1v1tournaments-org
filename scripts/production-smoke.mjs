@@ -3,13 +3,13 @@ import { performance } from 'node:perf_hooks';
 const baseUrl = String(process.env.SMOKE_BASE_URL || 'https://1v1tournaments.org').replace(/\/$/, '');
 
 const pageChecks = [
-  { path: '/', markers: ['All upcoming tournaments', 'Choose your next move'] },
+  { path: '/', markers: ['Next tournament', 'Checking schedule'] },
   { path: '/next', markers: ['Next tournament'] },
   { path: '/live', markers: ['Control room', 'Broadcast hub'] },
   { path: '/admin', markers: ['Private admin unavailable', 'Sponsors'] },
   { path: '/admin/sponsors', markers: ['Sponsor CRM', 'Host access required'] },
   { path: '/sponsors', markers: ['Sponsor 1v1 Tournaments', 'Sponsor inquiry'] },
-  { path: '/media-kit', markers: ['Media Kit', 'Sponsorship opportunities'] },
+  { path: '/media-kit', markers: ['Media Kit', 'Sponsorship packages'] },
   { path: '/results', markers: ['Results archive'] },
   { path: '/leaderboard', markers: ['Tournament rankings'] },
   { path: '/rules', markers: ['Rules'] },
