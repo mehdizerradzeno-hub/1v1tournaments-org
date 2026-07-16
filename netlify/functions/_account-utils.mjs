@@ -288,15 +288,27 @@ export async function deleteSession(sessionToken) {
 
 export async function getAccountFromEvent(event) {
   const sessionToken = getSessionId(event);
+  const smokeProbe = cleanText(event.headers['x-tournament-smoke']);
+  const logSmokeStage = (stage, detail = {}) => {
+    if (!smokeProbe) return;
+
+    console.info('Tournament session smoke', {
+      ...detail,
+      probe: smokeProbe,
+      stage,
+    });
+  };
 
   if (!sessionToken) {
+    logSmokeStage('session-cookie-missing');
     return null;
   }
 
   const signedSession = parseSignedSessionToken(sessionToken);
   const sessionId = signedSession?.sessionId || sessionToken;
   const sessionStore = getStoreWithFallback('player-sessions');
-  let session = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
+  const storedSession = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
+  let session = storedSession;
   const signedSessionCreatedAt = new Date(signedSession?.sessionCreatedAt).getTime();
   const signedSessionInGrace = Boolean(
     signedSession
@@ -313,14 +325,23 @@ export async function getAccountFromEvent(event) {
     };
   }
 
+  logSmokeStage('session-resolved', {
+    signedSessionInGrace,
+    signedSessionValid: Boolean(signedSession),
+    storedSessionFound: Boolean(storedSession),
+    tokenKind: sessionToken.startsWith(`${SESSION_TOKEN_PREFIX}.`) ? 'signed' : 'legacy',
+  });
+
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
     await deleteSession(sessionToken);
+    logSmokeStage('session-rejected');
     return null;
   }
 
   const account = await getAccountByEmail(session.accountEmail, { retry: true });
 
   if (!account && signedSessionInGrace && signedSession.accountId === session.accountId) {
+    logSmokeStage('signed-claims-fallback');
     return {
       createdAt: signedSession.accountCreatedAt,
       email: signedSession.accountEmail,
@@ -332,8 +353,10 @@ export async function getAccountFromEvent(event) {
   }
 
   if (!account || account.id !== session.accountId) {
+    logSmokeStage('account-rejected', { storedAccountFound: Boolean(account) });
     return null;
   }
 
+  logSmokeStage('stored-account-resolved');
   return account;
 }

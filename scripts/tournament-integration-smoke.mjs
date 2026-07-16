@@ -56,6 +56,7 @@ async function request(path, {
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       ...(cookie ? { Cookie: cookie } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'X-Tournament-Smoke': runId,
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
