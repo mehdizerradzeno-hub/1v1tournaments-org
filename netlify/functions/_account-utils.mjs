@@ -289,6 +289,7 @@ export async function deleteSession(sessionToken) {
 export async function getAccountFromEvent(event) {
   const sessionToken = getSessionId(event);
   const smokeProbe = cleanText(event.headers['x-tournament-smoke']);
+  const smokeTokenDigest = cleanText(event.headers['x-tournament-smoke-cookie-digest']);
   const logSmokeStage = (stage, detail = {}) => {
     if (!smokeProbe) return;
 
@@ -329,7 +330,11 @@ export async function getAccountFromEvent(event) {
     signedSessionInGrace,
     signedSessionValid: Boolean(signedSession),
     storedSessionFound: Boolean(storedSession),
+    tokenDigestMatches: smokeTokenDigest
+      ? identityKey(sessionToken) === smokeTokenDigest
+      : null,
     tokenKind: sessionToken.startsWith(`${SESSION_TOKEN_PREFIX}.`) ? 'signed' : 'legacy',
+    tokenLength: sessionToken.length,
   });
 
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {

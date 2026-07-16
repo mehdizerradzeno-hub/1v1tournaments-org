@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const HUB_ORIGIN = process.env.TOURNAMENT_HUB_ORIGIN || 'https://1v1tournaments.org';
 const SPADES_ORIGIN = process.env.SPADES_ORIGIN || 'https://1v1spades.com';
@@ -49,12 +49,17 @@ async function request(path, {
   origin = HUB_ORIGIN,
   token = '',
 } = {}) {
+  const cookieValue = decodeURIComponent(cookie.split('=', 2)[1] || '');
+  const cookieDigest = cookieValue
+    ? createHash('sha256').update(cookieValue).digest('hex').slice(0, 40)
+    : '';
   const response = await fetch(new URL(path, origin), {
     method,
     redirect: 'follow',
     headers: {
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       ...(cookie ? { Cookie: cookie } : {}),
+      ...(cookieDigest ? { 'X-Tournament-Smoke-Cookie-Digest': cookieDigest } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       'X-Tournament-Smoke': runId,
     },
