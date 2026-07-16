@@ -121,6 +121,21 @@ function getStartTimingLabel(tournament) {
   return `Starts in ${Math.round(absMinutes / 1440)} days`;
 }
 
+function getTournamentLifecycleLabel(tournament) {
+  const status = String(tournament?.status || 'upcoming').toLowerCase();
+
+  if (status === 'complete') return 'Complete';
+  if (status === 'expired') return 'Expired';
+  if (status === 'live') return 'Live';
+  if (status === 'archived') return 'Archived';
+  if (status === 'deleted') return 'Deleted';
+  return 'Upcoming';
+}
+
+function getTournamentPickerLabel(tournament) {
+  return `${tournament.title} - ${getTournamentLifecycleLabel(tournament)}`;
+}
+
 function getBracketPreviewLabel(signupCount, tournament) {
   const minimumPlayers = tournament?.minimumPlayers || 2;
   const rosterCap = tournament?.rosterCap || 0;
@@ -1120,7 +1135,7 @@ export default function AdminScreen() {
                   key={tournamentOption.slug}
                   onPress={() => setRosterSlug(tournamentOption.slug)}
                   variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
-                  {tournamentOption.title}
+                  {getTournamentPickerLabel(tournamentOption)}
                 </ActionButton>
               ))}
               <ActionButton onPress={handleNewTournamentDraft} variant="secondary">
@@ -1602,6 +1617,7 @@ export default function AdminScreen() {
     const tournamentPath = getTournamentPath(rosterSlug);
     const signupPath = getCheckInPath(rosterSlug);
     const isArchived = tournament?.status === 'archived';
+    const lifecycleLabel = getTournamentLifecycleLabel(tournament);
     const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, activeSignupCount);
     const nextHostMove = !hasHostCredential
       ? 'Sign in as host to unlock editing, clearing, and bracket actions.'
@@ -1621,7 +1637,17 @@ export default function AdminScreen() {
       { label: 'Start', value: getStartTimingLabel(tournament), tone: 'blue' },
       { label: 'Roster', value: `${activeSignupCount}${tournament?.rosterCap ? ` / ${tournament.rosterCap}` : ''}`, tone: activeSignupCount ? 'green' : 'blue' },
       { label: 'Bracket', value: bracket ? `${bracket.participantCount || 0} seeded` : 'Not generated', tone: bracket ? 'green' : 'accent' },
-      { label: 'Status', value: isArchived ? 'Archived' : liveRegistrationMeta.label, tone: isArchived ? 'rose' : liveRegistrationMeta.tone },
+      {
+        label: 'Status',
+        value: tournament?.status === 'upcoming'
+          ? `${lifecycleLabel} - ${liveRegistrationMeta.label}`
+          : lifecycleLabel,
+        tone: ['archived', 'expired', 'deleted'].includes(tournament?.status)
+          ? 'rose'
+          : tournament?.status === 'complete' || tournament?.status === 'live'
+            ? 'green'
+            : liveRegistrationMeta.tone,
+      },
     ];
 
     return (
@@ -1658,7 +1684,7 @@ export default function AdminScreen() {
                   onPress={() => setRosterSlug(tournamentOption.slug)}
                   style={styles.quickPickerButton}
                   variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
-                  {tournamentOption.title}
+                  {getTournamentPickerLabel(tournamentOption)}
                 </ActionButton>
               ))}
               <ActionButton onPress={handleNewTournamentDraft} style={styles.quickPickerButton} variant="secondary">

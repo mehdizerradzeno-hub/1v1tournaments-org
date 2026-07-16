@@ -1,5 +1,6 @@
 import { cleanText, getStoreWithFallback } from './_account-utils.mjs';
 import { createTournamentRecord, slugifyTournamentTitle } from '../../src/lib/tournamentCatalog.js';
+import { deriveTournamentLifecycle } from '../../src/lib/tournamentLifecycle.js';
 import { siteData } from '../../src/lib/siteData.js';
 
 const STORE_NAME = 'tournament-events';
@@ -50,12 +51,21 @@ export function normalizeHostedTournament(payload = {}) {
 
 export async function listHostedTournaments() {
   const store = getStoreWithFallback(STORE_NAME);
+  const bracketStore = getStoreWithFallback('tournament-brackets');
   const { blobs } = await store.list();
   const tournaments = await Promise.all(
     blobs.map((blob) => store.get(blob.key, { type: 'json' })),
   );
+  const hydrated = await Promise.all(tournaments.filter(Boolean).map(async (tournament) => {
+    if (!tournament.slug || tournament.deleted) {
+      return deriveTournamentLifecycle(tournament);
+    }
 
-  return tournaments.filter(Boolean).sort(byDateAsc);
+    const bracket = await bracketStore.get(`${tournament.slug}.json`, { type: 'json' });
+    return deriveTournamentLifecycle(tournament, bracket);
+  }));
+
+  return hydrated.filter(Boolean).sort(byDateAsc);
 }
 
 export async function loadHostedTournament(tournamentSlug) {
@@ -68,7 +78,14 @@ export async function loadHostedTournament(tournamentSlug) {
   const store = getStoreWithFallback(STORE_NAME);
   const tournament = await store.get(eventKey(slug), { type: 'json' });
 
-  return tournament?.deleted ? null : tournament;
+  if (!tournament || tournament.deleted) {
+    return null;
+  }
+
+  const bracketStore = getStoreWithFallback('tournament-brackets');
+  const bracket = await bracketStore.get(`${slug}.json`, { type: 'json' });
+
+  return deriveTournamentLifecycle(tournament, bracket);
 }
 
 export async function deleteHostedTournament(tournamentSlug) {
@@ -89,12 +106,14 @@ export async function deleteHostedTournament(tournamentSlug) {
     await store.setJSON(eventKey(slug), {
       slug,
       deleted: true,
+      hideSeeded: true,
       status: 'deleted',
       updatedAt,
       updatedBy: 'host-clear',
     }, {
       metadata: {
         tournamentSlug: slug,
+        hideSeeded: true,
         status: 'deleted',
         updatedAt,
       },

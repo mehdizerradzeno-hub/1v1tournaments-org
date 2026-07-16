@@ -130,6 +130,7 @@ export function publicAccount(account) {
     email: account.email,
     playerName: account.playerName,
     playerHandle: account.playerHandle || '',
+    emailVerified: account.emailVerified !== false,
     createdAt: account.createdAt,
   };
 }

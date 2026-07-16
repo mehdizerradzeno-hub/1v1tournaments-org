@@ -133,6 +133,40 @@ export async function logoutPlayerAccount() {
   return result;
 }
 
+async function postPlayerAccountAction(action, payload = {}) {
+  const response = await fetch(ACCOUNT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...payload, action }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player account action could not be completed.');
+  }
+
+  return result;
+}
+
+export function requestPlayerPasswordReset(payload) {
+  return postPlayerAccountAction('request-password-reset', payload);
+}
+
+export function resetPlayerPassword(payload) {
+  return postPlayerAccountAction('reset-password', payload);
+}
+
+export function requestPlayerEmailVerification(payload) {
+  return postPlayerAccountAction('request-email-verification', payload);
+}
+
+export function verifyPlayerEmail(payload) {
+  return postPlayerAccountAction('verify-email', payload);
+}
+
 export async function fetchSignupSummary({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const endpoint = `${readEndpoint(SIGNUP_ENDPOINT)}${query}`;

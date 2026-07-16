@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ActionButton,
@@ -16,7 +16,6 @@ import {
   fetchSponsorInquiries,
   fetchSponsorProspects,
   saveSponsorCollateral,
-  saveSponsorProspect,
   saveSponsorProspects,
   updateSponsorProspectStatus,
   updateSponsorInquiryStatus,
@@ -40,8 +39,7 @@ import { theme } from '../lib/theme.js';
 
 const CODE_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
 
-const EMPTY_IMPORT = `companyName,website,industry,headquarters,sourceType,sourceUrl,publicContactName,publicContactRole,publicContactEmail,publicContactFormUrl,notes
-Example Playing Cards,https://example.com,Playing cards,"Raleigh, NC",manual,https://example.com/contact,,,,https://example.com/contact,"Sample only. Replace with public or authorized information."`;
+const EMPTY_IMPORT = 'companyName,website,industry,headquarters,sourceType,sourceUrl,publicContactName,publicContactRole,publicContactEmail,publicContactFormUrl,notes';
 
 function useHostAccount() {
   const [state, setState] = useState({ loading: true, account: null, error: '' });
@@ -88,10 +86,16 @@ function StatTile({ label, value }) {
 
 function ProspectRow({ prospect, selected, onSelect }) {
   return (
-    <ActionButton
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`Open ${prospect.companyName || 'unnamed company'} sponsor prospect`}
       onPress={onSelect}
-      style={[styles.prospectRow, selected && styles.prospectRowSelected]}
-      variant="secondary">
+      style={({ pressed }) => [
+        styles.prospectRow,
+        selected && styles.prospectRowSelected,
+        pressed && styles.prospectRowPressed,
+      ]}>
       <View style={styles.prospectRowInner}>
         <View style={styles.prospectRowCopy}>
           <Text numberOfLines={1} style={styles.prospectName}>{prospect.companyName || 'Unnamed company'}</Text>
@@ -103,7 +107,7 @@ function ProspectRow({ prospect, selected, onSelect }) {
           {prospect.duplicateOfId ? 'Duplicate' : prospect.status}
         </Badge>
       </View>
-    </ActionButton>
+    </Pressable>
   );
 }
 
@@ -347,14 +351,14 @@ function SponsorInquiryInbox({ error, inquiries, loading, onRefresh, onUpdateSta
   );
 }
 
-function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
+function ResearchQueue({ candidates, loading, onPrepare }) {
   return (
     <Surface style={styles.researchPanel}>
       <View style={styles.researchHeader}>
         <View style={styles.researchCopy}>
-          <Text style={styles.researchTitle}>Mock-safe research preparation</Text>
+          <Text style={styles.researchTitle}>Sample research workspace</Text>
           <Text style={styles.researchBody}>
-            Bounded provider run. No live crawling, no contact attempts, and every material fact keeps a source.
+            Preview scoring and provenance with sample data. Samples never save to the CRM and no contact attempts are made.
           </Text>
         </View>
         <ActionButton disabled={loading} onPress={onPrepare}>
@@ -392,18 +396,16 @@ function ResearchQueue({ candidates, loading, onPrepare, onAccept }) {
                   </Text>
                 ))}
               </View>
-              <ActionButton
-                disabled={Boolean(candidate.prospect.duplicateOfId) || candidate.prospect.legalRiskStatus === 'NEEDS_REVIEW'}
-                onPress={() => onAccept(candidate)}
-                variant="secondary">
-                Accept into CRM preview
-              </ActionButton>
+              <View style={styles.sampleOnlyNotice}>
+                <Badge tone="blue">Sample only</Badge>
+                <Text style={styles.sampleOnlyText}>Cannot be saved. Add real prospects through the reviewed CSV import.</Text>
+              </View>
             </View>
           ))}
         </View>
       ) : (
         <EmptyState
-          body="Run the mock-safe preparation step to review example sponsor candidates with provenance and score breakdowns."
+          body="Prepare sample candidates to inspect provenance and scoring. This workspace never writes sample data to the CRM."
           title="No research candidates prepared"
         />
       )}
@@ -772,41 +774,6 @@ export default function SponsorAdminScreen() {
     }
   }
 
-  async function acceptResearchCandidate(candidate) {
-    const accepted = {
-      ...candidate.prospect,
-      id: '',
-    };
-
-    setProspectState({ loading: true, error: '', message: '' });
-
-    try {
-      const result = await saveSponsorProspect({ prospect: accepted });
-      const saved = result.prospect;
-
-      setProspects(result.prospects || [saved, ...prospects]);
-      setSelectedId(saved?.id || '');
-      setResearchRun((currentRun) => currentRun
-        ? {
-          ...currentRun,
-          candidatesAccepted: currentRun.candidatesAccepted + 1,
-          candidates: currentRun.candidates.filter((item) => item.id !== candidate.id),
-        }
-        : currentRun);
-      setProspectState({
-        loading: false,
-        error: '',
-        message: `${saved?.companyName || 'Sponsor prospect'} saved to the host CRM.`,
-      });
-    } catch (error) {
-      setProspectState({
-        loading: false,
-        error: error instanceof Error ? error.message : 'Research candidate could not be saved.',
-        message: '',
-      });
-    }
-  }
-
   async function changeProspectStatus(prospectId, status) {
     setProspectState({ loading: true, error: '', message: '' });
 
@@ -1111,7 +1078,7 @@ export default function SponsorAdminScreen() {
           {activeTab === 'prospects' ? (
             <>
               <Section
-                description="Paste CSV data to preview normalized prospects. Saving preview stores host-reviewed records in the sponsor CRM."
+                description="Paste reviewed sponsor data with public or authorized sources. Nothing is stored until you explicitly save a valid preview."
                 title="CSV import preview">
                 <Surface style={styles.importPanel}>
                   <TextInput
@@ -1125,10 +1092,16 @@ export default function SponsorAdminScreen() {
                     <View style={styles.importCopy}>
                       <Text style={styles.importTitle}>{importPreview.prospects.length} preview records</Text>
                       <Text style={styles.importMeta}>
-                        {importPreview.errors.length ? importPreview.errors.join(' ') : 'No structural CSV errors found.'}
+                        {importPreview.errors.length
+                          ? importPreview.errors.join(' ')
+                          : importPreview.prospects.length
+                            ? 'Ready for host review. Saving creates CRM records.'
+                            : 'Header ready. Add at least one reviewed company row to enable saving.'}
                       </Text>
                     </View>
-                    <ActionButton disabled={Boolean(importPreview.errors.length) || prospectState.loading} onPress={acceptPreview}>
+                    <ActionButton
+                      disabled={Boolean(importPreview.errors.length) || !importPreview.prospects.length || prospectState.loading}
+                      onPress={acceptPreview}>
                       {prospectState.loading ? 'Saving...' : 'Save preview'}
                     </ActionButton>
                   </View>
@@ -1183,12 +1156,11 @@ export default function SponsorAdminScreen() {
 
           {activeTab === 'research' ? (
             <Section
-              description="Prepare sponsor candidates from approved mock providers. Live search providers can be added later behind the same interface."
+              description="Use approved sample data to evaluate research scoring. Real prospects must enter through reviewed CSV rows with source URLs."
               title="Research queue">
               <ResearchQueue
                 candidates={researchRun?.candidates || []}
                 loading={researchLoading}
-                onAccept={acceptResearchCandidate}
                 onPrepare={prepareResearchQueue}
               />
             </Section>
@@ -1597,7 +1569,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   prospectRow: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    borderRadius: 8,
+    borderWidth: 1,
     marginBottom: 8,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   prospectRowCopy: {
     flex: 1,
@@ -1613,6 +1592,10 @@ const styles = StyleSheet.create({
   },
   prospectRowSelected: {
     borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(221, 164, 74, 0.09)',
+  },
+  prospectRowPressed: {
+    opacity: 0.82,
   },
   proposalNotice: {
     color: theme.colors.accent,
@@ -1715,6 +1698,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 17,
+  },
+  sampleOnlyNotice: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 10,
+  },
+  sampleOnlyText: {
+    color: theme.colors.muted,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+    minWidth: 180,
   },
   sourceBlock: {
     borderColor: theme.colors.line,

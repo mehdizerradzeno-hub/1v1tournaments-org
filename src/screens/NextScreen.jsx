@@ -746,13 +746,13 @@ function SponsorSoftwareShowcase() {
           </View>
           <Text style={styles.sponsorSoftwareNote}>{software.note}</Text>
           <View style={styles.sponsorSoftwareActions}>
-            {software.links.map((link, index) => (
+            {software.links.filter((link) => !link.href.startsWith('/admin')).map((link, index) => (
               <ActionButton
                 key={link.href}
-                href={link.href}
+                href={link.href === '/sponsors' ? '/sponsors#sponsor-inquiry' : link.href}
                 style={styles.sponsorSoftwareAction}
                 variant={index === 0 ? 'primary' : 'secondary'}>
-                {link.label}
+                {link.href === '/sponsors' ? 'Sponsor inquiry' : link.label}
               </ActionButton>
             ))}
           </View>

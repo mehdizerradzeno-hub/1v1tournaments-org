@@ -12,9 +12,9 @@ Standalone Expo Router project for `1v1tournaments.org`.
 - A general rules page.
 - A results archive page.
 - A live / YouTube links page.
-- A placeholder check-in route for future sign-up flow.
-- A private admin route with a localhost allowlist server and browser-local fallback.
-- Admin-editable placeholder data in `src/lib/siteData.js`.
+- Account-based check-in with password recovery and optional email verification.
+- A host-approved production admin route with token and localhost fallbacks.
+- Netlify Blob-backed tournaments, rosters, brackets, sponsor records, and daily snapshots.
 
 ## Project Structure
 
@@ -45,9 +45,9 @@ The production web export lands in `dist/` and can be deployed to any static hos
 
 ## Go Live
 
-1. Run `npm run build:web`.
-2. Upload the generated `dist/` folder to your static hosting provider.
-3. Point `1v1tournaments.org` at that host.
+1. Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build:web`.
+2. Push the reviewed branch to the connected Netlify repository.
+3. Wait for the Netlify production deploy, then run `npm run smoke:prod`.
 
 ## Adding Euchre Next
 
@@ -69,10 +69,63 @@ Future edits:
 - Keep `TOURNAMENT_ADMIN_TOKEN` as a fallback admin token for emergencies and setup.
 - Use the host dashboard `Schedule and registration` controls to update event date, time zone, check-in lead time, and registration status without editing code.
 - Use the host dashboard `Clear test data` control to wipe one tournament's roster and bracket during smoke tests while keeping player accounts intact.
+- Use `Delete tournament` when an event should disappear from public and host lists. Seeded events receive an explicit hide tombstone so they do not reappear after deletion.
 - Live schedule overrides are stored in the Netlify Blobs `tournament-settings` store and merged over the seeded `siteData.tournaments` records.
 - The localhost allowlist server started with `npm run admin:server` and the browser-local passphrase remain fallback paths for draft editing.
 - Put private draft tournament placeholders under `siteData.admin.draftTournaments` until a real remote auth layer exists.
 - The server state file lives at `.data/admin-state.json`, which is ignored by git.
+
+## Account Recovery And Verification
+
+Player passwords are stored as salted scrypt hashes. Password reset and optional email
+verification use six-digit, single-use codes that expire after 15 minutes. Account actions
+are rate-limited by a hashed network/account fingerprint.
+
+Configure these Netlify environment variables to enable email delivery:
+
+```text
+RESEND_API_KEY=<private Resend key>
+TOURNAMENT_EMAIL_FROM=1v1 Tournaments <support@your-verified-domain.example>
+```
+
+Email verification remains opt-in for a staged rollout. Set this only after the sender domain
+and recovery flow pass a live smoke test:
+
+```text
+REQUIRE_VERIFIED_PLAYER_EMAILS=true
+```
+
+Existing accounts without an `emailVerified` field remain treated as verified, so enabling the
+flag does not lock out the current roster.
+
+## Scheduled Operations
+
+Netlify runs two scheduled functions from source configuration:
+
+- `tournament-backup` runs daily and snapshots tournaments, settings, signups, brackets, and sponsor workflow records into the private `tournament-backups` Blob store. Player accounts, sessions, codes, and rate limits are deliberately excluded.
+- `tournament-reminders` checks every five minutes for tournaments starting in 25 to 35 minutes. It uses provider idempotency keys and private delivery markers to avoid duplicate messages.
+
+Reminder email is disabled by default. Enable it only after an approved live delivery test:
+
+```text
+TOURNAMENT_REMINDERS_ENABLED=true
+TOURNAMENT_REMINDER_BATCH_SIZE=50
+```
+
+The batch size is optional and capped at 100 messages per scheduled run.
+
+## Tournament Lifecycle
+
+Public event status is derived from schedule and bracket state on every event API read:
+
+- Future event without a bracket: `upcoming`
+- Started event without a bracket: `expired`
+- Published bracket: `live`
+- Completed bracket: `complete`
+- Host-archived or deleted event: stays archived or deleted
+
+Expired, live, complete, archived, and deleted events close registration automatically. The
+stored host record is left intact, so moving an expired event to a future date can reopen it.
 
 ## Discord Live Alerts
 

@@ -176,7 +176,7 @@ export const STARTER_SPONSORSHIP_PACKAGES = Object.freeze([
       'Food',
       'Venue space',
       'Streaming products',
-      'Tournament prizes',
+      'Player supplies',
       'Marketing support',
     ],
   },

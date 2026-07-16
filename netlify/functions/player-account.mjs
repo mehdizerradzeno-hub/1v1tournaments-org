@@ -20,6 +20,13 @@ import {
   withCookie,
 } from './_account-utils.mjs';
 import { isHostAccount } from './_host-auth.mjs';
+import {
+  consumePlayerEmailCode,
+  emailProviderConfigured,
+  issuePlayerEmailCode,
+  verifiedEmailsRequired,
+} from './_player-email.mjs';
+import { enforceRateLimit } from './_rate-limit.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -34,6 +41,17 @@ function json(statusCode, body) {
     statusCode,
     headers,
     body: JSON.stringify(body),
+  };
+}
+
+function rateLimited(result, message) {
+  return {
+    statusCode: 429,
+    headers: {
+      ...headers,
+      'Retry-After': String(result.retryAfterSeconds),
+    },
+    body: JSON.stringify({ error: message }),
   };
 }
 
@@ -99,6 +117,7 @@ async function createAccount(payload) {
     email,
     playerName,
     playerHandle,
+    emailVerified: !verifiedEmailsRequired(),
     password: createPasswordRecord(passwordCheck.password),
     createdAt: now,
     updatedAt: now,
@@ -116,7 +135,22 @@ async function createAccount(payload) {
 
   const session = await createSession(account);
 
-  return withCookie(json(201, { ok: true, account: publicPlayerAccount(account) }), sessionCookie(session.id));
+  let verificationDelivery = null;
+
+  if (!account.emailVerified && emailProviderConfigured()) {
+    verificationDelivery = await issuePlayerEmailCode({
+      email: account.email,
+      playerName: account.playerName,
+      purpose: 'verify-email',
+    }).catch((error) => ({ error: error.message, ok: false }));
+  }
+
+  return withCookie(json(201, {
+    ok: true,
+    account: publicPlayerAccount(account),
+    verificationRequired: !account.emailVerified,
+    verificationDelivery,
+  }), sessionCookie(session.id));
 }
 
 async function loginAccount(payload) {
@@ -142,6 +176,81 @@ async function logoutAccount(event) {
   await deleteSession(getSessionId(event));
 
   return withCookie(json(200, { ok: true, account: null }), clearSessionCookie());
+}
+
+async function requestEmailCode(payload, purpose) {
+  const email = cleanEmail(payload.contactEmail || payload.email);
+  const account = isEmailLike(email) ? await getAccountByEmail(email) : null;
+
+  if (account) {
+    await issuePlayerEmailCode({
+      email,
+      playerName: account.playerName,
+      purpose,
+    });
+  }
+
+  return json(200, {
+    ok: true,
+    configured: emailProviderConfigured(),
+    message: emailProviderConfigured()
+      ? 'If that player account exists, a code was sent.'
+      : 'Email recovery is not configured yet. Contact the tournament host.',
+  });
+}
+
+async function verifyAccountEmail(payload) {
+  const email = cleanEmail(payload.contactEmail || payload.email);
+  const account = await getAccountByEmail(email);
+  const valid = account && await consumePlayerEmailCode({
+    code: payload.code,
+    email,
+    purpose: 'verify-email',
+  });
+
+  if (!valid) {
+    return json(400, { error: 'That verification code is invalid or expired.' });
+  }
+
+  const updated = {
+    ...account,
+    emailVerified: true,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveAccount(updated);
+  return json(200, { ok: true, account: publicPlayerAccount(updated) });
+}
+
+async function resetAccountPassword(payload) {
+  const email = cleanEmail(payload.contactEmail || payload.email);
+  const passwordCheck = requirePassword(payload.password, payload.confirmPassword);
+
+  if (passwordCheck.error) {
+    return json(400, { error: passwordCheck.error });
+  }
+
+  const account = await getAccountByEmail(email);
+  const valid = account && await consumePlayerEmailCode({
+    code: payload.code,
+    email,
+    purpose: 'reset-password',
+  });
+
+  if (!valid) {
+    return json(400, { error: 'That recovery code is invalid or expired.' });
+  }
+
+  const updated = {
+    ...account,
+    password: createPasswordRecord(passwordCheck.password),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveAccount(updated);
+  const session = await createSession(updated);
+
+  return withCookie(json(200, { ok: true, account: publicPlayerAccount(updated) }), sessionCookie(session.id));
 }
 
 export async function handler(event) {
@@ -175,6 +284,29 @@ export async function handler(event) {
   }
 
   try {
+    const email = cleanEmail(payload.contactEmail || payload.email);
+    const limits = {
+      create: { limit: 5, windowMs: 60 * 60 * 1000 },
+      login: { limit: 10, windowMs: 15 * 60 * 1000 },
+      'request-password-reset': { limit: 5, windowMs: 60 * 60 * 1000 },
+      'request-email-verification': { limit: 5, windowMs: 60 * 60 * 1000 },
+      'reset-password': { limit: 8, windowMs: 60 * 60 * 1000 },
+      'verify-email': { limit: 8, windowMs: 60 * 60 * 1000 },
+    };
+    const rateLimit = limits[payload.action];
+
+    if (rateLimit) {
+      const limitResult = await enforceRateLimit(event, {
+        action: payload.action,
+        identity: email,
+        ...rateLimit,
+      });
+
+      if (!limitResult.allowed) {
+        return rateLimited(limitResult, 'Too many account attempts. Wait a few minutes and try again.');
+      }
+    }
+
     if (payload.action === 'create') {
       return createAccount(payload);
     }
@@ -187,7 +319,23 @@ export async function handler(event) {
       return logoutAccount(event);
     }
 
-    return json(400, { error: 'Choose create, login, or logout for the account action.' });
+    if (payload.action === 'request-password-reset') {
+      return requestEmailCode(payload, 'reset-password');
+    }
+
+    if (payload.action === 'reset-password') {
+      return resetAccountPassword(payload);
+    }
+
+    if (payload.action === 'request-email-verification') {
+      return requestEmailCode(payload, 'verify-email');
+    }
+
+    if (payload.action === 'verify-email') {
+      return verifyAccountEmail(payload);
+    }
+
+    return json(400, { error: 'Choose a supported player account action.' });
   } catch (error) {
     console.error('Player account action failed', error);
     return json(500, { error: 'Player accounts are not available yet.' });

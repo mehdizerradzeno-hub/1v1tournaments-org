@@ -42,6 +42,29 @@ const SPONSOR_VALUE_CARDS = [
   },
 ];
 
+const SPONSOR_PROOF_POINTS = [
+  {
+    label: 'Product',
+    value: '1v1 Spades',
+    body: 'Published on the Apple App Store with live head-to-head gameplay.',
+  },
+  {
+    label: 'Platform',
+    value: 'Live hub',
+    body: 'Account-based signup, brackets, match links, results, and sponsor workflows are running on 1v1tournaments.org.',
+  },
+  {
+    label: 'Event proof',
+    value: '16-player event',
+    body: 'The format has already been tested through a completed 16-player tournament.',
+  },
+  {
+    label: 'Direction',
+    value: 'Raleigh league',
+    body: 'Built toward a Raleigh 1v1 Spades League with local sponsor opportunities.',
+  },
+];
+
 const SPONSOR_FLOW_STEPS = [
   {
     title: 'Review packages',
@@ -68,6 +91,16 @@ const PACKAGE_FIT_COPY = {
   'presenting-sponsor': 'Best for a larger custom campaign or season-style presence.',
   'in-kind-sponsor': 'Best for non-cash support such as equipment, food, or creator tools.',
 };
+
+const PACKAGE_SCOPE_COPY = {
+  'community-supporter': 'Community',
+  'tournament-sponsor': 'Event',
+  'featured-partner': 'League',
+  'presenting-sponsor': 'Championship',
+  'in-kind-sponsor': 'Support',
+};
+
+const RECOMMENDED_PACKAGE_ID = 'featured-partner';
 
 const SPONSOR_READINESS_ITEMS = [
   {
@@ -174,6 +207,70 @@ function ValueCard({ item }) {
   );
 }
 
+function SponsorHero() {
+  return (
+    <Surface style={styles.sponsorHero}>
+      <View style={styles.sponsorHeroCopy}>
+        <Badge tone="accent">Founding sponsor path</Badge>
+        <Text style={styles.sponsorHeroTitle}>
+          Put your brand beside the tournament moments players already care about.
+        </Text>
+        <Text style={styles.sponsorHeroBody}>
+          1v1 Tournaments connects local sponsors to skill-based card-game events, stream nights, bracket pages, and results recaps with manual approval before anything goes public.
+        </Text>
+        <View style={styles.sponsorHeroActions}>
+          <ActionButton href="/sponsors#sponsor-inquiry">
+            Request sponsor review
+          </ActionButton>
+          <ActionButton href="/media-kit" variant="secondary">Open media kit</ActionButton>
+        </View>
+      </View>
+      <View style={styles.sponsorHeroPanel}>
+        <Text style={styles.sponsorHeroPanelLabel}>Raleigh league direction</Text>
+        <Text style={styles.sponsorHeroPanelTitle}>Local sponsors around real tournament moments.</Text>
+        <View style={styles.sponsorHeroSignalGrid}>
+          <View style={styles.sponsorHeroSignal}>
+            <Text style={styles.sponsorHeroSignalValue}>Free</Text>
+            <Text style={styles.sponsorHeroSignalLabel}>Entry</Text>
+          </View>
+          <View style={styles.sponsorHeroSignal}>
+            <Text style={styles.sponsorHeroSignalValue}>No</Text>
+            <Text style={styles.sponsorHeroSignalLabel}>Buy-ins</Text>
+          </View>
+          <View style={styles.sponsorHeroSignal}>
+            <Text style={styles.sponsorHeroSignalValue}>Manual</Text>
+            <Text style={styles.sponsorHeroSignalLabel}>Approval</Text>
+          </View>
+        </View>
+      </View>
+    </Surface>
+  );
+}
+
+function ProofPointCard({ item }) {
+  return (
+    <Surface style={styles.proofCard}>
+      <Text style={styles.proofLabel}>{item.label}</Text>
+      <Text style={styles.proofValue}>{item.value}</Text>
+      <Text style={styles.proofBody}>{item.body}</Text>
+    </Surface>
+  );
+}
+
+function SponsorProofSection() {
+  return (
+    <Section
+      description="Real product and event milestones, stated plainly without inflated audience claims."
+      title="What is already real">
+      <View style={styles.proofGrid}>
+        {SPONSOR_PROOF_POINTS.map((item) => (
+          <ProofPointCard key={item.label} item={item} />
+        ))}
+      </View>
+    </Section>
+  );
+}
+
 function DecisionCard({ item }) {
   return (
     <Surface style={styles.decisionCard}>
@@ -252,15 +349,20 @@ function RequirementRow({ item }) {
 function PackageCard({ item }) {
   const price = item.price ? `$${item.price.toLocaleString()}` : item.billingType === 'in-kind' ? 'In-kind' : 'Custom';
   const fitCopy = PACKAGE_FIT_COPY[item.id] || 'Configurable after sponsor review.';
+  const isRecommended = item.id === RECOMMENDED_PACKAGE_ID;
+  const scope = PACKAGE_SCOPE_COPY[item.id] || 'Custom';
 
   return (
-    <Surface style={styles.packageCard}>
+    <Surface style={[styles.packageCard, isRecommended && styles.packageCardRecommended]}>
       <View style={styles.packageTop}>
         <View style={styles.packageCopy}>
+          <Text style={styles.packageScope}>{scope}</Text>
           <Text style={styles.packageName}>{item.name}</Text>
           <Text style={styles.packagePrice}>{price}</Text>
         </View>
-        <Badge tone={item.public ? 'green' : 'neutral'}>{item.public ? 'Public' : 'Private'}</Badge>
+        <Badge tone={isRecommended ? 'accent' : item.public ? 'green' : 'neutral'}>
+          {isRecommended ? 'Best league fit' : item.public ? 'Public' : 'Private'}
+        </Badge>
       </View>
       <Text style={styles.packageFit}>{fitCopy}</Text>
       <Text style={styles.packageSubhead}>Includes</Text>
@@ -330,9 +432,9 @@ function SponsorInquiryForm() {
           <Badge tone={remainingCount ? 'accent' : 'green'}>
             {remainingCount ? `${remainingCount} item${remainingCount === 1 ? '' : 's'} left` : 'Ready'}
           </Badge>
-          <Text style={styles.formTitle}>Start a sponsor conversation</Text>
+          <Text style={styles.formTitle}>Request a sponsor review</Text>
           <Text style={styles.formBody}>
-            A short inquiry is enough. We will review fit, confirm details, and keep sponsor claims private until approved.
+            Send the basics. The host reviews fit, timing, category safety, and placement before any sponsor claim goes public.
           </Text>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: progressPercent }]} />
@@ -456,7 +558,7 @@ function SponsorInquiryForm() {
           {submitState.submitting ? 'Submitting...' : validation.accepted ? 'Send sponsor inquiry' : 'Complete details to send'}
         </ActionButton>
         <Text style={styles.privacyText}>
-          Manual review only. No public placement, sponsor claim, invoice, or outreach is created from this form.
+          Manual review only. No public placement, sponsor claim, invoice, payment request, or outreach is created from this form.
         </Text>
       </View>
       {submitState.error ? <Text style={styles.errorText}>{submitState.error}</Text> : null}
@@ -550,6 +652,20 @@ function SponsorPlacementSection() {
           <PlacementCard key={item.label} item={item} />
         ))}
       </View>
+      <Surface style={styles.placementPreview}>
+        <View style={styles.placementPreviewCopy}>
+          <Badge tone="accent">Example placement</Badge>
+          <Text style={styles.placementPreviewTitle}>Raleigh 1v1 Spades League presented by your brand</Text>
+          <Text style={styles.placementPreviewBody}>
+            Sponsor recognition can sit beside the next event, bracket, stream, and results recap without interrupting player actions.
+          </Text>
+        </View>
+        <View style={styles.placementPreviewStack}>
+          <View style={styles.previewPill}><Text style={styles.previewPillText}>Event page</Text></View>
+          <View style={styles.previewPill}><Text style={styles.previewPillText}>Stream night</Text></View>
+          <View style={styles.previewPill}><Text style={styles.previewPillText}>Results recap</Text></View>
+        </View>
+      </Surface>
     </Section>
   );
 }
@@ -614,7 +730,7 @@ function SponsorFinalCta({ mediaKitOnly }) {
         </Text>
       </View>
       <View style={styles.finalCtaActions}>
-        <ActionButton href="/sponsors">Sponsor inquiry</ActionButton>
+        <ActionButton href="/sponsors#sponsor-inquiry">Sponsor inquiry</ActionButton>
         <ActionButton href="/media-kit" variant="secondary">Media kit</ActionButton>
       </View>
     </Surface>
@@ -625,7 +741,7 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
   return (
     <HubScreen
       actions={[
-        { label: 'Sponsor inquiry', href: '/sponsors' },
+        { label: 'Sponsor inquiry', href: '/sponsors#sponsor-inquiry' },
         { label: 'Media Kit', href: '/media-kit', variant: 'secondary' },
         { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'ghost' },
       ]}
@@ -636,11 +752,15 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
         : 'Sponsor free-entry competitive Spades tournaments, stream moments, and community events with clear approval before anything goes public.'}
       stats={[
         { label: 'Product', value: 'App Store', tone: 'green' },
-        { label: 'Format', value: '1v1', tone: 'blue' },
+        { label: 'Milestone', value: '16-player event', tone: 'blue' },
         { label: 'Review', value: 'Manual', tone: 'accent' },
       ]}
       subtitle="Sponsor software"
       title={mediaKitOnly ? 'Media Kit' : 'Sponsor 1v1 Tournaments'}>
+      <SponsorHero />
+
+      <SponsorProofSection />
+
       <SponsorReadinessSection />
 
       <SponsorFlowSection />
@@ -655,7 +775,9 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
 
       <SponsorSafetySection />
 
-      <Section description="Starter packages are configurable and require sponsor review before any agreement." title="Sponsorship opportunities">
+      <Section
+        description="Compare starter packages by scope. Final deliverables are confirmed manually before anything is published."
+        title="Sponsorship packages">
         <View style={styles.packageGrid}>
           {STARTER_SPONSORSHIP_PACKAGES.filter((item) => item.public).map((item) => (
             <PackageCard key={item.id} item={item} />
@@ -664,7 +786,10 @@ export default function SponsorPublicScreen({ mediaKitOnly = false }) {
       </Section>
 
       {!mediaKitOnly ? (
-        <Section description="One short form starts the conversation. The host reviews every inquiry manually." title="Sponsor inquiry">
+        <Section
+          description="One short form starts the conversation. The host reviews every inquiry manually."
+          nativeID="sponsor-inquiry"
+          title="Sponsor inquiry">
           <SponsorInquiryForm />
         </Section>
       ) : null}
@@ -1043,6 +1168,11 @@ const styles = StyleSheet.create({
     flexBasis: 260,
     flexGrow: 1,
   },
+  packageCardRecommended: {
+    backgroundColor: 'rgba(214, 162, 78, 0.09)',
+    borderColor: 'rgba(214, 162, 78, 0.52)',
+    ...theme.shadow.premium,
+  },
   packageCopy: {
     flex: 1,
     minWidth: 180,
@@ -1079,6 +1209,15 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     marginTop: 4,
   },
+  packageScope: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 15,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
   packageSubhead: {
     color: theme.colors.accent,
     fontSize: 11,
@@ -1109,6 +1248,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  placementPreview: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(5, 11, 10, 0.78)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    justifyContent: 'space-between',
+    marginTop: 14,
+  },
+  placementPreviewBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  placementPreviewCopy: {
+    flex: 1.3,
+    minWidth: 260,
+  },
+  placementPreviewStack: {
+    flex: 1,
+    gap: 10,
+    minWidth: 220,
+  },
+  placementPreviewTitle: {
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 10,
   },
   placementTitle: {
     color: theme.colors.text,
@@ -1193,6 +1365,55 @@ const styles = StyleSheet.create({
     marginTop: 14,
     overflow: 'hidden',
   },
+  previewPill: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  previewPillText: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+    lineHeight: 18,
+    textTransform: 'uppercase',
+  },
+  proofBody: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  proofCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    flexBasis: 220,
+    flexGrow: 1,
+  },
+  proofGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  proofLabel: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  proofValue: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 8,
+  },
   safetyBody: {
     color: theme.colors.muted,
     fontSize: 14,
@@ -1228,6 +1449,99 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 18,
     marginTop: 12,
+  },
+  sponsorHero: {
+    alignItems: 'stretch',
+    backgroundColor: 'rgba(5, 11, 10, 0.82)',
+    borderColor: 'rgba(214, 162, 78, 0.38)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    marginBottom: 22,
+    overflow: 'hidden',
+    ...theme.shadow.premium,
+  },
+  sponsorHeroActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 18,
+  },
+  sponsorHeroBody: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 26,
+    marginTop: 12,
+    maxWidth: 720,
+  },
+  sponsorHeroCopy: {
+    flex: 1.45,
+    minWidth: 280,
+  },
+  sponsorHeroPanel: {
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'space-between',
+    minWidth: 260,
+    padding: 18,
+  },
+  sponsorHeroPanelLabel: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+  },
+  sponsorHeroPanelTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 10,
+  },
+  sponsorHeroSignal: {
+    backgroundColor: 'rgba(5, 11, 10, 0.55)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: 92,
+    flexGrow: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sponsorHeroSignalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 22,
+  },
+  sponsorHeroSignalLabel: {
+    color: theme.colors.muted,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 13,
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  sponsorHeroSignalValue: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  sponsorHeroTitle: {
+    color: theme.colors.text,
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 40,
+    marginTop: 12,
+    maxWidth: 760,
   },
   valueBody: {
     color: theme.colors.muted,

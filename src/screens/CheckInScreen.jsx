@@ -21,7 +21,11 @@ import {
   fetchTournamentEvent,
   loginPlayerAccount,
   logoutPlayerAccount,
+  requestPlayerEmailVerification,
+  requestPlayerPasswordReset,
+  resetPlayerPassword,
   submitTournamentSignup,
+  verifyPlayerEmail,
 } from '../lib/tournamentHostingClient.js';
 
 function signupCountLabel(count, loading = false) {
@@ -343,6 +347,15 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+  const [recoverySubmitting, setRecoverySubmitting] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationRequested, setVerificationRequested] = useState(false);
+  const [verificationSubmitting, setVerificationSubmitting] = useState(false);
   const [signupSummary, setSignupSummary] = useState({ count: 0, signups: [], loading: true, error: '' });
   const [liveBracket, setLiveBracket] = useState(null);
   const [tournamentSettings, setTournamentSettings] = useState(null);
@@ -732,6 +745,118 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     }
   }
 
+  async function handleRequestPasswordReset() {
+    if (!contactEmail.trim()) {
+      setAccountError('Enter the account email first.');
+      return;
+    }
+
+    setRecoverySubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await requestPlayerPasswordReset({ contactEmail });
+      setRecoveryRequested(Boolean(result.configured));
+      setAccountMessage(result.message || 'Check your email for a recovery code.');
+    } catch (recoveryError) {
+      setAccountError(recoveryError instanceof Error ? recoveryError.message : 'A recovery code could not be requested.');
+    } finally {
+      setRecoverySubmitting(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    const passwordError = getPasswordError(recoveryPassword, recoveryConfirmPassword);
+
+    if (!recoveryCode.trim()) {
+      setAccountError('Enter the recovery code from your email.');
+      return;
+    }
+
+    if (passwordError) {
+      setAccountError(passwordError);
+      return;
+    }
+
+    setRecoverySubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await resetPlayerPassword({
+        contactEmail,
+        code: recoveryCode,
+        password: recoveryPassword,
+        confirmPassword: recoveryConfirmPassword,
+      });
+      const nextAccount = await loadConfirmedAccount(result.account);
+
+      setAccount(nextAccount);
+      notifyPlayerAccountChanged(nextAccount);
+      setRecoveryOpen(false);
+      setRecoveryRequested(false);
+      setRecoveryCode('');
+      setRecoveryPassword('');
+      setRecoveryConfirmPassword('');
+      setPassword('');
+      setAccountMessage(`Password updated. Signed in as ${nextAccount?.playerName || contactEmail}.`);
+    } catch (recoveryError) {
+      setAccountError(recoveryError instanceof Error ? recoveryError.message : 'The password could not be reset.');
+    } finally {
+      setRecoverySubmitting(false);
+      setAccountLoading(false);
+    }
+  }
+
+  async function handleRequestEmailVerification() {
+    if (!account?.email) {
+      return;
+    }
+
+    setVerificationSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await requestPlayerEmailVerification({ contactEmail: account.email });
+      setVerificationRequested(Boolean(result.configured));
+      setAccountMessage(result.message || 'Check your email for a verification code.');
+    } catch (verificationError) {
+      setAccountError(verificationError instanceof Error ? verificationError.message : 'A verification code could not be requested.');
+    } finally {
+      setVerificationSubmitting(false);
+    }
+  }
+
+  async function handleVerifyEmail() {
+    if (!verificationCode.trim()) {
+      setAccountError('Enter the verification code from your email.');
+      return;
+    }
+
+    setVerificationSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+
+    try {
+      const result = await verifyPlayerEmail({
+        contactEmail: account?.email,
+        code: verificationCode,
+      });
+
+      setAccount(result.account || account);
+      notifyPlayerAccountChanged(result.account || account);
+      setVerificationRequested(false);
+      setVerificationCode('');
+      setAccountMessage('Email verified. This account can join tournaments.');
+    } catch (verificationError) {
+      setAccountError(verificationError instanceof Error ? verificationError.message : 'The email could not be verified.');
+    } finally {
+      setVerificationSubmitting(false);
+    }
+  }
+
   if (!tournament) {
     if (tournamentLookup.loading) {
       return (
@@ -771,6 +896,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const formatDetails = getSignupFormatDetails(visibleTournament);
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
+  const accountNeedsVerification = account?.emailVerified === false;
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
   const confirmedSignup = signup
     || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
@@ -905,16 +1031,26 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
                 </View>
                 <Text style={styles.joinActionTitle}>
-                  {registrationOpen ? `Reserve ${account.playerName}'s spot.` : 'Registration is not open right now.'}
+                  {accountNeedsVerification
+                    ? 'Verify your email before joining.'
+                    : registrationOpen
+                      ? `Reserve ${account.playerName}'s spot.`
+                      : 'Registration is not open right now.'}
                 </Text>
                 <Text style={styles.joinActionCopy}>
-                  {registrationOpen
+                  {accountNeedsVerification
+                    ? 'Enter the short code sent to this account email. Verification protects roster seats from account impersonation.'
+                    : registrationOpen
                     ? 'One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned Spades table.'
                     : registrationMeta.actionCopy}
                 </Text>
                 <View style={styles.buttonRow}>
-                  <ActionButton disabled={!registrationOpen || submitting} onPress={handleSubmitSignup}>
-                    {registrationOpen ? (submitting ? 'Saving spot...' : 'Join Tournament') : registrationMeta.label}
+                  <ActionButton disabled={!registrationOpen || accountNeedsVerification || submitting} onPress={handleSubmitSignup}>
+                    {accountNeedsVerification
+                      ? 'Verify email first'
+                      : registrationOpen
+                        ? (submitting ? 'Saving spot...' : 'Join Tournament')
+                        : registrationMeta.label}
                   </ActionButton>
                   <ActionButton href={tournamentPath} variant="secondary">
                     Event
@@ -924,6 +1060,41 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   </ActionButton>
                 </View>
               </View>
+
+              {accountNeedsVerification ? (
+                <View style={styles.recoveryPanel}>
+                  <View style={styles.summaryTopRow}>
+                    <Badge tone="accent">Email verification</Badge>
+                    <Text style={styles.accountEmail}>{account.email}</Text>
+                  </View>
+                  <Text style={styles.recoveryTitle}>Protect this roster identity</Text>
+                  <Text style={styles.recoveryCopy}>Request a six-digit code, then enter it below.</Text>
+                  {verificationRequested ? (
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.fieldLabel}>Verification code</Text>
+                      <TextInput
+                        inputMode="numeric"
+                        maxLength={6}
+                        onChangeText={setVerificationCode}
+                        placeholder="000000"
+                        placeholderTextColor="#6B766F"
+                        style={styles.input}
+                        value={verificationCode}
+                      />
+                    </View>
+                  ) : null}
+                  <View style={styles.buttonRow}>
+                    <ActionButton disabled={verificationSubmitting} onPress={handleRequestEmailVerification} variant="secondary">
+                      {verificationSubmitting ? 'Sending...' : verificationRequested ? 'Send another code' : 'Send verification code'}
+                    </ActionButton>
+                    {verificationRequested ? (
+                      <ActionButton disabled={verificationSubmitting || verificationCode.length !== 6} onPress={handleVerifyEmail}>
+                        Verify email
+                      </ActionButton>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
 
               <View style={styles.accountPanel}>
                 <View style={styles.summaryTopRow}>
@@ -1100,7 +1271,81 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     {accountSubmitting ? 'Opening...' : authActionLabel}
                   </ActionButton>
                 )}
+                {accountMode === 'login' ? (
+                  <ActionButton
+                    disabled={accountSubmitting}
+                    onPress={() => {
+                      setRecoveryOpen((current) => !current);
+                      setAccountError('');
+                      setAccountMessage('');
+                    }}
+                    variant="ghost">
+                    Forgot password?
+                  </ActionButton>
+                ) : null}
               </View>
+
+              {accountMode === 'login' && recoveryOpen ? (
+                <View style={styles.recoveryPanel}>
+                  <Badge tone="blue">Account recovery</Badge>
+                  <Text style={styles.recoveryTitle}>Reset your password</Text>
+                  <Text style={styles.recoveryCopy}>
+                    We will send a six-digit code to the account email above. Codes expire after 15 minutes.
+                  </Text>
+                  {recoveryRequested ? (
+                    <>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.fieldLabel}>Recovery code</Text>
+                        <TextInput
+                          inputMode="numeric"
+                          maxLength={6}
+                          onChangeText={setRecoveryCode}
+                          placeholder="000000"
+                          placeholderTextColor="#6B766F"
+                          style={styles.input}
+                          value={recoveryCode}
+                        />
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.fieldLabel}>New password</Text>
+                        <TextInput
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          onChangeText={setRecoveryPassword}
+                          placeholder="At least 8 characters"
+                          placeholderTextColor="#6B766F"
+                          secureTextEntry
+                          style={styles.input}
+                          value={recoveryPassword}
+                        />
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.fieldLabel}>Confirm new password</Text>
+                        <TextInput
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          onChangeText={setRecoveryConfirmPassword}
+                          placeholder="Type it again"
+                          placeholderTextColor="#6B766F"
+                          secureTextEntry
+                          style={styles.input}
+                          value={recoveryConfirmPassword}
+                        />
+                      </View>
+                    </>
+                  ) : null}
+                  <View style={styles.buttonRow}>
+                    <ActionButton disabled={recoverySubmitting} onPress={handleRequestPasswordReset} variant="secondary">
+                      {recoverySubmitting ? 'Sending...' : recoveryRequested ? 'Send another code' : 'Send recovery code'}
+                    </ActionButton>
+                    {recoveryRequested ? (
+                      <ActionButton disabled={recoverySubmitting} onPress={handleResetPassword}>
+                        Reset and sign in
+                      </ActionButton>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
             </>
           )}
 
@@ -1597,6 +1842,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
+  },
+  recoveryPanel: {
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.34)',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  recoveryTitle: {
+    color: '#F4EFE6',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 26,
+    marginTop: 10,
+  },
+  recoveryCopy: {
+    color: '#D4DDD7',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6,
   },
   switchAccountPanel: {
     borderWidth: 1,

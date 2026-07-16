@@ -221,6 +221,10 @@ export async function handler(event) {
     return json(401, { error: 'Create or sign in to a player account before signing up.' });
   }
 
+  if (String(process.env.REQUIRE_VERIFIED_PLAYER_EMAILS || '').trim().toLowerCase() === 'true' && account.emailVerified === false) {
+    return json(403, { error: 'Verify this player account email before joining a tournament.' });
+  }
+
   const playerName = cleanText(account.playerName || payload.playerName);
   const contactEmail = cleanEmail(account.email);
   const playerHandle = cleanText(account.playerHandle || payload.playerHandle);

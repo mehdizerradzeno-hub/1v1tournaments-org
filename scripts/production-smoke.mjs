@@ -3,46 +3,20 @@ import { performance } from 'node:perf_hooks';
 const baseUrl = String(process.env.SMOKE_BASE_URL || 'https://1v1tournaments.org').replace(/\/$/, '');
 
 const pageChecks = [
-  { path: '/', markers: ['Next tournament', 'Watch Tournament'] },
-  { path: '/next', markers: ['Next tournament lobby', 'Signed up players'] },
+  { path: '/', markers: ['All upcoming tournaments', 'Choose your next move'] },
+  { path: '/next', markers: ['Next tournament'] },
   { path: '/live', markers: ['Control room', 'Broadcast hub'] },
   { path: '/admin', markers: ['Private admin unavailable', 'Sponsors'] },
   { path: '/admin/sponsors', markers: ['Sponsor CRM', 'Host access required'] },
-  { path: '/sponsors', markers: ['Reach a Competitive Card-Game Community', 'Sponsor inquiry'] },
+  { path: '/sponsors', markers: ['Sponsor 1v1 Tournaments', 'Sponsor inquiry'] },
   { path: '/media-kit', markers: ['Media Kit', 'Sponsorship opportunities'] },
   { path: '/results', markers: ['Results archive'] },
   { path: '/leaderboard', markers: ['Tournament rankings'] },
   { path: '/rules', markers: ['Rules'] },
   { path: '/stream', markers: ['Stream'] },
-  { path: '/tournaments/10-pm-4-man-spades-test', markers: ['Looking up this hosted tournament'] },
-  { path: '/check-in/10-pm-4-man-spades-test', markers: ['Looking up this hosted tournament signup page'] },
 ];
 
 const apiChecks = [
-  {
-    path: '/.netlify/functions/tournament-events',
-    expectedStatus: 200,
-    validate: (body) => {
-      const json = parseJson(body);
-      return json.ok && Array.isArray(json.tournaments) && json.tournaments.some((item) => item.slug === '10-pm-4-man-spades-test');
-    },
-  },
-  {
-    path: '/.netlify/functions/tournament-signup?slug=10-pm-4-man-spades-test',
-    expectedStatus: 200,
-    validate: (body) => {
-      const json = parseJson(body);
-      return json.tournamentSlug === '10-pm-4-man-spades-test' && Number.isFinite(json.signupCount);
-    },
-  },
-  {
-    path: '/.netlify/functions/tournament-bracket?slug=10-pm-4-man-spades-test',
-    expectedStatus: 200,
-    validate: (body) => {
-      const json = parseJson(body);
-      return json.ok === true && Object.hasOwn(json, 'bracket');
-    },
-  },
   {
     path: '/.netlify/functions/stream-commands',
     expectedStatus: 200,
@@ -128,6 +102,71 @@ for (const check of apiChecks) {
     ok,
     detail: ok ? 'ok' : `expected ${check.expectedStatus}, body valid: ${bodyOk}`,
   });
+}
+
+const eventResult = await fetchText('/.netlify/functions/tournament-events');
+const eventPayload = parseJson(eventResult.body);
+const hostedTournament = eventPayload.tournaments?.find((item) => item?.slug && !item.deleted) || null;
+const eventListOk = eventResult.status === 200 && eventPayload.ok === true && Array.isArray(eventPayload.tournaments);
+
+results.push({
+  kind: 'api',
+  path: '/.netlify/functions/tournament-events',
+  status: eventResult.status,
+  ms: eventResult.ms,
+  ok: eventListOk,
+  detail: eventListOk ? `${eventPayload.tournaments.length} stored event(s)` : 'event list is invalid',
+});
+
+if (hostedTournament) {
+  const slug = hostedTournament.slug;
+  const dynamicChecks = [
+    {
+      kind: 'page',
+      path: `/tournaments/${encodeURIComponent(slug)}`,
+      expectedStatus: 200,
+      validate: (body) => body.includes('Looking up this hosted tournament'),
+    },
+    {
+      kind: 'page',
+      path: `/check-in/${encodeURIComponent(slug)}`,
+      expectedStatus: 200,
+      validate: (body) => body.includes('Looking up this hosted tournament signup page'),
+    },
+    {
+      kind: 'api',
+      path: `/.netlify/functions/tournament-signup?slug=${encodeURIComponent(slug)}`,
+      expectedStatus: 200,
+      validate: (body) => {
+        const json = parseJson(body);
+        return json.tournamentSlug === slug && Number.isFinite(json.signupCount);
+      },
+    },
+    {
+      kind: 'api',
+      path: `/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(slug)}`,
+      expectedStatus: 200,
+      validate: (body) => {
+        const json = parseJson(body);
+        return json.ok === true && Object.hasOwn(json, 'bracket');
+      },
+    },
+  ];
+
+  for (const check of dynamicChecks) {
+    const result = await fetchText(check.path);
+    const bodyOk = check.validate(result.body);
+    const ok = result.status === check.expectedStatus && bodyOk;
+
+    results.push({
+      kind: check.kind,
+      path: check.path,
+      status: result.status,
+      ms: result.ms,
+      ok,
+      detail: ok ? `ok (${slug})` : `expected ${check.expectedStatus}, body valid: ${bodyOk}`,
+    });
+  }
 }
 
 console.log(`Production smoke: ${baseUrl}`);

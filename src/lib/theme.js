@@ -17,8 +17,18 @@ export const theme = {
     blueSoft: 'rgba(94, 127, 163, 0.18)',
     green: '#D6A24E',
     greenSoft: 'rgba(214, 162, 78, 0.16)',
+    success: '#40B56F',
+    successSoft: 'rgba(64, 181, 111, 0.14)',
     rose: '#8F1D2C',
     roseSoft: 'rgba(143, 29, 44, 0.16)',
+  },
+  typography: {
+    eyebrow: 11,
+    caption: 12,
+    body: 14,
+    bodyLarge: 16,
+    title: 22,
+    display: 34,
   },
   radius: {
     xl: 30,
@@ -34,5 +44,21 @@ export const theme = {
     lg: 18,
     xl: 24,
     xxl: 32,
+  },
+  shadow: {
+    card: {
+      shadowColor: '#000',
+      shadowOpacity: 0.28,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 8,
+    },
+    premium: {
+      shadowColor: '#D6A24E',
+      shadowOpacity: 0.14,
+      shadowRadius: 30,
+      shadowOffset: { width: 0, height: 16 },
+      elevation: 10,
+    },
   },
 };

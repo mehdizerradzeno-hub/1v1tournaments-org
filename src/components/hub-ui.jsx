@@ -285,7 +285,7 @@ export function Section({ eyebrow, title, description, action, children, style, 
       <View style={styles.sectionHead}>
         <View style={styles.sectionTitleGroup}>
           {eyebrow ? <Text style={styles.sectionEyebrow}>{eyebrow}</Text> : null}
-          <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
+          <Text accessibilityRole="header" aria-level={2} style={styles.sectionTitle}>{title}</Text>
           {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
         </View>
         {action ? <View style={styles.sectionAction}>{action}</View> : null}
@@ -1356,7 +1356,7 @@ const styles = StyleSheet.create({
   },
   actionButtonInner: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.accent,
     borderWidth: 1,

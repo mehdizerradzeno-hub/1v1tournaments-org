@@ -41,6 +41,11 @@ const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.js
 const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/player-account.mjs', import.meta.url));
+const playerEmailFunctionFile = fileURLToPath(new URL('../netlify/functions/_player-email.mjs', import.meta.url));
+const rateLimitFunctionFile = fileURLToPath(new URL('../netlify/functions/_rate-limit.mjs', import.meta.url));
+const reminderFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-reminders.mjs', import.meta.url));
+const backupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-backup.mjs', import.meta.url));
+const scheduledOpsUtilsFile = fileURLToPath(new URL('../netlify/functions/_scheduled-ops-utils.mjs', import.meta.url));
 const accountUtilsFunctionFile = fileURLToPath(new URL('../netlify/functions/_account-utils.mjs', import.meta.url));
 const hostAuthFunctionFile = fileURLToPath(new URL('../netlify/functions/_host-auth.mjs', import.meta.url));
 const adminRosterFunctionFile = fileURLToPath(new URL('../netlify/functions/admin-roster.mjs', import.meta.url));
@@ -115,6 +120,10 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorAdminScreenSource, /Save edits/);
   assert.match(sponsorAdminScreenSource, /saveDraftEdit/);
   assert.match(sponsorAdminScreenSource, /saveProposalEdit/);
+  assert.match(sponsorAdminScreenSource, /Samples never save to the CRM/);
+  assert.match(sponsorAdminScreenSource, /!importPreview\.prospects\.length/);
+  assert.doesNotMatch(sponsorAdminScreenSource, /Accept into CRM preview/);
+  assert.doesNotMatch(sponsorAdminScreenSource, /saveSponsorProspect,/);
   assert.match(sponsorInquiriesSource, /requireTournamentAdmin/);
   assert.match(sponsorInquiriesSource, /RATE_LIMIT_MAX/);
   assert.match(sponsorInquiriesSource, /sponsor-inquiries/);
@@ -312,6 +321,11 @@ test('the signup route stays wired to the public tournament path', () => {
 test('phase 1 signup capture and public counts stay wired through Netlify Functions and Blobs', () => {
   assert.ok(existsSync(signupFunctionFile));
   assert.ok(existsSync(playerAccountFunctionFile));
+  assert.ok(existsSync(playerEmailFunctionFile));
+  assert.ok(existsSync(rateLimitFunctionFile));
+  assert.ok(existsSync(reminderFunctionFile));
+  assert.ok(existsSync(backupFunctionFile));
+  assert.ok(existsSync(scheduledOpsUtilsFile));
   assert.ok(existsSync(accountUtilsFunctionFile));
   assert.ok(existsSync(hostAuthFunctionFile));
   assert.ok(existsSync(adminRosterFunctionFile));
@@ -334,6 +348,11 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
 
   const signupFunctionSource = readFileSync(signupFunctionFile, 'utf8');
   const playerAccountSource = readFileSync(playerAccountFunctionFile, 'utf8');
+  const playerEmailSource = readFileSync(playerEmailFunctionFile, 'utf8');
+  const rateLimitSource = readFileSync(rateLimitFunctionFile, 'utf8');
+  const reminderSource = readFileSync(reminderFunctionFile, 'utf8');
+  const backupSource = readFileSync(backupFunctionFile, 'utf8');
+  const scheduledOpsUtilsSource = readFileSync(scheduledOpsUtilsFile, 'utf8');
   const accountUtilsSource = readFileSync(accountUtilsFunctionFile, 'utf8');
   const hostAuthSource = readFileSync(hostAuthFunctionFile, 'utf8');
   const adminRosterSource = readFileSync(adminRosterFunctionFile, 'utf8');
@@ -370,6 +389,17 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(playerAccountSource, /confirmPassword/);
   assert.match(playerAccountSource, /number or symbol/);
   assert.match(playerAccountSource, /hostApproved/);
+  assert.match(playerAccountSource, /request-password-reset/);
+  assert.match(playerAccountSource, /verify-email/);
+  assert.match(playerAccountSource, /enforceRateLimit/);
+  assert.match(playerEmailSource, /RESEND_API_KEY/);
+  assert.match(playerEmailSource, /Idempotency-Key/);
+  assert.match(rateLimitSource, /rate-limits/);
+  assert.match(scheduledOpsUtilsSource, /TOURNAMENT_REMINDERS_ENABLED/);
+  assert.match(reminderSource, /schedule: '\*\/5 \* \* \* \*'/);
+  assert.match(backupSource, /tournament-backups/);
+  assert.match(backupSource, /schedule: '@daily'/);
+  assert.doesNotMatch(backupSource, /snapshotStore\('player-accounts'\)/);
   assert.match(accountUtilsSource, /player-accounts/);
   assert.match(accountUtilsSource, /player-sessions/);
   assert.match(hostAuthSource, /TOURNAMENT_HOST_ACCOUNT_EMAILS/);
@@ -414,6 +444,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
+  assert.match(tournamentEventsUtilsSource, /hideSeeded: true/);
   assert.match(hubUiSource, /getMobileNavItems/);
   assert.match(hubUiSource, /My Match/);
   assert.match(hubUiSource, /Event/);
@@ -482,10 +513,15 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(checkInScreenSource, /Join Tournament is the next separate step/);
   assert.match(checkInScreenSource, /Create Account/);
   assert.match(checkInScreenSource, /Sign In/);
+  assert.match(checkInScreenSource, /Forgot password\?/);
+  assert.match(checkInScreenSource, /Reset and sign in/);
+  assert.match(checkInScreenSource, /Email verification/);
   assert.doesNotMatch(checkInScreenSource, /Sign In & Join Tournament/);
   assert.doesNotMatch(checkInScreenSource, /Create Account & Join Tournament/);
   assert.match(hostingClientSource, /fetchPlayerAccount/);
   assert.match(hostingClientSource, /createPlayerAccount/);
+  assert.match(hostingClientSource, /requestPlayerPasswordReset/);
+  assert.match(hostingClientSource, /verifyPlayerEmail/);
   assert.match(hostingClientSource, /fetchSignupSummary/);
   assert.match(hostingClientSource, /fetchTournamentPlayerStatus/);
   assert.match(hostingClientSource, /generateTournamentBracket/);

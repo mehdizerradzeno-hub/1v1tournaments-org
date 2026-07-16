@@ -1104,14 +1104,15 @@ function SponsorSoftwareStrip() {
   return (
     <Surface style={styles.sponsorSoftwareStrip}>
       <View style={styles.sponsorSoftwareCopy}>
-        <Badge tone="accent">{software.eyebrow}</Badge>
-        <Text style={styles.sponsorSoftwareTitle}>{software.title}</Text>
-        <Text style={styles.sponsorSoftwareBody}>{software.summary}</Text>
+        <Badge tone="accent">League sponsorship</Badge>
+        <Text style={styles.sponsorSoftwareTitle}>Sponsor the Raleigh 1v1 Spades League</Text>
+        <Text style={styles.sponsorSoftwareBody}>
+          {software.summary} Approved partners can appear around event pages, stream nights, and results while tournaments remain free-entry with no wagering or buy-ins.
+        </Text>
       </View>
       <View style={styles.sponsorSoftwareActions}>
-        <ActionButton href="/sponsors">Sponsor page</ActionButton>
+        <ActionButton href="/sponsors#sponsor-inquiry">Sponsor inquiry</ActionButton>
         <ActionButton href="/media-kit" variant="secondary">Media kit</ActionButton>
-        <ActionButton href="/admin/sponsors" variant="secondary">Host CRM</ActionButton>
       </View>
     </Surface>
   );
@@ -3683,7 +3684,7 @@ const styles = StyleSheet.create({
   sponsorSoftwareStrip: {
     alignItems: 'center',
     backgroundColor: 'rgba(7, 17, 15, 0.94)',
-    borderColor: 'rgba(94, 205, 158, 0.22)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,

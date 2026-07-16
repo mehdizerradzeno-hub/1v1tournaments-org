@@ -41,10 +41,14 @@ export async function handler(event) {
       if (requestedSlug) {
         const tournament = await loadHostedTournament(requestedSlug);
 
+        if (!tournament) {
+          return json(404, { error: 'That hosted tournament was not found.' });
+        }
+
         return json(200, {
           ok: true,
           tournament,
-          tournaments: tournament ? [tournament] : [],
+          tournaments: [tournament],
         });
       }
 
