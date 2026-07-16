@@ -679,18 +679,12 @@ function publicMatchDetails(bracket, matchId) {
 
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  return store.get(`${tournamentSlug}.json`, {
-    consistency: 'strong',
-    type: 'json',
-  });
+  return store.get(`${tournamentSlug}.json`, { type: 'json' });
 }
 
 async function loadBracketWithMetadata(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  const result = await store.getWithMetadata(`${tournamentSlug}.json`, {
-    consistency: 'strong',
-    type: 'json',
-  });
+  const result = await store.getWithMetadata(`${tournamentSlug}.json`, { type: 'json' });
 
   if (!result) {
     return null;

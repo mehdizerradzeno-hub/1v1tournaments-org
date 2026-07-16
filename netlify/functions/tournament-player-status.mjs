@@ -144,10 +144,7 @@ async function loadTournamentSignups(tournamentSlug) {
 
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  return store.get(`${tournamentSlug}.json`, {
-    consistency: 'strong',
-    type: 'json',
-  });
+  return store.get(`${tournamentSlug}.json`, { type: 'json' });
 }
 
 function signupMatchesAccount(signup, account) {

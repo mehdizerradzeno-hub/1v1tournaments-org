@@ -54,7 +54,7 @@ export async function listHostedTournaments() {
   const bracketStore = getStoreWithFallback('tournament-brackets');
   const { blobs } = await store.list();
   const tournaments = await Promise.all(
-    blobs.map((blob) => store.get(blob.key, { consistency: 'strong', type: 'json' })),
+    blobs.map((blob) => store.get(blob.key, { type: 'json' })),
   );
   const hydrated = await Promise.all(tournaments.filter(Boolean).map(async (tournament) => {
     if (!tournament.slug || tournament.deleted) {
@@ -76,7 +76,7 @@ export async function loadHostedTournament(tournamentSlug) {
   }
 
   const store = getStoreWithFallback(STORE_NAME);
-  const tournament = await store.get(eventKey(slug), { consistency: 'strong', type: 'json' });
+  const tournament = await store.get(eventKey(slug), { type: 'json' });
 
   if (!tournament || tournament.deleted) {
     return null;
@@ -96,7 +96,7 @@ export async function deleteHostedTournament(tournamentSlug) {
   }
 
   const store = getStoreWithFallback(STORE_NAME);
-  const existing = await store.get(eventKey(slug), { consistency: 'strong', type: 'json' });
+  const existing = await store.get(eventKey(slug), { type: 'json' });
   const seededTournament = siteData.tournaments.some((tournament) => tournament.slug === slug);
 
   await store.delete(eventKey(slug));

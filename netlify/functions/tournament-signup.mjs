@@ -130,10 +130,7 @@ async function publicSignupSummary(store, tournamentSlug, currentAccount = null)
 
 async function loadTournamentBracket(tournamentSlug) {
   const store = getBracketStore();
-  return store.get(`${tournamentSlug}.json`, {
-    consistency: 'strong',
-    type: 'json',
-  });
+  return store.get(`${tournamentSlug}.json`, { type: 'json' });
 }
 
 function registrationClosedMessage(status) {
@@ -250,10 +247,10 @@ export async function handler(event) {
     const { settings, date: tournamentDate } = await getTournamentDate(tournamentSlug);
     const key = signupKey(tournamentSlug, account.id);
     const legacyEmailKey = signupKey(tournamentSlug, contactEmail);
-    const existingByAccount = await store.get(key, { consistency: 'strong', type: 'json' });
+    const existingByAccount = await store.get(key, { type: 'json' });
     const existingByLegacyEmail = existingByAccount
       ? null
-      : await store.get(legacyEmailKey, { consistency: 'strong', type: 'json' });
+      : await store.get(legacyEmailKey, { type: 'json' });
     const existing = existingByAccount || existingByLegacyEmail;
 
     if (existing) {

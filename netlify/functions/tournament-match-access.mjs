@@ -6,6 +6,7 @@ import {
   cleanEmail,
   cleanText,
   getAccountFromEvent,
+  getJsonWithRetry,
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
@@ -136,10 +137,7 @@ async function findSignupForAccount(tournamentSlug, account) {
 
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
-  return store.get(`${tournamentSlug}.json`, {
-    consistency: 'strong',
-    type: 'json',
-  });
+  return getJsonWithRetry(store, `${tournamentSlug}.json`);
 }
 
 async function saveTicket(ticket, record) {
@@ -156,10 +154,7 @@ async function saveTicket(ticket, record) {
 
 async function loadTicket(ticket) {
   const store = getStoreWithFallback('tournament-match-tickets');
-  return store.get(ticketKey(ticket), {
-    consistency: 'strong',
-    type: 'json',
-  });
+  return getJsonWithRetry(store, ticketKey(ticket));
 }
 
 async function deleteTicket(ticket) {

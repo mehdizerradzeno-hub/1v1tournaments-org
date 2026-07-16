@@ -12,6 +12,7 @@ import { getStore } from '@netlify/blobs';
 export const PLAYER_SESSION_COOKIE = 'one_v_one_player_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MAX_FIELD_LENGTH = 500;
+const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
 export function getStoreWithFallback(name) {
   const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
@@ -22,6 +23,28 @@ export function getStoreWithFallback(name) {
   }
 
   return getStore(name);
+}
+
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function getJsonWithRetry(store, key, options = {}) {
+  const delays = options.delays || IMMEDIATE_READ_RETRY_DELAYS_MS;
+
+  for (const delayMs of delays) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+
+    const value = await store.get(key, { type: 'json' });
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 export function cleanText(value) {
@@ -135,12 +158,14 @@ export function publicAccount(account) {
   };
 }
 
-export async function getAccountByEmail(email) {
+export async function getAccountByEmail(email, options = {}) {
   const accountStore = getStoreWithFallback('player-accounts');
-  return accountStore.get(accountKey(email), {
-    consistency: 'strong',
-    type: 'json',
-  });
+
+  if (options.retry) {
+    return getJsonWithRetry(accountStore, accountKey(email));
+  }
+
+  return accountStore.get(accountKey(email), { type: 'json' });
 }
 
 export async function saveAccount(account, options = {}) {
@@ -186,17 +211,14 @@ export async function getAccountFromEvent(event) {
   }
 
   const sessionStore = getStoreWithFallback('player-sessions');
-  const session = await sessionStore.get(sessionKey(sessionId), {
-    consistency: 'strong',
-    type: 'json',
-  });
+  const session = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
 
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
     await deleteSession(sessionId);
     return null;
   }
 
-  const account = await getAccountByEmail(session.accountEmail);
+  const account = await getAccountByEmail(session.accountEmail, { retry: true });
 
   if (!account || account.id !== session.accountId) {
     return null;
