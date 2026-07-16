@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   scryptSync,
@@ -11,6 +12,8 @@ import { getStore } from '@netlify/blobs';
 
 export const PLAYER_SESSION_COOKIE = 'one_v_one_player_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_PROPAGATION_GRACE_MS = 5 * 60 * 1000;
+const SESSION_TOKEN_PREFIX = 'v1';
 const MAX_FIELD_LENGTH = 500;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
@@ -69,6 +72,80 @@ export function accountKey(email) {
 
 export function sessionKey(sessionId) {
   return `${identityKey(sessionId)}.json`;
+}
+
+function sessionSigningSecret() {
+  return String(process.env.TOURNAMENT_SESSION_SECRET || '').trim();
+}
+
+function sessionSignature(encodedPayload, secret) {
+  return createHmac('sha256', secret).update(encodedPayload).digest('base64url');
+}
+
+export function createSignedSessionToken(session, account) {
+  const secret = sessionSigningSecret();
+
+  if (!secret) {
+    return '';
+  }
+
+  if (secret.length < 32) {
+    throw new Error('TOURNAMENT_SESSION_SECRET must contain at least 32 characters.');
+  }
+
+  const payload = {
+    accountCreatedAt: account.createdAt,
+    accountEmail: account.email,
+    accountId: account.id,
+    emailVerified: account.emailVerified !== false,
+    expiresAt: session.expiresAt,
+    playerHandle: account.playerHandle || '',
+    playerName: account.playerName,
+    sessionCreatedAt: session.createdAt,
+    sessionId: session.id,
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = sessionSignature(encodedPayload, secret);
+
+  return `${SESSION_TOKEN_PREFIX}.${encodedPayload}.${signature}`;
+}
+
+export function parseSignedSessionToken(token) {
+  const secret = sessionSigningSecret();
+  const [prefix, encodedPayload, providedSignature, ...extraParts] = String(token || '').split('.');
+
+  if (!secret || prefix !== SESSION_TOKEN_PREFIX || !encodedPayload || !providedSignature || extraParts.length) {
+    return null;
+  }
+
+  const expectedSignature = Buffer.from(sessionSignature(encodedPayload, secret));
+  const actualSignature = Buffer.from(providedSignature);
+
+  if (
+    expectedSignature.length !== actualSignature.length
+    || !timingSafeEqual(expectedSignature, actualSignature)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    const expiresAt = new Date(payload.expiresAt).getTime();
+
+    if (
+      !payload.sessionId
+      || !payload.accountId
+      || !isEmailLike(payload.accountEmail)
+      || !Number.isFinite(expiresAt)
+      || expiresAt <= Date.now()
+    ) {
+      return null;
+    }
+
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 export function parseCookies(cookieHeader = '') {
@@ -193,32 +270,66 @@ export async function createSession(account) {
     },
   });
 
-  return session;
+  return {
+    ...session,
+    token: createSignedSessionToken(session, account),
+  };
 }
 
-export async function deleteSession(sessionId) {
-  if (!sessionId) return;
+export async function deleteSession(sessionToken) {
+  if (!sessionToken) return;
+
+  const signedSession = parseSignedSessionToken(sessionToken);
+  const sessionId = signedSession?.sessionId || sessionToken;
 
   const sessionStore = getStoreWithFallback('player-sessions');
   await sessionStore.delete(sessionKey(sessionId));
 }
 
 export async function getAccountFromEvent(event) {
-  const sessionId = getSessionId(event);
+  const sessionToken = getSessionId(event);
 
-  if (!sessionId) {
+  if (!sessionToken) {
     return null;
   }
 
+  const signedSession = parseSignedSessionToken(sessionToken);
+  const sessionId = signedSession?.sessionId || sessionToken;
   const sessionStore = getStoreWithFallback('player-sessions');
-  const session = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
+  let session = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
+  const signedSessionCreatedAt = new Date(signedSession?.sessionCreatedAt).getTime();
+  const signedSessionInGrace = Boolean(
+    signedSession
+    && Number.isFinite(signedSessionCreatedAt)
+    && signedSessionCreatedAt + SESSION_PROPAGATION_GRACE_MS > Date.now()
+  );
+
+  if (!session && signedSessionInGrace) {
+    session = {
+      accountEmail: signedSession.accountEmail,
+      accountId: signedSession.accountId,
+      expiresAt: signedSession.expiresAt,
+      id: signedSession.sessionId,
+    };
+  }
 
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
-    await deleteSession(sessionId);
+    await deleteSession(sessionToken);
     return null;
   }
 
   const account = await getAccountByEmail(session.accountEmail, { retry: true });
+
+  if (!account && signedSessionInGrace && signedSession.accountId === session.accountId) {
+    return {
+      createdAt: signedSession.accountCreatedAt,
+      email: signedSession.accountEmail,
+      emailVerified: signedSession.emailVerified,
+      id: signedSession.accountId,
+      playerHandle: signedSession.playerHandle || '',
+      playerName: signedSession.playerName,
+    };
+  }
 
   if (!account || account.id !== session.accountId) {
     return null;

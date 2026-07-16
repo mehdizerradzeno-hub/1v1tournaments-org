@@ -403,6 +403,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(accountUtilsSource, /player-accounts/);
   assert.match(accountUtilsSource, /player-sessions/);
   assert.match(accountUtilsSource, /getJsonWithRetry/);
+  assert.match(accountUtilsSource, /TOURNAMENT_SESSION_SECRET/);
+  assert.match(accountUtilsSource, /createSignedSessionToken/);
+  assert.match(accountUtilsSource, /parseSignedSessionToken/);
   assert.doesNotMatch(accountUtilsSource, /consistency: 'strong'/);
   assert.match(hostAuthSource, /TOURNAMENT_HOST_ACCOUNT_EMAILS/);
   assert.match(hostAuthSource, /requireTournamentAdmin/);

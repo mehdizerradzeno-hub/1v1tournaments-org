@@ -150,7 +150,7 @@ async function createAccount(payload) {
     account: publicPlayerAccount(account),
     verificationRequired: !account.emailVerified,
     verificationDelivery,
-  }), sessionCookie(session.id));
+  }), sessionCookie(session.token || session.id));
 }
 
 async function loginAccount(payload) {
@@ -169,7 +169,10 @@ async function loginAccount(payload) {
 
   const session = await createSession(account);
 
-  return withCookie(json(200, { ok: true, account: publicPlayerAccount(account) }), sessionCookie(session.id));
+  return withCookie(
+    json(200, { ok: true, account: publicPlayerAccount(account) }),
+    sessionCookie(session.token || session.id),
+  );
 }
 
 async function logoutAccount(event) {
@@ -250,7 +253,10 @@ async function resetAccountPassword(payload) {
   await saveAccount(updated);
   const session = await createSession(updated);
 
-  return withCookie(json(200, { ok: true, account: publicPlayerAccount(updated) }), sessionCookie(session.id));
+  return withCookie(
+    json(200, { ok: true, account: publicPlayerAccount(updated) }),
+    sessionCookie(session.token || session.id),
+  );
 }
 
 export async function handler(event) {

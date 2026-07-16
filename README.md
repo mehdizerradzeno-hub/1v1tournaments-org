@@ -67,6 +67,7 @@ Future edits:
 - Set `TOURNAMENT_HOST_ACCOUNT_EMAILS` to one or more host account emails, separated by commas or spaces.
 - You can also set `TOURNAMENT_HOST_ACCOUNT_IDS` when you want to allowlist immutable account IDs instead of emails.
 - Keep `TOURNAMENT_ADMIN_TOKEN` as a fallback admin token for emergencies and setup.
+- Set `TOURNAMENT_SESSION_SECRET` to a dedicated random value of at least 32 characters. It signs player session cookies and must not reuse the admin token.
 - Use the host dashboard `Schedule and registration` controls to update event date, time zone, check-in lead time, and registration status without editing code.
 - Use the host dashboard `Clear test data` control to wipe one tournament's roster and bracket during smoke tests while keeping player accounts intact.
 - Use `Delete tournament` when an event should disappear from public and host lists. Seeded events receive an explicit hide tombstone so they do not reappear after deletion.
