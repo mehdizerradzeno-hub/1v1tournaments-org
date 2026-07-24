@@ -733,7 +733,7 @@ async function loadTournamentForBracket(tournamentSlug) {
   return hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament;
 }
 
-function checkInOpenStatus(tournament, now = new Date()) {
+export function checkInOpenStatus(tournament, now = new Date()) {
   const startDate = new Date(tournament?.date);
 
   if (Number.isNaN(startDate.getTime())) {
@@ -896,7 +896,7 @@ export async function handler(event) {
       const tournament = await loadTournamentForBracket(tournamentSlug);
       const checkInStatus = checkInOpenStatus(tournament);
 
-      if (!checkInStatus.open) {
+      if (!checkInStatus.open && payload.allowEarly !== true) {
         return json(403, {
           error: checkInStatus.error,
           opensAt: checkInStatus.opensAt?.toISOString(),

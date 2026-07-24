@@ -1500,6 +1500,41 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleGenerateEarlyTestBracket() {
+    const token = rosterToken.trim();
+    const selectedMode = getTournamentMode(liveTournament?.mode);
+
+    if (!hasHostCredential) {
+      setBracketFeedback('', 'Sign in with a host-approved account or enter the tournament admin token before generating a bracket.');
+      return;
+    }
+
+    if (!canGenerateTournamentMode(selectedMode.value)) {
+      setBracketFeedback('', `${selectedMode.label} is saved for the event, but bracket generation for that mode is the next wiring phase.`);
+      return;
+    }
+
+    setBracketLoading(true);
+    setBracketFeedback('', '');
+
+    try {
+      const result = await generateTournamentBracket({
+        token,
+        slug: rosterSlug,
+        allowEarly: true,
+      });
+      setBracket(result.bracket || null);
+      setBracketFeedback(
+        'Generated an early test bracket. Registration is now locked until the bracket is reset.',
+        '',
+      );
+    } catch (error) {
+      setBracketFeedback('', error instanceof Error ? error.message : 'Could not generate the early test bracket.');
+    } finally {
+      setBracketLoading(false);
+    }
+  }
+
   async function handleResetBracket() {
     const token = rosterToken.trim();
 
@@ -1729,6 +1764,13 @@ export default function AdminScreen() {
               variant="secondary">
               {bracketLoading ? 'Generating...' : 'Generate bracket'}
             </ActionButton>
+            <ActionButton
+              disabled={!hasHostCredential || !playerCountReady || bracketLoading}
+              onPress={handleGenerateEarlyTestBracket}
+              style={styles.quickActionButton}
+              variant="ghost">
+              Generate early test bracket
+            </ActionButton>
             <ActionButton onPress={handleLoadRoster} style={styles.quickActionButton} variant="secondary">
               {rosterLoading ? 'Refreshing...' : 'Refresh roster'}
             </ActionButton>
@@ -1747,6 +1789,9 @@ export default function AdminScreen() {
               Clear/delete tournament
             </ActionButton>
           </View>
+
+          {bracketError ? <Text style={styles.errorText}>{bracketError}</Text> : null}
+          {bracketMessage ? <Text style={styles.successText}>{bracketMessage}</Text> : null}
 
           {archiveConfirmOpen ? (
             <View style={styles.quickConfirmPanel}>
@@ -3382,7 +3427,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   quickPickerButton: {
-    minWidth: 170,
+    flexBasis: 240,
+    flexGrow: 1,
+    maxWidth: '100%',
+    minWidth: 0,
   },
   quickFlowStrip: {
     flexDirection: 'row',
@@ -3458,7 +3506,10 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   quickActionButton: {
-    minWidth: 188,
+    flexBasis: 220,
+    flexGrow: 1,
+    maxWidth: '100%',
+    minWidth: 0,
   },
   quickConfirmPanel: {
     backgroundColor: 'rgba(94, 127, 163, 0.08)',

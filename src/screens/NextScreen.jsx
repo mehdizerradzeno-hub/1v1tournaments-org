@@ -288,17 +288,18 @@ export default function NextScreen() {
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentsLoaded, setHostedTournamentsLoaded] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const upcoming = useMemo(
+  const publicTournaments = useMemo(
     () => hostedTournamentsLoaded
-      ? mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming')
+      ? mergeTournamentLists(getUpcomingTournaments(), hostedTournaments)
+          .filter((tournament) => ['upcoming', 'live'].includes(tournament.status))
       : [],
     [hostedTournaments, hostedTournamentsLoaded],
   );
-  const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
-  const hydratedUpcoming = sortTournamentsByDate(
-    upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
+  const publicTournamentSlugs = publicTournaments.map((tournament) => tournament.slug).join('|');
+  const hydratedPublicTournaments = sortTournamentsByDate(
+    publicTournaments.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
   );
-  const tournament = getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
+  const tournament = getNextPublicTournament(hydratedPublicTournaments, eventDataBySlug, nowMs);
   const eventData = eventDataBySlug[tournament?.slug || ''] || {};
   const signupSummary = eventData.signupSummary || { count: 0, signups: [], loading: Boolean(tournament) };
   const bracket = eventData.bracket || null;
@@ -340,7 +341,7 @@ export default function NextScreen() {
   }, []);
 
   useEffect(() => {
-    if (!upcoming.length) {
+    if (!publicTournaments.length) {
       return undefined;
     }
 
@@ -355,7 +356,7 @@ export default function NextScreen() {
       refreshing = true;
 
       const settled = await Promise.allSettled(
-        upcoming.map(async (item) => {
+        publicTournaments.map(async (item) => {
           const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
             fetchTournamentSettings({ slug: item.slug }),
             fetchTournamentBracket({ slug: item.slug }),
@@ -398,7 +399,7 @@ export default function NextScreen() {
       active = false;
       clearInterval(refreshTimer);
     };
-  }, [upcoming, upcomingSlugs]);
+  }, [publicTournaments, publicTournamentSlugs]);
 
   useEffect(() => {
     const timer = setInterval(() => {

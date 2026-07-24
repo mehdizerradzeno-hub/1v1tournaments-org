@@ -274,6 +274,9 @@ export async function handler(event) {
     return json(200, {
       ok: true,
       account: publicPlayerAccount(account),
+      capabilities: {
+        emailRecovery: emailProviderConfigured(),
+      },
     });
   }
 

@@ -410,7 +410,7 @@ export async function issueTournamentMatchTicket({ slug, matchId }) {
   return result;
 }
 
-export async function generateTournamentBracket({ token, slug }) {
+export async function generateTournamentBracket({ token, slug, allowEarly = false }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const response = await fetch(`${BRACKET_ENDPOINT}${query}`, {
     method: 'POST',
@@ -418,7 +418,7 @@ export async function generateTournamentBracket({ token, slug }) {
     headers: adminHeaders(token, {
       'Content-Type': 'application/json',
     }),
-    body: JSON.stringify({ action: 'generate' }),
+    body: JSON.stringify({ action: 'generate', allowEarly }),
   });
   const result = await readJsonResponse(response);
 

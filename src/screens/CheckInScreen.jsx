@@ -347,6 +347,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
+  const [emailRecoveryConfigured, setEmailRecoveryConfigured] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [recoveryRequested, setRecoveryRequested] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -433,6 +434,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         if (active && loadId === accountLoadIdRef.current) {
           const nextAccount = result.account || null;
           setAccount(nextAccount);
+          setEmailRecoveryConfigured(Boolean(result.capabilities?.emailRecovery));
 
           if (nextAccount) {
             notifyPlayerAccountChanged(nextAccount);
@@ -1273,17 +1275,23 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 )}
                 {accountMode === 'login' ? (
                   <ActionButton
-                    disabled={accountSubmitting}
+                    disabled={accountSubmitting || !emailRecoveryConfigured}
                     onPress={() => {
                       setRecoveryOpen((current) => !current);
                       setAccountError('');
                       setAccountMessage('');
                     }}
                     variant="ghost">
-                    Forgot password?
+                    {emailRecoveryConfigured ? 'Forgot password?' : 'Recovery unavailable'}
                   </ActionButton>
                 ) : null}
               </View>
+
+              {accountMode === 'login' && !emailRecoveryConfigured ? (
+                <Text style={styles.mutedWarning}>
+                  Email recovery is not configured yet. Contact the tournament host if you cannot sign in.
+                </Text>
+              ) : null}
 
               {accountMode === 'login' && recoveryOpen ? (
                 <View style={styles.recoveryPanel}>

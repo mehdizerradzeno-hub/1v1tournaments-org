@@ -765,6 +765,7 @@ export default function TournamentScreen({ slug }) {
         primaryAction={primaryPlayerAction}
         registrationMeta={registrationMeta}
         result={result}
+        slug={visibleTournament.slug}
       />
 
       <TournamentArrivalRail
@@ -1700,7 +1701,10 @@ function PlayerStatusSpotlight({
   primaryAction,
   registrationMeta,
   result,
+  slug,
 }) {
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
   const data = playerStatus.data || {};
   const currentMatch = data.currentMatch || null;
   const accountName = data.account?.playerName || '';
@@ -1740,6 +1744,28 @@ function PlayerStatusSpotlight({
   const actionLabel = currentMatch ? 'Play My Match' : primaryAction?.label || 'Next Step';
   const matchPlayers = currentMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
 
+  async function handlePlayMyMatch() {
+    if (!currentMatch || opening) return;
+
+    setOpenError('');
+    setOpening(true);
+
+    try {
+      const result = await issueTournamentMatchTicket({
+        slug,
+        matchId: currentMatch.id,
+      });
+
+      if (result.roomUrl && globalThis.location?.assign) {
+        globalThis.location.assign(result.roomUrl);
+      }
+    } catch (error) {
+      setOpenError(error instanceof Error ? error.message : 'Match access could not be opened.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
   return (
     <Surface style={[styles.statusSpotlight, currentMatch && styles.statusSpotlightReady]}>
       <View style={styles.statusSpotlightTopRow}>
@@ -1764,11 +1790,12 @@ function PlayerStatusSpotlight({
             </Text>
             <Text style={styles.statusSpotlightMatchPlayers}>{matchPlayers}</Text>
           </View>
-          <ActionButton href={primaryAction.href} style={styles.statusSpotlightPlayButton}>
-            Play My Match
+          <ActionButton onPress={handlePlayMyMatch} style={styles.statusSpotlightPlayButton}>
+            {opening ? 'Opening...' : 'Play My Match'}
           </ActionButton>
         </View>
       ) : null}
+      {openError ? <Text style={styles.playerStatusWarning}>{openError}</Text> : null}
       <View style={styles.statusSpotlightSteps}>
         {steps.map((step, index) => (
           <View

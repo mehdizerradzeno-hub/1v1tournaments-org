@@ -31,10 +31,12 @@ function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
 }
 
 function getNextNavTournamentSlug(hostedTournaments = []) {
-  const tournaments = mergeTournamentLists(getUpcomingTournaments(), hostedTournaments)
-    .filter((tournament) => tournament.status === 'upcoming');
+  const tournaments = mergeTournamentLists(getUpcomingTournaments(), hostedTournaments);
+  const liveTournament = tournaments.find((tournament) => tournament.status === 'live');
 
-  return getNextFutureTournament(tournaments)?.slug || null;
+  return liveTournament?.slug
+    || getNextFutureTournament(tournaments.filter((tournament) => tournament.status === 'upcoming'))?.slug
+    || null;
 }
 
 function getNavItems(paths) {
@@ -654,9 +656,9 @@ export function HubScreen({
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && width > 0 && width < 720;
   const showTopNav = showNavigation && (forceTopNav || !showMobileNav);
   const showLaptopLayout = Platform.OS === 'web' && width >= 1360;
-  const showTinyHeader = width > 0 && width < 390;
+  const showTinyHeader = width > 0 && width < 520;
   const showStickyActions = stickyActions && pathname !== '/admin' && !showMobileNav;
-  const showDockedMobileNav = showNavigation && showMobileNav;
+  const showDockedMobileNav = showNavigation && showMobileNav && pathname !== '/admin';
   const showInlineMobileNav = false;
   const showStickyActionCopy = width >= 430;
   const compactHero = heroVariant === 'compact';

@@ -418,6 +418,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentBracketSource, /tournament-brackets/);
   assert.match(tournamentBracketSource, /loadTournamentMode/);
   assert.match(tournamentBracketSource, /checkInOpenStatus/);
+  assert.match(tournamentBracketSource, /payload\.allowEarly !== true/);
   assert.match(tournamentBracketSource, /Check-in has not opened yet/);
   assert.match(tournamentBracketSource, /canGenerateTournamentMode/);
   assert.match(tournamentBracketSource, /buildFourPlayerDoubleEliminationBracket/);

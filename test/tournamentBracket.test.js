@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildFourPlayerDoubleEliminationBracket,
   buildThreePlayerTwoLifeBracket,
+  checkInOpenStatus,
   findMatch,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
@@ -29,6 +30,20 @@ function winner(bracket, matchId, slot = 0) {
 
   return match.players[slot];
 }
+
+test('bracket check-in reports when normal generation opens', () => {
+  const tournament = {
+    date: '2026-07-29T19:00:00-04:00',
+    timeZone: 'America/New_York',
+    checkInLeadMinutes: 30,
+  };
+  const early = checkInOpenStatus(tournament, new Date('2026-07-29T18:00:00-04:00'));
+  const open = checkInOpenStatus(tournament, new Date('2026-07-29T18:30:00-04:00'));
+
+  assert.equal(early.open, false);
+  assert.match(early.error, /Bracket generation opens/);
+  assert.equal(open.open, true);
+});
 
 test('4-player double-elimination bracket requires exactly four players', () => {
   assert.throws(() => buildFourPlayerDoubleEliminationBracket({
