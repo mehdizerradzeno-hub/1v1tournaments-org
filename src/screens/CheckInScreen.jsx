@@ -1191,8 +1191,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={setPassword}
+                  onSubmitEditing={() => {
+                    if (accountMode === 'login' && accountFormStatus.ready) {
+                      handleLoginAccount();
+                    }
+                  }}
                   placeholder="At least 8 characters"
                   placeholderTextColor="#6B766F"
+                  returnKeyType={accountMode === 'login' ? 'go' : 'next'}
                   secureTextEntry
                   style={styles.input}
                   value={password}
@@ -1207,8 +1213,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                       onChangeText={setConfirmPassword}
+                      onSubmitEditing={() => {
+                        if (accountFormStatus.ready) {
+                          handleCreateAccount();
+                        }
+                      }}
                       placeholder="Type it again"
                       placeholderTextColor="#6B766F"
+                      returnKeyType="go"
                       secureTextEntry
                       style={styles.input}
                       value={confirmPassword}
@@ -1236,8 +1248,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     autoCapitalize="none"
                     autoCorrect={false}
                     onChangeText={setPlayerHandle}
+                    onSubmitEditing={() => {
+                      if (accountFormStatus.ready) {
+                        handleCreateAccount();
+                      }
+                    }}
                     placeholder="Discord or Spades name, if different"
                     placeholderTextColor="#6B766F"
+                    returnKeyType="go"
                     style={styles.input}
                     value={playerHandle}
                   />
@@ -1333,8 +1351,14 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                           autoCapitalize="none"
                           autoCorrect={false}
                           onChangeText={setRecoveryConfirmPassword}
+                          onSubmitEditing={() => {
+                            if (!recoverySubmitting) {
+                              handleResetPassword();
+                            }
+                          }}
                           placeholder="Type it again"
                           placeholderTextColor="#6B766F"
+                          returnKeyType="go"
                           secureTextEntry
                           style={styles.input}
                           value={recoveryConfirmPassword}

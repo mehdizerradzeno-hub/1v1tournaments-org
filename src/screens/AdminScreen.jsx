@@ -2203,8 +2203,10 @@ export default function AdminScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={setServerAccountId}
+              onSubmitEditing={handleUnlockWithAccountId}
               placeholder="Enter your account ID"
               placeholderTextColor="#6B766F"
+              returnKeyType="go"
               style={styles.input}
               value={serverAccountId}
             />
@@ -2668,8 +2670,10 @@ export default function AdminScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={setCreateConfirm}
+                onSubmitEditing={handleCreateAccess}
                 placeholder="Confirm the passphrase"
                 placeholderTextColor="#6B766F"
+                returnKeyType="go"
                 secureTextEntry
                 style={styles.input}
                 value={createConfirm}
@@ -2716,8 +2720,10 @@ export default function AdminScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={setUnlockPassphrase}
+                onSubmitEditing={handleUnlock}
                 placeholder="Enter the private passphrase"
                 placeholderTextColor="#6B766F"
+                returnKeyType="go"
                 secureTextEntry
                 style={styles.input}
                 value={unlockPassphrase}

@@ -521,6 +521,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(checkInScreenSource, /Join Tournament is the next separate step/);
   assert.match(checkInScreenSource, /Create Account/);
   assert.match(checkInScreenSource, /Sign In/);
+  assert.match(checkInScreenSource, /onSubmitEditing/);
+  assert.match(checkInScreenSource, /returnKeyType="go"/);
   assert.match(checkInScreenSource, /Forgot password\?/);
   assert.match(checkInScreenSource, /Reset and sign in/);
   assert.match(checkInScreenSource, /Email verification/);
