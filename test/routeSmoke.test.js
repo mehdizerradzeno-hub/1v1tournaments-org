@@ -622,6 +622,9 @@ test('Twitch chat bot runner reads editable stream commands', () => {
   assert.match(botSource, /HEALTH_ENDPOINT/);
   assert.match(botSource, /HEALTH_MONITOR_TOKEN/);
   assert.match(botSource, /sendHeartbeat/);
+  assert.match(botSource, /function startHeartbeatLoop/);
+  assert.match(botSource, /setInterval\(\(\) => \{/);
+  assert.match(botSource, /clearInterval\(heartbeatTimer\)/);
   assert.match(botSource, /stream-commands/);
   assert.match(botSource, /health/);
   assert.match(botSource, /PRIVMSG/);
