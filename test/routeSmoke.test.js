@@ -19,6 +19,7 @@ const sponsorsRouteFile = fileURLToPath(new URL('../app/sponsors.jsx', import.me
 const mediaKitRouteFile = fileURLToPath(new URL('../app/media-kit.jsx', import.meta.url));
 const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', import.meta.url));
 const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
+const streamRouteFile = fileURLToPath(new URL('../app/stream.jsx', import.meta.url));
 const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
 const overlayRouteFile = fileURLToPath(new URL('../app/overlay.jsx', import.meta.url));
 const overlayBracketRouteFile = fileURLToPath(new URL('../app/overlay/bracket.jsx', import.meta.url));
@@ -34,6 +35,7 @@ const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPub
 const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
+const streamModeScreenFile = fileURLToPath(new URL('../src/screens/StreamModeScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
 const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
 const resultsScreenFile = fileURLToPath(new URL('../src/screens/ResultsScreen.jsx', import.meta.url));
@@ -248,6 +250,11 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /TOURNAMENT_ADMIN_TOKEN/);
   assert.match(liveScreenSource, /sendDiscordAlert/);
   assert.match(liveScreenSource, /fetchRuntimeHealth/);
+  assert.match(liveScreenSource, /fetchTournamentEvents/);
+  assert.match(liveScreenSource, /getPublicTournamentCatalog/);
+  assert.match(liveScreenSource, /getNextPublicTournament/);
+  assert.match(liveScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
+  assert.match(liveScreenSource, /Event announcements stay disabled/);
   assert.match(liveScreenSource, /Render bot online/);
   assert.match(liveScreenSource, /Last heartbeat/);
   assert.match(hostingClientSource, /DISCORD_ALERT_ENDPOINT/);
@@ -277,6 +284,22 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(healthSource, /Heartbeat stale/);
 });
 
+test('/stream waits for and refreshes the hosted tournament feed', () => {
+  assert.ok(existsSync(streamRouteFile));
+  assert.ok(existsSync(streamModeScreenFile));
+
+  const streamRouteSource = readFileSync(streamRouteFile, 'utf8');
+  const streamModeScreenSource = readFileSync(streamModeScreenFile, 'utf8');
+
+  assert.match(streamRouteSource, /StreamModeScreen/);
+  assert.match(streamModeScreenSource, /getPublicTournamentCatalog/);
+  assert.match(streamModeScreenSource, /getPublicTournamentFeedStatus/);
+  assert.match(streamModeScreenSource, /Loading tournament schedule/);
+  assert.match(streamModeScreenSource, /Tournament schedule unavailable/);
+  assert.match(streamModeScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
+  assert.match(streamModeScreenSource, /setInterval\(loadEventData, 15000\)/);
+});
+
 test('overlay routes stay wired to OBS browser sources', () => {
   assert.ok(existsSync(overlayRouteFile));
   assert.ok(existsSync(overlayBracketRouteFile));
@@ -289,6 +312,9 @@ test('overlay routes stay wired to OBS browser sources', () => {
 
   assert.match(bracketRouteSource, /variant="bracket"/);
   assert.match(compactRouteSource, /variant="compact"/);
+  assert.match(overlayScreenSource, /getPublicTournamentCatalog/);
+  assert.match(overlayScreenSource, /getPublicTournamentFeedStatus/);
+  assert.match(overlayScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
   assert.match(overlayScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.match(overlayScreenSource, /getOverlayStatusLabel/);
 });
@@ -454,6 +480,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /hideSeeded: true/);
+  assert.match(tournamentEventsUtilsSource, /Promise\.allSettled/);
+  assert.match(tournamentEventsUtilsSource, /Tournament bracket hydration failed/);
   assert.match(hubUiSource, /getMobileNavItems/);
   assert.match(hubUiSource, /My Match/);
   assert.match(hubUiSource, /Event/);
