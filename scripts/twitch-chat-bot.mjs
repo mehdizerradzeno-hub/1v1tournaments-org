@@ -26,6 +26,7 @@ const healthToken = cleanEnv(process.env.HEALTH_MONITOR_TOKEN);
 let commands = new Map();
 let lastCommandLoadAt = 0;
 let lastHeartbeatAt = 0;
+let heartbeatTimer = null;
 const cooldowns = new Map();
 
 function cleanEnv(value) {
@@ -222,6 +223,22 @@ async function sendHeartbeat({ force = false, status = 'online' } = {}) {
   }
 }
 
+function stopHeartbeatLoop() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+function startHeartbeatLoop() {
+  stopHeartbeatLoop();
+  sendHeartbeat({ force: true }).catch(() => {});
+  heartbeatTimer = setInterval(() => {
+    sendHeartbeat({ force: true }).catch(() => {});
+  }, HEARTBEAT_MS);
+  heartbeatTimer.unref();
+}
+
 function writeLogin(socket) {
   socket.write(`PASS ${oauthToken}\r\n`);
   socket.write(`NICK ${botUsername}\r\n`);
@@ -243,13 +260,13 @@ function connect({ secure = true } = {}) {
         () => {
           writeLogin(socket);
           console.log(`Connected to Twitch chat over TLS as ${botUsername}, joining #${channel}`);
-          sendHeartbeat({ force: true }).catch(() => {});
+          startHeartbeatLoop();
         },
       )
     : net.connect(TWITCH_IRC_PLAIN_PORT, TWITCH_IRC_HOST, () => {
         writeLogin(socket);
         console.log(`Connected to Twitch chat as ${botUsername}, joining #${channel}`);
-        sendHeartbeat({ force: true }).catch(() => {});
+        startHeartbeatLoop();
       });
 
   socket.setEncoding('utf8');
@@ -307,6 +324,8 @@ function connect({ secure = true } = {}) {
   });
 
   socket.on('close', () => {
+    stopHeartbeatLoop();
+
     if (secure && lastErrorCode === 'ERR_TLS_CERT_ALTNAME_INVALID') {
       console.error('TLS certificate name mismatch from Twitch IRC edge. Falling back to plain IRC port 6667...');
       connect({ secure: false });
