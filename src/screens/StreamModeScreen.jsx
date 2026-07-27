@@ -16,7 +16,11 @@ import {
   getUpcomingTournaments,
 } from '../lib/siteData.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
-import { getNextPublicTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import {
+  getNextPublicTournament,
+  getPublicTournamentCatalog,
+  getPublicTournamentFeedStatus,
+} from '../lib/tournamentCatalog.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
@@ -177,10 +181,13 @@ export default function StreamModeScreen() {
   const { width } = useWindowDimensions();
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
+  const [hostedTournamentState, setHostedTournamentState] = useState({ error: '', loaded: false });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const upcoming = useMemo(
-    () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
-    [hostedTournaments],
+    () => hostedTournamentState.loaded
+      ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
+      : [],
+    [hostedTournaments, hostedTournamentState.loaded],
   );
   const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
   const hydratedUpcoming = sortTournamentsByDate(
@@ -205,28 +212,48 @@ export default function StreamModeScreen() {
   const countdownParts = getCountdownParts(featuredTournament, nowMs);
   const viewerNextSteps = getViewerNextSteps(registrationMeta, featuredBracket);
   const isWide = Platform.OS === 'web' && width >= 920;
+  const feedStatus = getPublicTournamentFeedStatus({
+    error: hostedTournamentState.error,
+    loaded: hostedTournamentState.loaded,
+    tournament: featuredTournament,
+  });
 
   useEffect(() => {
     let active = true;
+    let refreshing = false;
 
     async function loadHostedTournaments() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
       try {
         const result = await fetchTournamentEvents();
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
+          setHostedTournamentState({ error: '', loaded: true });
         }
-      } catch {
+      } catch (error) {
         if (active) {
-          setHostedTournaments([]);
+          setHostedTournamentState({
+            error: error instanceof Error ? error.message : 'Tournament schedule could not be loaded.',
+            loaded: true,
+          });
         }
+      } finally {
+        refreshing = false;
       }
     }
 
     loadHostedTournaments();
+    const refreshTimer = setInterval(loadHostedTournaments, 15000);
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
     };
   }, []);
 
@@ -236,8 +263,15 @@ export default function StreamModeScreen() {
     }
 
     let active = true;
+    let refreshing = false;
 
     async function loadEventData() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
       const settled = await Promise.allSettled(
         upcoming.map(async (tournament) => {
           const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
@@ -248,14 +282,9 @@ export default function StreamModeScreen() {
 
           return {
             slug: tournament.slug,
-            settings: settingsResult.status === 'fulfilled' ? settingsResult.value.settings || null : null,
-            bracket: bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null,
-            signupSummary: {
-              count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
-              signups: signupResult.status === 'fulfilled' ? signupResult.value.signups || [] : [],
-              loading: false,
-              unavailable: signupResult.status !== 'fulfilled',
-            },
+            settingsResult,
+            bracketResult,
+            signupResult,
           };
         }),
       );
@@ -264,19 +293,51 @@ export default function StreamModeScreen() {
         return;
       }
 
-      setEventDataBySlug(
-        Object.fromEntries(
-          settled
-            .filter((result) => result.status === 'fulfilled')
-            .map((result) => [result.value.slug, result.value]),
-        ),
-      );
+      setEventDataBySlug((previous) => Object.fromEntries(
+        settled
+          .filter((result) => result.status === 'fulfilled')
+          .map((result) => {
+            const {
+              bracketResult,
+              settingsResult,
+              signupResult,
+              slug,
+            } = result.value;
+            const prior = previous[slug] || {};
+
+            return [slug, {
+              settings: settingsResult.status === 'fulfilled'
+                ? settingsResult.value.settings || null
+                : prior.settings || null,
+              bracket: bracketResult.status === 'fulfilled'
+                ? bracketResult.value.bracket || null
+                : prior.bracket || null,
+              signupSummary: signupResult.status === 'fulfilled'
+                ? {
+                    count: signupResult.value.signupCount || 0,
+                    signups: signupResult.value.signups || [],
+                    loading: false,
+                    unavailable: false,
+                  }
+                : prior.signupSummary || {
+                    count: 0,
+                    signups: [],
+                    loading: false,
+                    unavailable: true,
+                  },
+            }];
+          }),
+      ));
+
+      refreshing = false;
     }
 
     loadEventData();
+    const refreshTimer = setInterval(loadEventData, 15000);
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
     };
   }, [upcoming, upcomingSlugs]);
 
@@ -304,7 +365,17 @@ export default function StreamModeScreen() {
       lead="A clean guest-facing board for Twitch viewers, OBS browser sources, and tournament-day sharing."
       subtitle="Next tournament, signup count, public roster, and match links in one place."
       title="Stream board">
-      {!featuredTournament ? (
+      {feedStatus === 'loading' ? (
+        <EmptyState
+          body="Checking the hosted tournament feed before showing event links."
+          title="Loading tournament schedule"
+        />
+      ) : feedStatus === 'error' ? (
+        <EmptyState
+          body="The hosted tournament feed is temporarily unavailable. Refresh before sharing this screen."
+          title="Tournament schedule unavailable"
+        />
+      ) : !featuredTournament ? (
         <EmptyState
           body="Add an upcoming public tournament and this page will turn into the stream board automatically."
           title="No upcoming tournament is scheduled"
