@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ActionButton,
@@ -35,7 +35,6 @@ import {
 } from '../lib/tournamentSettings.js';
 import {
   clearTournamentData,
-  deleteTournamentEvent,
   fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentEvents,
@@ -1128,20 +1127,32 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Tournament to manage</Text>
-            <View style={styles.tournamentPicker}>
-              {adminTournaments.map((tournamentOption) => (
-                <ActionButton
-                  key={tournamentOption.slug}
-                  onPress={() => setRosterSlug(tournamentOption.slug)}
-                  variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
-                  {getTournamentPickerLabel(tournamentOption)}
-                </ActionButton>
-              ))}
-              <ActionButton onPress={handleNewTournamentDraft} variant="secondary">
-                New tournament
-              </ActionButton>
-            </View>
+            <Text style={styles.fieldLabel}>
+              Tournament to manage ({adminTournaments.length} event{adminTournaments.length === 1 ? '' : 's'})
+            </Text>
+            <ScrollView
+              contentContainerStyle={styles.tournamentScrollContent}
+              nestedScrollEnabled
+              style={styles.tournamentScroll}>
+              <View style={styles.tournamentPicker}>
+                {adminTournaments.map((tournamentOption) => {
+                  const selected = rosterSlug === tournamentOption.slug;
+
+                  return (
+                    <ActionButton
+                      accessibilityState={{ selected }}
+                      key={tournamentOption.slug}
+                      onPress={() => setRosterSlug(tournamentOption.slug)}
+                      variant={selected ? 'primary' : 'secondary'}>
+                      {getTournamentPickerLabel(tournamentOption)}
+                    </ActionButton>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <ActionButton onPress={handleNewTournamentDraft} variant="secondary">
+              New tournament
+            </ActionButton>
           </View>
 
           <View style={styles.eventEditorPanel}>
@@ -1589,53 +1600,16 @@ export default function AdminScreen() {
 
     try {
       const result = await clearTournamentData({ token, slug: rosterSlug });
-      const [settingsResult, eventResult] = await Promise.allSettled([
-        resetTournamentSettings({ token, slug: rosterSlug }),
-        deleteTournamentEvent({ token, slug: rosterSlug }),
-      ]);
       const emptyRoster = result.rosters?.[0] || { tournamentSlug: rosterSlug, signups: [] };
       const deletedSignupCount = result.deletedSignupCount || 0;
-      const deletedHostedEvent = eventResult.status === 'fulfilled' ? Boolean(eventResult.value.deleted) : false;
-      const nextHostedTournaments = eventResult.status === 'fulfilled'
-        ? eventResult.value.tournaments || []
-        : hostedTournaments.filter((tournament) => tournament.slug !== rosterSlug);
 
       setRosters([emptyRoster]);
       setBracket(null);
-      setScheduleSettings(null);
-      setHostedTournaments(nextHostedTournaments);
       setClearConfirmOpen(false);
       setRosterLastRefreshedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       setRosterFeedback(`Roster cleared: ${deletedSignupCount} registered player${deletedSignupCount === 1 ? '' : 's'} removed.`, '');
       setBracketFeedback('Bracket cleared for this tournament.', '');
-      setScheduleFeedback(
-        settingsResult.status === 'fulfilled'
-          ? 'Schedule override cleared for this tournament.'
-          : '',
-        settingsResult.status === 'rejected'
-          ? settingsResult.reason instanceof Error
-            ? settingsResult.reason.message
-            : 'Could not clear schedule override.'
-          : '',
-      );
-      setEventFeedback(
-        eventResult.status === 'fulfilled'
-          ? deletedHostedEvent
-            ? 'Hosted event record deleted.'
-            : 'No hosted event record existed for this slug.'
-          : '',
-        eventResult.status === 'rejected'
-          ? eventResult.reason instanceof Error
-            ? eventResult.reason.message
-            : 'Could not delete hosted event record.'
-          : '',
-      );
-      setHostFeedback(
-        deletedHostedEvent
-          ? 'Tournament cleared, including hosted event record. Player accounts were kept.'
-          : 'Tournament data cleared. No hosted event record existed for this slug. Player accounts were kept.',
-        '',
-      );
+      setHostFeedback('Roster and bracket cleared. The event, schedule, registration settings, and player accounts were kept.', '');
     } catch (error) {
       setHostFeedback('', error instanceof Error ? error.message : 'Could not clear tournament test data.');
     } finally {
@@ -1711,21 +1685,33 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.quickPickerBlock}>
-            <Text style={styles.quickPickerLabel}>Select tournament</Text>
-            <View style={styles.quickPickerRow}>
-              {adminTournaments.map((tournamentOption) => (
-                <ActionButton
-                  key={tournamentOption.slug}
-                  onPress={() => setRosterSlug(tournamentOption.slug)}
-                  style={styles.quickPickerButton}
-                  variant={rosterSlug === tournamentOption.slug ? 'primary' : 'secondary'}>
-                  {getTournamentPickerLabel(tournamentOption)}
-                </ActionButton>
-              ))}
-              <ActionButton onPress={handleNewTournamentDraft} style={styles.quickPickerButton} variant="secondary">
-                New tournament
-              </ActionButton>
-            </View>
+            <Text style={styles.quickPickerLabel}>
+              Select tournament ({adminTournaments.length} event{adminTournaments.length === 1 ? '' : 's'})
+            </Text>
+            <ScrollView
+              contentContainerStyle={styles.tournamentScrollContent}
+              nestedScrollEnabled
+              style={styles.tournamentScroll}>
+              <View style={styles.quickPickerRow}>
+                {adminTournaments.map((tournamentOption) => {
+                  const selected = rosterSlug === tournamentOption.slug;
+
+                  return (
+                    <ActionButton
+                      accessibilityState={{ selected }}
+                      key={tournamentOption.slug}
+                      onPress={() => setRosterSlug(tournamentOption.slug)}
+                      style={styles.quickPickerButton}
+                      variant={selected ? 'primary' : 'secondary'}>
+                      {getTournamentPickerLabel(tournamentOption)}
+                    </ActionButton>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <ActionButton onPress={handleNewTournamentDraft} style={styles.quickPickerButton} variant="secondary">
+              New tournament
+            </ActionButton>
           </View>
 
           <View style={styles.quickFlowStrip}>
@@ -1786,7 +1772,7 @@ export default function AdminScreen() {
               onPress={handleRequestClearTournamentData}
               style={styles.quickActionButton}
               variant="danger">
-              Clear/delete tournament
+              Clear roster only
             </ActionButton>
           </View>
 
@@ -1812,15 +1798,15 @@ export default function AdminScreen() {
           {clearConfirmOpen ? (
             <View style={styles.quickDangerConfirmPanel}>
               <View style={styles.quickDangerHeader}>
-                <Badge tone="rose">Deletes selected event data</Badge>
+                <Badge tone="rose">Deletes roster and bracket</Badge>
                 <Badge tone="green">Keeps player accounts</Badge>
               </View>
               <Text style={styles.resetDangerBody}>
-                Clear {tournament?.title || rosterSlug}? This deletes the tournament roster, bracket, schedule override, and hosted event record. Player accounts stay.
+                Clear the roster and bracket for {tournament?.title || rosterSlug}? The event, schedule, registration settings, and player accounts will be preserved.
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                  {clearLoading ? 'Clearing...' : 'Yes, clear tournament'}
+                  {clearLoading ? 'Clearing...' : 'Yes, clear roster and bracket'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel
@@ -3431,6 +3417,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  tournamentScroll: {
+    maxHeight: 240,
+    marginBottom: 12,
+  },
+  tournamentScrollContent: {
+    paddingBottom: 4,
   },
   quickPickerButton: {
     flexBasis: 240,

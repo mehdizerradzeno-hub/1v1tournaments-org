@@ -1126,6 +1126,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
             <>
               <View style={styles.modeRow}>
                 <ActionButton
+                  accessibilityState={{ selected: accountMode === 'create' }}
                   disabled={accountSubmitting}
                   onPress={() => {
                     setAccountMode('create');
@@ -1137,6 +1138,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   New player
                 </ActionButton>
                 <ActionButton
+                  accessibilityState={{ selected: accountMode === 'login' }}
                   disabled={accountSubmitting}
                   onPress={() => {
                     setAccountMode('login');

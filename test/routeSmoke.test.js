@@ -29,6 +29,7 @@ const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
 const indexRouteFile = fileURLToPath(new URL('../app/index.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
+const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
 const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
@@ -608,6 +609,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.ok(existsSync(adminRouteFile));
   assert.ok(existsSync(adminScreenFile));
   const adminScreenSource = readFileSync(adminScreenFile, 'utf8');
+  const homeScreenSource = readFileSync(homeScreenFile, 'utf8');
   const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
 
   assert.match(adminScreenSource, /resetTournamentBracket/);
@@ -620,10 +622,12 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Edit selected event/);
   assert.match(adminScreenSource, /Select tournament/);
   assert.match(adminScreenSource, /Refresh roster/);
-  assert.match(adminScreenSource, /Clear\/delete tournament/);
+  assert.match(adminScreenSource, /Clear roster only/);
+  assert.match(adminScreenSource, /tournamentScrollContent/);
+  assert.match(adminScreenSource, /registration settings, and player accounts will be preserved/);
   assert.match(adminScreenSource, /Lifecycle controls moved up/);
-  assert.match(adminScreenSource, /Yes, clear tournament/);
-  assert.match(adminScreenSource, /deleteTournamentEvent/);
+  assert.match(adminScreenSource, /Yes, clear roster and bracket/);
+  assert.doesNotMatch(homeScreenSource, /HomepageFrontDoor/);
   assert.match(adminScreenSource, /Edit selected tournament/);
   assert.match(adminScreenSource, /Tournament mode/);
   assert.match(adminScreenSource, /TOURNAMENT_MODES/);

@@ -103,7 +103,7 @@ function shortAccountName(account) {
   return name.length > 18 ? `${name.slice(0, 17)}...` : name;
 }
 
-function LinkShell({ href, children, style, accessibilityLabel, onPress, variant = 'primary', external = false, disabled = false }) {
+function LinkShell({ href, children, style, accessibilityLabel, accessibilityState, onPress, variant = 'primary', external = false, disabled = false }) {
   const linkStyles = ({ pressed }) => [
     styles.button,
     variant === 'secondary' && styles.buttonSecondary,
@@ -116,7 +116,7 @@ function LinkShell({ href, children, style, accessibilityLabel, onPress, variant
   if (href && isInternalHref(href) && !external && !disabled) {
     return (
       <Link accessibilityLabel={accessibilityLabel} href={href} asChild>
-        <Pressable accessibilityRole="link" style={linkStyles}>
+        <Pressable accessibilityRole="link" accessibilityState={accessibilityState} style={linkStyles}>
           {children}
         </Pressable>
       </Link>
@@ -127,6 +127,7 @@ function LinkShell({ href, children, style, accessibilityLabel, onPress, variant
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={href ? 'link' : 'button'}
+      accessibilityState={{ ...accessibilityState, disabled }}
       disabled={disabled}
       onPress={() => {
         if (disabled) {
@@ -191,10 +192,11 @@ export function Badge({ children, tone = 'neutral', style }) {
   );
 }
 
-export function ActionButton({ href, onPress, children, variant = 'primary', external = false, style, accessibilityLabel, disabled = false }) {
+export function ActionButton({ href, onPress, children, variant = 'primary', external = false, style, accessibilityLabel, accessibilityState, disabled = false }) {
   return (
     <LinkShell
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityState}
       disabled={disabled}
       external={external}
       href={href}
@@ -1144,6 +1146,8 @@ const styles = StyleSheet.create({
   mobileBottomNavChip: {
     alignItems: 'center',
     borderRadius: 999,
+    minHeight: 48,
+    justifyContent: 'center',
     paddingVertical: 6,
     paddingHorizontal: 4,
     backgroundColor: 'transparent',

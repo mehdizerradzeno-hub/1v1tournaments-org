@@ -282,16 +282,6 @@ export default function HomeScreen() {
       showHero={false}
       subtitle="Free-entry Spades tournaments with account-based signup, hosted brackets, and clear match links."
       title={siteData.site.name}>
-      <HomepageFrontDoor
-        bracket={featuredBracket}
-        matchStatusPath={featuredMatchStatusPath}
-        registrationMeta={featuredRegistrationMeta}
-        signupPath={featuredSignupPath}
-        signupSummary={featuredSignupSummary}
-        tournament={featuredTournament}
-        tournamentPath={featuredTournamentPath}
-      />
-
       <PremiumCountdownHero
         bracket={featuredBracket}
         countdown={featuredCountdown}
@@ -612,116 +602,6 @@ function PremiumDownloadSection() {
         </View>
       </Section>
     </>
-  );
-}
-
-function HomepageFrontDoor({
-  bracket,
-  matchStatusPath,
-  registrationMeta,
-  signupPath,
-  signupSummary,
-  tournament,
-  tournamentPath,
-}) {
-  if (!tournament) {
-    return null;
-  }
-
-  const signups = signupSummary.signups || [];
-  const cap = getRosterCap(tournament);
-  const registeredCount = signupSummary.count || signups.length || 0;
-  const signupLoading = Boolean(signupSummary.loading);
-  const registrationOpen = registrationMeta.value === 'open';
-  const bracketLive = Boolean(bracket);
-  const joinHref = registrationOpen ? signupPath : tournamentPath;
-  const joinLabel = registrationOpen ? 'Join' : 'Event';
-  const joinBody = registrationOpen
-    ? 'Create or open your tournament account and reserve your seat.'
-    : 'Registration is not open, but the event page still shows schedule, roster, and rules.';
-
-  return (
-    <Section
-      description="The homepage now points visitors to the three places they need most on stream day."
-      eyebrow="Start here"
-      nativeID="start-here"
-      title="Choose your next move">
-      <Surface style={styles.frontDoorShell}>
-        <View style={styles.frontDoorHeader}>
-          <View style={styles.frontDoorTitleBlock}>
-            <Badge tone={bracketLive ? 'green' : registrationMeta.tone}>
-              {bracketLive ? 'Bracket live' : registrationMeta.label}
-            </Badge>
-            <Text style={styles.frontDoorTitle}>{tournament.title}</Text>
-            <Text style={styles.frontDoorMeta}>
-              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
-            </Text>
-          </View>
-          <View style={styles.frontDoorCountTile}>
-            <Text style={styles.frontDoorCountLabel}>Signed up</Text>
-            <Text style={styles.frontDoorCountValue}>
-              {signupLoading ? '--' : registeredCount}
-              <Text style={styles.frontDoorCountCap}> / {cap}</Text>
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.frontDoorGrid}>
-          <FrontDoorCard
-            actionLabel="Event"
-            body="See time, roster, bracket, rules, results, and match status in one event page."
-            href={tournamentPath}
-            meta="Next"
-            title="Next tournament"
-            tone="accent"
-          />
-          <FrontDoorCard
-            actionLabel="Watch"
-            body="Open the public stream page with Twitch, roster, and stream-day links."
-            href="/stream"
-            meta="Stream"
-            title="Watch Tournament"
-            tone="blue"
-          />
-          <FrontDoorCard
-            actionLabel={joinLabel}
-            body={joinBody}
-            href={joinHref}
-            meta="Player"
-            title="Join tournament"
-            tone="green"
-          />
-        </View>
-
-        <View style={styles.frontDoorSecondaryRow}>
-          <ActionButton href={matchStatusPath} variant="secondary">
-            My Match
-          </ActionButton>
-          <ActionButton href="/next" variant="secondary">
-            Compact lobby
-          </ActionButton>
-          <ActionButton href="/leaderboard" variant="secondary">
-            Tournament leaderboard
-          </ActionButton>
-          <ActionButton href="/rules" variant="secondary">
-            Rules
-          </ActionButton>
-        </View>
-      </Surface>
-    </Section>
-  );
-}
-
-function FrontDoorCard({ actionLabel, body, href, meta, title, tone }) {
-  return (
-    <Surface style={[styles.frontDoorCard, styles[`frontDoorCard${tone[0].toUpperCase()}${tone.slice(1)}`]]}>
-      <Text style={styles.frontDoorCardMeta}>{meta}</Text>
-      <Text style={styles.frontDoorCardTitle}>{title}</Text>
-      <Text style={styles.frontDoorCardBody}>{body}</Text>
-      <ActionButton href={href} style={styles.frontDoorCardAction}>
-        {actionLabel}
-      </ActionButton>
-    </Surface>
   );
 }
 

@@ -1208,6 +1208,7 @@ function TournamentTabs({ activeTab, onSelectTab }) {
 
         return (
           <ActionButton
+            accessibilityState={{ selected }}
             key={tab.id}
             onPress={() => onSelectTab(tab.id)}
             style={styles.tournamentTabButton}
