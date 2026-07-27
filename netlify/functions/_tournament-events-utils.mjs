@@ -53,19 +53,34 @@ export async function listHostedTournaments() {
   const store = getStoreWithFallback(STORE_NAME);
   const bracketStore = getStoreWithFallback('tournament-brackets');
   const { blobs } = await store.list();
-  const tournaments = await Promise.all(
+  const tournamentReads = await Promise.allSettled(
     blobs.map((blob) => store.get(blob.key, { type: 'json' })),
   );
-  const hydrated = await Promise.all(tournaments.filter(Boolean).map(async (tournament) => {
+  const tournaments = tournamentReads
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value)
+    .filter(Boolean);
+  const hydratedReads = await Promise.allSettled(tournaments.map(async (tournament) => {
     if (!tournament.slug || tournament.deleted) {
       return deriveTournamentLifecycle(tournament);
     }
 
-    const bracket = await bracketStore.get(`${tournament.slug}.json`, { type: 'json' });
+    let bracket = null;
+
+    try {
+      bracket = await bracketStore.get(`${tournament.slug}.json`, { type: 'json' });
+    } catch (error) {
+      console.error(`Tournament bracket hydration failed for ${tournament.slug}`, error);
+    }
+
     return deriveTournamentLifecycle(tournament, bracket);
   }));
 
-  return hydrated.filter(Boolean).sort(byDateAsc);
+  return hydratedReads
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value)
+    .filter(Boolean)
+    .sort(byDateAsc);
 }
 
 export async function loadHostedTournament(tournamentSlug) {

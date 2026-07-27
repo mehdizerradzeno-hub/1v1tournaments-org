@@ -6,6 +6,8 @@ import {
   getActiveOrFutureTournaments,
   getNextFutureTournament,
   getNextPublicTournament,
+  getPublicTournamentCatalog,
+  getPublicTournamentFeedStatus,
   mergeTournamentLists,
   slugifyTournamentTitle,
 } from '../src/lib/tournamentCatalog.js';
@@ -252,6 +254,103 @@ test('completed expired brackets are not treated as upcoming', () => {
     [],
   );
   assert.equal(getNextPublicTournament(tournaments, {}, nowMs), null);
+});
+
+test('API-derived live tournaments stay public before bracket hydration', () => {
+  const tournaments = [
+    createTournamentRecord({
+      title: 'Live Hosted Cup',
+      slug: 'live-hosted-cup',
+      date: '2026-07-10T20:00:00-04:00',
+      status: 'live',
+    }),
+    createTournamentRecord({
+      title: 'Future Cup',
+      slug: 'future-cup',
+      date: '2026-07-24T20:00:00-04:00',
+    }),
+  ];
+  const nowMs = new Date('2026-07-12T12:00:00-04:00').getTime();
+
+  assert.deepEqual(
+    getActiveOrFutureTournaments(tournaments, {}, nowMs).map((tournament) => tournament.slug),
+    ['live-hosted-cup', 'future-cup'],
+  );
+});
+
+test('a completed hydrated bracket overrides a stale live catalog status', () => {
+  const tournament = createTournamentRecord({
+    title: 'Completed Hosted Cup',
+    slug: 'completed-hosted-cup',
+    date: '2026-07-10T20:00:00-04:00',
+    status: 'live',
+  });
+  const nowMs = new Date('2026-07-12T12:00:00-04:00').getTime();
+
+  assert.deepEqual(
+    getActiveOrFutureTournaments(
+      [tournament],
+      {
+        'completed-hosted-cup': {
+          bracket: { status: 'complete' },
+        },
+      },
+      nowMs,
+    ),
+    [],
+  );
+});
+
+test('public catalog merges hosted upcoming and live events over seeded records', () => {
+  const catalog = getPublicTournamentCatalog(
+    [
+      createTournamentRecord({
+        title: 'Expired Seeded Event',
+        slug: 'expired-seeded-event',
+        date: '2026-07-10T20:00:00-04:00',
+      }),
+    ],
+    [
+      {
+        title: 'Rudino Hosted Event',
+        slug: 'rudino-hosted-event',
+        date: '2026-07-29T19:00:00-04:00',
+        status: 'upcoming',
+      },
+      {
+        title: 'Live Hosted Event',
+        slug: 'live-hosted-event',
+        date: '2026-07-11T19:00:00-04:00',
+        status: 'live',
+      },
+      {
+        title: 'Completed Hosted Event',
+        slug: 'completed-hosted-event',
+        date: '2026-07-09T19:00:00-04:00',
+        status: 'complete',
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    catalog.map((tournament) => tournament.slug),
+    ['expired-seeded-event', 'live-hosted-event', 'rudino-hosted-event'],
+  );
+});
+
+test('public tournament feed distinguishes loading, failure, empty, ready, and stale data', () => {
+  assert.equal(getPublicTournamentFeedStatus(), 'loading');
+  assert.equal(getPublicTournamentFeedStatus({ loaded: true, error: 'offline' }), 'error');
+  assert.equal(getPublicTournamentFeedStatus({ loaded: true }), 'empty');
+  assert.equal(getPublicTournamentFeedStatus({ loaded: true, tournament: { slug: 'cup' } }), 'ready');
+  assert.equal(
+    getPublicTournamentFeedStatus({
+      loaded: true,
+      error: 'refresh failed',
+      tournament: { slug: 'cup' },
+    }),
+    'stale',
+  );
 });
 
 test('tournament slugs stay URL safe', () => {

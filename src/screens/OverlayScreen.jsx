@@ -8,7 +8,11 @@ import {
   getUpcomingTournaments,
 } from '../lib/siteData.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
-import { getNextPublicTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import {
+  getNextPublicTournament,
+  getPublicTournamentCatalog,
+  getPublicTournamentFeedStatus,
+} from '../lib/tournamentCatalog.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
@@ -107,10 +111,13 @@ function getOverlayStatusLabel(bracket, registrationMeta) {
 export default function OverlayScreen({ variant = 'full' }) {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
+  const [hostedTournamentState, setHostedTournamentState] = useState({ error: '', loaded: false });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const upcoming = useMemo(
-    () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
-    [hostedTournaments],
+    () => hostedTournamentState.loaded
+      ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
+      : [],
+    [hostedTournaments, hostedTournamentState.loaded],
   );
   const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
   const hydratedUpcoming = sortTournamentsByDate(
@@ -133,28 +140,48 @@ export default function OverlayScreen({ variant = 'full' }) {
   const signups = signupSummary.signups || [];
   const liveCount = hydratedUpcoming.filter((tournament) => eventDataBySlug[tournament.slug]?.bracket).length;
   const eventCount = hydratedUpcoming.length;
+  const feedStatus = getPublicTournamentFeedStatus({
+    error: hostedTournamentState.error,
+    loaded: hostedTournamentState.loaded,
+    tournament: featuredTournament,
+  });
 
   useEffect(() => {
     let active = true;
+    let refreshing = false;
 
     async function loadHostedTournaments() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
       try {
         const result = await fetchTournamentEvents();
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
+          setHostedTournamentState({ error: '', loaded: true });
         }
-      } catch {
+      } catch (error) {
         if (active) {
-          setHostedTournaments([]);
+          setHostedTournamentState({
+            error: error instanceof Error ? error.message : 'Tournament schedule could not be loaded.',
+            loaded: true,
+          });
         }
+      } finally {
+        refreshing = false;
       }
     }
 
     loadHostedTournaments();
+    const refreshTimer = setInterval(loadHostedTournaments, 15000);
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
     };
   }, []);
 
@@ -183,14 +210,9 @@ export default function OverlayScreen({ variant = 'full' }) {
 
           return {
             slug: tournament.slug,
-            settings: settingsResult.status === 'fulfilled' ? settingsResult.value.settings || null : null,
-            bracket: bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null,
-            signupSummary: {
-              count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
-              signups: signupResult.status === 'fulfilled' ? signupResult.value.signups || [] : [],
-              loading: false,
-              unavailable: signupResult.status !== 'fulfilled',
-            },
+            settingsResult,
+            bracketResult,
+            signupResult,
           };
         }),
       );
@@ -199,13 +221,41 @@ export default function OverlayScreen({ variant = 'full' }) {
         return;
       }
 
-      setEventDataBySlug(
-        Object.fromEntries(
-          settled
-            .filter((result) => result.status === 'fulfilled')
-            .map((result) => [result.value.slug, result.value]),
-        ),
-      );
+      setEventDataBySlug((previous) => Object.fromEntries(
+        settled
+          .filter((result) => result.status === 'fulfilled')
+          .map((result) => {
+            const {
+              bracketResult,
+              settingsResult,
+              signupResult,
+              slug,
+            } = result.value;
+            const prior = previous[slug] || {};
+
+            return [slug, {
+              settings: settingsResult.status === 'fulfilled'
+                ? settingsResult.value.settings || null
+                : prior.settings || null,
+              bracket: bracketResult.status === 'fulfilled'
+                ? bracketResult.value.bracket || null
+                : prior.bracket || null,
+              signupSummary: signupResult.status === 'fulfilled'
+                ? {
+                    count: signupResult.value.signupCount || 0,
+                    signups: signupResult.value.signups || [],
+                    loading: false,
+                    unavailable: false,
+                  }
+                : prior.signupSummary || {
+                    count: 0,
+                    signups: [],
+                    loading: false,
+                    unavailable: true,
+                  },
+            }];
+          }),
+      ));
 
       refreshing = false;
     }
@@ -230,11 +280,17 @@ export default function OverlayScreen({ variant = 'full' }) {
   }, []);
 
   if (!featuredTournament) {
+    const emptyTitle = feedStatus === 'loading'
+      ? 'Checking tournament feed'
+      : feedStatus === 'error'
+        ? 'Tournament feed unavailable'
+        : 'Next event loading';
+
     return (
       <View style={styles.overlayRoot}>
         <View style={[styles.overlayShell, variant === 'compact' && styles.compactShell]}>
           <Text style={styles.kicker}>1v1 TOURNAMENTS</Text>
-          <Text style={styles.title}>Next event loading</Text>
+          <Text style={styles.title}>{emptyTitle}</Text>
           <Text style={styles.joinText}>Join: 1v1tournaments.org/next</Text>
         </View>
       </View>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -14,7 +14,17 @@ import { downloadLinks } from '../lib/downloadLinks.js';
 import { formatDateLine } from '../lib/format.js';
 import { getGamePath, getStreams, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 import { buildDefaultStreamCommands } from '../lib/streamCommands.js';
-import { fetchRuntimeHealth, fetchStreamCommands, sendDiscordAlert } from '../lib/tournamentHostingClient.js';
+import {
+  getNextPublicTournament,
+  getPublicTournamentCatalog,
+  getPublicTournamentFeedStatus,
+} from '../lib/tournamentCatalog.js';
+import {
+  fetchRuntimeHealth,
+  fetchStreamCommands,
+  fetchTournamentEvents,
+  sendDiscordAlert,
+} from '../lib/tournamentHostingClient.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -52,12 +62,13 @@ function buildAnnouncementCopy(nextTournament, nextTournamentPath) {
   ];
 }
 
-function buildGoLiveChecklist({ hasDiscord, hasTwitch }) {
+function buildGoLiveChecklist({ eventFeedReady, hasDiscord, hasTwitch }) {
   return [
+    { label: 'Tournament feed', ready: eventFeedReady, value: eventFeedReady ? 'Confirmed' : 'Checking' },
     { label: 'Twitch URL', ready: hasTwitch, value: hasTwitch ? 'Connected' : 'Set TWITCH_URL' },
     { label: 'Discord URL', ready: hasDiscord, value: hasDiscord ? 'Connected' : 'Optional placeholder' },
     { label: 'Overlay URLs', ready: true, value: 'Ready' },
-    { label: 'Announcement copy', ready: true, value: 'Ready' },
+    { label: 'Announcement copy', ready: eventFeedReady, value: eventFeedReady ? 'Ready' : 'Waiting' },
   ];
 }
 
@@ -100,6 +111,22 @@ function getBotHealthMeta(runtimeHealth) {
       : `Last heartbeat ${formatHealthAge(bot.ageSeconds)}. Check Render if commands stop responding.`,
     label: healthy ? 'Online' : 'Check bot',
   };
+}
+
+function getTournamentFeedWarning(feedStatus) {
+  if (feedStatus === 'loading') {
+    return 'Checking the hosted tournament feed before enabling event announcements.';
+  }
+
+  if (feedStatus === 'stale') {
+    return 'Showing the last confirmed tournament. Event announcements stay disabled until the hosted feed refreshes.';
+  }
+
+  if (feedStatus === 'empty') {
+    return 'No upcoming or live hosted tournament is available. Event announcements are disabled.';
+  }
+
+  return 'The hosted tournament feed is unavailable. Event announcements stay disabled until it refreshes.';
 }
 
 const RUN_OF_SHOW = [
@@ -155,16 +182,68 @@ const PRESENTATION_PLAN = [
 
 export default function LiveScreen() {
   const [activeTab, setActiveTab] = useState('control');
+  const [hostedTournaments, setHostedTournaments] = useState([]);
+  const [hostedTournamentState, setHostedTournamentState] = useState({ error: '', loaded: false });
   const [streamCommands, setStreamCommands] = useState({ commands: [], loading: true, error: '', source: 'default' });
   const [runtimeHealth, setRuntimeHealth] = useState({ loading: true, error: '', bot: null, site: null });
   const streams = getStreams();
   const hasTwitch = isConfiguredUrl(downloadLinks.twitch);
   const hasDiscord = isConfiguredUrl(downloadLinks.discord);
-  const upcoming = getUpcomingTournaments();
-  const nextTournament = upcoming[0] || null;
+  const publicTournaments = useMemo(
+    () => hostedTournamentState.loaded
+      ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
+      : [],
+    [hostedTournaments, hostedTournamentState.loaded],
+  );
+  const nextTournament = getNextPublicTournament(publicTournaments);
+  const feedStatus = getPublicTournamentFeedStatus({
+    error: hostedTournamentState.error,
+    loaded: hostedTournamentState.loaded,
+    tournament: nextTournament,
+  });
+  const eventFeedReady = feedStatus === 'ready';
   const nextTournamentPath = nextTournament ? getTournamentPath(nextTournament.slug) : '/next';
-  const announcementItems = buildAnnouncementCopy(nextTournament, nextTournamentPath);
+  const announcementItems = nextTournament ? buildAnnouncementCopy(nextTournament, nextTournamentPath) : [];
   const discordAnnouncement = announcementItems.find((item) => item.label === 'Discord live post')?.text || '';
+
+  useEffect(() => {
+    let active = true;
+    let refreshing = false;
+
+    async function loadHostedTournaments() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
+      try {
+        const result = await fetchTournamentEvents();
+
+        if (active) {
+          setHostedTournaments(result.tournaments || []);
+          setHostedTournamentState({ error: '', loaded: true });
+        }
+      } catch (error) {
+        if (active) {
+          setHostedTournamentState({
+            error: error instanceof Error ? error.message : 'Tournament schedule could not be loaded.',
+            loaded: true,
+          });
+        }
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    loadHostedTournaments();
+    const refreshTimer = setInterval(loadHostedTournaments, 15000);
+
+    return () => {
+      active = false;
+      clearInterval(refreshTimer);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -271,11 +350,18 @@ export default function LiveScreen() {
         streams={streams}
       />
 
+      {eventFeedReady ? null : (
+        <Text style={styles.commandWarning}>
+          {getTournamentFeedWarning(feedStatus)}
+        </Text>
+      )}
+
       <LiveCommandTabs activeTab={activeTab} onSelectTab={setActiveTab} />
 
       {activeTab === 'control' ? (
         <ControlPanel
           discordAnnouncement={discordAnnouncement}
+          eventFeedReady={eventFeedReady}
           hasDiscord={hasDiscord}
           hasTwitch={hasTwitch}
           nextTournament={nextTournament}
@@ -288,7 +374,8 @@ export default function LiveScreen() {
       {activeTab === 'announce' ? (
         <AnnouncePanel
           announcementItems={announcementItems}
-          checklistItems={buildGoLiveChecklist({ hasDiscord, hasTwitch })}
+          checklistItems={buildGoLiveChecklist({ eventFeedReady, hasDiscord, hasTwitch })}
+          eventFeedReady={eventFeedReady}
           hasDiscord={hasDiscord}
         />
       ) : null}
@@ -407,7 +494,14 @@ function LiveCommandTabs({ activeTab, onSelectTab }) {
   );
 }
 
-function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTournament, nextTournamentPath }) {
+function ControlPanel({
+  discordAnnouncement,
+  eventFeedReady,
+  hasDiscord,
+  hasTwitch,
+  nextTournament,
+  nextTournamentPath,
+}) {
   return (
     <>
       <PresentationPlan />
@@ -434,7 +528,11 @@ function ControlPanel({ discordAnnouncement, hasDiscord, hasTwitch, nextTourname
 
       <Section description="The stream-day controls that should stay within reach." title="Control desk">
         <View style={styles.controlGrid}>
-          <DiscordAlertPanel hasDiscord={hasDiscord} message={discordAnnouncement} />
+          <DiscordAlertPanel
+            eventFeedReady={eventFeedReady}
+            hasDiscord={hasDiscord}
+            message={discordAnnouncement}
+          />
           <Surface style={styles.quickPanel}>
             <Text style={styles.quickMeta}>Quick actions</Text>
             <Text style={styles.quickTitle}>Open the important stuff</Text>
@@ -504,7 +602,7 @@ function ObsPanel() {
   );
 }
 
-function AnnouncePanel({ announcementItems, checklistItems, hasDiscord }) {
+function AnnouncePanel({ announcementItems, checklistItems, eventFeedReady, hasDiscord }) {
   return (
     <>
       <LiveTabCommandCard
@@ -521,7 +619,13 @@ function AnnouncePanel({ announcementItems, checklistItems, hasDiscord }) {
       />
 
       <Section description="Copy-ready text for Twitch, Discord, and social posts." nativeID="announcement-kit" title="Announcement kit">
-        <AnnouncementKit items={announcementItems} />
+        {eventFeedReady ? (
+          <AnnouncementKit items={announcementItems} />
+        ) : (
+          <Text style={styles.commandWarning}>
+            Announcement copy will appear after the hosted tournament feed is confirmed.
+          </Text>
+        )}
       </Section>
 
       <Section description="Automated stream-day readiness check for what can be handled from this site." nativeID="go-live-checklist" title="Go-live checklist">
@@ -757,11 +861,20 @@ function CommandCard({ actionLabel, body, external = false, href, meta, title, t
   );
 }
 
-function DiscordAlertPanel({ hasDiscord, message }) {
+function DiscordAlertPanel({ eventFeedReady, hasDiscord, message }) {
   const [sendState, setSendState] = useState({ sending: false, feedback: '', error: '' });
   const [adminToken, setAdminToken] = useState('');
 
   async function handleSendDiscordAlert() {
+    if (!eventFeedReady || !message) {
+      setSendState({
+        sending: false,
+        feedback: '',
+        error: 'Confirm the hosted tournament feed before sending a live alert.',
+      });
+      return;
+    }
+
     setSendState({ sending: true, feedback: '', error: '' });
 
     try {
@@ -817,7 +930,7 @@ function DiscordAlertPanel({ hasDiscord, message }) {
         </Text>
       </View>
       <View style={styles.discordActions}>
-        <ActionButton onPress={handleSendDiscordAlert}>
+        <ActionButton disabled={!eventFeedReady || sendState.sending} onPress={handleSendDiscordAlert}>
           {sendState.sending ? 'Sending...' : 'Send live alert'}
         </ActionButton>
         {hasDiscord ? (
