@@ -215,6 +215,17 @@ function isLiveBracket(bracket) {
   return Boolean(bracket) && bracket.status !== 'complete';
 }
 
+function isLiveTournament(tournament, eventDataBySlug = {}) {
+  const bracket = tournament?.slug ? eventDataBySlug[tournament.slug]?.bracket : null;
+
+  if (bracket) {
+    return hasLiveBracket(tournament, eventDataBySlug);
+  }
+
+  const status = String(tournament?.status || '').trim().toLowerCase();
+  return status === 'live';
+}
+
 function hasLiveBracket(tournament, eventDataBySlug = {}) {
   if (!tournament?.slug) {
     return false;
@@ -225,10 +236,10 @@ function hasLiveBracket(tournament, eventDataBySlug = {}) {
 
 export function getActiveOrFutureTournaments(tournaments = [], eventDataBySlug = {}, nowMs = Date.now()) {
   return [...tournaments]
-    .filter((tournament) => hasLiveBracket(tournament, eventDataBySlug) || isFutureTournament(tournament, nowMs))
+    .filter((tournament) => isLiveTournament(tournament, eventDataBySlug) || isFutureTournament(tournament, nowMs))
     .sort((left, right) => {
-      const leftLive = hasLiveBracket(left, eventDataBySlug);
-      const rightLive = hasLiveBracket(right, eventDataBySlug);
+      const leftLive = isLiveTournament(left, eventDataBySlug);
+      const rightLive = isLiveTournament(right, eventDataBySlug);
 
       if (leftLive && !rightLive) return -1;
       if (!leftLive && rightLive) return 1;
@@ -305,4 +316,21 @@ export function mergeTournamentLists(baseTournaments = [], hostedTournaments = [
     if (!Number.isFinite(rightTime)) return -1;
     return leftTime - rightTime;
   });
+}
+
+export function getPublicTournamentCatalog(baseTournaments = [], hostedTournaments = []) {
+  return mergeTournamentLists(baseTournaments, hostedTournaments)
+    .filter((tournament) => ['upcoming', 'live'].includes(String(tournament?.status || '').toLowerCase()));
+}
+
+export function getPublicTournamentFeedStatus({
+  error = '',
+  loaded = false,
+  tournament = null,
+} = {}) {
+  if (!loaded) return 'loading';
+  if (tournament && error) return 'stale';
+  if (tournament) return 'ready';
+  if (error) return 'error';
+  return 'empty';
 }
