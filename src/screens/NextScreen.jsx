@@ -261,7 +261,7 @@ function absoluteTournamentUrl(path) {
 }
 
 function getQrUrl(value) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(value)}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(value)}`;
 }
 
 function getNextMatchLabel(bracket) {
@@ -511,6 +511,7 @@ function NextLobbyHero({
     : getSeatsMessage(openSeats, signupCount, rosterCap);
   const primaryHref = registrationMeta.value === 'open' ? checkInPath : tournamentPath;
   const primaryLabel = registrationMeta.value === 'open' ? 'Join Tournament' : 'View Event';
+  const appStoreUrl = downloadLinks.appStoreSpades;
   const sponsor = getTournamentSponsor(tournament);
   const countdownKey = `${countdownParts.dayLabel}-${countdownParts.clockLabel}`;
 
@@ -545,6 +546,9 @@ function NextLobbyHero({
               {countdownParts.clockLabel}
             </Text>
           </View>
+          {isPhone ? (
+            <StreamQrGrid appStoreUrl={appStoreUrl} isPhone joinUrl={joinUrl} />
+          ) : null}
           <Text
             dataSet={getMotionDataSet('title')}
             style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}>
@@ -598,6 +602,10 @@ function NextLobbyHero({
         </View>
 
         <View dataSet={getMotionDataSet('card')} style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}>
+          {isPhone ? null : (
+            <StreamQrGrid appStoreUrl={appStoreUrl} isPhone={false} joinUrl={joinUrl} />
+          )}
+
           <View style={styles.eventPanelHeader}>
             <Text style={styles.eventPanelLabel}>Tournament status</Text>
             <Text style={styles.eventPanelMeta}>{tournament.location}</Text>
@@ -674,24 +682,50 @@ function NextLobbyHero({
               ))}
             </View>
           </View>
-
-          <View dataSet={getMotionDataSet('card')} style={styles.qrPanel}>
-            <View style={styles.qrCopy}>
-              <Text style={styles.qrLabel}>Scan to join</Text>
-              <Text numberOfLines={1} style={styles.qrUrl}>{joinUrl}</Text>
-            </View>
-            <View style={styles.qrWrap}>
-              <Image
-                accessibilityLabel="QR code for the next tournament signup"
-                resizeMode="contain"
-                source={{ uri: getQrUrl(joinUrl) }}
-                style={styles.qr}
-              />
-            </View>
-          </View>
         </View>
       </View>
     </Surface>
+  );
+}
+
+function StreamQrGrid({ appStoreUrl, isPhone, joinUrl }) {
+  return (
+    <View style={[styles.heroQrSection, isPhone && styles.heroQrSectionPhone]}>
+      <View style={styles.heroQrHeader}>
+        <Text style={styles.eventPanelLabel}>Scan from your phone</Text>
+        <Text style={styles.eventPanelMeta}>Join the event or get the game</Text>
+      </View>
+
+      <View style={styles.heroQrGrid}>
+        <View style={styles.heroQrCard}>
+          <View style={styles.heroQrWrap}>
+            <Image
+              accessibilityLabel="QR code for the next tournament signup"
+              resizeMode="contain"
+              source={{ uri: getQrUrl(joinUrl) }}
+              style={[styles.heroQr, isPhone && styles.heroQrPhone]}
+            />
+          </View>
+          <Text style={styles.heroQrLabel}>Scan to join</Text>
+          <Text style={styles.heroQrMeta}>Registration and bracket</Text>
+        </View>
+
+        {appStoreUrl ? (
+          <View style={[styles.heroQrCard, styles.heroQrCardApp]}>
+            <View style={styles.heroQrWrap}>
+              <Image
+                accessibilityLabel="QR code for 1v1 Spades on the App Store"
+                resizeMode="contain"
+                source={{ uri: getQrUrl(appStoreUrl) }}
+                style={[styles.heroQr, isPhone && styles.heroQrPhone]}
+              />
+            </View>
+            <Text style={styles.heroQrLabel}>Get 1v1 Spades</Text>
+            <Text style={styles.heroQrMeta}>Apple App Store</Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -894,6 +928,64 @@ const styles = StyleSheet.create({
   heroTextPhone: {
     fontSize: 14,
     lineHeight: 21,
+  },
+  heroQr: {
+    height: 152,
+    width: 152,
+  },
+  heroQrCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.07)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    flexBasis: 180,
+    minWidth: 160,
+    padding: 10,
+  },
+  heroQrCardApp: {
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.34)',
+  },
+  heroQrGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  heroQrHeader: {
+    gap: 4,
+  },
+  heroQrLabel: {
+    color: '#F4EFE6',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
+    marginTop: 9,
+    textAlign: 'center',
+  },
+  heroQrMeta: {
+    color: '#A7A29A',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 15,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  heroQrSection: {
+    gap: 12,
+  },
+  heroQrSectionPhone: {
+    marginTop: 18,
+  },
+  heroQrPhone: {
+    height: 136,
+    width: 136,
+  },
+  heroQrWrap: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 8,
   },
   heroTitle: {
     color: '#F4EFE6',
@@ -1140,43 +1232,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 12,
     overflow: 'hidden',
-  },
-  qr: {
-    height: 96,
-    width: 96,
-  },
-  qrCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
-  qrLabel: {
-    color: '#F4EFE6',
-    fontSize: 15,
-    fontWeight: '900',
-    lineHeight: 20,
-  },
-  qrPanel: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(244, 239, 230, 0.04)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 16,
-    padding: 12,
-  },
-  qrUrl: {
-    color: '#A7A29A',
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
-  },
-  qrWrap: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 8,
   },
   lobbySideRail: {
     flexBasis: 330,
