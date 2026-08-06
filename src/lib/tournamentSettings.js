@@ -294,7 +294,7 @@ export function mergeTournamentSettings(tournament, settings) {
       preview: formatLeadMinutes(checkInLeadMinutes),
       window: registrationStatus === 'open' ? formatLeadWindow(checkInLeadMinutes) : statusMeta.actionCopy,
     },
-    competitionMeta: normalizeCompetitionMeta(settings.competitionMeta || settings.leagueMeta || tournament),
+    competitionMeta: normalizeCompetitionMeta(nextSettings.competitionMeta || nextSettings.leagueMeta || tournament),
     agenda: buildAgenda(tournament, date, timeZone, timeZoneLabel, checkInLeadMinutes),
     liveSettings: settings || null,
   };
