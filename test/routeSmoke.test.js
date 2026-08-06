@@ -21,6 +21,7 @@ const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', imp
 const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
 const streamRouteFile = fileURLToPath(new URL('../app/stream.jsx', import.meta.url));
 const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
+const tournamentsIndexRouteFile = fileURLToPath(new URL('../app/tournaments/index.jsx', import.meta.url));
 const overlayRouteFile = fileURLToPath(new URL('../app/overlay.jsx', import.meta.url));
 const overlayBracketRouteFile = fileURLToPath(new URL('../app/overlay/bracket.jsx', import.meta.url));
 const overlayCompactRouteFile = fileURLToPath(new URL('../app/overlay/compact.jsx', import.meta.url));
@@ -211,6 +212,15 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextScreenSource, /SponsorSoftwareShowcase/);
   assert.match(nextScreenSource, /getSponsorSoftware/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
+});
+
+test('/tournaments stays wired to the public tournament hub instead of the unmatched route', () => {
+  assert.ok(existsSync(tournamentsIndexRouteFile));
+
+  const tournamentsIndexRouteSource = readFileSync(tournamentsIndexRouteFile, 'utf8');
+
+  assert.match(tournamentsIndexRouteSource, /NextScreen/);
+  assert.doesNotMatch(tournamentsIndexRouteSource, /Redirect/);
 });
 
 test('/live stays wired to stream-day command tools', () => {

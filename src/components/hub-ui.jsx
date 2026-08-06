@@ -8,6 +8,7 @@ import { formatPlacement, formatResultDate, formatShortDate } from '../lib/forma
 import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
 import { getNextFutureTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
 import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
+import { useHydrated } from '../lib/useHydrated.js';
 
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
@@ -642,6 +643,7 @@ export function HubScreen({
 }) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
+  const isHydrated = useHydrated();
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
@@ -666,6 +668,10 @@ export function HubScreen({
   const compactHero = heroVariant === 'compact';
 
   useEffect(() => {
+    if (!isHydrated) {
+      return undefined;
+    }
+
     let active = true;
 
     async function loadPlayerAccount(fallbackAccount = null) {
@@ -715,9 +721,13 @@ export function HubScreen({
         globalThis.removeEventListener(PLAYER_ACCOUNT_CHANGED_EVENT, refreshPlayerAccount);
       }
     };
-  }, []);
+  }, [isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) {
+      return undefined;
+    }
+
     let active = true;
 
     async function loadNavTournament() {
@@ -739,7 +749,7 @@ export function HubScreen({
     return () => {
       active = false;
     };
-  }, []);
+  }, [isHydrated]);
 
   return (
     <View style={styles.root}>

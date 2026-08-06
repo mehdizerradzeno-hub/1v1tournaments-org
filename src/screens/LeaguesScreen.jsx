@@ -13,6 +13,7 @@ import {
 import { getGameBySlug } from '../lib/siteData.js';
 import { buildLeagueRecord, nextLeagueMatch, leagueWeekLabel } from '../lib/leagueCatalog.js';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
+import { useHydrated } from '../lib/useHydrated.js';
 import {
   archiveLeague,
   exportLeagueStandingsAction,
@@ -75,6 +76,7 @@ function matchPreviewText(match = null) {
 }
 
 export default function LeaguesScreen() {
+  const isHydrated = useHydrated();
   const [league, setLeague] = useState(null);
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +97,10 @@ export default function LeaguesScreen() {
   const [resultMatchId, setResultMatchId] = useState('');
 
   useEffect(() => {
+    if (!isHydrated) {
+      return undefined;
+    }
+
     let active = true;
 
     async function loadAccount() {
@@ -129,7 +135,7 @@ export default function LeaguesScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isHydrated]);
 
   const membership = useMemo(() => parsePlayerStatus(league, account), [league, account]);
   const nextMatch = useMemo(() => {
