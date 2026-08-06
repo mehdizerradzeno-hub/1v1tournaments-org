@@ -495,6 +495,9 @@ function PremiumCountdownHero({
         <ActionButton href={matchStatusPath} style={styles.heroActionButton} variant="secondary">
           Find my match
         </ActionButton>
+        <ActionButton href="/leagues" style={styles.heroActionButton} variant="secondary">
+          My leagues
+        </ActionButton>
         <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
           View bracket
         </ActionButton>
