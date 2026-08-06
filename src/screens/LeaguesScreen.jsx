@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -108,9 +108,17 @@ export default function LeaguesScreen() {
         const response = await fetch('/.netlify/functions/player-account', { credentials: 'include' });
         const text = await response.text();
         const result = text ? JSON.parse(text) : null;
-        if (active) setAccount(result?.account || null);
+        if (active) {
+          startTransition(() => {
+            setAccount(result?.account || null);
+          });
+        }
       } catch {
-        if (active) setAccount(null);
+        if (active) {
+          startTransition(() => {
+            setAccount(null);
+          });
+        }
       }
     }
 
@@ -119,14 +127,24 @@ export default function LeaguesScreen() {
         const response = await fetchLeagues();
         const records = (response.leagues || []).map((item) => buildLeagueRecord(item));
         if (active) {
-          setLeagues(records);
-          setLeague((previous) => previous ? records.find((item) => item.id === previous.id) || records[0] || null : records[0] || null);
-          setError('');
+          startTransition(() => {
+            setLeagues(records);
+            setLeague((previous) => previous ? records.find((item) => item.id === previous.id) || records[0] || null : records[0] || null);
+            setError('');
+          });
         }
       } catch (nextError) {
-        if (active) setError(normalizeMessage(nextError));
+        if (active) {
+          startTransition(() => {
+            setError(normalizeMessage(nextError));
+          });
+        }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          startTransition(() => {
+            setLoading(false);
+          });
+        }
       }
     }
 

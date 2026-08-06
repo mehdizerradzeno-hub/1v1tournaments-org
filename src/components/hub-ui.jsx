@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, usePathname } from 'expo-router';
@@ -679,15 +679,21 @@ export function HubScreen({
         const result = await fetchPlayerAccount();
 
         if (active) {
-          setPlayerAccount(result.account || fallbackAccount);
+          startTransition(() => {
+            setPlayerAccount(result.account || fallbackAccount);
+          });
         }
       } catch {
         if (active) {
-          setPlayerAccount(fallbackAccount || null);
+          startTransition(() => {
+            setPlayerAccount(fallbackAccount || null);
+          });
         }
       } finally {
         if (active) {
-          setPlayerAccountLoading(false);
+          startTransition(() => {
+            setPlayerAccountLoading(false);
+          });
         }
       }
     }
@@ -698,10 +704,14 @@ export function HubScreen({
 
       if (active) {
         if (hasAccountHint) {
-          setPlayerAccount(accountHint);
-          setPlayerAccountLoading(false);
+          startTransition(() => {
+            setPlayerAccount(accountHint);
+            setPlayerAccountLoading(false);
+          });
         } else {
-          setPlayerAccountLoading(true);
+          startTransition(() => {
+            setPlayerAccountLoading(true);
+          });
         }
       }
 
@@ -735,11 +745,15 @@ export function HubScreen({
         const result = await fetchTournamentEvents();
 
         if (active) {
-          setNavTournamentSlug(getNextNavTournamentSlug(result.tournaments || []));
+          startTransition(() => {
+            setNavTournamentSlug(getNextNavTournamentSlug(result.tournaments || []));
+          });
         }
       } catch {
         if (active) {
-          setNavTournamentSlug(getNextNavTournamentSlug([]));
+          startTransition(() => {
+            setNavTournamentSlug(getNextNavTournamentSlug([]));
+          });
         }
       }
     }
