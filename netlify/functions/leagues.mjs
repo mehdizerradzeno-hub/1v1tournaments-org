@@ -133,7 +133,7 @@ export async function handler(event) {
     if (!targetLeagueId) return json(400, { error: 'Choose a league before joining it.' });
     if (!account) return json(401, { error: 'Create or sign in to a player account before joining a league.' });
 
-    const league = await addLeagueParticipant(targetLeagueId, {
+    const result = await addLeagueParticipant(targetLeagueId, {
       accountId: account.id,
       accountEmail: account.email,
       canonicalAccountId: accountCanonicalId(account),
@@ -142,8 +142,15 @@ export async function handler(event) {
       deactivateOnly: false,
     });
 
-    if (!league) return json(404, { error: 'That league was not found.' });
-    return json(200, { ok: true, league, waitlisted: Boolean(league.waitlisted) });
+    if (!result) return json(404, { error: 'That league was not found.' });
+    if (result.blocked === 'archived') {
+      return json(409, { error: 'That league is archived and no longer accepts join requests.' });
+    }
+    if (result.blocked === 'registration-closed') {
+      return json(409, { error: 'League registration is currently closed.' });
+    }
+
+    return json(200, { ok: true, league: result.league, waitlisted: Boolean(result.waitlisted) });
   }
 
   if (action === 'leave') {

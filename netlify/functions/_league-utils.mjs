@@ -145,11 +145,28 @@ export async function addLeagueParticipant(leagueId, accountIdentity = {}, optio
   const league = await loadLeague(store, leagueId);
   if (!league) return null;
 
+  if (league.status === 'archived') {
+    return {
+      league: withStandings(league),
+      waitlisted: false,
+      blocked: 'archived',
+    };
+  }
+
+  if (league.registrationOpen === false) {
+    return {
+      league: withStandings(league),
+      waitlisted: false,
+      blocked: 'registration-closed',
+    };
+  }
+
   const update = joinLeagueRecord(league, accountIdentity, options);
   if (!update.changed) {
     return {
-      ...withStandings(league),
+      league: withStandings(league),
       waitlisted: update.waitlisted,
+      blocked: null,
     };
   }
 
@@ -162,8 +179,9 @@ export async function addLeagueParticipant(leagueId, accountIdentity = {}, optio
 
   await store.setJSON(leagueKey(league.id), next);
   return {
-    ...withStandings(next),
+    league: withStandings(next),
     waitlisted: update.waitlisted,
+    blocked: null,
   };
 }
 
