@@ -1,5 +1,5 @@
-import LeaguesScreen from '../src/screens/LeaguesScreen.jsx';
+import LeaguesRouteScreen from '../src/screens/LeaguesRouteScreen.jsx';
 
 export default function LeaguesRoute() {
-  return <LeaguesScreen />;
+  return <LeaguesRouteScreen />;
 }

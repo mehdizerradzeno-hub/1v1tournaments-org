@@ -8,15 +8,12 @@ export function useHydrated() {
       return undefined;
     }
 
-    let timeoutId = 0;
-    timeoutId = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       setHydrated(true);
-    }, 2000);
+    }, 0);
 
     return () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
+      window.clearTimeout(timeoutId);
     };
   }, []);
 

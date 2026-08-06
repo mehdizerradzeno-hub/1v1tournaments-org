@@ -21,6 +21,8 @@ const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', imp
 const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
 const streamRouteFile = fileURLToPath(new URL('../app/stream.jsx', import.meta.url));
 const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
+const leaguesRouteFile = fileURLToPath(new URL('../app/leagues.jsx', import.meta.url));
+const adminLeaguesRouteFile = fileURLToPath(new URL('../app/admin/leagues.jsx', import.meta.url));
 const tournamentsIndexRouteFile = fileURLToPath(new URL('../app/tournaments/index.jsx', import.meta.url));
 const overlayRouteFile = fileURLToPath(new URL('../app/overlay.jsx', import.meta.url));
 const overlayBracketRouteFile = fileURLToPath(new URL('../app/overlay/bracket.jsx', import.meta.url));
@@ -38,6 +40,7 @@ const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardS
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const streamModeScreenFile = fileURLToPath(new URL('../src/screens/StreamModeScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
+const leaguesRouteScreenFile = fileURLToPath(new URL('../src/screens/LeaguesRouteScreen.jsx', import.meta.url));
 const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
 const resultsScreenFile = fileURLToPath(new URL('../src/screens/ResultsScreen.jsx', import.meta.url));
 const rulesScreenFile = fileURLToPath(new URL('../src/screens/RulesScreen.jsx', import.meta.url));
@@ -221,6 +224,23 @@ test('/tournaments stays wired to the public tournament hub instead of the unmat
 
   assert.match(tournamentsIndexRouteSource, /NextScreen/);
   assert.doesNotMatch(tournamentsIndexRouteSource, /Redirect/);
+});
+
+test('/leagues routes keep a deterministic loading shell for the first render', () => {
+  assert.ok(existsSync(leaguesRouteFile));
+  assert.ok(existsSync(adminLeaguesRouteFile));
+  assert.ok(existsSync(leaguesRouteScreenFile));
+
+  const leaguesRouteSource = readFileSync(leaguesRouteFile, 'utf8');
+  const adminLeaguesRouteSource = readFileSync(adminLeaguesRouteFile, 'utf8');
+  const leaguesRouteScreenSource = readFileSync(leaguesRouteScreenFile, 'utf8');
+
+  assert.match(leaguesRouteSource, /LeaguesRouteScreen/);
+  assert.match(adminLeaguesRouteSource, /LeaguesRouteScreen/);
+  assert.match(leaguesRouteScreenSource, /useHydrated/);
+  assert.match(leaguesRouteScreenSource, /Loading league data\./);
+  assert.match(leaguesRouteScreenSource, /Please wait while leagues load\./);
+  assert.match(leaguesRouteScreenSource, /LeaguesScreen/);
 });
 
 test('/live stays wired to stream-day command tools', () => {
