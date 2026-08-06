@@ -7,7 +7,6 @@ import {
   generateLeagueSchedule,
   joinLeagueRecord,
   leaveLeagueRecord,
-  normalizeMatchResult,
   promoteFromWaitlist,
   standingsToCsv,
 } from '../../src/lib/leagueCatalog.js';
@@ -20,6 +19,24 @@ function cleanText(value, fallback = '') {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeMatchResult(value = {}) {
+  const homeScore = Number.parseInt(value.homeScore, 10);
+  const awayScore = Number.parseInt(value.awayScore, 10);
+
+  return {
+    winner: cleanText(value.winner, value.winnerId ? 'home' : ''),
+    winnerId: cleanText(value.winnerId),
+    homeScore: Number.isFinite(homeScore) ? String(homeScore) : '0',
+    awayScore: Number.isFinite(awayScore) ? String(awayScore) : '0',
+    tie: Boolean(value.tie),
+    forfeit: Boolean(value.forfeit),
+    noShow: Boolean(value.noShow),
+    dispute: Boolean(value.dispute),
+    source: cleanText(value.source),
+    callbackId: cleanText(value.callbackId),
+  };
 }
 
 function getLeagueStore() {
