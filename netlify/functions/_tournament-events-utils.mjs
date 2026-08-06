@@ -114,9 +114,6 @@ export async function listHostedTournaments() {
       return deriveTournamentLifecycle(hydrateCompetitionContext(tournament));
     }
 
-    const bracket = await bracketStore.get(`${tournament.slug}.json`, { type: 'json' });
-    return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
-    
     let bracket = null;
 
     try {
