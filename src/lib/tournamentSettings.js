@@ -24,6 +24,16 @@ export const REGISTRATION_STATUS_OPTIONS = [
 const DEFAULT_CHECK_IN_LEAD_MINUTES = 30;
 const DEFAULT_TIME_ZONE = 'America/New_York';
 const DEFAULT_TIME_ZONE_LABEL = 'ET';
+const DEFAULT_COMPETITION_MODE = 'tournament';
+const DEFAULT_LEAGUE_COMPETITION_META = Object.freeze({
+  competitionMode: DEFAULT_COMPETITION_MODE,
+  leagueId: null,
+  seasonId: null,
+  scheduleId: null,
+  divisionId: null,
+  venueId: null,
+  matchAssignmentId: null,
+});
 
 function cleanText(value, fallback = '') {
   const text = String(value || '').trim();
@@ -115,6 +125,41 @@ function formatLeadWindow(minutes) {
   }
 
   return `Opens ${minutes} minutes before the start time.`;
+}
+
+function normalizeLeagueText(value, fallback = '') {
+  const text = cleanText(value, '');
+  return text || fallback;
+}
+
+function normalizeCompetitionMeta(value = {}) {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_LEAGUE_COMPETITION_META };
+  }
+
+  const competitionMode = cleanText(value.competitionMode || value.mode).toLowerCase();
+
+  return {
+    ...DEFAULT_LEAGUE_COMPETITION_META,
+    competitionMode: competitionMode === 'league' ? 'league' : DEFAULT_COMPETITION_MODE,
+    leagueId: normalizeLeagueText(value.leagueId, null),
+    seasonId: normalizeLeagueText(value.seasonId, null),
+    scheduleId: normalizeLeagueText(value.scheduleId, null),
+    divisionId: normalizeLeagueText(value.divisionId, null),
+    venueId: normalizeLeagueText(value.venueId, null),
+    matchAssignmentId: normalizeLeagueText(value.matchAssignmentId, null),
+    raw: value.raw && typeof value.raw === 'object' ? value.raw : undefined,
+  };
+}
+
+export function getTournamentCompetitionMode(tournament = {}) {
+  return normalizeCompetitionMeta(
+    tournament?.competitionMeta || tournament?.leagueMeta || {},
+  ).competitionMode;
+}
+
+export function isLeagueTournament(tournament = {}) {
+  return getTournamentCompetitionMode(tournament) === 'league';
 }
 
 function formatCallout(minutes, status) {
@@ -249,6 +294,7 @@ export function mergeTournamentSettings(tournament, settings) {
       preview: formatLeadMinutes(checkInLeadMinutes),
       window: registrationStatus === 'open' ? formatLeadWindow(checkInLeadMinutes) : statusMeta.actionCopy,
     },
+    competitionMeta: normalizeCompetitionMeta(settings.competitionMeta || settings.leagueMeta || tournament),
     agenda: buildAgenda(tournament, date, timeZone, timeZoneLabel, checkInLeadMinutes),
     liveSettings: settings || null,
   };

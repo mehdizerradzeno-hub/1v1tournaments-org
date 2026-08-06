@@ -1,7 +1,28 @@
 const CLOSED_STATUSES = new Set(['archived', 'complete', 'deleted', 'expired', 'live']);
+const DEFAULT_COMPETITION_MODE = 'tournament';
 
 function normalizedStatus(value, fallback = '') {
   return String(value || fallback).trim().toLowerCase();
+}
+
+function normalizeCompetitionMode(value) {
+  return String(value || DEFAULT_COMPETITION_MODE).toLowerCase() === 'league'
+    ? 'league'
+    : DEFAULT_COMPETITION_MODE;
+}
+
+export function getTournamentCompetitionMeta(tournament = {}) {
+  const meta = tournament?.competitionMeta || tournament?.leagueMeta || {};
+  const competitionMode = normalizeCompetitionMode(meta.competitionMode);
+
+  return {
+    ...meta,
+    competitionMode,
+  };
+}
+
+export function isLeagueTournament(tournament = {}) {
+  return getTournamentCompetitionMeta(tournament).competitionMode === 'league';
 }
 
 export function deriveTournamentLifecycle(tournament, bracket = null, now = new Date()) {
@@ -44,6 +65,7 @@ export function deriveTournamentLifecycle(tournament, bracket = null, now = new 
     ...tournament,
     status,
     registrationStatus,
+    competitionMeta: getTournamentCompetitionMeta(tournament),
     lifecycle: {
       reason,
       storedStatus,

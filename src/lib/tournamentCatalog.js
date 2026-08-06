@@ -6,6 +6,18 @@ const DEFAULT_TIME_ZONE_LABEL = 'ET';
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
 const DEFAULT_CHECK_IN_LEAD_MINUTES = 30;
+export const TOURNAMENT_CONTEXT_SCHEMA_VERSION = 1;
+const DEFAULT_COMPETITION_MODE = 'tournament';
+const DEFAULT_COMPETITION_META = Object.freeze({
+  schemaVersion: TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+  competitionMode: DEFAULT_COMPETITION_MODE,
+  leagueId: null,
+  seasonId: null,
+  scheduleId: null,
+  divisionId: null,
+  venueId: null,
+  matchAssignmentId: null,
+});
 
 const DEFAULT_CHECK_IN = {
   title: 'Signup',
@@ -59,6 +71,36 @@ function cleanText(value, fallback = '') {
 
 function cleanShortText(value, fallback = '') {
   return cleanText(value, fallback).slice(0, 160);
+}
+
+function normalizeCompetitionMeta(value = {}) {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_COMPETITION_META };
+  }
+
+  return {
+    ...DEFAULT_COMPETITION_META,
+    competitionMode: value.competitionMode === 'league' ? 'league' : DEFAULT_COMPETITION_MODE,
+    leagueId: cleanShortText(value.leagueId, ''),
+    seasonId: cleanShortText(value.seasonId, ''),
+    scheduleId: cleanShortText(value.scheduleId, ''),
+    divisionId: cleanShortText(value.divisionId, ''),
+    venueId: cleanShortText(value.venueId, ''),
+    matchAssignmentId: cleanShortText(value.matchAssignmentId, ''),
+    schemaVersion: TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+    raw: value.raw && typeof value.raw === 'object' ? value.raw : undefined,
+  };
+}
+
+export function getTournamentCompetitionMode(tournament = {}) {
+  return cleanShortText(
+    (tournament?.competitionMeta || tournament?.leagueMeta)?.competitionMode,
+    DEFAULT_COMPETITION_MODE,
+  );
+}
+
+export function isLeagueTournament(tournament = {}) {
+  return getTournamentCompetitionMode(tournament) === 'league';
 }
 
 function positiveInteger(value, fallback, min = 1, max = 128) {
@@ -171,6 +213,10 @@ export function createTournamentRecord(payload = {}) {
     mode: getTournamentModeValue(mode.value),
     checkInLeadMinutes,
     location: cleanShortText(payload.location, 'Online'),
+    competitionMeta: normalizeCompetitionMeta({
+      ...(payload.competitionMeta || payload.leagueMeta || {}),
+      ...(payload.competitionContext || {}),
+    }),
     format: cleanShortText(payload.format, mode.format),
     rosterCap,
     minimumPlayers,

@@ -103,4 +103,3 @@ export async function handler(event) {
     return json(500, { error: 'Tournament settings storage is not available yet.' });
   }
 }
-

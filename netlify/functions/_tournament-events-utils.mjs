@@ -1,9 +1,57 @@
 import { cleanText, getStoreWithFallback } from './_account-utils.mjs';
-import { createTournamentRecord, slugifyTournamentTitle } from '../../src/lib/tournamentCatalog.js';
+import {
+  TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+  createTournamentRecord,
+  slugifyTournamentTitle,
+} from '../../src/lib/tournamentCatalog.js';
 import { deriveTournamentLifecycle } from '../../src/lib/tournamentLifecycle.js';
 import { siteData } from '../../src/lib/siteData.js';
 
 const STORE_NAME = 'tournament-events';
+
+function normalizeCompetitionMeta(value = {}) {
+  if (!value || typeof value !== 'object') {
+    return {
+      schemaVersion: TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+      competitionMode: 'tournament',
+      leagueId: null,
+      seasonId: null,
+      scheduleId: null,
+      divisionId: null,
+      venueId: null,
+      matchAssignmentId: null,
+    };
+  }
+
+  return {
+    schemaVersion: TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+    competitionMode: value.competitionMode === 'league' ? 'league' : 'tournament',
+    leagueId: cleanText(value.leagueId, ''),
+    seasonId: cleanText(value.seasonId, ''),
+    scheduleId: cleanText(value.scheduleId, ''),
+    divisionId: cleanText(value.divisionId, ''),
+    venueId: cleanText(value.venueId, ''),
+    matchAssignmentId: cleanText(value.matchAssignmentId, ''),
+    raw: value.raw && typeof value.raw === 'object' ? value.raw : undefined,
+  };
+}
+
+function hydrateCompetitionContext(record = {}) {
+  const base = record?.competitionMeta || record?.leagueMeta || {
+    competitionMode: record?.competitionMode,
+    leagueId: record?.leagueId,
+    seasonId: record?.seasonId,
+    scheduleId: record?.scheduleId,
+    divisionId: record?.divisionId,
+    venueId: record?.venueId,
+    matchAssignmentId: record?.matchAssignmentId,
+  };
+
+  return {
+    ...record,
+    competitionMeta: normalizeCompetitionMeta(base),
+  };
+}
 
 function eventKey(tournamentSlug) {
   return `${cleanText(tournamentSlug)}.json`;
@@ -42,6 +90,7 @@ export function normalizeHostedTournament(payload = {}) {
 
   return createTournamentRecord({
     ...payload,
+    competitionMeta: normalizeCompetitionMeta(payload.competitionMeta || payload.leagueMeta || payload),
     slug,
     title,
     date: parsedDate.toISOString(),
@@ -62,9 +111,12 @@ export async function listHostedTournaments() {
     .filter(Boolean);
   const hydratedReads = await Promise.allSettled(tournaments.map(async (tournament) => {
     if (!tournament.slug || tournament.deleted) {
-      return deriveTournamentLifecycle(tournament);
+      return deriveTournamentLifecycle(hydrateCompetitionContext(tournament));
     }
 
+    const bracket = await bracketStore.get(`${tournament.slug}.json`, { type: 'json' });
+    return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
+    
     let bracket = null;
 
     try {
@@ -73,7 +125,7 @@ export async function listHostedTournaments() {
       console.error(`Tournament bracket hydration failed for ${tournament.slug}`, error);
     }
 
-    return deriveTournamentLifecycle(tournament, bracket);
+    return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
   }));
 
   return hydratedReads
@@ -100,7 +152,7 @@ export async function loadHostedTournament(tournamentSlug) {
   const bracketStore = getStoreWithFallback('tournament-brackets');
   const bracket = await bracketStore.get(`${slug}.json`, { type: 'json' });
 
-  return deriveTournamentLifecycle(tournament, bracket);
+  return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
 }
 
 export async function deleteHostedTournament(tournamentSlug) {
@@ -143,6 +195,7 @@ export async function saveHostedTournament(tournament, account = null) {
   const updatedAt = new Date().toISOString();
   const nextTournament = {
     ...tournament,
+    competitionMeta: normalizeCompetitionMeta(tournament?.competitionMeta || tournament?.leagueMeta || {}),
     updatedAt,
     updatedBy: account?.email || 'token',
   };
