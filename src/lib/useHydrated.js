@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 let hydrated = false;
 let hydrationScheduled = false;
 const listeners = new Set();
+let releaseLoadListener = null;
 
 function emitHydrated() {
   if (hydrated) {
@@ -11,6 +12,10 @@ function emitHydrated() {
 
   hydrated = true;
   hydrationScheduled = false;
+  if (releaseLoadListener) {
+    releaseLoadListener();
+    releaseLoadListener = null;
+  }
   listeners.forEach((listener) => listener());
 }
 
@@ -21,12 +26,18 @@ function scheduleHydrated() {
 
   hydrationScheduled = true;
 
-  if (typeof window.requestAnimationFrame === 'function') {
-    window.requestAnimationFrame(() => emitHydrated());
+  const finishHydration = () => {
+    window.setTimeout(() => emitHydrated(), 0);
+  };
+
+  if (typeof document !== 'undefined' && document.readyState === 'complete') {
+    finishHydration();
     return;
   }
 
-  window.setTimeout(() => emitHydrated(), 0);
+  const handleLoad = () => finishHydration();
+  window.addEventListener('load', handleLoad, { once: true });
+  releaseLoadListener = () => window.removeEventListener('load', handleLoad);
 }
 
 function subscribe(callback) {
