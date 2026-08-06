@@ -2,7 +2,10 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { connectLambda, getStore } from '@netlify/blobs';
 
-import { getAccountFromEvent } from './_account-utils.mjs';
+import {
+  accountCanonicalId,
+  getAccountFromEvent,
+} from './_account-utils.mjs';
 import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
@@ -259,6 +262,7 @@ export async function handler(event) {
         ...existing,
         tournamentSlug,
         accountId: account.id,
+        accountCanonicalId: accountCanonicalId(account),
         accountEmail: account.email,
         playerName: existing.playerName || playerName,
         contactEmail,
@@ -313,6 +317,7 @@ export async function handler(event) {
       id: randomUUID(),
       tournamentSlug,
       accountId: account.id,
+      accountCanonicalId: accountCanonicalId(account),
       accountEmail: account.email,
       playerName,
       contactEmail,

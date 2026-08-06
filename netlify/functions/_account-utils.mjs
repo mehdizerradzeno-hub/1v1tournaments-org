@@ -228,12 +228,19 @@ export function publicAccount(account) {
 
   return {
     id: account.id,
+    canonicalAccountId: account.canonicalAccountId || account.id,
     email: account.email,
     playerName: account.playerName,
     playerHandle: account.playerHandle || '',
     emailVerified: account.emailVerified !== false,
     createdAt: account.createdAt,
   };
+}
+
+export function accountCanonicalId(account) {
+  if (!account) return "";
+  const value = typeof account.canonicalAccountId === "string" ? account.canonicalAccountId.trim() : "";
+  return value || String(account.id || "").trim();
 }
 
 export async function getAccountByEmail(email, options = {}) {

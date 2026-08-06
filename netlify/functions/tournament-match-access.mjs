@@ -5,6 +5,7 @@ import { connectLambda } from '@netlify/blobs';
 import {
   cleanEmail,
   cleanText,
+  accountCanonicalId,
   getAccountFromEvent,
   getJsonWithRetry,
   getStoreWithFallback,
@@ -147,6 +148,7 @@ async function saveTicket(ticket, record) {
       matchId: record.matchId,
       tournamentSlug: record.tournamentSlug,
       accountId: record.accountId,
+      accountCanonicalId: record.accountCanonicalId,
       expiresAt: record.expiresAt,
     },
   });
@@ -244,6 +246,7 @@ async function issueTicket(event, payload) {
     matchId,
     tournamentSlug,
     accountId: account.id,
+    accountCanonicalId: accountCanonicalId(account),
     accountEmail: account.email,
     signupId: signup?.id || '',
     playerId: match.players[seatIndex].id,
