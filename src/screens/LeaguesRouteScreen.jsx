@@ -4,7 +4,12 @@ import LeaguesScreen from './LeaguesScreen.jsx';
 
 function LeaguesLoadingShell() {
   return (
-    <HubScreen title="Leagues" subtitle="Loading league data.">
+    <HubScreen
+      showHeader={false}
+      showNavigation={false}
+      stickyActions={false}
+      title="Leagues"
+      subtitle="Loading league data.">
       <EmptyState title="Loading" body="Please wait while leagues load." />
     </HubScreen>
   );

@@ -238,6 +238,9 @@ test('/leagues routes keep a deterministic loading shell for the first render', 
   assert.match(leaguesRouteSource, /LeaguesRouteScreen/);
   assert.match(adminLeaguesRouteSource, /LeaguesRouteScreen/);
   assert.match(leaguesRouteScreenSource, /useHydrated/);
+  assert.match(leaguesRouteScreenSource, /showHeader=\{false\}/);
+  assert.match(leaguesRouteScreenSource, /showNavigation=\{false\}/);
+  assert.match(leaguesRouteScreenSource, /stickyActions=\{false\}/);
   assert.match(leaguesRouteScreenSource, /Loading league data\./);
   assert.match(leaguesRouteScreenSource, /Please wait while leagues load\./);
   assert.match(leaguesRouteScreenSource, /LeaguesScreen/);
