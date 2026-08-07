@@ -144,11 +144,17 @@ export async function sharedIdentityForAccount(account, options = {}) {
   const canonicalAccountId = accountCanonicalId(account);
   if (!canonicalAccountId) return null;
 
+  const storedHandle = cleanText(account.playerHandle);
+  const handle = storedHandle || `player-${createHash('sha256')
+    .update(canonicalAccountId)
+    .digest('hex')
+    .slice(0, 24)}`;
+
   return {
     protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
     canonicalAccountId,
     displayName: cleanText(account.playerName),
-    handle: cleanText(account.playerHandle),
+    handle,
     emailVerified: account.emailVerified !== false,
     aliases: await listAccountAliases(canonicalAccountId, options),
   };
