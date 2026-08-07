@@ -91,9 +91,11 @@ function signupKey(tournamentSlug, contactEmail) {
   return `${tournamentSlug}/${emailKey(contactEmail)}.json`;
 }
 
-function publicSignup(signup, currentAccount = null) {
+export function publicSignup(signup, currentAccount = null) {
   return {
     id: signup.id,
+    accountId: signup.accountId || '',
+    canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
     tournamentSlug: signup.tournamentSlug,
     playerName: signup.playerName,
     playerHandle: signup.playerHandle,
@@ -263,6 +265,7 @@ export async function handler(event) {
         tournamentSlug,
         accountId: account.id,
         accountCanonicalId: accountCanonicalId(account),
+        canonicalAccountId: accountCanonicalId(account),
         accountEmail: account.email,
         playerName: existing.playerName || playerName,
         contactEmail,
@@ -318,6 +321,7 @@ export async function handler(event) {
       tournamentSlug,
       accountId: account.id,
       accountCanonicalId: accountCanonicalId(account),
+      canonicalAccountId: accountCanonicalId(account),
       accountEmail: account.email,
       playerName,
       contactEmail,

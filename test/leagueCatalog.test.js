@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   applyLeagueMatchResult,
+  buildLeagueMatchRoomUrl,
   buildLeagueRecord,
   buildLeagueStandings,
   generateLeagueSchedule,
@@ -155,6 +156,59 @@ test('applyLeagueMatchResult is idempotent for repeated callback IDs', () => {
   assert.equal(second.changed, false);
   assert.equal(second.completeIgnored, true);
   assert.equal(second.duplicate, true);
+});
+
+test('league match launch routing preserves Spades and rejects unconfigured games', () => {
+  assert.equal(
+    buildLeagueMatchRoomUrl({ id: 'league-1', gameSlug: 'spades' }, { id: 'week-1' }),
+    'https://1v1spades.com/match/league-1-week-1',
+  );
+  assert.equal(
+    buildLeagueMatchRoomUrl({ id: 'league-1', gameSlug: 'euchre' }, { id: 'week-1' }),
+    '',
+  );
+  assert.equal(
+    buildLeagueMatchRoomUrl(
+      { id: 'league-1', gameSlug: 'euchre' },
+      { id: 'week-1' },
+      { gameMatchBaseUrls: { euchre: 'https://euchre.example/match/' } },
+    ),
+    'https://euchre.example/match/league-1-week-1',
+  );
+});
+
+test('league results prefer canonical identity when callbacks use a legacy account ID', () => {
+  const result = applyLeagueMatchResult(buildLeagueRecord({
+    id: 'identity-league',
+    matches: [{
+      id: 'match-1',
+      status: 'scheduled',
+      homeTeam: { accountId: 'legacy-home', canonicalAccountId: 'canonical-home', displayName: 'Home' },
+      awayTeam: { accountId: 'legacy-away', canonicalAccountId: 'canonical-away', displayName: 'Away' },
+    }],
+  }), 'match-1', {
+    winner: 'home',
+    winnerId: 'legacy-home',
+    homeScore: 10,
+    awayScore: 5,
+  }, { callbackId: 'canonical-callback' });
+
+  assert.equal(result.match.result.winnerId, 'canonical-home');
+});
+
+test('Euchre schedule generation never silently creates Spades room URLs', () => {
+  const league = generateLeagueSchedule(buildLeagueRecord({
+    id: 'euchre-league',
+    gameSlug: 'euchre',
+    participants: [
+      { accountId: 'one', canonicalAccountId: 'canonical-one', displayName: 'One' },
+      { accountId: 'two', canonicalAccountId: 'canonical-two', displayName: 'Two' },
+    ],
+  }), { weekCount: 1 });
+
+  assert.equal(league.matches[0].roomUrl, '');
+  assert.equal(league.matches[0].homeTeam.accountId.length > 0, true);
+  assert.equal(league.matches[0].homeTeam.canonicalAccountId.length > 0, true);
 });
 
 test('generateLeagueSchedule preserves completed match results on regeneration', () => {

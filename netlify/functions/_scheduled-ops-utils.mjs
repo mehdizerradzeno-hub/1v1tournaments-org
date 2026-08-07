@@ -59,6 +59,7 @@ export function backupStoreNames() {
     'tournament-settings',
     'tournament-signups',
     'tournament-brackets',
+    'shared-account-aliases',
     'sponsor-inquiries',
     'sponsor-prospects',
     'sponsor-outreach-drafts',

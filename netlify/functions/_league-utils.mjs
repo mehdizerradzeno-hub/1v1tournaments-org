@@ -291,7 +291,20 @@ export async function launchLeagueMatch(leagueId, matchId, roomUrl = '', account
   if (index < 0) return null;
 
   const now = nowIso();
-  const nextUrl = cleanText(roomUrl) || buildLeagueMatchRoomUrl(league, matches[index]);
+  const nextUrl = cleanText(roomUrl) || buildLeagueMatchRoomUrl(league, matches[index], {
+    gameMatchBaseUrls: {
+      spades: process.env.SPADES_MATCH_BASE_URL,
+      euchre: process.env.EUCHRE_MATCH_BASE_URL,
+    },
+  });
+
+  if (!nextUrl) {
+    return {
+      ...withStandings(league),
+      launchUnavailable: true,
+      match: matches[index],
+    };
+  }
   matches[index] = {
     ...matches[index],
     roomUrl: nextUrl,

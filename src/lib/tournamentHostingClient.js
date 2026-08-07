@@ -1,3 +1,5 @@
+import { prepareSharedAccountLaunch } from './sharedAccountLaunch.js';
+
 const SIGNUP_ENDPOINT = '/.netlify/functions/tournament-signup';
 const ACCOUNT_ENDPOINT = '/.netlify/functions/player-account';
 const ROSTER_ENDPOINT = '/.netlify/functions/admin-roster';
@@ -407,7 +409,16 @@ export async function issueTournamentMatchTicket({ slug, matchId }) {
     throw new Error(result?.error || 'Match access could not be opened.');
   }
 
-  return result;
+  const accountLaunch = await prepareSharedAccountLaunch({
+    audience: 'spades',
+    destinationUrl: result.roomUrl,
+    requireAccount: true,
+  });
+
+  return {
+    ...result,
+    roomUrl: accountLaunch.url,
+  };
 }
 
 export async function generateTournamentBracket({ token, slug, allowEarly = false }) {

@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ActionButton,
@@ -14,6 +14,7 @@ import { getGameBySlug } from '../lib/siteData.js';
 import { buildLeagueRecord, nextLeagueMatch, leagueWeekLabel } from '../lib/leagueCatalog.js';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
 import { useHydrated } from '../lib/useHydrated.js';
+import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
 import {
   archiveLeague,
   exportLeagueStandingsAction,
@@ -306,12 +307,32 @@ export default function LeaguesScreen() {
     if (!league?.id || !matchId) return;
 
     try {
-      const room = existingRoom || `${window?.location?.origin || 'https://1v1spades.com'}/match/${matchId}`;
-      const result = await launchLeagueMatch({ token: adminToken, leagueId: league.id, matchId, roomUrl: room });
+      const result = await launchLeagueMatch({ token: adminToken, leagueId: league.id, matchId, roomUrl: existingRoom });
       setLeague(buildLeagueRecord(result.league || result));
       setAdminToast('Match room saved.');
     } catch (error) {
       setAdminToast(normalizeMessage(error));
+    }
+  }
+
+  async function handleOpenAssignedMatch(match) {
+    if (!account || !match?.roomUrl) return;
+
+    setActionBusy(true);
+    setActionBusyType(`launch-${match.id}`);
+    setError('');
+    try {
+      await openSharedAccountGame({
+        audience: league?.gameSlug,
+        destinationUrl: match.roomUrl,
+        openUrl: (url) => Linking.openURL(url),
+        requireAccount: true,
+      });
+    } catch (launchError) {
+      setError(normalizeMessage(launchError));
+    } finally {
+      setActionBusy(false);
+      setActionBusyType('');
     }
   }
 
@@ -539,6 +560,13 @@ export default function LeaguesScreen() {
                     {meSeat ? <Text style={styles.listMeta}>You are assigned as {meSeat}</Text> : null}
                     <Text style={styles.listMeta}>Result: {match.result ? `${match.result.homeScore}-${match.result.awayScore}` : 'not reported'}</Text>
                     <View style={styles.actionRow}>
+                      {meSeat && match.roomUrl && match.status !== 'complete' ? (
+                        <ActionButton
+                          disabled={actionBusy}
+                          onPress={() => handleOpenAssignedMatch(match)}>
+                          {actionBusyType === `launch-${match.id}` ? 'Opening...' : 'Launch match'}
+                        </ActionButton>
+                      ) : null}
                       <ActionButton disabled={adminBusy} onPress={() => handleLaunchMatch(match.id, match.roomUrl)} variant="secondary">Set room URL</ActionButton>
                       <ActionButton disabled={adminBusy} onPress={() => {
                         setResultMatchId(match.id);

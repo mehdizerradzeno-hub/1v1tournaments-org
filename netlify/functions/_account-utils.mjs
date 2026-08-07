@@ -98,6 +98,7 @@ export function createSignedSessionToken(session, account) {
     accountCreatedAt: account.createdAt,
     accountEmail: account.email,
     accountId: account.id,
+    canonicalAccountId: accountCanonicalId(account),
     emailVerified: account.emailVerified !== false,
     expiresAt: session.expiresAt,
     playerHandle: account.playerHandle || '',
@@ -360,6 +361,7 @@ export async function getAccountFromEvent(event) {
       email: signedSession.accountEmail,
       emailVerified: signedSession.emailVerified,
       id: signedSession.accountId,
+      canonicalAccountId: signedSession.canonicalAccountId || signedSession.accountId,
       playerHandle: signedSession.playerHandle || '',
       playerName: signedSession.playerName,
     };

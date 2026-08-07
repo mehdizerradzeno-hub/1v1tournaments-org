@@ -11,6 +11,7 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
 
 const SPADES_MATCH_BASE_URL = process.env.SPADES_MATCH_BASE_URL || 'https://1v1spades.com/match';
 const MATCH_TICKET_TTL_MS = 30 * 60 * 1000;
@@ -50,6 +51,8 @@ function publicPlayer(player) {
 
   return {
     id: player.id,
+    accountId: player.accountId || '',
+    canonicalAccountId: player.canonicalAccountId || player.accountId || '',
     seed: player.seed,
     name: player.name,
     handle: player.handle || '',
@@ -72,9 +75,14 @@ function signupMatchesAccount(signup, account) {
   if (!signup || !account) return false;
 
   const accountId = cleanText(account.id);
+  const canonicalAccountId = accountCanonicalId(account);
   const accountEmail = cleanEmail(account.email);
 
   if (accountId && cleanText(signup.accountId) === accountId) {
+    return true;
+  }
+
+  if (canonicalAccountId && cleanText(signup.canonicalAccountId || signup.accountCanonicalId) === canonicalAccountId) {
     return true;
   }
 
@@ -89,6 +97,7 @@ function signupMatchesAccount(signup, account) {
 
 function findPlayerSeat(match, account, signup = null) {
   const accountId = cleanText(account?.id);
+  const canonicalAccountId = accountCanonicalId(account);
   const signupId = cleanText(signup?.id);
   const accountSeatIndex = match.players.findIndex((player) => {
     return player?.accountId && cleanText(player.accountId) === accountId;
@@ -96,6 +105,14 @@ function findPlayerSeat(match, account, signup = null) {
 
   if (accountSeatIndex === 0 || accountSeatIndex === 1) {
     return accountSeatIndex;
+  }
+
+  const canonicalSeatIndex = match.players.findIndex((player) => {
+    return canonicalAccountId && cleanText(player?.canonicalAccountId) === canonicalAccountId;
+  });
+
+  if (canonicalSeatIndex === 0 || canonicalSeatIndex === 1) {
+    return canonicalSeatIndex;
   }
 
   const signupSeatIndex = match.players.findIndex((player) => {
@@ -116,6 +133,7 @@ function ticketMatchesPlayer(player, record) {
 
   return (
     cleanText(player.accountId) === cleanText(record.accountId)
+    || cleanText(player.canonicalAccountId) === cleanText(record.canonicalAccountId || record.accountCanonicalId)
     || (
       cleanText(record.signupId)
       && cleanText(player.id) === cleanText(record.signupId)
@@ -149,6 +167,7 @@ async function saveTicket(ticket, record) {
       tournamentSlug: record.tournamentSlug,
       accountId: record.accountId,
       accountCanonicalId: record.accountCanonicalId,
+      canonicalAccountId: record.canonicalAccountId || record.accountCanonicalId,
       expiresAt: record.expiresAt,
     },
   });
@@ -170,11 +189,12 @@ function roomUrl(matchId, ticket) {
   return url.toString();
 }
 
-function matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord = null }) {
+export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord = null }) {
   const player = match.players[seatIndex];
 
   return {
     ok: true,
+    protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
     matchId: match.id,
     tournamentSlug: bracket.tournamentSlug,
     bracketStatus: bracket.status,
@@ -191,6 +211,12 @@ function matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord = n
     },
     seatIndex,
     player: publicPlayer(player),
+    identity: ticketRecord
+      ? {
+          accountId: ticketRecord.accountId,
+          canonicalAccountId: ticketRecord.canonicalAccountId || ticketRecord.accountCanonicalId || ticketRecord.accountId,
+        }
+      : null,
     expiresAt: ticketRecord?.expiresAt || null,
   };
 }
@@ -247,6 +273,7 @@ async function issueTicket(event, payload) {
     tournamentSlug,
     accountId: account.id,
     accountCanonicalId: accountCanonicalId(account),
+    canonicalAccountId: accountCanonicalId(account),
     accountEmail: account.email,
     signupId: signup?.id || '',
     playerId: match.players[seatIndex].id,

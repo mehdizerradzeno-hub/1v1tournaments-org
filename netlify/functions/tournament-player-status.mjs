@@ -3,6 +3,7 @@ import { connectLambda } from '@netlify/blobs';
 import {
   cleanEmail,
   cleanText,
+  accountCanonicalId,
   getAccountFromEvent,
   getStoreWithFallback,
   publicAccount,
@@ -28,6 +29,8 @@ function publicSignup(signup) {
 
   return {
     id: signup.id,
+    accountId: signup.accountId || '',
+    canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
     tournamentSlug: signup.tournamentSlug,
     playerName: signup.playerName,
     playerHandle: signup.playerHandle || '',
@@ -41,6 +44,8 @@ function publicPlayer(player) {
 
   return {
     id: player.id,
+    accountId: player.accountId || '',
+    canonicalAccountId: player.canonicalAccountId || player.accountId || '',
     seed: player.seed,
     name: player.name,
     handle: player.handle || '',
@@ -151,9 +156,14 @@ function signupMatchesAccount(signup, account) {
   if (!signup || !account) return false;
 
   const accountId = cleanText(account.id);
+  const canonicalAccountId = accountCanonicalId(account);
   const accountEmail = cleanEmail(account.email);
 
   if (accountId && cleanText(signup.accountId) === accountId) {
+    return true;
+  }
+
+  if (canonicalAccountId && cleanText(signup.canonicalAccountId || signup.accountCanonicalId) === canonicalAccountId) {
     return true;
   }
 

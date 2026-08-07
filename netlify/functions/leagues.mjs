@@ -212,6 +212,12 @@ export async function handler(event) {
 
     const league = await launchLeagueMatch(targetLeagueId, matchId, payload.roomUrl, adminCheck.account);
     if (!league) return json(404, { error: 'That league or match was not found.' });
+    if (league.launchUnavailable) {
+      return json(409, {
+        error: 'Match launch is not configured for this league game yet. Add a verified room URL or configure the game service.',
+        gameSlug: league.gameSlug,
+      });
+    }
     return json(200, { ok: true, league, match: league.match || null });
   }
 

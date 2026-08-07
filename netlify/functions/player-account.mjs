@@ -112,8 +112,10 @@ async function createAccount(payload) {
   }
 
   const now = new Date().toISOString();
+  const accountId = `acct_${randomUUID()}`;
   const account = {
-    id: `acct_${randomUUID()}`,
+    id: accountId,
+    canonicalAccountId: accountId,
     email,
     playerName,
     playerHandle,

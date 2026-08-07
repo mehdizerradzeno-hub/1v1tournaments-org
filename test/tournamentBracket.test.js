@@ -13,6 +13,7 @@ function signup(index, name) {
   return {
     id: `signup-${index}`,
     accountId: `account-${index}`,
+    canonicalAccountId: `canonical-account-${index}`,
     playerName: name,
     playerHandle: `p${index}`,
     contactEmail: `player${index}@example.com`,
@@ -65,6 +66,7 @@ test('4-player double-elimination bracket advances winners, losers, and reset fi
 
   assert.equal(bracket.format, 'four-player-double-elimination');
   assert.equal(bracket.participantCount, 4);
+  assert.equal(bracket.participants[0].canonicalAccountId, 'canonical-account-1');
   assert.equal(bracket.rounds.length, 5);
   assert.equal(findMatch(bracket, 'friends-test-r1-m1').status, 'ready');
   assert.equal(findMatch(bracket, 'friends-test-r1-m2').status, 'ready');
@@ -183,4 +185,25 @@ test('3-player two-life bracket rotates waiting player and tracks lives', () => 
   assert.equal(bracket.status, 'complete');
   assert.equal(bracket.winner.name, 'Alex (p1)');
   assert.equal(bracket.standings.find((standing) => standing.name.startsWith('Blake')).status, 'out');
+});
+
+test('repeated tournament winner callbacks do not advance or count a result twice', () => {
+  const bracket = buildThreePlayerTwoLifeBracket({
+    tournamentSlug: 'three-life-idempotent',
+    signups: [
+      signup(1, 'Alex'),
+      signup(2, 'Blake'),
+      signup(3, 'Casey'),
+    ],
+  });
+  const match = findMatch(bracket, 'three-life-idempotent-r1-m1');
+  const winnerPlayer = match.players[0];
+
+  setMatchWinner(bracket, match, winnerPlayer);
+  const livesAfterFirstCallback = bracket.standings.find((standing) => standing.id === match.loserId)?.lives;
+  setMatchWinner(bracket, match, winnerPlayer);
+
+  assert.equal(match.status, 'final');
+  assert.equal(match.winnerId, winnerPlayer.id);
+  assert.equal(bracket.standings.find((standing) => standing.id === match.loserId)?.lives, livesAfterFirstCallback);
 });

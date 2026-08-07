@@ -80,6 +80,7 @@ function publicParticipant(signup, index) {
   return {
     id: signup.id,
     accountId: signup.accountId || '',
+    canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
     seed: index + 1,
     name: signup.playerName,
     handle: signup.playerHandle || '',
@@ -159,6 +160,10 @@ function placePlayerInMatch(bracket, matchId, slot, player) {
 }
 
 export function setMatchWinner(bracket, match, player) {
+  if (match.status === 'final' && match.winnerId === player?.id) {
+    return;
+  }
+
   if (bracket.format === 'three-player-two-life') {
     setThreePlayerTwoLifeMatchWinner(bracket, match, player);
     return;
@@ -607,6 +612,8 @@ function publicBracket(bracket) {
     ...bracket,
     participants: bracket.participants.map((participant) => ({
       id: participant.id,
+      accountId: participant.accountId || '',
+      canonicalAccountId: participant.canonicalAccountId || participant.accountId || '',
       seed: participant.seed,
       name: participant.name,
       handle: participant.handle || '',
@@ -619,6 +626,8 @@ function publicBracket(bracket) {
           player
             ? {
                 id: player.id,
+                accountId: player.accountId || '',
+                canonicalAccountId: player.canonicalAccountId || player.accountId || '',
                 seed: player.seed,
                 name: player.name,
                 handle: player.handle || '',
@@ -653,6 +662,8 @@ function publicMatchDetails(bracket, matchId) {
             player
               ? {
                   id: player.id,
+                  accountId: player.accountId || '',
+                  canonicalAccountId: player.canonicalAccountId || player.accountId || '',
                   seed: player.seed,
                   name: player.name,
                   handle: player.handle || '',

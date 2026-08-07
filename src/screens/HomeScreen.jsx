@@ -16,6 +16,7 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
 import { APP_STORE_BADGE_URL, downloadLinks } from '../lib/downloadLinks.js';
+import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
 import {
   buildResultFromTournamentBracket,
   getGameBySlug,
@@ -534,7 +535,7 @@ function PremiumCountdownHero({
           label="Download 1v1 Spades on the App Store"
           large
         />
-        <PremiumLinkButton href={downloadLinks.webSpades} label="Play on the Web" />
+        <PremiumLinkButton gameAudience="spades" href={downloadLinks.webSpades} label="Play on the Web" />
         <PremiumLinkButton href={downloadLinks.twitch} label="Twitch" />
         <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
         <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
@@ -739,7 +740,7 @@ function PremiumGameDownloadCard({ game }) {
       <Text style={styles.downloadGameBody}>{game.body}</Text>
       <View style={styles.downloadButtonStack}>
         <AppStoreBadgeButton href={game.appStoreUrl} label={`Download ${game.title} on the App Store`} />
-        <PremiumLinkButton href={game.webUrl} label="Play on Web" />
+        <PremiumLinkButton gameAudience={game.key} href={game.webUrl} label="Play on Web" />
       </View>
     </Surface>
   );
@@ -771,25 +772,51 @@ function AppStoreBadgeButton({ href, label, large = false }) {
   );
 }
 
-function PremiumLinkButton({ href, label }) {
+function PremiumLinkButton({ href, label, gameAudience = '' }) {
   const enabled = isConfiguredUrl(href);
+  const [launching, setLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState('');
+
+  async function handlePress() {
+    if (!gameAudience) {
+      openExternalUrl(href);
+      return;
+    }
+
+    setLaunching(true);
+    setLaunchError('');
+    try {
+      await openSharedAccountGame({
+        audience: gameAudience,
+        destinationUrl: href,
+        openUrl: (url) => Linking.openURL(url),
+      });
+    } catch (error) {
+      setLaunchError(error instanceof Error ? error.message : 'Game launch failed. Try again.');
+    } finally {
+      setLaunching(false);
+    }
+  }
 
   return (
-    <Pressable
-      accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
-      accessibilityRole={enabled ? 'link' : 'button'}
-      disabled={!enabled}
-      onPress={() => openExternalUrl(href)}
-      style={({ hovered, pressed }) => [
-        styles.premiumLinkButton,
-        !enabled && styles.premiumLinkButtonDisabled,
-        hovered && enabled && styles.downloadHover,
-        pressed && enabled && styles.downloadPressed,
-      ]}>
-      <Text style={[styles.premiumLinkButtonText, !enabled && styles.premiumLinkButtonTextDisabled]}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={styles.premiumLinkGroup}>
+      <Pressable
+        accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
+        accessibilityRole={enabled ? 'link' : 'button'}
+        disabled={!enabled || launching}
+        onPress={handlePress}
+        style={({ hovered, pressed }) => [
+          styles.premiumLinkButton,
+          !enabled && styles.premiumLinkButtonDisabled,
+          hovered && enabled && styles.downloadHover,
+          pressed && enabled && styles.downloadPressed,
+        ]}>
+        <Text style={[styles.premiumLinkButtonText, !enabled && styles.premiumLinkButtonTextDisabled]}>
+          {launching ? 'Opening...' : label}
+        </Text>
+      </Pressable>
+      {launchError ? <Text style={styles.gameLaunchError}>{launchError}</Text> : null}
+    </View>
   );
 }
 
@@ -1402,6 +1429,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     transitionDuration: '160ms',
     transitionProperty: 'transform, opacity, background-color, border-color',
+  },
+  premiumLinkGroup: {
+    alignItems: 'flex-start',
+    maxWidth: 280,
+  },
+  gameLaunchError: {
+    color: '#FCA5A5',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
   },
   premiumLinkButtonDisabled: {
     backgroundColor: 'rgba(244, 239, 230, 0.05)',

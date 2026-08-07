@@ -370,12 +370,29 @@ export function promoteFromWaitlist(record, identity = {}) {
   return { league: { ...league, participants: players }, changed: true };
 }
 
-export function buildLeagueMatchRoomUrl(league, match) {
+export function buildLeagueMatchRoomUrl(league, match, options = {}) {
   const leagueId = cleanText(league?.id || league?.leagueId);
   const matchId = cleanText(match?.id);
+  const gameSlug = cleanGame(match?.gameSlug || league?.gameSlug);
+  const configuredPrefixes = options.gameMatchBaseUrls || {};
+  const roomPrefix = cleanText(
+    configuredPrefixes[gameSlug] || (gameSlug === 'spades' ? DEFAULT_ROOM_PREFIX : ''),
+  ).replace(/\/$/, '');
 
-  if (!matchId) return '';
-  return `${DEFAULT_ROOM_PREFIX}/${leagueId}-${matchId}`;
+  if (!matchId || !roomPrefix) return '';
+  return `${roomPrefix}/${leagueId}-${matchId}`;
+}
+
+function canonicalMatchIdentity(match, winnerId) {
+  const value = cleanText(winnerId);
+  if (!value) return '';
+
+  const teams = [match.homeTeam, match.awayTeam].filter(Boolean);
+  const team = teams.find((candidate) => (
+    cleanText(candidate.canonicalAccountId) === value
+    || cleanText(candidate.accountId) === value
+  ));
+  return cleanText(team?.canonicalAccountId || value);
 }
 
 function resultSignature(result = {}) {
@@ -424,7 +441,7 @@ export function applyLeagueMatchResult(league, matchId, result = {}, options = {
     ...(existing.result || {}),
     ...normalized,
     winner: normalized.winner || existing.result?.winner || '',
-    winnerId: normalized.winnerId || existing.result?.winnerId || '',
+    winnerId: canonicalMatchIdentity(existing, normalized.winnerId) || existing.result?.winnerId || '',
     source: cleanText(normalized.source || existing.result?.source || options.source),
     completedAt: normalized.completedAt || new Date().toISOString(),
     callbackId: callbackId || existing.result?.callbackId,
@@ -469,6 +486,18 @@ export function applyLeagueMatchResult(league, matchId, result = {}, options = {
 function ensureParticipantName(record, participantId) {
   const match = record.participants.find((player) => player.canonicalAccountId === participantId || player.accountId === participantId);
   return cleanText(match?.displayName, 'TBD');
+}
+
+function participantMatchIdentity(record, participantId) {
+  const participant = record.participants.find((player) => (
+    player.canonicalAccountId === participantId || player.accountId === participantId
+  ));
+
+  return {
+    canonicalAccountId: cleanText(participant?.canonicalAccountId || participantId),
+    accountId: cleanText(participant?.accountId),
+    displayName: cleanText(participant?.displayName || 'TBD'),
+  };
 }
 
 export function buildLeagueStandings(league) {
@@ -702,10 +731,10 @@ export function generateLeagueSchedule(league, options = {}) {
         status: existingMatch?.status === 'complete' ? 'complete' : 'scheduled',
         homePlayerId: home,
         awayPlayerId: away,
-        homeTeam: { canonicalAccountId: home, accountId: '', displayName: ensureParticipantName(record, home) },
-        awayTeam: { canonicalAccountId: away, accountId: '', displayName: ensureParticipantName(record, away) },
+        homeTeam: participantMatchIdentity(record, home),
+        awayTeam: participantMatchIdentity(record, away),
         venue: record.venue?.name || 'online',
-        roomUrl: existingMatch?.roomUrl || `${DEFAULT_ROOM_PREFIX}/${matchId}`,
+        roomUrl: existingMatch?.roomUrl || buildLeagueMatchRoomUrl(record, { id: matchId, gameSlug: record.gameSlug }),
         roomLaunchedAt: existingMatch?.roomLaunchedAt || '',
         result: existingMatch?.status === 'complete' && existingMatch?.result ? existingMatch.result : null,
         resultHistory: existingMatch?.resultHistory || [],
