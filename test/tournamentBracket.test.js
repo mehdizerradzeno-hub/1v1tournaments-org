@@ -187,7 +187,7 @@ test('3-player two-life bracket rotates waiting player and tracks lives', () => 
   assert.equal(bracket.standings.find((standing) => standing.name.startsWith('Blake')).status, 'out');
 });
 
-test('repeated tournament winner callbacks do not advance or count a result twice', () => {
+test('repeated or conflicting tournament winner callbacks cannot change a final result', () => {
   const bracket = buildThreePlayerTwoLifeBracket({
     tournamentSlug: 'three-life-idempotent',
     signups: [
@@ -198,12 +198,19 @@ test('repeated tournament winner callbacks do not advance or count a result twic
   });
   const match = findMatch(bracket, 'three-life-idempotent-r1-m1');
   const winnerPlayer = match.players[0];
+  const conflictingPlayer = match.players[1];
 
   setMatchWinner(bracket, match, winnerPlayer);
   const livesAfterFirstCallback = bracket.standings.find((standing) => standing.id === match.loserId)?.lives;
+  const nextMatchPlayersAfterFirstCallback = findMatch(bracket, 'three-life-idempotent-r1-m2').players.map((player) => player?.id || null);
   setMatchWinner(bracket, match, winnerPlayer);
+  setMatchWinner(bracket, match, conflictingPlayer);
 
   assert.equal(match.status, 'final');
   assert.equal(match.winnerId, winnerPlayer.id);
   assert.equal(bracket.standings.find((standing) => standing.id === match.loserId)?.lives, livesAfterFirstCallback);
+  assert.deepEqual(
+    findMatch(bracket, 'three-life-idempotent-r1-m2').players.map((player) => player?.id || null),
+    nextMatchPlayersAfterFirstCallback,
+  );
 });

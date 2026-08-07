@@ -12,9 +12,17 @@ import {
   publicAccount,
 } from './_account-utils.mjs';
 import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
+import {
+  TOURNAMENT_MATCH_TICKET_TTL_MS,
+  TournamentGameContractError,
+  assertTournamentTicketAccess,
+  buildTournamentLaunchUrl,
+  normalizeTournamentGame,
+  tournamentSeat,
+} from './_tournament-game-contract.mjs';
 
 const SPADES_MATCH_BASE_URL = process.env.SPADES_MATCH_BASE_URL || 'https://1v1spades.com/match';
-const MATCH_TICKET_TTL_MS = 30 * 60 * 1000;
+const EUCHRE_MATCH_BASE_URL = process.env.EUCHRE_MATCH_BASE_URL || '';
 const MATCH_ID_RE = /^([a-z0-9]+(?:-[a-z0-9]+)*)-r([1-9]\d*)-m([1-9]\d*)$/i;
 
 const headers = {
@@ -42,7 +50,7 @@ function tournamentSlugFromMatchId(matchId) {
   return match ? match[1] : '';
 }
 
-function ticketKey(ticket) {
+export function ticketKey(ticket) {
   return `${createHash('sha256').update(ticket).digest('hex')}.json`;
 }
 
@@ -126,21 +134,6 @@ function findPlayerSeat(match, account, signup = null) {
   return -1;
 }
 
-function ticketMatchesPlayer(player, record) {
-  if (!player || cleanText(player.id) !== cleanText(record.playerId)) {
-    return false;
-  }
-
-  return (
-    cleanText(player.accountId) === cleanText(record.accountId)
-    || cleanText(player.canonicalAccountId) === cleanText(record.canonicalAccountId || record.accountCanonicalId)
-    || (
-      cleanText(record.signupId)
-      && cleanText(player.id) === cleanText(record.signupId)
-    )
-  );
-}
-
 async function loadTournamentSignups(tournamentSlug) {
   const store = getStoreWithFallback('tournament-signups');
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
@@ -183,19 +176,16 @@ async function deleteTicket(ticket) {
   await store.delete(ticketKey(ticket));
 }
 
-function roomUrl(matchId, ticket) {
-  const url = new URL(`${SPADES_MATCH_BASE_URL}/${matchId}`);
-  url.searchParams.set('ticket', ticket);
-  return url.toString();
-}
-
 export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord = null }) {
   const player = match.players[seatIndex];
+  const game = normalizeTournamentGame(bracket.gameSlug || ticketRecord?.game || 'spades');
 
   return {
     ok: true,
     protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
     matchId: match.id,
+    game,
+    tournamentId: bracket.tournamentSlug,
     tournamentSlug: bracket.tournamentSlug,
     bracketStatus: bracket.status,
     round: {
@@ -210,6 +200,9 @@ export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRec
       players: match.players.map(publicPlayer),
     },
     seatIndex,
+    seat: ticketRecord?.seat || tournamentSeat(game, seatIndex),
+    roomId: ticketRecord?.roomId || match.id,
+    participantIds: match.players.filter(Boolean).map((participant) => participant.id),
     player: publicPlayer(player),
     identity: ticketRecord
       ? {
@@ -243,6 +236,7 @@ async function issueTicket(event, payload) {
   }
 
   const { round, match } = matchLookup;
+  const game = normalizeTournamentGame(bracket.gameSlug || 'spades');
 
   if (match.status === 'final') {
     return json(409, { error: 'This match already has a final result.' });
@@ -268,7 +262,28 @@ async function issueTicket(event, payload) {
 
   const now = Date.now();
   const ticket = randomBytes(32).toString('base64url');
+  let launchUrl;
+
+  try {
+    launchUrl = buildTournamentLaunchUrl({
+      game,
+      matchId,
+      ticket,
+      spadesBaseUrl: SPADES_MATCH_BASE_URL,
+      euchreBaseUrl: EUCHRE_MATCH_BASE_URL,
+    });
+  } catch (error) {
+    if (error instanceof TournamentGameContractError) {
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+
+    throw error;
+  }
+
   const record = {
+    protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
+    game,
+    tournamentId: tournamentSlug,
     matchId,
     tournamentSlug,
     accountId: account.id,
@@ -278,8 +293,11 @@ async function issueTicket(event, payload) {
     signupId: signup?.id || '',
     playerId: match.players[seatIndex].id,
     seatIndex,
+    seat: tournamentSeat(game, seatIndex),
+    roomId: match.id,
+    participantIds: match.players.filter(Boolean).map((participant) => participant.id),
     issuedAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + MATCH_TICKET_TTL_MS).toISOString(),
+    expiresAt: new Date(now + TOURNAMENT_MATCH_TICKET_TTL_MS).toISOString(),
   };
 
   await saveTicket(ticket, record);
@@ -288,7 +306,7 @@ async function issueTicket(event, payload) {
     ...matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }),
     account: publicAccount(account),
     ticket,
-    roomUrl: roomUrl(matchId, ticket),
+    roomUrl: launchUrl,
   });
 }
 
@@ -306,15 +324,6 @@ async function verifyTicket(payload) {
     return json(401, { error: 'This match ticket was not found. Open the match from 1v1 Tournaments again.' });
   }
 
-  if (new Date(record.expiresAt).getTime() <= Date.now()) {
-    await deleteTicket(ticket).catch(() => {});
-    return json(401, { error: 'This match ticket expired. Open the match from 1v1 Tournaments again.' });
-  }
-
-  if (requestedMatchId && requestedMatchId !== record.matchId) {
-    return json(403, { error: 'This match ticket belongs to a different match.' });
-  }
-
   const bracket = await loadBracket(record.tournamentSlug);
   const matchLookup = findMatch(bracket, record.matchId);
 
@@ -326,12 +335,29 @@ async function verifyTicket(payload) {
   const seatIndex = Number(record.seatIndex);
   const player = seatIndex === 0 || seatIndex === 1 ? match.players[seatIndex] : null;
 
-  if (!ticketMatchesPlayer(player, record)) {
-    return json(403, { error: 'This match ticket no longer matches the bracket assignment.' });
-  }
+  try {
+    assertTournamentTicketAccess({
+      record,
+      bracket,
+      match,
+      player,
+      request: {
+        matchId: requestedMatchId,
+        game: payload.game,
+        canonicalAccountId: payload.canonicalAccountId,
+        seat: payload.seat,
+      },
+    });
+  } catch (error) {
+    if (error instanceof TournamentGameContractError) {
+      if (error.code === 'expired_ticket') {
+        await deleteTicket(ticket).catch(() => {});
+      }
 
-  if (match.status === 'final') {
-    return json(409, { error: 'This match already has a final result.' });
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+
+    throw error;
   }
 
   return json(200, matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }));

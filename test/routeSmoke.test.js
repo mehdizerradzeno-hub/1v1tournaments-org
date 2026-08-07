@@ -490,7 +490,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentMatchAccessSource, /issue-ticket/);
   assert.match(tournamentMatchAccessSource, /verify-ticket/);
   assert.match(tournamentMatchAccessSource, /findSignupForAccount/);
-  assert.match(tournamentMatchAccessSource, /ticketMatchesPlayer/);
+  assert.match(tournamentMatchAccessSource, /assertTournamentTicketAccess/);
   assert.match(tournamentMatchAccessSource, /signupId/);
   assert.match(tournamentMatchAccessSource, /getJsonWithRetry/);
   assert.doesNotMatch(tournamentMatchAccessSource, /consistency: 'strong'/);

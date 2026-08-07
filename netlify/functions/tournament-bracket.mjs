@@ -9,6 +9,12 @@ import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
 import { normalizeCheckInLeadMinutes } from '../../src/lib/tournamentSettings.js';
+import {
+  TOURNAMENT_GAME_PROTOCOL_VERSION,
+  TournamentGameContractError,
+  normalizeTournamentGame,
+  normalizeTournamentResultCallback,
+} from './_tournament-game-contract.mjs';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
@@ -96,7 +102,11 @@ function adminParticipant(signup, index) {
   };
 }
 
-function roomUrl(tournamentSlug, roundIndex, matchIndex) {
+function roomUrl(tournamentSlug, roundIndex, matchIndex, gameSlug = 'spades') {
+  if (normalizeTournamentGame(gameSlug) !== 'spades') {
+    return '';
+  }
+
   return `${SPADES_MATCH_BASE_URL}/${tournamentSlug}-r${roundIndex}-m${matchIndex}`;
 }
 
@@ -160,7 +170,7 @@ function placePlayerInMatch(bracket, matchId, slot, player) {
 }
 
 export function setMatchWinner(bracket, match, player) {
-  if (match.status === 'final' && match.winnerId === player?.id) {
+  if (match.status === 'final') {
     return;
   }
 
@@ -285,7 +295,8 @@ function initializeByes(bracket) {
   });
 }
 
-export function buildBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+export function buildBracket({ tournamentSlug, signups, includeAdminFields = false, gameSlug = 'spades' }) {
+  const normalizedGame = normalizeTournamentGame(gameSlug);
   const sortedSignups = [...signups].sort((left, right) => {
     const leftDate = new Date(left.createdAt || 0).getTime();
     const rightDate = new Date(right.createdAt || 0).getTime();
@@ -320,7 +331,7 @@ export function buildBracket({ tournamentSlug, signups, includeAdminFields = fal
           winnerName: '',
           nextMatchId,
           nextSlot: matchIndex % 2 === 1 ? 0 : 1,
-          roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex),
+          roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex, normalizedGame),
         };
       }),
     });
@@ -336,8 +347,8 @@ export function buildBracket({ tournamentSlug, signups, includeAdminFields = fal
     tournamentSlug,
     status: 'published',
     format: 'single-elimination',
-    gameSlug: 'spades',
-    matchBaseUrl: SPADES_MATCH_BASE_URL,
+    gameSlug: normalizedGame,
+    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
     participantCount: participants.length,
     participants,
     rounds,
@@ -351,7 +362,8 @@ export function buildBracket({ tournamentSlug, signups, includeAdminFields = fal
   return bracket;
 }
 
-export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields = false, gameSlug = 'spades' }) {
+  const normalizedGame = normalizeTournamentGame(gameSlug);
   const sortedSignups = [...signups].sort((left, right) => {
     const leftDate = new Date(left.createdAt || 0).getTime();
     const rightDate = new Date(right.createdAt || 0).getTime();
@@ -378,7 +390,7 @@ export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signup
     loserNextSlot,
     resetMatchId,
     resetOnWinnerSlot,
-    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex),
+    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex, normalizedGame),
   });
 
   const rounds = [
@@ -482,8 +494,8 @@ export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signup
     tournamentSlug,
     status: 'published',
     format: 'four-player-double-elimination',
-    gameSlug: 'spades',
-    matchBaseUrl: SPADES_MATCH_BASE_URL,
+    gameSlug: normalizedGame,
+    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
     participantCount: participants.length,
     participants,
     rounds,
@@ -493,7 +505,8 @@ export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signup
   };
 }
 
-export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields = false }) {
+export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields = false, gameSlug = 'spades' }) {
+  const normalizedGame = normalizeTournamentGame(gameSlug);
   const sortedSignups = [...signups].sort((left, right) => {
     const leftDate = new Date(left.createdAt || 0).getTime();
     const rightDate = new Date(right.createdAt || 0).getTime();
@@ -518,7 +531,7 @@ export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includ
     loserName: '',
     nextMatchId: null,
     nextSlot: null,
-    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex),
+    roomUrl: roomUrl(tournamentSlug, roundIndex, matchIndex, normalizedGame),
   });
 
   const rounds = [
@@ -578,8 +591,8 @@ export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includ
     tournamentSlug,
     status: 'published',
     format: 'three-player-two-life',
-    gameSlug: 'spades',
-    matchBaseUrl: SPADES_MATCH_BASE_URL,
+    gameSlug: normalizedGame,
+    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
     participantCount: participants.length,
     participants,
     standings: participants.map((participant) => ({
@@ -675,11 +688,25 @@ function publicMatchDetails(bracket, matchId) {
           endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
           method: 'POST',
           tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
-          bodyTemplate: {
-            action: 'report-winner',
-            matchId,
-            winnerId: 'winner-player-id-from-this-match',
-          },
+          bodyTemplate: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'
+            ? {
+                action: 'report-result',
+                protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
+                game: 'euchre',
+                tournamentId: bracket.tournamentSlug,
+                matchId,
+                completionId: 'authoritative-euchre-completion-id',
+                winnerParticipantId: 'winner-participant-id-from-this-match',
+                winnerCanonicalAccountId: 'winner-canonical-account-id-from-this-match',
+                scores: { north: 10, south: 0 },
+                forfeit: false,
+                forfeitReason: '',
+              }
+            : {
+                action: 'report-winner',
+                matchId,
+                winnerId: 'winner-player-id-from-this-match',
+              },
         },
       };
     }
@@ -808,6 +835,89 @@ async function reportWinnerWithRetry(tournamentSlug, matchId, winnerId) {
   return { error: json(409, { error: 'The bracket changed while saving this result. Try reporting the winner again.' }) };
 }
 
+export function applyAuthoritativeTournamentResult(bracket, result, now = new Date()) {
+  const game = normalizeTournamentGame(bracket?.gameSlug || 'spades');
+
+  if (game !== result.game) {
+    throw new TournamentGameContractError(409, 'This result belongs to a different game.', 'wrong_game');
+  }
+
+  const match = findMatch(bracket, result.matchId);
+
+  if (!match) {
+    throw new TournamentGameContractError(404, 'That match was not found in this bracket.', 'match_not_found');
+  }
+
+  const winner = match.players.find((player) => player?.id === result.winnerParticipantId);
+
+  if (!winner) {
+    throw new TournamentGameContractError(400, 'The winner is not assigned to this match.', 'wrong_player');
+  }
+
+  const winnerCanonicalAccountId = cleanText(winner.canonicalAccountId || winner.accountId);
+
+  if (winnerCanonicalAccountId !== result.winnerCanonicalAccountId) {
+    throw new TournamentGameContractError(403, 'The winner identity does not match the bracket assignment.', 'wrong_identity');
+  }
+
+  if (match.status === 'final') {
+    if (match.winnerId === winner.id) {
+      return { duplicate: true, match };
+    }
+
+    throw new TournamentGameContractError(409, 'This match already has a different final result.', 'conflicting_result');
+  }
+
+  setMatchWinner(bracket, match, winner);
+  match.completion = {
+    protocolVersion: result.protocolVersion,
+    game: result.game,
+    completionId: result.completionId,
+    winnerParticipantId: result.winnerParticipantId,
+    winnerCanonicalAccountId: result.winnerCanonicalAccountId,
+    scores: result.scores,
+    forfeit: result.forfeit,
+    forfeitReason: result.forfeitReason,
+    completedAt: now.toISOString(),
+  };
+
+  return { duplicate: false, match };
+}
+
+async function reportAuthoritativeResultWithRetry(tournamentSlug, result) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const loaded = await loadBracketWithMetadata(tournamentSlug);
+
+    if (!loaded) {
+      return { error: json(404, { error: 'Generate a bracket before reporting results.' }) };
+    }
+
+    let applied;
+
+    try {
+      applied = applyAuthoritativeTournamentResult(loaded.bracket, result);
+    } catch (error) {
+      if (error instanceof TournamentGameContractError) {
+        return { error: json(error.statusCode, { error: error.message, code: error.code }) };
+      }
+
+      throw error;
+    }
+
+    if (applied.duplicate) {
+      return { bracket: loaded.bracket, duplicate: true };
+    }
+
+    const savedBracket = await saveBracket(loaded.bracket, { onlyIfMatch: loaded.etag });
+
+    if (savedBracket.modified !== false) {
+      return { bracket: savedBracket, duplicate: false };
+    }
+  }
+
+  return { error: json(409, { error: 'The bracket changed while saving this result. Try reporting it again.' }) };
+}
+
 async function requireAdmin(event) {
   const adminCheck = await requireTournamentAdmin(event);
 
@@ -838,6 +948,21 @@ async function requireMatchReporter(event) {
   }
 
   return { error: json(401, { error: 'Enter the tournament match result token or sign in with a host-approved account.' }) };
+}
+
+function requireAuthoritativeGameReporter(event) {
+  const matchResultToken = getMatchResultToken();
+  const bearerToken = getBearerToken(event);
+
+  if (!matchResultToken) {
+    return { error: json(503, { error: 'Tournament match result token is not configured on Netlify.' }) };
+  }
+
+  if (bearerToken !== matchResultToken) {
+    return { error: json(401, { error: 'This authoritative game result is not authorized.' }) };
+  }
+
+  return { ok: true, method: 'match-result-token' };
 }
 
 export async function handler(event) {
@@ -941,10 +1066,10 @@ export async function handler(event) {
       }
 
       const bracket = tournamentMode.value === 'four-player-double-elimination'
-        ? buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields: true })
+        ? buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug })
         : tournamentMode.value === 'three-player-two-life'
-          ? buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields: true })
-          : buildBracket({ tournamentSlug, signups, includeAdminFields: true });
+          ? buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug })
+          : buildBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug });
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });
@@ -978,6 +1103,39 @@ export async function handler(event) {
       }
 
       return json(200, { ok: true, bracket: result.bracket });
+    }
+
+    if (payload.action === 'report-result') {
+      const reporterCheck = requireAuthoritativeGameReporter(event);
+
+      if (reporterCheck.error) {
+        return reporterCheck.error;
+      }
+
+      let normalizedResult;
+
+      try {
+        normalizedResult = normalizeTournamentResultCallback(payload, tournamentSlug);
+      } catch (error) {
+        if (error instanceof TournamentGameContractError) {
+          return json(error.statusCode, { error: error.message, code: error.code });
+        }
+
+        throw error;
+      }
+
+      const result = await reportAuthoritativeResultWithRetry(tournamentSlug, normalizedResult);
+
+      if (result.error) {
+        return result.error;
+      }
+
+      return json(200, {
+        ok: true,
+        protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
+        duplicate: result.duplicate,
+        bracket: result.bracket,
+      });
     }
 
     return json(400, { error: 'Choose a supported bracket action.' });
