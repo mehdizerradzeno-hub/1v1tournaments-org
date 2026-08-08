@@ -21,6 +21,7 @@ import {
   SPADES_ACCOUNT_DESTINATION,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../lib/spadesAccountConnect.js';
+import { resolveAccountConnectMode, runAccountHandoffOnce } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
 
 function inputProps(setValue) {
@@ -33,7 +34,15 @@ function inputProps(setValue) {
   };
 }
 
-export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
+export function GameAccountConnectScreen({
+  initialMode = 'signin',
+  gameName = 'Spades',
+  badgeLabel = '1V1 SPADES',
+  destination = SPADES_ACCOUNT_DESTINATION,
+  accountActions = SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
+  prepareReturn = prepareSpadesAccountReturn,
+  signedOutManageFallback = false,
+}) {
   const [mode, setMode] = useState(initialMode);
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +66,12 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
       .then((result) => {
         if (!active) return;
         setAccount(result.account || null);
-        if (result.account) setMode('manage');
+        if (result.account || (initialMode === 'manage' && signedOutManageFallback)) {
+          setMode(resolveAccountConnectMode(initialMode, {
+            hasAccount: Boolean(result.account),
+            signedOutManageFallback,
+          }));
+        }
       })
       .catch(() => {
         if (active) setAccount(null);
@@ -68,7 +82,7 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialMode, signedOutManageFallback]);
 
   const selectMode = (nextMode) => {
     setMode(nextMode);
@@ -77,21 +91,20 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
     if (nextMode !== 'reset') setRecoveryRequested(false);
   };
 
-  const returnToSpades = async () => {
-    if (handoffStartedRef.current) return;
-    handoffStartedRef.current = true;
+  const returnToGame = async () => {
     setSubmitting(true);
     setError('');
     try {
-      const launch = await prepareSpadesAccountReturn();
-      if (!launch.authorized || typeof globalThis.location?.assign !== 'function') {
-        throw new Error('Spades authorization could not be opened.');
-      }
-      globalThis.location.assign(launch.url);
+      await runAccountHandoffOnce(handoffStartedRef, async () => {
+        const launch = await prepareReturn();
+        if (!launch.authorized || typeof globalThis.location?.assign !== 'function') {
+          throw new Error(`${gameName} authorization could not be opened.`);
+        }
+        globalThis.location.assign(launch.url);
+      });
     } catch (handoffError) {
-      handoffStartedRef.current = false;
       setSubmitting(false);
-      setError(handoffError instanceof Error ? handoffError.message : 'Spades authorization could not be opened.');
+      setError(handoffError instanceof Error ? handoffError.message : `${gameName} authorization could not be opened.`);
     }
   };
 
@@ -101,7 +114,7 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
     try {
       const result = await loginPlayerAccount({ contactEmail, password });
       setAccount(result.account || null);
-      await returnToSpades();
+      await returnToGame();
     } catch (signInError) {
       setSubmitting(false);
       setError(signInError instanceof Error ? signInError.message : 'Sign in could not be completed.');
@@ -124,7 +137,7 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
         confirmPassword,
       });
       setAccount(result.account || null);
-      await returnToSpades();
+      await returnToGame();
     } catch (createError) {
       setSubmitting(false);
       setError(createError instanceof Error ? createError.message : 'Account creation could not be completed.');
@@ -185,12 +198,12 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.heading}>
-        <Badge tone="accent">1V1 SPADES</Badge>
+        <Badge tone="accent">{badgeLabel}</Badge>
         <Text style={styles.title}>{account ? 'Manage Account' : 'Connect your shared account'}</Text>
         <Text style={styles.subtitle}>
           {account
             ? 'Your verified 1v1 account is ready to return to Spades.'
-            : 'Sign in, create an account, or reset your password without leaving the Spades app.'}
+            : `Sign in, create an account, or reset your password without leaving the ${gameName} app.`}
         </Text>
       </View>
 
@@ -199,14 +212,14 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
           <>
             <Text style={styles.sectionTitle}>{account.playerName || 'Shared 1v1 account'}</Text>
             <Text style={styles.muted}>{account.email || 'Account identity verified'}</Text>
-            <ActionButton disabled={submitting} onPress={returnToSpades}>
-              {submitting ? 'Connecting...' : 'Continue to Spades'}
+            <ActionButton disabled={submitting} onPress={returnToGame}>
+              {submitting ? 'Connecting...' : `Continue to ${gameName}`}
             </ActionButton>
           </>
         ) : (
           <>
             <View style={styles.actionRow}>
-              {SPADES_SIGNED_OUT_ACCOUNT_ACTIONS.map((action) => (
+              {accountActions.map((action) => (
                 <ActionButton
                   accessibilityState={{ selected: mode === action.id }}
                   disabled={submitting}
@@ -281,13 +294,17 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <ActionButton
-          onPress={() => globalThis.location?.assign?.(SPADES_ACCOUNT_DESTINATION)}
+          onPress={() => globalThis.location?.assign?.(destination)}
           variant="ghost">
-          Cancel and return to Spades
+          Cancel and return to {gameName}
         </ActionButton>
       </Surface>
     </ScrollView>
   );
+}
+
+export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
+  return <GameAccountConnectScreen initialMode={initialMode} />;
 }
 
 const styles = StyleSheet.create({
