@@ -8,6 +8,7 @@ import {
   openSharedAccountGame,
   prepareSharedAccountLaunch,
 } from '../src/lib/sharedAccountLaunch.js';
+import { issueTournamentMatchTicket } from '../src/lib/tournamentHostingClient.js';
 
 function response(status, body) {
   return {
@@ -75,6 +76,45 @@ test('tournament launch preserves ticket and URL-encodes a distinct account code
   assert.equal(url.searchParams.get('ticket'), 'tournament-ticket');
   assert.equal(url.searchParams.get('sharedAccountCode'), 'account+code/with?symbols=');
   assert.match(launch.url, /sharedAccountCode=account%2Bcode%2Fwith%3Fsymbols%3D/);
+});
+
+test('tournament match launch authorizes the game returned by match access', async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    for (const game of ['spades', 'euchre']) {
+      const requests = [];
+      globalThis.fetch = async (endpoint, options) => {
+        const body = JSON.parse(options.body);
+        requests.push({ endpoint, body });
+
+        if (body.action === 'issue-ticket') {
+          return response(201, {
+            game,
+            roomUrl: `https://${game}.example/play?ticket=opaque-ticket`,
+          });
+        }
+
+        return issueResponse(game, `${game}-account-code`);
+      };
+
+      const launch = await issueTournamentMatchTicket({
+        slug: 'controlled-smoke',
+        matchId: 'controlled-smoke-r1-m1',
+      });
+
+      assert.deepEqual(requests.map((request) => request.body.action), [
+        'issue-ticket',
+        'issue-game-authorization',
+      ]);
+      assert.equal(requests[1].endpoint, SHARED_ACCOUNT_ENDPOINT);
+      assert.equal(requests[1].body.audience, game);
+      assert.equal(new URL(launch.roomUrl).searchParams.get('ticket'), 'opaque-ticket');
+      assert.equal(new URL(launch.roomUrl).searchParams.get('sharedAccountCode'), `${game}-account-code`);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('signed-out normal launch retains guest behavior without fabricating identity claims', async () => {

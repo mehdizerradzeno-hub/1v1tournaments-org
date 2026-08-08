@@ -410,7 +410,7 @@ export async function issueTournamentMatchTicket({ slug, matchId }) {
   }
 
   const accountLaunch = await prepareSharedAccountLaunch({
-    audience: 'spades',
+    audience: result.game,
     destinationUrl: result.roomUrl,
     requireAccount: true,
   });
