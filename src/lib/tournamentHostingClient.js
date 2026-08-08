@@ -8,6 +8,7 @@ const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
+const EUCHRE_PILOT_ENDPOINT = '/.netlify/functions/tournament-pilot';
 const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
 const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
 const HEALTH_ENDPOINT = '/.netlify/functions/health';
@@ -203,6 +204,63 @@ export async function fetchTournamentEvents({ slug } = {}) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Tournament events could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchEuchrePilot({ token, slug }) {
+  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+  const response = await fetch(`${EUCHRE_PILOT_ENDPOINT}${query}`, {
+    credentials: 'include',
+    headers: adminHeaders(token),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Invited Euchre pilot readiness could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function configureEuchrePilot({ token, slug, capacity, invitedCanonicalAccountIds }) {
+  const response = await fetch(EUCHRE_PILOT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      action: 'configure',
+      tournamentSlug: slug,
+      capacity,
+      invitedCanonicalAccountIds,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Invited Euchre pilot could not be configured.');
+  }
+
+  return result;
+}
+
+export async function setEuchrePilotCheckIn({ token, slug, canonicalAccountId, checkedIn }) {
+  const response = await fetch(EUCHRE_PILOT_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      action: 'set-check-in',
+      tournamentSlug: slug,
+      canonicalAccountId,
+      checkedIn,
+    }),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player check-in could not be updated.');
   }
 
   return result;

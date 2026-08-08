@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildBracket,
   buildFourPlayerDoubleEliminationBracket,
   buildThreePlayerTwoLifeBracket,
   checkInOpenStatus,
@@ -51,6 +52,24 @@ test('4-player double-elimination bracket requires exactly four players', () => 
     tournamentSlug: 'friends-test',
     signups: [signup(1, 'One'), signup(2, 'Two'), signup(3, 'Three')],
   }), /exactly four registered players/);
+});
+
+test('8-player invited Euchre pilot builds seven deterministic single-elimination matches', () => {
+  const bracket = buildBracket({
+    tournamentSlug: 'euchre-pilot-eight',
+    gameSlug: 'euchre',
+    includeAdminFields: true,
+    signups: Array.from({ length: 8 }, (_, index) => signup(index + 1, `Player ${index + 1}`)),
+  });
+
+  assert.equal(bracket.gameSlug, 'euchre');
+  assert.equal(bracket.participantCount, 8);
+  assert.equal(bracket.rounds.length, 3);
+  assert.equal(bracket.rounds.flatMap((round) => round.matches).length, 7);
+  assert.equal(bracket.rounds[0].matches.every((match) => match.status === 'ready'), true);
+  assert.equal(bracket.rounds[0].matches[0].id, 'euchre-pilot-eight-r1-m1');
+  assert.equal(bracket.rounds[2].matches[0].id, 'euchre-pilot-eight-r3-m1');
+  assert.equal(bracket.participants.every((participant) => participant.canonicalAccountId), true);
 });
 
 test('4-player double-elimination bracket advances winners, losers, and reset final', () => {

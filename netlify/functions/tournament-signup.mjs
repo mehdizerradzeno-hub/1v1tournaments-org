@@ -7,7 +7,9 @@ import {
   getAccountFromEvent,
 } from './_account-utils.mjs';
 import { loadHostedTournament } from './_tournament-events-utils.mjs';
+import { loadEuchrePilotPolicy } from './_euchre-pilot-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
+import { evaluateEuchrePilotSignupAccess } from '../../src/lib/euchrePilot.js';
 import { siteData } from '../../src/lib/siteData.js';
 
 const MAX_FIELD_LENGTH = 500;
@@ -257,6 +259,19 @@ export async function handler(event) {
       ? null
       : await store.get(legacyEmailKey, { type: 'json' });
     const existing = existingByAccount || existingByLegacyEmail;
+    const pilotPolicy = await loadEuchrePilotPolicy(tournamentSlug);
+    const pilotAccess = evaluateEuchrePilotSignupAccess(
+      pilotPolicy,
+      accountCanonicalId(account),
+      {
+        existing: Boolean(existing),
+        signupCount: (await loadTournamentSignups(store, tournamentSlug)).length,
+      },
+    );
+
+    if (!pilotAccess.allowed) {
+      return json(403, { error: pilotAccess.message, code: pilotAccess.code });
+    }
 
     if (existing) {
       const now = new Date().toISOString();

@@ -59,6 +59,7 @@ function groupSignups(signups) {
       id: signup.id,
       tournamentSlug: signup.tournamentSlug,
       accountId: signup.accountId || '',
+      canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
       accountEmail: signup.accountEmail || '',
       playerName: signup.playerName,
       contactEmail: signup.contactEmail,

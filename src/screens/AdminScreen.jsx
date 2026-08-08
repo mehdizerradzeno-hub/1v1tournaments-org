@@ -2810,6 +2810,18 @@ export default function AdminScreen() {
 
       {renderHostRunSection()}
 
+      <Section
+        description="Keep public Euchre discovery off while a host runs a 4- or 8-player canonical-account pilot."
+        title="Invited Euchre pilot">
+        <Surface style={styles.panel}>
+          <View style={styles.metaRow}>
+            <Badge tone="accent">Host only</Badge>
+            <Text style={styles.metaText}>Configure admissions, attendance, assignments, results, and recovery guidance in the isolated pilot console.</Text>
+          </View>
+          <ActionButton href="/admin/euchre-pilot">Open Euchre pilot console</ActionButton>
+        </Surface>
+      </Section>
+
       {renderLiveRosterSection()}
 
       {renderBracketManagerSection()}
