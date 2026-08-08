@@ -9,6 +9,7 @@ import {
   getPublicTournamentCatalog,
   getPublicTournamentFeedStatus,
   mergeTournamentLists,
+  normalizeTournamentGameSlug,
   slugifyTournamentTitle,
 } from '../src/lib/tournamentCatalog.js';
 import { canGenerateTournamentMode, getTournamentMode, TOURNAMENT_MODES } from '../src/lib/tournamentModes.js';
@@ -29,6 +30,16 @@ test('hosted tournament records get the full public page shape from simple input
   assert.equal(tournament.status, 'upcoming');
   assert.equal(tournament.links[0].href, '/tournaments/spades-friday-night-cup');
   assert.match(tournament.bracketFlexPolicy, /Advertised 16-player bracket/);
+});
+
+test('tournament game defaults to Spades and preserves explicit canonical games', () => {
+  assert.equal(normalizeTournamentGameSlug(), 'spades');
+  assert.equal(normalizeTournamentGameSlug('spades'), 'spades');
+  assert.equal(normalizeTournamentGameSlug('euchre'), 'euchre');
+  assert.equal(normalizeTournamentGameSlug('hearts'), 'spades');
+  assert.equal(createTournamentRecord({ title: 'Legacy event' }).gameSlug, 'spades');
+  assert.equal(createTournamentRecord({ title: 'Spades event', gameSlug: 'spades' }).gameSlug, 'spades');
+  assert.equal(createTournamentRecord({ title: 'Euchre event', gameSlug: 'euchre' }).gameSlug, 'euchre');
 });
 
 test('generated bracket policy copy updates when hosted event capacity changes', () => {

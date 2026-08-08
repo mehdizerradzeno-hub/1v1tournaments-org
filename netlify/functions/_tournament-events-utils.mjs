@@ -1,7 +1,9 @@
 import { cleanText, getStoreWithFallback } from './_account-utils.mjs';
 import {
   TOURNAMENT_CONTEXT_SCHEMA_VERSION,
+  TOURNAMENT_GAME_SLUGS,
   createTournamentRecord,
+  normalizeTournamentGameSlug,
   slugifyTournamentTitle,
 } from '../../src/lib/tournamentCatalog.js';
 import { deriveTournamentLifecycle } from '../../src/lib/tournamentLifecycle.js';
@@ -49,6 +51,7 @@ function hydrateCompetitionContext(record = {}) {
 
   return {
     ...record,
+    gameSlug: normalizeTournamentGameSlug(record?.gameSlug),
     competitionMeta: normalizeCompetitionMeta(base),
   };
 }
@@ -75,6 +78,7 @@ export function normalizeHostedTournament(payload = {}) {
   const slug = slugifyTournamentTitle(payload.slug || title);
   const date = cleanText(payload.date || payload.startAt);
   const parsedDate = new Date(date);
+  const requestedGameSlug = cleanText(payload.gameSlug);
 
   if (!title) {
     return { error: 'Enter a tournament title before saving.' };
@@ -88,8 +92,13 @@ export function normalizeHostedTournament(payload = {}) {
     return { error: 'Enter a valid tournament date and time.' };
   }
 
+  if (requestedGameSlug && !TOURNAMENT_GAME_SLUGS.includes(requestedGameSlug)) {
+    return { error: 'Tournament game must be spades or euchre.' };
+  }
+
   return createTournamentRecord({
     ...payload,
+    gameSlug: requestedGameSlug || 'spades',
     competitionMeta: normalizeCompetitionMeta(payload.competitionMeta || payload.leagueMeta || payload),
     slug,
     title,

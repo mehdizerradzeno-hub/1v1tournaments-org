@@ -99,8 +99,12 @@ test('pilot admin route and private host endpoint exist without changing public 
   const siteData = fileURLToPath(new URL('../src/lib/siteData.js', import.meta.url));
 
   assert.equal(existsSync(route), true);
-  assert.match(readFileSync(endpoint, 'utf8'), /requireTournamentAdmin/);
-  assert.match(readFileSync(endpoint, 'utf8'), /roomConnectionTelemetry: false/);
+  const endpointSource = readFileSync(endpoint, 'utf8');
+
+  assert.match(endpointSource, /requireTournamentAdmin/);
+  assert.match(endpointSource, /roomConnectionTelemetry: false/);
+  assert.match(endpointSource, /tournament\.gameSlug !== 'euchre'/);
+  assert.match(endpointSource, /only be attached to an Euchre tournament/);
   assert.match(readFileSync(signup, 'utf8'), /evaluateEuchrePilotSignupAccess/);
   assert.match(readFileSync(siteData, 'utf8'), /Current tournament operations are Spades-only/);
 });

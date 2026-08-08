@@ -695,6 +695,10 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Edit selected tournament/);
   assert.match(adminScreenSource, /Tournament mode/);
   assert.match(adminScreenSource, /TOURNAMENT_MODES/);
+  assert.match(adminScreenSource, /TOURNAMENT_GAME_OPTIONS/);
+  assert.match(adminScreenSource, /setEventGameSlug\('spades'\)/);
+  assert.match(adminScreenSource, /setEventGameSlug\(normalizeTournamentGameSlug\(tournament\.gameSlug\)\)/);
+  assert.match(adminScreenSource, /gameSlug: eventGameSlug/);
   assert.match(adminScreenSource, /Save event/);
   assert.match(adminScreenSource, /New tournament/);
   assert.match(adminScreenSource, /saveTournamentEvent/);

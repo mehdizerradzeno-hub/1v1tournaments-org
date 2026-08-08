@@ -1,6 +1,7 @@
 import { getTournamentMode, getTournamentModeValue } from './tournamentModes.js';
 
 const DEFAULT_GAME_SLUG = 'spades';
+export const TOURNAMENT_GAME_SLUGS = Object.freeze(['spades', 'euchre']);
 const DEFAULT_TIME_ZONE = 'America/New_York';
 const DEFAULT_TIME_ZONE_LABEL = 'ET';
 const DEFAULT_ROSTER_CAP = 8;
@@ -71,6 +72,12 @@ function cleanText(value, fallback = '') {
 
 function cleanShortText(value, fallback = '') {
   return cleanText(value, fallback).slice(0, 160);
+}
+
+export function normalizeTournamentGameSlug(value, fallback = DEFAULT_GAME_SLUG) {
+  const gameSlug = cleanShortText(value);
+
+  return TOURNAMENT_GAME_SLUGS.includes(gameSlug) ? gameSlug : fallback;
 }
 
 function normalizeCompetitionMeta(value = {}) {
@@ -188,7 +195,7 @@ export function createTournamentRecord(payload = {}) {
     positiveInteger(payload.minimumPlayers, DEFAULT_MINIMUM_PLAYERS, 2, rosterCap),
     rosterCap,
   );
-  const gameSlug = cleanShortText(payload.gameSlug, DEFAULT_GAME_SLUG);
+  const gameSlug = normalizeTournamentGameSlug(payload.gameSlug);
   const date = cleanDate(payload.date || payload.startAt, '');
   const timeZone = cleanShortText(payload.timeZone, DEFAULT_TIME_ZONE);
   const timeZoneLabel = cleanShortText(payload.timeZoneLabel, DEFAULT_TIME_ZONE_LABEL).slice(0, 12);

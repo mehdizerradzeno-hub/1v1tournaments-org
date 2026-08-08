@@ -19,7 +19,12 @@ import {
 } from '../lib/adminServerClient.js';
 import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from '../lib/adminServerState.js';
 import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
-import { createTournamentRecord, mergeTournamentLists, slugifyTournamentTitle } from '../lib/tournamentCatalog.js';
+import {
+  createTournamentRecord,
+  mergeTournamentLists,
+  normalizeTournamentGameSlug,
+  slugifyTournamentTitle,
+} from '../lib/tournamentCatalog.js';
 import {
   canGenerateTournamentMode,
   getTournamentMode,
@@ -70,6 +75,10 @@ import {
 } from '../lib/adminStorage.js';
 
 const CODE_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
+const TOURNAMENT_GAME_OPTIONS = Object.freeze([
+  { label: 'Spades', value: 'spades' },
+  { label: 'Euchre', value: 'euchre' },
+]);
 
 function canUseClipboard() {
   return typeof globalThis.navigator !== 'undefined' && Boolean(globalThis.navigator?.clipboard?.writeText);
@@ -308,6 +317,7 @@ export default function AdminScreen() {
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [eventTitle, setEventTitle] = useState(() => initialScheduleDefaults.title || siteData.tournaments[0]?.title || '');
   const [eventSlug, setEventSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const [eventGameSlug, setEventGameSlug] = useState(() => normalizeTournamentGameSlug(siteData.tournaments[0]?.gameSlug));
   const [eventSummary, setEventSummary] = useState(() => siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
   const [eventMode, setEventMode] = useState(() => siteData.tournaments[0]?.mode || 'single-elimination');
   const [eventRosterCap, setEventRosterCap] = useState(() => String(siteData.tournaments[0]?.rosterCap || 8));
@@ -549,6 +559,7 @@ export default function AdminScreen() {
 
     setEventTitle(tournament.title || '');
     setEventSlug(tournament.slug || '');
+    setEventGameSlug(normalizeTournamentGameSlug(tournament.gameSlug));
     setEventSummary(tournament.detail || tournament.summary || '');
     setEventMode(getTournamentMode(tournament.mode).value);
     setEventRosterCap(String(tournament.rosterCap || 8));
@@ -565,6 +576,7 @@ export default function AdminScreen() {
 
     setEventTitle(draftTitle);
     setEventSlug(slugifyTournamentTitle(draftTitle));
+    setEventGameSlug('spades');
     setEventSummary('A free-entry Spades bracket with account signup, hosted match links, and posted results.');
     setEventMode('single-elimination');
     setEventRosterCap('8');
@@ -865,6 +877,7 @@ export default function AdminScreen() {
       bracketFlexPolicy: '',
       slug,
       title,
+      gameSlug: eventGameSlug,
       mode: selectedMode.value,
       format: selectedMode.format,
       date,
@@ -1211,6 +1224,21 @@ export default function AdminScreen() {
                   style={styles.input}
                   value={eventMinimumPlayers}
                 />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Game</Text>
+              <View style={styles.tournamentPicker}>
+                {TOURNAMENT_GAME_OPTIONS.map((option) => (
+                  <ActionButton
+                    accessibilityState={{ selected: eventGameSlug === option.value }}
+                    key={option.value}
+                    onPress={() => setEventGameSlug(option.value)}
+                    variant={eventGameSlug === option.value ? 'primary' : 'secondary'}>
+                    {option.label}
+                  </ActionButton>
+                ))}
               </View>
             </View>
 
