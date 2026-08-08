@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveAccountConnectMode, runAccountHandoffOnce } from '../src/lib/accountConnect.js';
+import {
+  resolveAccountConnectMode,
+  returnToGameWithoutAccountChange,
+  runAccountHandoffOnce,
+  signOutAccountConnectSession,
+  verifiedAccountReturnCopy,
+} from '../src/lib/accountConnect.js';
 import {
   EUCHRE_ACCOUNT_DESTINATION,
   EUCHRE_ACCOUNT_ENTRY_ROUTE,
@@ -85,4 +91,38 @@ test('authorization handoff executes exactly once and releases the gate after fa
     throw new Error('temporary failure');
   }), /temporary failure/);
   assert.equal(retryGate.current, false);
+});
+
+test('Euchre sign out clears account state and supports a different next account', async () => {
+  let logoutCalls = 0;
+  const signedOut = await signOutAccountConnectSession(async () => {
+    logoutCalls += 1;
+    return { ok: true, account: null };
+  });
+
+  assert.equal(logoutCalls, 1);
+  assert.deepEqual(signedOut, { account: null, mode: 'signin' });
+  assert.equal(resolveAccountConnectMode('signin', {
+    hasAccount: Boolean({ canonicalAccountId: 'acct_account_b' }),
+    signedOutManageFallback: true,
+  }), 'manage');
+});
+
+test('Return to Euchre is navigation-only and account copy stays game-specific', () => {
+  let destination = '';
+  returnToGameWithoutAccountChange(EUCHRE_ACCOUNT_DESTINATION, {
+    assign(value) {
+      destination = value;
+    },
+  });
+
+  assert.equal(destination, EUCHRE_ACCOUNT_DESTINATION);
+  assert.equal(verifiedAccountReturnCopy('Euchre'), 'Your verified 1v1 account is ready to return to Euchre.');
+});
+
+test('sign out rejects a response that did not clear the authoritative account', async () => {
+  await assert.rejects(
+    () => signOutAccountConnectSession(async () => ({ ok: true, account: { canonicalAccountId: 'acct_still_signed_in' } })),
+    /could not be signed out/i,
+  );
 });

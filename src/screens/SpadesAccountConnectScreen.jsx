@@ -13,6 +13,7 @@ import {
   createPlayerAccount,
   fetchPlayerAccount,
   loginPlayerAccount,
+  logoutPlayerAccount,
   requestPlayerPasswordReset,
   resetPlayerPassword,
 } from '../lib/tournamentHostingClient.js';
@@ -21,7 +22,13 @@ import {
   SPADES_ACCOUNT_DESTINATION,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../lib/spadesAccountConnect.js';
-import { resolveAccountConnectMode, runAccountHandoffOnce } from '../lib/accountConnect.js';
+import {
+  resolveAccountConnectMode,
+  returnToGameWithoutAccountChange,
+  runAccountHandoffOnce,
+  signOutAccountConnectSession,
+  verifiedAccountReturnCopy,
+} from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
 
 function inputProps(setValue) {
@@ -186,6 +193,33 @@ export function GameAccountConnectScreen({
     }
   };
 
+  const signOut = async () => {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const nextState = await signOutAccountConnectSession(logoutPlayerAccount);
+      handoffStartedRef.current = false;
+      setAccount(nextState.account);
+      setMode(nextState.mode);
+      setPlayerName('');
+      setPlayerHandle('');
+      setContactEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setRecoveryRequested(false);
+      setRecoveryCode('');
+      setRecoveryPassword('');
+      setRecoveryConfirmPassword('');
+      setMessage(`Signed out. Sign in with the account you want to use with ${gameName}.`);
+    } catch (logoutError) {
+      setError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -202,7 +236,7 @@ export function GameAccountConnectScreen({
         <Text style={styles.title}>{account ? 'Manage Account' : 'Connect your shared account'}</Text>
         <Text style={styles.subtitle}>
           {account
-            ? 'Your verified 1v1 account is ready to return to Spades.'
+            ? verifiedAccountReturnCopy(gameName)
             : `Sign in, create an account, or reset your password without leaving the ${gameName} app.`}
         </Text>
       </View>
@@ -214,6 +248,10 @@ export function GameAccountConnectScreen({
             <Text style={styles.muted}>{account.email || 'Account identity verified'}</Text>
             <ActionButton disabled={submitting} onPress={returnToGame}>
               {submitting ? 'Connecting...' : `Continue to ${gameName}`}
+            </ActionButton>
+            <Text style={styles.muted}>Sign out here only to switch the shared 1v1 account used by this browser.</Text>
+            <ActionButton disabled={submitting} onPress={signOut} variant="danger">
+              {submitting ? 'Signing out...' : 'Sign Out'}
             </ActionButton>
           </>
         ) : (
@@ -294,9 +332,10 @@ export function GameAccountConnectScreen({
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <ActionButton
-          onPress={() => globalThis.location?.assign?.(destination)}
+          disabled={submitting}
+          onPress={() => returnToGameWithoutAccountChange(destination)}
           variant="ghost">
-          Cancel and return to {gameName}
+          Return to {gameName}
         </ActionButton>
       </Surface>
     </ScrollView>

@@ -10,9 +10,11 @@ import {
 import {
   createPlayerAccount,
   loginPlayerAccount,
+  logoutPlayerAccount,
   requestPlayerPasswordReset,
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
+import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
   const originalFetch = globalThis.fetch;
@@ -104,4 +106,14 @@ test('Forgot and Reset Password use the existing recovery actions', async () => 
   assert.equal(requestBody.action, 'request-password-reset');
   assert.equal(resetBody.action, 'reset-password');
   assert.equal(resetBody.code, '123456');
+});
+
+test('Sign Out uses the authoritative shared player-account logout action', async () => {
+  const body = await captureAccountAction(
+    () => logoutPlayerAccount(),
+    { ok: true, account: null },
+  );
+
+  assert.deepEqual(body, { action: 'logout' });
+  assert.equal(verifiedAccountReturnCopy('Spades'), 'Your verified 1v1 account is ready to return to Spades.');
 });

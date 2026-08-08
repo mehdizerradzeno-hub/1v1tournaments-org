@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  clearSessionCookie,
   createSignedSessionToken,
   getSessionId,
   parseSignedSessionToken,
@@ -93,4 +94,16 @@ test('signed player sessions reject tampering and expiration', () => {
 
   assert.equal(parseSignedSessionToken(tamperedToken), null);
   assert.equal(parseSignedSessionToken(expiredToken), null);
+});
+
+test('sign out expires only the authoritative Tournaments player session cookie', () => {
+  const cookie = clearSessionCookie();
+
+  assert.match(cookie, /^one_v_one_player_session=/);
+  assert.match(cookie, /Path=\//);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Secure/);
+  assert.match(cookie, /SameSite=Lax/);
+  assert.match(cookie, /Max-Age=0/);
+  assert.doesNotMatch(cookie, /spades|euchre/i);
 });
