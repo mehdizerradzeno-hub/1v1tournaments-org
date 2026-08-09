@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   createTournamentRecord,
+  getDefaultTournamentSummary,
+  getTournamentGameName,
   getActiveOrFutureTournaments,
   getNextFutureTournament,
   getNextPublicTournament,
@@ -37,9 +39,37 @@ test('tournament game defaults to Spades and preserves explicit canonical games'
   assert.equal(normalizeTournamentGameSlug('spades'), 'spades');
   assert.equal(normalizeTournamentGameSlug('euchre'), 'euchre');
   assert.equal(normalizeTournamentGameSlug('hearts'), 'spades');
-  assert.equal(createTournamentRecord({ title: 'Legacy event' }).gameSlug, 'spades');
-  assert.equal(createTournamentRecord({ title: 'Spades event', gameSlug: 'spades' }).gameSlug, 'spades');
-  assert.equal(createTournamentRecord({ title: 'Euchre event', gameSlug: 'euchre' }).gameSlug, 'euchre');
+  const legacy = createTournamentRecord({ title: 'Legacy event' });
+  const spades = createTournamentRecord({ title: 'Spades event', gameSlug: 'spades' });
+  const euchre = createTournamentRecord({ title: 'Euchre event', gameSlug: 'euchre' });
+
+  assert.equal(legacy.gameSlug, 'spades');
+  assert.equal(spades.gameSlug, 'spades');
+  assert.equal(euchre.gameSlug, 'euchre');
+  assert.equal(getTournamentGameName(), 'Spades');
+  assert.equal(getTournamentGameName('euchre'), 'Euchre');
+  assert.equal(getDefaultTournamentSummary(), 'A free-entry Spades bracket with account signup, hosted match links, and posted results.');
+  assert.match(legacy.checkIn.steps[2], /Spades/);
+  assert.match(spades.checkIn.steps[2], /Spades/);
+  assert.match(euchre.checkIn.steps[2], /Euchre/);
+  assert.doesNotMatch(euchre.checkIn.steps[2], /Spades/);
+});
+
+test('known generated Spades check-in copy normalizes only for explicit Euchre events', () => {
+  const customStep = 'Use the host desk before opening your assigned table.';
+  const euchre = createTournamentRecord({
+    title: 'Euchre event',
+    gameSlug: 'euchre',
+    checkIn: { steps: ['Sign in.', 'Check in.', 'Open your Spades match link after the bracket is published.'] },
+  });
+  const custom = createTournamentRecord({
+    title: 'Custom Euchre event',
+    gameSlug: 'euchre',
+    checkIn: { steps: ['Sign in.', 'Check in.', customStep] },
+  });
+
+  assert.equal(euchre.checkIn.steps[2], 'Open your Euchre match link after the bracket is published.');
+  assert.equal(custom.checkIn.steps[2], customStep);
 });
 
 test('generated bracket policy copy updates when hosted event capacity changes', () => {

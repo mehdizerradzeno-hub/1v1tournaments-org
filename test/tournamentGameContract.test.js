@@ -7,6 +7,7 @@ import {
   TournamentGameContractError,
   assertTournamentTicketAccess,
   buildTournamentLaunchUrl,
+  buildTournamentReturnPath,
   normalizeTournamentResultCallback,
 } from '../netlify/functions/_tournament-game-contract.mjs';
 import {
@@ -15,7 +16,7 @@ import {
   findMatch,
   handler as bracketHandler,
 } from '../netlify/functions/tournament-bracket.mjs';
-import { ticketKey } from '../netlify/functions/tournament-match-access.mjs';
+import { matchAccessPayload, ticketKey } from '../netlify/functions/tournament-match-access.mjs';
 
 function signup(index) {
   return {
@@ -40,6 +41,7 @@ function fixture() {
     game: 'euchre',
     tournamentId: bracket.tournamentSlug,
     tournamentSlug: bracket.tournamentSlug,
+    tournamentReturnPath: '/tournaments/euchre-season-one',
     matchId: match.id,
     roomId: match.id,
     playerId: match.players[0].id,
@@ -76,18 +78,26 @@ test('Euchre launch uses the configured route without inventing a match path', (
     game: 'euchre',
     matchId: 'euchre-season-one-r1-m1',
     ticket: 'opaque-ticket',
+    tournamentSlug: 'euchre-season-one',
     euchreBaseUrl: 'https://onev1-euchre-preview.onrender.com/',
   }));
 
   assert.equal(launch.pathname, '/');
   assert.equal(launch.searchParams.get('matchId'), 'euchre-season-one-r1-m1');
   assert.equal(launch.searchParams.get('ticket'), 'opaque-ticket');
+  assert.equal(launch.searchParams.get('tournamentReturnPath'), '/tournaments/euchre-season-one');
   assert.throws(() => buildTournamentLaunchUrl({
     game: 'euchre',
     matchId: 'match-1',
     ticket: 'opaque-ticket',
+    tournamentSlug: 'euchre-season-one',
     euchreBaseUrl: '',
   }), (error) => error instanceof TournamentGameContractError && error.code === 'game_unavailable');
+  assert.equal(buildTournamentReturnPath('Euchre-Season-One'), '/tournaments/euchre-season-one');
+  assert.throws(
+    () => buildTournamentReturnPath('https://attacker.example/redirect'),
+    (error) => error instanceof TournamentGameContractError && error.code === 'invalid_return_context',
+  );
 });
 
 test('Spades launch path and opaque ticket hashing remain unchanged', () => {
@@ -100,7 +110,17 @@ test('Spades launch path and opaque ticket hashing remain unchanged', () => {
 
   assert.equal(launch.pathname, '/match/summer-r1-m1');
   assert.equal(launch.searchParams.get('ticket'), 'opaque-ticket');
+  assert.equal(launch.searchParams.has('tournamentReturnPath'), false);
   assert.equal(ticketKey('opaque-ticket'), 'f13ee9b2677f32949e09f039d588b7b401291659f611ee9a1881283f5a3ba481.json');
+});
+
+test('verified Euchre match access returns the same safe tournament context stored with the ticket', () => {
+  const { bracket, match, record } = fixture();
+  const round = bracket.rounds.find((item) => item.matches.some((candidate) => candidate.id === match.id));
+  const payload = matchAccessPayload({ bracket, round, match, seatIndex: 0, ticketRecord: record });
+
+  assert.deepEqual(payload.tournamentContext, { returnPath: '/tournaments/euchre-season-one' });
+  assert.equal(payload.identity.canonicalAccountId, 'acct-1');
 });
 
 test('valid Euchre ticket is player, canonical identity, game, match, and seat bound', () => {

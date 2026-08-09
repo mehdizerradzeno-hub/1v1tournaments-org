@@ -13,6 +13,7 @@ import { formatDateLine } from '../lib/format.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
+import { getTournamentGameName } from '../lib/tournamentCatalog.js';
 import {
   createPlayerAccount,
   fetchPlayerAccount,
@@ -894,6 +895,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
+  const gameName = getTournamentGameName(visibleTournament.gameSlug);
   const checkIn = visibleTournament.checkIn;
   const formatDetails = getSignupFormatDetails(visibleTournament);
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
@@ -1043,7 +1045,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   {accountNeedsVerification
                     ? 'Enter the short code sent to this account email. Verification protects roster seats from account impersonation.'
                     : registrationOpen
-                    ? 'One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned Spades table.'
+                    ? `One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned ${gameName} match.`
                     : registrationMeta.actionCopy}
                 </Text>
                 <View style={styles.buttonRow}>
@@ -1255,7 +1257,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                         handleCreateAccount();
                       }
                     }}
-                    placeholder="Discord or Spades name, if different"
+                    placeholder={`Discord or ${gameName} name, if different`}
                     placeholderTextColor="#6B766F"
                     returnKeyType="go"
                     style={styles.input}
@@ -1267,7 +1269,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 <View style={styles.optionalFieldPrompt}>
                   <View style={styles.optionalFieldCopy}>
                     <Text style={styles.optionalFieldTitle}>Handle is optional</Text>
-                    <Text style={styles.optionalFieldBody}>Most players can skip this. Use it only if your Discord or Spades name is different.</Text>
+                    <Text style={styles.optionalFieldBody}>Most players can skip this. Use it only if your Discord or {gameName} name is different.</Text>
                   </View>
                   <ActionButton onPress={() => setShowOptionalHandle(true)} variant="ghost">
                     Add handle

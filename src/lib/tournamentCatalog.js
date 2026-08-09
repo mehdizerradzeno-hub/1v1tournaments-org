@@ -80,6 +80,40 @@ export function normalizeTournamentGameSlug(value, fallback = DEFAULT_GAME_SLUG)
   return TOURNAMENT_GAME_SLUGS.includes(gameSlug) ? gameSlug : fallback;
 }
 
+export function getTournamentGameName(value) {
+  return normalizeTournamentGameSlug(value) === 'euchre' ? 'Euchre' : 'Spades';
+}
+
+export function getDefaultTournamentSummary(value) {
+  return `A free-entry ${getTournamentGameName(value)} bracket with account signup, hosted match links, and posted results.`;
+}
+
+function normalizeTournamentCheckIn(value, gameSlug) {
+  const gameName = getTournamentGameName(gameSlug);
+  const defaultMatchStep = `Open your ${gameName} match link after the bracket is published.`;
+  const incoming = value && typeof value === 'object' ? value : {};
+  const incomingSteps = Array.isArray(incoming.steps) ? incoming.steps : DEFAULT_CHECK_IN.steps;
+  const steps = incomingSteps.map((step) => {
+    const text = cleanText(step);
+
+    if (gameSlug === 'euchre' && text === DEFAULT_CHECK_IN.steps[2]) {
+      return defaultMatchStep;
+    }
+
+    return text;
+  }).filter(Boolean);
+
+  return {
+    ...DEFAULT_CHECK_IN,
+    ...incoming,
+    steps: steps.length ? steps : [
+      DEFAULT_CHECK_IN.steps[0],
+      DEFAULT_CHECK_IN.steps[1],
+      defaultMatchStep,
+    ],
+  };
+}
+
 function normalizeCompetitionMeta(value = {}) {
   if (!value || typeof value !== 'object') {
     return { ...DEFAULT_COMPETITION_META };
@@ -201,7 +235,8 @@ export function createTournamentRecord(payload = {}) {
   const timeZoneLabel = cleanShortText(payload.timeZoneLabel, DEFAULT_TIME_ZONE_LABEL).slice(0, 12);
   const checkInLeadMinutes = positiveInteger(payload.checkInLeadMinutes, DEFAULT_CHECK_IN_LEAD_MINUTES, 0, 1440);
   const mode = getTournamentMode(payload.mode || payload.tournamentMode);
-  const summary = cleanShortText(payload.summary, `A hosted ${gameSlug} bracket with live signup, match links, and posted results.`);
+  const gameName = getTournamentGameName(gameSlug);
+  const summary = cleanShortText(payload.summary, `A hosted ${gameName} bracket with live signup, match links, and posted results.`);
   const detail = cleanText(
     payload.detail,
     `${title} uses account-based signup, hosted match links, automatic result reporting, and a post-match summary.`,
@@ -232,10 +267,7 @@ export function createTournamentRecord(payload = {}) {
     summary,
     detail,
     callout: cleanShortText(payload.callout, 'Check-in opens before the start time.'),
-    checkIn: {
-      ...DEFAULT_CHECK_IN,
-      ...(payload.checkIn || {}),
-    },
+    checkIn: normalizeTournamentCheckIn(payload.checkIn, gameSlug),
     bracket: {
       ...DEFAULT_BRACKET,
       ...(payload.bracket || {}),

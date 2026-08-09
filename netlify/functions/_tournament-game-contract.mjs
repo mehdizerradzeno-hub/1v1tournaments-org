@@ -6,6 +6,7 @@ export const TOURNAMENT_MATCH_TICKET_TTL_MS = 30 * 60 * 1000;
 
 const SUPPORTED_GAMES = new Set(['spades', 'euchre']);
 const EUCHRE_SEATS = ['north', 'south'];
+const TOURNAMENT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export class TournamentGameContractError extends Error {
   constructor(statusCode, message, code) {
@@ -36,7 +37,17 @@ export function tournamentSeat(game, seatIndex) {
   return normalizedGame === 'euchre' ? EUCHRE_SEATS[seatIndex] : `player-${seatIndex + 1}`;
 }
 
-export function buildTournamentLaunchUrl({ game, matchId, ticket, spadesBaseUrl, euchreBaseUrl }) {
+export function buildTournamentReturnPath(tournamentSlug) {
+  const slug = cleanText(tournamentSlug).toLowerCase();
+
+  if (!TOURNAMENT_SLUG_RE.test(slug)) {
+    throw new TournamentGameContractError(400, 'A valid tournament is required for return routing.', 'invalid_return_context');
+  }
+
+  return `/tournaments/${slug}`;
+}
+
+export function buildTournamentLaunchUrl({ game, matchId, ticket, tournamentSlug, spadesBaseUrl, euchreBaseUrl }) {
   const normalizedGame = normalizeTournamentGame(game);
   const cleanId = cleanText(matchId);
   const cleanTicket = cleanText(ticket);
@@ -65,6 +76,7 @@ export function buildTournamentLaunchUrl({ game, matchId, ticket, spadesBaseUrl,
   const url = new URL(base);
   url.searchParams.set('matchId', cleanId);
   url.searchParams.set('ticket', cleanTicket);
+  url.searchParams.set('tournamentReturnPath', buildTournamentReturnPath(tournamentSlug));
   return url.toString();
 }
 

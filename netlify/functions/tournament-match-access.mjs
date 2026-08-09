@@ -17,6 +17,7 @@ import {
   TournamentGameContractError,
   assertTournamentTicketAccess,
   buildTournamentLaunchUrl,
+  buildTournamentReturnPath,
   normalizeTournamentGame,
   tournamentSeat,
 } from './_tournament-game-contract.mjs';
@@ -187,6 +188,11 @@ export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRec
     game,
     tournamentId: bracket.tournamentSlug,
     tournamentSlug: bracket.tournamentSlug,
+    tournamentContext: game === 'euchre'
+      ? {
+          returnPath: ticketRecord?.tournamentReturnPath || buildTournamentReturnPath(bracket.tournamentSlug),
+        }
+      : null,
     bracketStatus: bracket.status,
     round: {
       index: round.index,
@@ -225,7 +231,7 @@ async function issueTicket(event, payload) {
   const tournamentSlug = cleanText(payload.tournamentSlug) || tournamentSlugFromMatchId(matchId);
 
   if (!matchId || !tournamentSlug) {
-    return json(400, { error: 'Choose a valid tournament match before opening Spades.' });
+    return json(400, { error: 'Choose a valid tournament match before opening the game.' });
   }
 
   const bracket = await loadBracket(tournamentSlug);
@@ -269,6 +275,7 @@ async function issueTicket(event, payload) {
       game,
       matchId,
       ticket,
+      tournamentSlug,
       spadesBaseUrl: SPADES_MATCH_BASE_URL,
       euchreBaseUrl: EUCHRE_MATCH_BASE_URL,
     });
@@ -295,6 +302,7 @@ async function issueTicket(event, payload) {
     seatIndex,
     seat: tournamentSeat(game, seatIndex),
     roomId: match.id,
+    tournamentReturnPath: game === 'euchre' ? buildTournamentReturnPath(tournamentSlug) : '',
     participantIds: match.players.filter(Boolean).map((participant) => participant.id),
     issuedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + TOURNAMENT_MATCH_TICKET_TTL_MS).toISOString(),

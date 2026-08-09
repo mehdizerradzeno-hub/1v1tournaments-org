@@ -32,6 +32,7 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+import { getTournamentGameName } from '../lib/tournamentCatalog.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   fetchTournamentPlayerStatus,
@@ -668,6 +669,7 @@ export default function TournamentScreen({ slug }) {
 
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
+  const gameName = getTournamentGameName(visibleTournament.gameSlug);
   const isPrimaryGame = game?.slug === siteData.site.primaryGameSlug;
   const gamePath = game ? getGamePath(game.slug) : null;
   const streams = (visibleTournament.streamSlugs || [])
@@ -759,6 +761,7 @@ export default function TournamentScreen({ slug }) {
       />
 
       <PlayerStatusSpotlight
+        gameName={gameName}
         isBracketLive={isBracketLive}
         liveBracket={liveBracket}
         playerStatus={playerStatus}
@@ -934,7 +937,7 @@ export default function TournamentScreen({ slug }) {
 
           {liveBracket ? (
             <Section
-              description="Match cards show assigned players, winners, and Spades room links."
+              description={`Match cards show assigned players, winners, and ${gameName} match links.`}
               nativeID="live-bracket"
               title={bracketSectionTitle}>
               <LiveBracketBoard bracket={liveBracket} />
@@ -943,7 +946,7 @@ export default function TournamentScreen({ slug }) {
 
           {!liveBracket ? (
             <Section
-              description="After the host generates a bracket, match cards show the assigned players and Spades room links."
+              description={`After the host generates a bracket, match cards show the assigned players and ${gameName} match links.`}
               nativeID="live-bracket"
               title={bracketSectionTitle}>
               <BracketBoard bracket={visibleTournament.bracket} />
@@ -1679,13 +1682,13 @@ function playerSpotlightTitle(playerStatus, result) {
   return 'Create an account to join.';
 }
 
-function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta) {
+function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, gameName) {
   const data = playerStatus.data;
   const accountName = data?.account?.playerName || '';
   const signupName = data?.signup?.playerName || '';
 
   if (playerStatus.loading) return 'One moment while we check this browser for a player account and roster seat.';
-  if (data?.currentMatch) return 'Open your assigned Spades table from My Match, then return here after the game.';
+  if (data?.currentMatch) return `Open your assigned ${gameName} match from My Match, then return here after the game.`;
   if (data?.nextStep === 'champion') return 'Nice. The bracket has you marked as tournament winner.';
   if (data?.nextStep === 'complete') return 'This event is complete. You can review the final bracket and results.';
   if (signupName) return `${signupName} is on the roster. The host will publish match links when the bracket is ready.`;
@@ -1696,6 +1699,7 @@ function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta) {
 }
 
 function PlayerStatusSpotlight({
+  gameName,
   isBracketLive,
   liveBracket,
   playerStatus,
@@ -1774,7 +1778,7 @@ function PlayerStatusSpotlight({
           <Badge tone={statusTone(data.nextStep)}>{statusBadgeLabel(data.nextStep)}</Badge>
           <Text style={styles.statusSpotlightTitle}>{playerSpotlightTitle(playerStatus, result)}</Text>
           <Text style={styles.statusSpotlightBody}>
-            {playerSpotlightBody(playerStatus, isBracketLive, registrationMeta)}
+            {playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, gameName)}
           </Text>
         </View>
         <View style={styles.statusSpotlightAction}>

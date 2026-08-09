@@ -91,7 +91,7 @@ test('tournament match launch authorizes the game returned by match access', asy
         if (body.action === 'issue-ticket') {
           return response(201, {
             game,
-            roomUrl: `https://${game}.example/play?ticket=opaque-ticket`,
+            roomUrl: `https://${game}.example/play?ticket=opaque-ticket${game === 'euchre' ? '&tournamentReturnPath=%2Ftournaments%2Fcontrolled-smoke' : ''}`,
           });
         }
 
@@ -111,6 +111,10 @@ test('tournament match launch authorizes the game returned by match access', asy
       assert.equal(requests[1].body.audience, game);
       assert.equal(new URL(launch.roomUrl).searchParams.get('ticket'), 'opaque-ticket');
       assert.equal(new URL(launch.roomUrl).searchParams.get('sharedAccountCode'), `${game}-account-code`);
+      assert.equal(
+        new URL(launch.roomUrl).searchParams.get('tournamentReturnPath'),
+        game === 'euchre' ? '/tournaments/controlled-smoke' : null,
+      );
     }
   } finally {
     globalThis.fetch = originalFetch;

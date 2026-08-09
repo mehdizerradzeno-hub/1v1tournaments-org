@@ -21,6 +21,8 @@ import { normalizeAccountIds, parseAccountIds, serializeAdminServerPacket } from
 import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } from '../lib/siteData.js';
 import {
   createTournamentRecord,
+  getDefaultTournamentSummary,
+  getTournamentGameName,
   mergeTournamentLists,
   normalizeTournamentGameSlug,
   slugifyTournamentTitle,
@@ -559,8 +561,14 @@ export default function AdminScreen() {
 
     setEventTitle(tournament.title || '');
     setEventSlug(tournament.slug || '');
-    setEventGameSlug(normalizeTournamentGameSlug(tournament.gameSlug));
-    setEventSummary(tournament.detail || tournament.summary || '');
+    const gameSlug = normalizeTournamentGameSlug(tournament.gameSlug);
+    const summary = tournament.detail || tournament.summary || '';
+    setEventGameSlug(gameSlug);
+    setEventSummary(
+      gameSlug === 'euchre' && summary === getDefaultTournamentSummary('spades')
+        ? getDefaultTournamentSummary('euchre')
+        : summary,
+    );
     setEventMode(getTournamentMode(tournament.mode).value);
     setEventRosterCap(String(tournament.rosterCap || 8));
     setEventMinimumPlayers(String(tournament.minimumPlayers || 2));
@@ -577,7 +585,7 @@ export default function AdminScreen() {
     setEventTitle(draftTitle);
     setEventSlug(slugifyTournamentTitle(draftTitle));
     setEventGameSlug('spades');
-    setEventSummary('A free-entry Spades bracket with account signup, hosted match links, and posted results.');
+    setEventSummary(getDefaultTournamentSummary('spades'));
     setEventMode('single-elimination');
     setEventRosterCap('8');
     setEventMinimumPlayers('2');
@@ -589,6 +597,16 @@ export default function AdminScreen() {
     setScheduleCheckInLeadMinutes('30');
     setEventFeedback('Fill in the event title, date, and start time, then save the tournament.', '');
     setScheduleFeedback('', '');
+  }
+
+  function handleSelectEventGame(gameSlug) {
+    const nextGameSlug = normalizeTournamentGameSlug(gameSlug);
+    setEventGameSlug(nextGameSlug);
+    setEventSummary((current) => (
+      current === getDefaultTournamentSummary('spades') || current === getDefaultTournamentSummary('euchre')
+        ? getDefaultTournamentSummary(nextGameSlug)
+        : current
+    ));
   }
 
   function handleSelectEventMode(value) {
@@ -1234,7 +1252,7 @@ export default function AdminScreen() {
                   <ActionButton
                     accessibilityState={{ selected: eventGameSlug === option.value }}
                     key={option.value}
-                    onPress={() => setEventGameSlug(option.value)}
+                    onPress={() => handleSelectEventGame(option.value)}
                     variant={eventGameSlug === option.value ? 'primary' : 'secondary'}>
                     {option.label}
                   </ActionButton>
@@ -1944,6 +1962,7 @@ export default function AdminScreen() {
   async function handleCopyPlayerInstructions() {
     const tournamentPath = getTournamentPath(rosterSlug);
     const tournament = liveTournament || selectedTournament;
+    const gameName = getTournamentGameName(tournament?.gameSlug);
     const text = [
       `${tournament?.title || '1v1 tournament'} player link:`,
       `https://1v1tournaments.org${tournamentPath}`,
@@ -1954,7 +1973,7 @@ export default function AdminScreen() {
       '3. Sign up if you have not already.',
       '4. After the bracket is live, use "Your tournament status" and press "Play my match."',
       '',
-      'Do not join from bare Spades room links. Player seats are account-gated from the tournament page.',
+      `Do not join from bare ${gameName} room links. Player seats are account-gated from the tournament page.`,
     ].join('\n');
 
     try {
@@ -2449,6 +2468,8 @@ export default function AdminScreen() {
   }
 
   function renderBracketManagerSection() {
+    const gameName = getTournamentGameName((liveTournament || selectedTournament)?.gameSlug);
+    const gameDestination = gameName === 'Euchre' ? 'the configured Euchre service' : '1v1spades.com';
     const readyMatches = bracket?.rounds
       ?.flatMap((round) => round.matches.map((match) => ({ ...match, roundTitle: round.title })))
       ?.filter((match) => match.players?.filter(Boolean).length === 2) || [];
@@ -2458,13 +2479,13 @@ export default function AdminScreen() {
 
     return (
       <Section
-        description="Create the public bracket from the registered player roster and give each match a Spades room link."
+        description={`Create the public bracket from the registered player roster and give each match a ${gameName} match link.`}
         title="Bracket manager">
         <Surface style={styles.bracketPanel}>
           <View style={styles.metaRow}>
             <Badge tone={bracket ? 'green' : 'blue'}>{bracket ? bracket.status : 'Not generated'}</Badge>
             <Text style={styles.metaText}>
-              Matches open in 1v1spades.com rooms while this hub tracks bracket state and winners.
+              Matches open in {gameDestination} rooms while this hub tracks bracket state and winners.
             </Text>
           </View>
 
