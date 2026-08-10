@@ -276,6 +276,7 @@ export default function HomeScreen() {
 
   return (
     <HubScreen
+      accountHref="/account"
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
       forceTopNav

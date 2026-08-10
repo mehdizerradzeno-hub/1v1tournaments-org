@@ -48,6 +48,7 @@ export function GameAccountConnectScreen({
   destination = SPADES_ACCOUNT_DESTINATION,
   accountActions = SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
   prepareReturn = prepareSpadesAccountReturn,
+  returnAfterSignOut = false,
   signedOutManageFallback = false,
 }) {
   const [mode, setMode] = useState(initialMode);
@@ -213,6 +214,9 @@ export function GameAccountConnectScreen({
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setMessage(`Signed out. Sign in with the account you want to use with ${gameName}.`);
+      if (returnAfterSignOut) {
+        returnToGameWithoutAccountChange(destination);
+      }
     } catch (logoutError) {
       setError(logoutError instanceof Error ? logoutError.message : 'Player account could not be signed out.');
     } finally {

@@ -536,7 +536,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(nextScreenSource, /mergeTournamentSettings/);
   assert.match(nextScreenSource, /fetchTournamentEvents/);
   assert.match(nextScreenSource, /mergeTournamentLists/);
-  assert.match(nextScreenSource, /showHeader=\{false\}/);
+  assert.match(nextScreenSource, /accountHref="\/account"/);
+  assert.doesNotMatch(nextScreenSource, /showHeader=\{false\}/);
   assert.ok(
     nextScreenSource.indexOf('styles.countdownPanel') < nextScreenSource.indexOf('styles.heroBadgeRow'),
     '/next must keep the countdown panel above supporting event badges',

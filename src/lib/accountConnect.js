@@ -1,3 +1,9 @@
+export const SHARED_ACCOUNT_ACTIONS = Object.freeze([
+  { id: 'signin', label: 'Sign In' },
+  { id: 'create', label: 'Create Account' },
+  { id: 'reset', label: 'Reset Password' },
+]);
+
 export async function runAccountHandoffOnce(handoffRef, operation) {
   if (handoffRef.current) {
     return { executed: false, value: null };

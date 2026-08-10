@@ -414,10 +414,10 @@ export default function NextScreen() {
   if (!hostedTournamentsLoaded) {
     return (
       <HubScreen
+        accountHref="/account"
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Next"
         lead="Loading the live tournament schedule."
-        showHeader={false}
         showNavigation={false}
         stickyActions={false}
         subtitle="Checking events"
@@ -434,10 +434,10 @@ export default function NextScreen() {
   if (!tournament) {
     return (
       <HubScreen
+        accountHref="/account"
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Next"
         lead="The next public event will appear here when it is scheduled."
-        showHeader={false}
         showNavigation={false}
         stickyActions={false}
         subtitle="No upcoming tournament is published yet"
@@ -453,6 +453,7 @@ export default function NextScreen() {
 
   return (
     <HubScreen
+      accountHref="/account"
       actions={[
         { label: registrationMeta.value === 'open' ? 'Join' : 'Event', href: registrationMeta.value === 'open' ? checkInPath : tournamentPath },
         { label: 'Event', href: tournamentPath, variant: 'secondary' },
@@ -464,7 +465,6 @@ export default function NextScreen() {
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
       showHero={false}
-      showHeader={false}
       showNavigation={false}
       subtitle={formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
       stickyActions={false}
