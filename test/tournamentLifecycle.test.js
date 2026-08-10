@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveTournamentLifecycle } from '../src/lib/tournamentLifecycle.js';
+import {
+  deriveTournamentLifecycle,
+  hasActiveTournamentMatches,
+} from '../src/lib/tournamentLifecycle.js';
 
 const now = new Date('2026-07-16T12:00:00.000Z');
 
@@ -54,4 +57,27 @@ test('completed brackets close and complete the tournament', () => {
 test('host archives and deletion tombstones remain authoritative', () => {
   assert.equal(deriveTournamentLifecycle(event({ status: 'archived' }), null, now).status, 'archived');
   assert.equal(deriveTournamentLifecycle(event({ deleted: true }), null, now).status, 'deleted');
+});
+
+test('active assigned matches block deletion while completed results do not', () => {
+  const activeBracket = {
+    status: 'published',
+    rounds: [{
+      matches: [{ status: 'ready', players: [{ id: 'north' }, { id: 'south' }] }],
+    }],
+  };
+  const completedBracket = {
+    status: 'complete',
+    rounds: [{
+      matches: [{
+        status: 'final',
+        players: [{ id: 'north' }, { id: 'south' }],
+        winnerId: 'south',
+        completion: { completionId: 'completion-1' },
+      }],
+    }],
+  };
+
+  assert.equal(hasActiveTournamentMatches(activeBracket), true);
+  assert.equal(hasActiveTournamentMatches(completedBracket), false);
 });

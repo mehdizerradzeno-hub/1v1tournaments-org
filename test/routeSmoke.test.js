@@ -485,9 +485,13 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentBracketSource, /loserNextMatchId/);
   assert.match(tournamentBracketSource, /resetMatchId/);
   assert.match(tournamentBracketSource, /accountId/);
+  assert.match(tournamentBracketSource, /isHostedTournamentDeleted/);
+  assert.match(tournamentBracketSource, /cannot generate a new bracket/);
   assert.match(tournamentMatchAccessSource, /tournament-match-tickets/);
   assert.match(tournamentMatchAccessSource, /getAccountFromEvent/);
   assert.match(tournamentMatchAccessSource, /issue-ticket/);
+  assert.match(tournamentMatchAccessSource, /isHostedTournamentDeleted/);
+  assert.match(tournamentMatchAccessSource, /cannot issue new Play Match access/);
   assert.match(tournamentMatchAccessSource, /verify-ticket/);
   assert.match(tournamentMatchAccessSource, /findSignupForAccount/);
   assert.match(tournamentMatchAccessSource, /assertTournamentTicketAccess/);
@@ -512,6 +516,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
+  assert.match(tournamentEventsUtilsSource, /deletedAt/);
+  assert.match(tournamentEventsUtilsSource, /deletedBy/);
+  assert.match(tournamentEventsUtilsSource, /hasActiveTournamentMatches/);
   assert.match(tournamentEventsUtilsSource, /hideSeeded: true/);
   assert.match(tournamentEventsUtilsSource, /Promise\.allSettled/);
   assert.match(tournamentEventsUtilsSource, /Tournament bracket hydration failed/);

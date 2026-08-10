@@ -25,6 +25,23 @@ export function isLeagueTournament(tournament = {}) {
   return getTournamentCompetitionMeta(tournament).competitionMode === 'league';
 }
 
+export function isTournamentDeleted(tournament = {}) {
+  return Boolean(tournament?.deleted) || normalizedStatus(tournament?.status) === 'deleted';
+}
+
+export function hasActiveTournamentMatches(bracket = null) {
+  if (!bracket || normalizedStatus(bracket.status) === 'complete') {
+    return false;
+  }
+
+  return (bracket.rounds || []).some((round) => (
+    (round.matches || []).some((match) => (
+      normalizedStatus(match?.status) !== 'final'
+      && (match?.players || []).filter(Boolean).length === 2
+    ))
+  ));
+}
+
 export function deriveTournamentLifecycle(tournament, bracket = null, now = new Date()) {
   if (!tournament) {
     return null;
@@ -37,7 +54,7 @@ export function deriveTournamentLifecycle(tournament, bracket = null, now = new 
   let status = storedStatus;
   let reason = 'stored-status';
 
-  if (storedStatus === 'deleted' || tournament.deleted) {
+  if (isTournamentDeleted(tournament)) {
     status = 'deleted';
     reason = 'deleted';
   } else if (storedStatus === 'archived') {

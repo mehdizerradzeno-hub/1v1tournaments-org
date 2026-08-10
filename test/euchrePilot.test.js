@@ -105,6 +105,8 @@ test('pilot admin route and private host endpoint exist without changing public 
   assert.match(endpointSource, /roomConnectionTelemetry: false/);
   assert.match(endpointSource, /tournament\.gameSlug !== 'euchre'/);
   assert.match(endpointSource, /only be attached to an Euchre tournament/);
+  assert.match(endpointSource, /isHostedTournamentDeleted/);
+  assert.match(endpointSource, /cannot accept check-in changes/);
   assert.match(readFileSync(signup, 'utf8'), /evaluateEuchrePilotSignupAccess/);
   assert.match(readFileSync(siteData, 'utf8'), /Current tournament operations are Spades-only/);
 });

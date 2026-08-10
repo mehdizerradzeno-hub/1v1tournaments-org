@@ -42,6 +42,7 @@ import {
 } from '../lib/tournamentSettings.js';
 import {
   clearTournamentData,
+  deleteTournamentEvent,
   fetchPlayerAccount,
   fetchTournamentBracket,
   fetchTournamentEvents,
@@ -57,6 +58,7 @@ import {
   saveStreamCommands,
   saveTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
+import { hasActiveTournamentMatches } from '../lib/tournamentLifecycle.js';
 import { STREAM_COMMAND_ENDPOINT, buildDefaultStreamCommands } from '../lib/streamCommands.js';
 import {
   buildAdminDraftPacket,
@@ -344,6 +346,8 @@ export default function AdminScreen() {
   const [streamCommandError, setStreamCommandError] = useState('');
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
   const [playerAccount, setPlayerAccount] = useState(null);
@@ -1094,6 +1098,71 @@ export default function AdminScreen() {
     }
   }
 
+  function handleRequestDeleteTournament() {
+    if (!hasHostCredential) {
+      setHostFeedback('', 'Sign in with a host-approved account or enter the fallback token before deleting a tournament.');
+      return;
+    }
+
+    if (hasActiveTournamentMatches(bracket)) {
+      setHostFeedback('', 'Finish, cancel, or archive the active assigned match before deleting this event.');
+      return;
+    }
+
+    setDeleteConfirmOpen(true);
+    setHostFeedback('', '');
+  }
+
+  function handleCancelDeleteTournament() {
+    setDeleteConfirmOpen(false);
+    setHostFeedback('', '');
+  }
+
+  async function handleDeleteTournament() {
+    const token = rosterToken.trim();
+    const tournament = liveTournament || selectedTournament;
+
+    if (deleteLoading) return;
+
+    if (!hasHostCredential || !tournament?.slug) {
+      setHostFeedback('', 'Choose a tournament and authenticate as a host before deleting it.');
+      return;
+    }
+
+    setDeleteLoading(true);
+    setHostFeedback('', '');
+
+    try {
+      const result = await deleteTournamentEvent({ token, slug: tournament.slug });
+      const nextHostedTournaments = result.tournaments || [];
+      const remainingTournaments = mergeTournamentLists(siteData.tournaments, nextHostedTournaments);
+      const nextTournament = remainingTournaments[0] || null;
+
+      setHostedTournaments(nextHostedTournaments);
+      setDeleteConfirmOpen(false);
+      setScheduleSettings(null);
+
+      if (nextTournament) {
+        setRosterSlug(nextTournament.slug);
+        setEventSlug(nextTournament.slug);
+        applyEventFields(nextTournament);
+        applyScheduleFields(nextTournament, null);
+      } else {
+        setRosterSlug('');
+        setEventSlug('');
+      }
+
+      setHostFeedback(
+        `${tournament.title} was removed from normal listings. Its roster, bracket, matches, and results remain preserved.`,
+        '',
+      );
+    } catch (deleteError) {
+      setHostFeedback('', deleteError instanceof Error ? deleteError.message : 'Could not delete this tournament.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   function renderScheduleSection() {
     const tournament = liveTournament || selectedTournament;
     const isArchived = tournament?.status === 'archived';
@@ -1672,6 +1741,7 @@ export default function AdminScreen() {
     const tournamentPath = getTournamentPath(rosterSlug);
     const signupPath = getCheckInPath(rosterSlug);
     const isArchived = tournament?.status === 'archived';
+    const deleteBlockedByActiveMatch = hasActiveTournamentMatches(bracket);
     const lifecycleLabel = getTournamentLifecycleLabel(tournament);
     const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, activeSignupCount);
     const nextHostMove = !hasHostCredential
@@ -1820,6 +1890,13 @@ export default function AdminScreen() {
               variant="danger">
               Clear roster only
             </ActionButton>
+            <ActionButton
+              disabled={!hasHostCredential || deleteLoading || deleteBlockedByActiveMatch}
+              onPress={handleRequestDeleteTournament}
+              style={styles.quickActionButton}
+              variant="danger">
+              Delete event
+            </ActionButton>
           </View>
 
           {bracketError ? <Text style={styles.errorText}>{bracketError}</Text> : null}
@@ -1835,6 +1912,32 @@ export default function AdminScreen() {
                   {archiveLoading ? 'Archiving...' : 'Yes, archive event'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelArchiveTournament} variant="ghost">
+                  Cancel
+                </ActionButton>
+              </View>
+            </View>
+          ) : null}
+
+          {deleteBlockedByActiveMatch ? (
+            <Text style={styles.errorText}>
+              Delete is blocked while this tournament has an active assigned match. Finish, cancel, or archive it first.
+            </Text>
+          ) : null}
+
+          {deleteConfirmOpen ? (
+            <View style={styles.quickDangerConfirmPanel}>
+              <View style={styles.quickDangerHeader}>
+                <Badge tone="rose">Soft delete event</Badge>
+                <Badge tone="green">Keeps match history</Badge>
+              </View>
+              <Text style={styles.resetDangerBody}>
+                Delete {tournament?.title || rosterSlug} ({tournament?.slug || rosterSlug})? This removes the event from normal admin and public listings and blocks registration, check-in, bracket generation, and new Play Match access. Historical matches and results remain preserved.
+              </Text>
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={deleteLoading} onPress={handleDeleteTournament} variant="danger">
+                  {deleteLoading ? 'Deleting...' : 'Yes, soft delete event'}
+                </ActionButton>
+                <ActionButton onPress={handleCancelDeleteTournament} variant="ghost">
                   Cancel
                 </ActionButton>
               </View>

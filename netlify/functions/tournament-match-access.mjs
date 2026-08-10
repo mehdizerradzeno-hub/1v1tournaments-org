@@ -12,6 +12,7 @@ import {
   publicAccount,
 } from './_account-utils.mjs';
 import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
+import { isHostedTournamentDeleted } from './_tournament-events-utils.mjs';
 import {
   TOURNAMENT_MATCH_TICKET_TTL_MS,
   TournamentGameContractError,
@@ -232,6 +233,13 @@ async function issueTicket(event, payload) {
 
   if (!matchId || !tournamentSlug) {
     return json(400, { error: 'Choose a valid tournament match before opening the game.' });
+  }
+
+  if (await isHostedTournamentDeleted(tournamentSlug)) {
+    return json(410, {
+      error: 'This tournament has been deleted and cannot issue new Play Match access.',
+      code: 'tournament_deleted',
+    });
   }
 
   const bracket = await loadBracket(tournamentSlug);

@@ -1,6 +1,6 @@
 import { connectLambda } from '@netlify/blobs';
 
-import { cleanText } from './_account-utils.mjs';
+import { accountCanonicalId, cleanText } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
 import {
   deleteHostedTournament,
@@ -92,12 +92,26 @@ export async function handler(event) {
     }
 
     try {
-      const deleted = await deleteHostedTournament(tournamentSlug);
+      const deletion = await deleteHostedTournament(tournamentSlug, {
+        deletedBy: accountCanonicalId(adminCheck.account) || adminCheck.method,
+      });
+
+      if (deletion.blocked) {
+        return json(409, {
+          error: 'This tournament has an active assigned match. Finish, cancel, or archive it before deleting the event.',
+          code: deletion.code,
+        });
+      }
+
+      if (deletion.notFound) {
+        return json(404, { error: 'That hosted tournament was not found.' });
+      }
 
       return json(200, {
         ok: true,
-        deleted,
+        deleted: deletion.deleted,
         hostAuth: adminCheck.method,
+        tournament: deletion.tournament,
         tournamentSlug,
         tournaments: await listHostedTournaments(),
       });

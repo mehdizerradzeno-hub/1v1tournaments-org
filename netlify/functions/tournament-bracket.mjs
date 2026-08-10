@@ -5,7 +5,10 @@ import {
   getBearerToken,
   requireTournamentAdmin,
 } from './_host-auth.mjs';
-import { loadHostedTournament } from './_tournament-events-utils.mjs';
+import {
+  isHostedTournamentDeleted,
+  loadHostedTournament,
+} from './_tournament-events-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
 import { normalizeCheckInLeadMinutes } from '../../src/lib/tournamentSettings.js';
@@ -1027,6 +1030,13 @@ export async function handler(event) {
 
       if (adminCheck.error) {
         return adminCheck.error;
+      }
+
+      if (await isHostedTournamentDeleted(tournamentSlug)) {
+        return json(410, {
+          error: 'This tournament has been deleted and cannot generate a new bracket.',
+          code: 'tournament_deleted',
+        });
       }
 
       const tournament = await loadTournamentForBracket(tournamentSlug);

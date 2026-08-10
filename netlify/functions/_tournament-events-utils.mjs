@@ -6,7 +6,11 @@ import {
   normalizeTournamentGameSlug,
   slugifyTournamentTitle,
 } from '../../src/lib/tournamentCatalog.js';
-import { deriveTournamentLifecycle } from '../../src/lib/tournamentLifecycle.js';
+import {
+  deriveTournamentLifecycle,
+  hasActiveTournamentMatches,
+  isTournamentDeleted,
+} from '../../src/lib/tournamentLifecycle.js';
 import { siteData } from '../../src/lib/siteData.js';
 
 const STORE_NAME = 'tournament-events';
@@ -161,39 +165,79 @@ export async function loadHostedTournament(tournamentSlug) {
   return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
 }
 
-export async function deleteHostedTournament(tournamentSlug) {
+export async function loadHostedTournamentRecord(tournamentSlug, options = {}) {
   const slug = cleanText(tournamentSlug);
 
   if (!slug) {
-    return false;
+    return null;
   }
 
-  const store = getStoreWithFallback(STORE_NAME);
+  const store = options.store || getStoreWithFallback(STORE_NAME);
+  return store.get(eventKey(slug), { type: 'json' });
+}
+
+export async function isHostedTournamentDeleted(tournamentSlug, options = {}) {
+  return isTournamentDeleted(await loadHostedTournamentRecord(tournamentSlug, options));
+}
+
+export async function deleteHostedTournament(tournamentSlug, options = {}) {
+  const slug = cleanText(tournamentSlug);
+
+  if (!slug) {
+    return { deleted: false, notFound: true, tournament: null };
+  }
+
+  const store = options.store || getStoreWithFallback(STORE_NAME);
+  const bracketStore = options.bracketStore || getStoreWithFallback('tournament-brackets');
   const existing = await store.get(eventKey(slug), { type: 'json' });
-  const seededTournament = siteData.tournaments.some((tournament) => tournament.slug === slug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === slug) || null;
 
-  await store.delete(eventKey(slug));
+  if (isTournamentDeleted(existing)) {
+    return { alreadyDeleted: true, deleted: true, tournament: existing };
+  }
 
-  if (seededTournament) {
-    const updatedAt = new Date().toISOString();
-    await store.setJSON(eventKey(slug), {
-      slug,
-      deleted: true,
+  if (!existing && !seededTournament) {
+    return { deleted: false, notFound: true, tournament: null };
+  }
+
+  const bracket = await bracketStore.get(`${slug}.json`, { type: 'json' });
+
+  if (hasActiveTournamentMatches(bracket)) {
+    return {
+      blocked: true,
+      code: 'active_matches',
+      deleted: false,
+      tournament: existing || seededTournament,
+    };
+  }
+
+  const date = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
+  const deletedAt = date.toISOString();
+  const deletedBy = cleanText(options.deletedBy) || 'host-token';
+  const tombstone = {
+    ...(seededTournament || {}),
+    ...(existing || {}),
+    slug,
+    deleted: true,
+    hideSeeded: true,
+    status: 'deleted',
+    registrationStatus: 'closed',
+    deletedAt,
+    deletedBy,
+    updatedAt: deletedAt,
+    updatedBy: deletedBy,
+  };
+
+  await store.setJSON(eventKey(slug), tombstone, {
+    metadata: {
+      tournamentSlug: slug,
       hideSeeded: true,
       status: 'deleted',
-      updatedAt,
-      updatedBy: 'host-clear',
-    }, {
-      metadata: {
-        tournamentSlug: slug,
-        hideSeeded: true,
-        status: 'deleted',
-        updatedAt,
-      },
-    });
-  }
+      deletedAt,
+    },
+  });
 
-  return Boolean(existing) || seededTournament;
+  return { deleted: true, tournament: tombstone };
 }
 
 export async function saveHostedTournament(tournament, account = null) {

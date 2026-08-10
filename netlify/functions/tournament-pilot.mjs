@@ -7,7 +7,10 @@ import {
   saveEuchrePilotPolicy,
 } from './_euchre-pilot-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
-import { loadHostedTournament } from './_tournament-events-utils.mjs';
+import {
+  isHostedTournamentDeleted,
+  loadHostedTournament,
+} from './_tournament-events-utils.mjs';
 import {
   normalizeEuchrePilotPolicy,
   normalizePilotCanonicalAccountId,
@@ -75,6 +78,13 @@ export async function handler(event) {
   }
 
   try {
+    if (event.httpMethod === 'POST' && await isHostedTournamentDeleted(tournamentSlug)) {
+      return json(410, {
+        error: 'This tournament has been deleted and cannot accept check-in changes.',
+        code: 'tournament_deleted',
+      });
+    }
+
     const tournament = await loadHostedTournament(tournamentSlug);
 
     if (!tournament) {

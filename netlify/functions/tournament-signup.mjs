@@ -6,7 +6,10 @@ import {
   accountCanonicalId,
   getAccountFromEvent,
 } from './_account-utils.mjs';
-import { loadHostedTournament } from './_tournament-events-utils.mjs';
+import {
+  isHostedTournamentDeleted,
+  loadHostedTournament,
+} from './_tournament-events-utils.mjs';
 import { loadEuchrePilotPolicy } from './_euchre-pilot-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
 import { evaluateEuchrePilotSignupAccess } from '../../src/lib/euchrePilot.js';
@@ -250,6 +253,13 @@ export async function handler(event) {
   }
 
   try {
+    if (await isHostedTournamentDeleted(tournamentSlug)) {
+      return json(410, {
+        error: 'This tournament has been deleted and no longer accepts registration.',
+        code: 'tournament_deleted',
+      });
+    }
+
     const store = getSignupStore();
     const { settings, date: tournamentDate } = await getTournamentDate(tournamentSlug);
     const key = signupKey(tournamentSlug, account.id);
