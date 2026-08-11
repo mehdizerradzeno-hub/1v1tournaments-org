@@ -21,6 +21,10 @@ function player(id, seed, name) {
   return { id, seed, name, canonicalAccountId: `private-${id}`, email: `${id}@example.test` };
 }
 
+function broadcastWrapper({ hydrated, width, height }) {
+  return !hydrated || width < 680 || height < 760 ? 'ScrollView' : 'View';
+}
+
 function eightPlayerBracket() {
   const players = Array.from({ length: 8 }, (_, index) => player(`p${index + 1}`, index + 1, `Player ${index + 1}`));
   return {
@@ -136,4 +140,26 @@ test('stacked broadcast brackets expand around every match before the footer', a
   assert.match(screenSource, /<\/View>\s*<View style=\{styles\.footer\}>/);
   assert.doesNotMatch(screenSource, /(bracketPanel|rounds|matchStack)Stacked:\s*\{[^}]*\bheight\s*:/);
   assert.doesNotMatch(screenSource, /(bracketPanel|rounds|matchStack)Stacked:\s*\{[^}]*overflow:\s*'hidden'/);
+});
+
+test('public broadcast direct loads keep the server wrapper through first hydration', async () => {
+  const [routeSource, screenSource] = await Promise.all([
+    readFile(new URL('../app/overlay/bracket.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/screens/BroadcastBracketScreen.jsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(routeSource, /BroadcastBracketScreen/);
+  assert.match(screenSource, /import \{ useHydrated \} from '\.\.\/lib\/useHydrated';/);
+  assert.match(screenSource, /const isHydrated = useHydrated\(\);/);
+  assert.match(screenSource, /const shouldScroll = !isHydrated \|\| compact \|\| height < 760;/);
+  assert.match(screenSource, /if \(shouldScroll\) \{\s*return <ScrollView/);
+
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1920, height: 1080 }]) {
+    const serverWrapper = broadcastWrapper({ hydrated: false, width: 0, height: 0 });
+    const firstClientWrapper = broadcastWrapper({ hydrated: false, ...viewport });
+    assert.equal(firstClientWrapper, serverWrapper, `${viewport.width}x${viewport.height} must hydrate the server wrapper`);
+  }
+
+  assert.equal(broadcastWrapper({ hydrated: true, width: 390, height: 844 }), 'ScrollView');
+  assert.equal(broadcastWrapper({ hydrated: true, width: 1920, height: 1080 }), 'View');
 });

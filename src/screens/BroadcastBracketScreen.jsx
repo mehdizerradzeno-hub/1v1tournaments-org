@@ -10,6 +10,7 @@ import {
 
 import { buildBroadcastBracketModel, formatBroadcastDate } from '../lib/broadcastBracketPresentation';
 import { fetchTournamentBracket, fetchTournamentEvents } from '../lib/tournamentHostingClient';
+import { useHydrated } from '../lib/useHydrated';
 
 const COLORS = {
   black: '#050505',
@@ -167,6 +168,7 @@ function BroadcastContent({ model, width }) {
 
 export default function BroadcastBracketScreen({ tournamentSlug = '' }) {
   const { width, height } = useWindowDimensions();
+  const isHydrated = useHydrated();
   const [state, setState] = useState({ event: null, bracket: null, loading: true, error: '' });
 
   useEffect(() => {
@@ -200,13 +202,14 @@ export default function BroadcastBracketScreen({ tournamentSlug = '' }) {
 
   const model = useMemo(() => buildBroadcastBracketModel(state), [state]);
   const compact = width < 680;
+  const shouldScroll = !isHydrated || compact || height < 760;
   const frame = state.loading ? (
     <View style={styles.statePanel}><Text style={styles.stateEyebrow}>1V1 LIVE</Text><Text style={styles.stateTitle}>Loading broadcast bracket</Text></View>
   ) : state.error || !model ? (
     <View style={[styles.statePanel, styles.errorPanel]}><Text style={styles.stateEyebrow}>BROADCAST UNAVAILABLE</Text><Text style={styles.stateTitle}>{state.error || 'Tournament not found.'}</Text><Text style={styles.stateCopy}>No bracket state has been invented. Try this public link again shortly.</Text></View>
   ) : <BroadcastContent model={model} width={width} />;
 
-  if (compact || height < 760) {
+  if (shouldScroll) {
     return <ScrollView contentContainerStyle={styles.scrollContent} style={styles.page}>{frame}</ScrollView>;
   }
   return <View style={styles.page}>{frame}</View>;

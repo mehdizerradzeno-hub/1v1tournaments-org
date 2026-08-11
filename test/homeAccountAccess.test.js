@@ -35,6 +35,7 @@ test('Tournament Hub account route reuses the existing authoritative account flo
 });
 
 test('mobile header remains compact and exposes only one Sign Out action', () => {
-  assert.match(hubSource, /width > 0 && width < 520/);
+  assert.match(hubSource, /const hasHydratedViewport = isHydrated && width > 0;/);
+  assert.match(hubSource, /showTinyHeader = hasHydratedViewport && width < 520/);
   assert.equal(sharedAccountScreenSource.match(/'Sign Out'/g)?.length, 1);
 });
