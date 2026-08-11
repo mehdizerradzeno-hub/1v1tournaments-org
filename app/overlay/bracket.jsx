@@ -1,5 +1,9 @@
-import OverlayScreen from '../../src/screens/OverlayScreen.jsx';
+import { useGlobalSearchParams } from 'expo-router';
 
-export default function BracketOverlayRoute() {
-  return <OverlayScreen variant="bracket" />;
+import BroadcastBracketScreen from '../../src/screens/BroadcastBracketScreen';
+
+export default function BroadcastBracketRoute() {
+  const params = useGlobalSearchParams();
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  return <BroadcastBracketScreen tournamentSlug={String(slug || '')} />;
 }

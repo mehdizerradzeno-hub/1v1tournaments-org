@@ -1,1 +1,1 @@
-export { default } from '../src/screens/NextScreen.jsx';
+export { default } from '../src/screens/TournamentLandingRoute';

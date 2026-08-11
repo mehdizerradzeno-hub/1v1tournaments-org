@@ -40,8 +40,10 @@ const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardS
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const streamModeScreenFile = fileURLToPath(new URL('../src/screens/StreamModeScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
+const tournamentLandingRouteFile = fileURLToPath(new URL('../src/screens/TournamentLandingRoute.jsx', import.meta.url));
 const leaguesRouteScreenFile = fileURLToPath(new URL('../src/screens/LeaguesRouteScreen.jsx', import.meta.url));
 const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
+const broadcastBracketScreenFile = fileURLToPath(new URL('../src/screens/BroadcastBracketScreen.jsx', import.meta.url));
 const resultsScreenFile = fileURLToPath(new URL('../src/screens/ResultsScreen.jsx', import.meta.url));
 const rulesScreenFile = fileURLToPath(new URL('../src/screens/RulesScreen.jsx', import.meta.url));
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
@@ -156,14 +158,14 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
   assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
 });
 
-test('homepage is the public next-event lobby for stream traffic', () => {
+test('homepage is the multi-game platform hub', () => {
   assert.ok(existsSync(indexRouteFile));
   assert.ok(existsSync(nextScreenFile));
 
   const indexRouteSource = readFileSync(indexRouteFile, 'utf8');
 
-  assert.match(indexRouteSource, /NextScreen/);
-  assert.doesNotMatch(indexRouteSource, /HomeScreen/);
+  assert.match(indexRouteSource, /HomeScreen/);
+  assert.doesNotMatch(indexRouteSource, /NextScreen/);
 });
 
 test('public support pages keep players routed back to active tournament flow', () => {
@@ -199,9 +201,11 @@ test('/next stays wired to the public next-event lobby', () => {
 
   const nextRouteSource = readFileSync(nextRouteFile, 'utf8');
   const nextScreenSource = readFileSync(nextScreenFile, 'utf8');
+  const tournamentLandingRouteSource = readFileSync(tournamentLandingRouteFile, 'utf8');
   const netlifyConfigSource = readFileSync(netlifyConfigFile, 'utf8');
 
-  assert.match(nextRouteSource, /NextScreen/);
+  assert.match(nextRouteSource, /TournamentLandingRoute/);
+  assert.match(tournamentLandingRouteSource, /NextScreen/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
   assert.match(nextScreenSource, /Tournament status/);
   assert.match(nextScreenSource, /heroVariant="compact"/);
@@ -221,8 +225,10 @@ test('/tournaments stays wired to the public tournament hub instead of the unmat
   assert.ok(existsSync(tournamentsIndexRouteFile));
 
   const tournamentsIndexRouteSource = readFileSync(tournamentsIndexRouteFile, 'utf8');
+  const tournamentLandingRouteSource = readFileSync(tournamentLandingRouteFile, 'utf8');
 
-  assert.match(tournamentsIndexRouteSource, /NextScreen/);
+  assert.match(tournamentsIndexRouteSource, /TournamentLandingRoute/);
+  assert.match(tournamentLandingRouteSource, /NextScreen/);
   assert.doesNotMatch(tournamentsIndexRouteSource, /Redirect/);
 });
 
@@ -342,14 +348,20 @@ test('overlay routes stay wired to OBS browser sources', () => {
   const bracketRouteSource = readFileSync(overlayBracketRouteFile, 'utf8');
   const compactRouteSource = readFileSync(overlayCompactRouteFile, 'utf8');
   const overlayScreenSource = readFileSync(overlayScreenFile, 'utf8');
+  const broadcastBracketScreenSource = readFileSync(broadcastBracketScreenFile, 'utf8');
 
-  assert.match(bracketRouteSource, /variant="bracket"/);
+  assert.match(bracketRouteSource, /BroadcastBracketScreen/);
+  assert.match(bracketRouteSource, /useGlobalSearchParams/);
+  assert.match(bracketRouteSource, /tournamentSlug/);
   assert.match(compactRouteSource, /variant="compact"/);
   assert.match(overlayScreenSource, /getPublicTournamentCatalog/);
   assert.match(overlayScreenSource, /getPublicTournamentFeedStatus/);
   assert.match(overlayScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
   assert.match(overlayScreenSource, /setInterval\(loadEventData, 15000\)/);
   assert.match(overlayScreenSource, /getOverlayStatusLabel/);
+  assert.match(broadcastBracketScreenSource, /LIVE DATA \/ 15S REFRESH/);
+  assert.match(broadcastBracketScreenSource, /mobileRoundTabs/);
+  assert.doesNotMatch(broadcastBracketScreenSource, /canonicalAccountId|participantId|accountId/);
 });
 
 test('the featured tournament route stays wired to the Spades launch event', () => {
@@ -545,7 +557,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Overall standings/);
   assert.match(nextScreenSource, /Find My Match/);
-  assert.match(nextScreenSource, /Host Admin/);
+  assert.doesNotMatch(nextScreenSource, /Host Admin/);
+  assert.match(nextScreenSource, /1V1 Community Cups/);
+  assert.match(nextScreenSource, /Open stream bracket/);
+  assert.match(nextScreenSource, /fetchTournamentPlayerStatus/);
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /getSignInPath/);

@@ -42,20 +42,23 @@ function getNextNavTournamentSlug(hostedTournaments = []) {
 
 function getNavItems(paths) {
   return [
-    { label: 'Join', href: paths.checkInPath },
+    { label: 'Compete', href: '/games' },
+    { label: 'Tournaments', href: '/tournaments' },
+    { label: 'Leagues', href: '/leagues' },
+    { label: 'Rankings', href: '/leaderboard' },
+    { label: 'Results', href: '/results' },
+    { label: 'Profile', href: '/account' },
     { label: 'My Match', href: paths.matchPath, activePath: paths.tournamentPath },
-    { label: 'Event', href: paths.tournamentPath },
-    { label: 'Watch', href: '/stream' },
-    { label: 'Rules', href: '/rules' },
   ];
 }
 
 function getMobileNavItems(paths) {
   return [
-    { label: 'Join', href: paths.checkInPath },
+    { label: 'Compete', href: '/games' },
     { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
-    { label: 'Event', href: paths.tournamentPath },
-    { label: 'Watch', href: '/stream' },
+    { label: 'Events', href: '/tournaments' },
+    { label: 'Leagues', href: '/leagues' },
+    { label: 'Profile', href: '/account' },
   ];
 }
 
@@ -790,7 +793,7 @@ export function HubScreen({
                     </View>
                     <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
                       <Text style={styles.brandTitle}>1v1 Tournaments</Text>
-                      <Text style={styles.brandDomain}>Free-entry Spades events</Text>
+                      <Text style={styles.brandDomain}>Spades • Euchre • Tournaments</Text>
                     </View>
                   </Pressable>
                 </Link>

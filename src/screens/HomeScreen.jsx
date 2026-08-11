@@ -4,7 +4,6 @@ import { Image, Linking, Pressable, Text, View, StyleSheet, useWindowDimensions 
 import {
   ActionButton,
   Badge,
-  GameCard,
   HubScreen,
   ResultCard,
   Section,
@@ -12,15 +11,12 @@ import {
   StatPill,
   Surface,
   EmptyState,
-  BulletList,
 } from '../components/hub-ui.jsx';
 import { formatDateLine, formatShortDate } from '../lib/format.js';
 import { APP_STORE_BADGE_URL, downloadLinks } from '../lib/downloadLinks.js';
 import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
 import {
   buildResultFromTournamentBracket,
-  getGameBySlug,
-  getGamePath,
   getGames,
   getResults,
   getStreams,
@@ -35,6 +31,12 @@ import {
   getNextPublicTournament,
   mergeTournamentLists,
 } from '../lib/tournamentCatalog.js';
+import {
+  getAppleReleaseLabel,
+  getFeaturedCompetitionAction,
+  PLATFORM_GAME_PRESENTATION,
+  PLATFORM_SUBMISSION_STATEMENT,
+} from '../lib/platformPresentation.js';
 import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
@@ -168,7 +170,6 @@ export default function HomeScreen() {
     () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
     [hostedTournaments],
   );
-  const spades = getGameBySlug(siteData.site.primaryGameSlug);
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
   const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
   const hydratedUpcoming = sortTournamentsByDate(
@@ -280,10 +281,14 @@ export default function HomeScreen() {
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
       forceTopNav
-      lead="Create an account, sign up for the next Spades tournament, open your match when the bracket is live, play, then come back for results."
+      lead="One account for competitive Spades and Euchre, tournament assignments, leagues, rankings, and results."
       showHero={false}
-      subtitle="Free-entry Spades tournaments with account-based signup, hosted brackets, and clear match links."
+      subtitle="One account. Ranked competition. Tournaments."
       title={siteData.site.name}>
+      <PlatformIntroHero />
+
+      <PremiumDownloadSection />
+
       <PremiumCountdownHero
         bracket={featuredBracket}
         countdown={featuredCountdown}
@@ -307,8 +312,6 @@ export default function HomeScreen() {
         tournamentPath={featuredTournamentPath}
       />
 
-      <PremiumDownloadSection />
-
       <Section
         action={featuredTournament ? <ActionButton href={featuredTournamentPath}>Open next event</ActionButton> : null}
         description="Live, tonight, and upcoming public tournaments appear here, soonest first."
@@ -326,43 +329,6 @@ export default function HomeScreen() {
           nowMs={nowMs}
           tournaments={visibleUpcoming}
         />
-      </Section>
-
-      {spades ? (
-        <Section
-          description="Spades is the gameplay app. The tournament hub creates the match links and bracket context."
-          title="Spades spotlight">
-          <Surface style={styles.spadesSpotlight}>
-            <View style={styles.spadesTopRow}>
-              <Badge tone="accent">Featured game</Badge>
-              <Text style={styles.spadesPath}>/spades</Text>
-            </View>
-            <Text style={styles.spadesTitle}>{spades.name}</Text>
-            <Text style={styles.spadesLead}>{spades.heroCopy}</Text>
-            <BulletList items={spades.highlights} tone="accent" />
-            <View style={styles.spadesStats}>
-              {spades.quickFacts.map((fact) => (
-                <StatPill key={fact.label} label={fact.label} value={fact.value} tone="accent" />
-              ))}
-            </View>
-            <View style={styles.spadesActions}>
-              <ActionButton href={getGamePath(spades.slug)}>Open Spades</ActionButton>
-              <ActionButton href={getTournamentPath(siteData.site.primaryTournamentSlug)} variant="secondary">
-                Event
-              </ActionButton>
-            </View>
-          </Surface>
-        </Section>
-      ) : null}
-
-      <Section
-        description="Spades is active now. Euchre stays as a coming-soon lane until it is ready."
-        title="Game lineup">
-        {games.map((game) => (
-          <View key={game.slug} style={styles.block}>
-            <GameCard game={game} href={game.status === 'active' ? getGamePath(game.slug) : null} />
-          </View>
-        ))}
       </Section>
 
       <Section
@@ -393,6 +359,33 @@ export default function HomeScreen() {
   );
 }
 
+function PlatformIntroHero() {
+  const { width } = useWindowDimensions();
+  const compact = width > 0 && width < 700;
+
+  return (
+    <Surface style={[styles.platformHero, compact && styles.platformHeroCompact]}>
+      <View pointerEvents="none" style={styles.platformHeroBackdrop}>
+        <Text style={styles.platformHeroSuit}>♠</Text>
+        <Text style={[styles.platformHeroSuit, styles.platformHeroSuitRight]}>♦</Text>
+      </View>
+      <View style={styles.platformHeroCopy}>
+        <Badge tone="accent">1V1 Competitive</Badge>
+        <Text accessibilityRole="header" style={[styles.platformHeroTitle, compact && styles.platformHeroTitleCompact]}>
+          Spades &amp; Euchre
+        </Text>
+        <Text style={styles.platformHeroLead}>One account. Ranked competition. Tournaments.</Text>
+        <Text style={styles.platformHeroCallout}>No partner. No excuses.</Text>
+      </View>
+      <View style={styles.platformHeroActions}>
+        <ActionButton href="/games">Compete</ActionButton>
+        <ActionButton href="/tournaments" variant="secondary">Tournaments</ActionButton>
+        <ActionButton href="/leagues" variant="secondary">Leagues</ActionButton>
+      </View>
+    </Surface>
+  );
+}
+
 function PremiumCountdownHero({
   bracket,
   countdown,
@@ -406,6 +399,17 @@ function PremiumCountdownHero({
   tournamentPath,
 }) {
   const isBracketLive = Boolean(bracket);
+  const gameSlug = tournament?.gameSlug || tournament?.game || 'spades';
+  const gamePresentation = PLATFORM_GAME_PRESENTATION[gameSlug] || PLATFORM_GAME_PRESENTATION.spades;
+  const primaryAction = getFeaturedCompetitionAction({
+    status: tournament?.status,
+    registrationStatus: registrationMeta?.value,
+    hasBracket: isBracketLive,
+    tournamentPath,
+    signupPath,
+    matchPath: matchStatusPath,
+  });
+  const gameWebUrl = gameSlug === 'euchre' ? downloadLinks.webEuchre : downloadLinks.webSpades;
   const { width } = useWindowDimensions();
   const isCompact = width > 0 && width < 760;
   const isTight = width > 0 && width < 440;
@@ -459,7 +463,7 @@ function PremiumCountdownHero({
         <Text accessibilityRole="header" style={[styles.premiumHeroTitle, isCompact && styles.premiumHeroTitleCompact]}>
           {tournament.title}
         </Text>
-        <Text style={styles.premiumHeroSubtitle}>Free-entry. Account-based. Head-to-head Spades.</Text>
+        <Text style={styles.premiumHeroSubtitle}>Free-entry. Account-based. Head-to-head {gamePresentation.name}.</Text>
         <Text style={styles.premiumHeroDate}>
           {countdown.hasDate ? formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel) : 'Date pending'}
         </Text>
@@ -491,20 +495,14 @@ function PremiumCountdownHero({
       </View>
 
       <View style={styles.heroPrimaryActions}>
-        <ActionButton href={signupPath} style={styles.heroActionButton}>
-          Join next tournament
+        <ActionButton href={primaryAction.href} style={styles.heroActionButton}>
+          {primaryAction.label}
         </ActionButton>
         <ActionButton href={matchStatusPath} style={styles.heroActionButton} variant="secondary">
-          Find my match
-        </ActionButton>
-        <ActionButton href="/leagues" style={styles.heroActionButton} variant="secondary">
-          My leagues
+          My Match
         </ActionButton>
         <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
-          View bracket
-        </ActionButton>
-        <ActionButton href="/#next-tournaments" style={styles.heroActionButton} variant="secondary">
-          All upcoming
+          Bracket
         </ActionButton>
       </View>
 
@@ -512,8 +510,8 @@ function PremiumCountdownHero({
         <ActionButton href="/stream" style={styles.heroSecondaryButton} variant="secondary">
           Watch live
         </ActionButton>
-        <ActionButton href="/admin" style={styles.heroSecondaryButton} variant="ghost">
-          Host admin
+        <ActionButton href="/results" style={styles.heroSecondaryButton} variant="ghost">
+          Results
         </ActionButton>
       </View>
 
@@ -531,12 +529,7 @@ function PremiumCountdownHero({
       </View>
 
       <View style={styles.heroActionRow}>
-        <AppStoreBadgeButton
-          href={downloadLinks.appStoreSpades}
-          label="Download 1v1 Spades on the App Store"
-          large
-        />
-        <PremiumLinkButton gameAudience="spades" href={downloadLinks.webSpades} label="Play on the Web" />
+        <PremiumLinkButton gameAudience={gameSlug} href={gameWebUrl} label={`Play ${gamePresentation.name} on the Web`} />
         <PremiumLinkButton href={downloadLinks.twitch} label="Twitch" />
         <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
         <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
@@ -546,21 +539,23 @@ function PremiumCountdownHero({
 }
 
 function PremiumDownloadSection() {
+  const spadesPresentation = PLATFORM_GAME_PRESENTATION.spades;
+  const euchrePresentation = PLATFORM_GAME_PRESENTATION.euchre;
   const games = [
     {
       key: 'spades',
-      title: '1v1 Spades',
-      eyebrow: 'Live now',
-      body: 'Open the competitive Spades app, play on web, or install from the App Store.',
+      title: spadesPresentation.name,
+      eyebrow: getAppleReleaseLabel(spadesPresentation.releaseState),
+      body: spadesPresentation.description,
       appStoreUrl: downloadLinks.appStoreSpades,
       webUrl: downloadLinks.webSpades,
       accent: '#D6A24E',
     },
     {
       key: 'euchre',
-      title: '1v1 Euchre',
-      eyebrow: 'Next game',
-      body: 'Euchre is wired for the same 1v1 family experience. The App Store badge appears automatically when its URL is configured.',
+      title: euchrePresentation.name,
+      eyebrow: getAppleReleaseLabel(euchrePresentation.releaseState),
+      body: euchrePresentation.description,
       appStoreUrl: downloadLinks.appStoreEuchre,
       webUrl: downloadLinks.webEuchre,
       accent: '#5E7FA3',
@@ -570,10 +565,10 @@ function PremiumDownloadSection() {
   return (
     <>
       <Section
-        description="Install the apps, launch the web versions, or jump straight into hosted events from one consistent landing section."
-        eyebrow="Official downloads"
+        description={PLATFORM_SUBMISSION_STATEMENT}
+        eyebrow="The games"
         nativeID="downloads"
-        title="Play the 1v1 card lineup">
+        title="Choose your table">
         <View style={styles.downloadGamesGrid}>
           {games.map((game) => (
             <PremiumGameDownloadCard key={game.key} game={game} />
@@ -2023,5 +2018,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
+  },
+  platformHero: {
+    backgroundColor: '#07110F',
+    borderColor: 'rgba(214, 162, 78, 0.42)',
+    minHeight: 390,
+    overflow: 'hidden',
+    paddingHorizontal: 28,
+    paddingVertical: 34,
+  },
+  platformHeroCompact: {
+    minHeight: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 26,
+  },
+  platformHeroBackdrop: {
+    bottom: 0,
+    left: 0,
+    opacity: 0.12,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  platformHeroSuit: {
+    color: '#D6A24E',
+    fontSize: 260,
+    fontWeight: '900',
+    left: -35,
+    lineHeight: 280,
+    position: 'absolute',
+    top: 70,
+  },
+  platformHeroSuitRight: {
+    color: '#5E7FA3',
+    left: 'auto',
+    right: -35,
+    top: -50,
+  },
+  platformHeroCopy: {
+    maxWidth: 820,
+    position: 'relative',
+  },
+  platformHeroTitle: {
+    color: '#F4EFE6',
+    fontFamily: 'Georgia',
+    fontSize: 72,
+    fontWeight: '900',
+    letterSpacing: -2,
+    lineHeight: 78,
+    marginTop: 20,
+  },
+  platformHeroTitleCompact: {
+    fontSize: 44,
+    letterSpacing: -1,
+    lineHeight: 49,
+  },
+  platformHeroLead: {
+    color: '#F4EFE6',
+    fontSize: 21,
+    fontWeight: '800',
+    lineHeight: 30,
+    marginTop: 16,
+  },
+  platformHeroCallout: {
+    color: '#D6A24E',
+    fontFamily: 'Georgia',
+    fontSize: 27,
+    fontStyle: 'italic',
+    fontWeight: '800',
+    lineHeight: 34,
+    marginTop: 9,
+  },
+  platformHeroActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 28,
+    position: 'relative',
   },
 });

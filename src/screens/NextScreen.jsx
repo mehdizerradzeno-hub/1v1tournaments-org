@@ -19,11 +19,17 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import { getNextPublicTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import {
+  findRedditSundayCommunityCup,
+  getCommunityCupPrimaryAction,
+  getTournamentBroadcastPath,
+} from '../lib/platformPresentation.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import {
   fetchSignupSummary,
   fetchTournamentBracket,
   fetchTournamentEvents,
+  fetchTournamentPlayerStatus,
   fetchTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
 
@@ -287,6 +293,7 @@ export default function NextScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentsLoaded, setHostedTournamentsLoaded] = useState(false);
+  const [communityPlayerStatus, setCommunityPlayerStatus] = useState({ data: null, error: '', loading: false });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const publicTournaments = useMemo(
     () => hostedTournamentsLoaded
@@ -299,6 +306,11 @@ export default function NextScreen() {
   const hydratedPublicTournaments = sortTournamentsByDate(
     publicTournaments.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
   );
+  const communityTournament = findRedditSundayCommunityCup(hydratedPublicTournaments);
+  const communityEventData = eventDataBySlug[communityTournament?.slug || ''] || {};
+  const communityRegistrationMeta = communityTournament
+    ? getEffectiveRegistrationStatus(communityTournament, { hasLiveBracket: Boolean(communityEventData.bracket) })
+    : null;
   const tournament = getNextPublicTournament(hydratedPublicTournaments, eventDataBySlug, nowMs);
   const eventData = eventDataBySlug[tournament?.slug || ''] || {};
   const signupSummary = eventData.signupSummary || { count: 0, signups: [], loading: Boolean(tournament) };
@@ -411,6 +423,43 @@ export default function NextScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!communityTournament?.slug) {
+      return undefined;
+    }
+
+    let active = true;
+    let refreshing = false;
+
+    async function loadCommunityPlayerStatus() {
+      if (refreshing) return;
+      refreshing = true;
+
+      try {
+        const result = await fetchTournamentPlayerStatus({ slug: communityTournament.slug });
+        if (active) setCommunityPlayerStatus({ data: result, error: '', loading: false });
+      } catch (error) {
+        if (active) {
+          setCommunityPlayerStatus({
+            data: null,
+            error: error instanceof Error ? error.message : 'Player status is unavailable.',
+            loading: false,
+          });
+        }
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    loadCommunityPlayerStatus();
+    const refreshTimer = setInterval(loadCommunityPlayerStatus, 15000);
+
+    return () => {
+      active = false;
+      clearInterval(refreshTimer);
+    };
+  }, [communityTournament?.slug]);
+
   if (!hostedTournamentsLoaded) {
     return (
       <HubScreen
@@ -447,6 +496,7 @@ export default function NextScreen() {
           body="Add or publish a tournament and this page becomes the public lobby."
           title="No event ready"
         />
+        <CommunityCupsSection tournament={null} />
       </HubScreen>
     );
   }
@@ -481,6 +531,12 @@ export default function NextScreen() {
         signupSummary={signupSummary}
         tournament={tournament}
         tournamentPath={tournamentPath}
+      />
+      <CommunityCupsSection
+        bracket={communityEventData.bracket || null}
+        playerStatus={communityPlayerStatus}
+        registrationMeta={communityRegistrationMeta}
+        tournament={communityTournament}
       />
       <SponsorSoftwareShowcase />
     </HubScreen>
@@ -570,9 +626,6 @@ function NextLobbyHero({
             </ActionButton>
             <ActionButton href="/stream" style={styles.heroExitButton} variant="secondary">
               Watch Live
-            </ActionButton>
-            <ActionButton href="/admin" style={styles.heroExitButton} variant="ghost">
-              Host Admin
             </ActionButton>
           </View>
 
@@ -684,6 +737,91 @@ function NextLobbyHero({
           </View>
         </View>
       </View>
+    </Surface>
+  );
+}
+
+function CommunityCupsSection({ bracket = null, playerStatus = null, registrationMeta = null, tournament }) {
+  const tournamentPath = tournament ? getTournamentPath(tournament.slug) : '/tournaments';
+  const signupPath = tournament ? getCheckInPath(tournament.slug) : '/tournaments';
+  const bracketPath = tournament ? `${tournamentPath}#live-bracket` : '/tournaments';
+  const broadcastPath = tournament ? getTournamentBroadcastPath(tournament.slug) : '/overlay/bracket';
+  const primaryAction = tournament ? getCommunityCupPrimaryAction({
+    playerStatus,
+    status: tournament.status,
+    registrationStatus: registrationMeta?.value,
+    hasBracket: Boolean(bracket),
+    tournamentPath,
+    signupPath,
+    matchPath: `${tournamentPath}#my-match`,
+    bracketPath,
+  }) : null;
+
+  return (
+    <Surface nativeID="community-cups" style={styles.communitySection}>
+      <View style={styles.communityHeader}>
+        <View style={styles.communityHeaderCopy}>
+          <Text style={styles.communityEyebrow}>1V1 Community Cups</Text>
+          <Text style={styles.communityTitle}>A clear path from open cups to championships.</Text>
+          <Text style={styles.communityBody}>
+            Community competitions live under the 1V1 platform, alongside future leagues and the permanent results archive.
+          </Text>
+        </View>
+        <Badge tone="accent">Community-run competition</Badge>
+      </View>
+
+      <View style={styles.competitionHierarchy}>
+        <View style={styles.hierarchyCard}>
+          <Text style={styles.hierarchyLabel}>Official Championships</Text>
+          <Text style={styles.hierarchyValue}>Season championships</Text>
+          <Text style={styles.hierarchyMeta}>Top-level 1V1 events.</Text>
+        </View>
+        <View style={[styles.hierarchyCard, styles.hierarchyCardActive]}>
+          <Text style={styles.hierarchyLabel}>Community Cups</Text>
+          <Text style={styles.hierarchyValue}>Reddit Cups</Text>
+          <Text style={styles.hierarchyMeta}>Discord and venue cups can follow.</Text>
+        </View>
+        <View style={styles.hierarchyCard}>
+          <Text style={styles.hierarchyLabel}>Future Leagues</Text>
+          <Text style={styles.hierarchyValue}>Recurring seasons</Text>
+          <Text style={styles.hierarchyMeta}>Schedules and standings.</Text>
+        </View>
+        <View style={styles.hierarchyCard}>
+          <Text style={styles.hierarchyLabel}>Results & Champions</Text>
+          <Text style={styles.hierarchyValue}>Permanent archive</Text>
+          <ActionButton href="/results" variant="ghost">Open results</ActionButton>
+        </View>
+      </View>
+
+      {tournament ? (
+        <View style={styles.communityEventCard}>
+          <View style={styles.communityEventCopy}>
+            <View style={styles.communityBadges}>
+              <Badge tone="accent">Reddit Cup</Badge>
+              <Badge tone="blue">Spades</Badge>
+              <Badge tone="green">Free entry</Badge>
+              <Badge tone={registrationMeta?.tone || 'neutral'}>{registrationMeta?.label || 'Event posted'}</Badge>
+            </View>
+            <Text style={styles.communityEventTitle}>{tournament.title}</Text>
+            <Text style={styles.communityEventDate}>
+              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)} • {getRosterCap(tournament)} player cap • Single elimination
+            </Text>
+            <Text style={styles.communityEventInstructions}>
+              Register now. Check-in opens 30 minutes before the event. The public bracket is generated after check-in.
+            </Text>
+            {playerStatus?.error ? <Text style={styles.communityStatusWarning}>{playerStatus.error}</Text> : null}
+          </View>
+          <View style={styles.communityActions}>
+            <ActionButton href={primaryAction.href}>{playerStatus?.loading ? 'Checking your status...' : primaryAction.label}</ActionButton>
+            <ActionButton href={broadcastPath} variant="secondary">Open stream bracket</ActionButton>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.communityEmpty}>
+          <Text style={styles.communityEventTitle}>No Community Cup is published yet.</Text>
+          <Text style={styles.communityBody}>The next Reddit Cup will appear here from the authoritative tournament schedule.</Text>
+        </View>
+      )}
     </Surface>
   );
 }
@@ -1543,5 +1681,135 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 17,
     maxWidth: 240,
+  },
+  communitySection: {
+    gap: 22,
+    marginTop: 28,
+  },
+  communityHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  communityHeaderCopy: {
+    flex: 1,
+    minWidth: 260,
+  },
+  communityEyebrow: {
+    color: '#D6A24E',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  communityTitle: {
+    color: '#F4EFE6',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 36,
+    marginTop: 8,
+  },
+  communityBody: {
+    color: '#A7A29A',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
+    marginTop: 8,
+    maxWidth: 760,
+  },
+  competitionHierarchy: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  hierarchyCard: {
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 5,
+    minWidth: 210,
+    padding: 15,
+  },
+  hierarchyCardActive: {
+    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
+  },
+  hierarchyLabel: {
+    color: '#D6A24E',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  hierarchyValue: {
+    color: '#F4EFE6',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  hierarchyMeta: {
+    color: '#A7A29A',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  communityEventCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(12, 36, 30, 0.76)',
+    borderColor: 'rgba(65, 194, 116, 0.38)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    justifyContent: 'space-between',
+    padding: 18,
+  },
+  communityEventCopy: {
+    flex: 1,
+    minWidth: 250,
+  },
+  communityBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  communityEventTitle: {
+    color: '#F4EFE6',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
+    marginTop: 10,
+  },
+  communityEventDate: {
+    color: '#D6A24E',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  communityEventInstructions: {
+    color: '#C9C2B8',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 9,
+  },
+  communityActions: {
+    gap: 10,
+    minWidth: 230,
+  },
+  communityStatusWarning: {
+    color: '#F0C86A',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  communityEmpty: {
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderRadius: 14,
+    padding: 18,
   },
 });

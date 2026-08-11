@@ -1,0 +1,32 @@
+[data-tournament-page="true"],
+[data-tournament-page="true"] * {
+  box-sizing: border-box;
+}
+
+[data-tournament-page="true"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 430px) {
+  [data-tournament-page="true"] * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere;
+  }
+
+  [data-tournament-page="true"] img,
+  [data-tournament-page="true"] svg,
+  [data-tournament-page="true"] canvas {
+    width: auto;
+    height: auto;
+    max-width: 100% !important;
+  }
+
+  [data-tournament-page="true"] [role="button"],
+  [data-tournament-page="true"] a {
+    min-height: 44px;
+    white-space: normal;
+  }
+}

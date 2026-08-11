@@ -11,7 +11,7 @@ export default function RootLayout() {
         <title>1v1 Tournaments</title>
         <meta
           name="description"
-          content="Free-entry 1v1 card-game tournaments for Spades, with Euchre coming soon."
+          content="One account for competitive Spades and Euchre, tournaments, leagues, rankings, and results."
         />
         <style>{`
           html,

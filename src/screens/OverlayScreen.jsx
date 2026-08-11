@@ -108,7 +108,86 @@ function getOverlayStatusLabel(bracket, registrationMeta) {
   return registrationMeta.label.toUpperCase();
 }
 
-export default function OverlayScreen({ variant = 'full' }) {
+function getMatchWinnerName(match) {
+  return match?.winnerName || match?.winner?.name || match?.winner?.playerName || '';
+}
+
+function getMatchBroadcastStatus(match) {
+  if (getMatchWinnerName(match) || match?.status === 'final') return 'Final';
+  if (match?.status === 'active') return 'Playing';
+  if (match?.status === 'ready') return 'Ready';
+  if ((match?.players || []).filter(Boolean).length === 1) return 'Bye';
+  return 'Pending';
+}
+
+function StreamBracketBoard({ bracket, tournament }) {
+  const rounds = bracket?.rounds || [];
+  const champion = bracket?.winner?.name || bracket?.winner?.playerName || bracket?.championName || '';
+  const gameName = String(tournament?.gameSlug || tournament?.game || 'spades').toLowerCase() === 'euchre'
+    ? 'Euchre'
+    : 'Spades';
+
+  return (
+    <View style={styles.broadcastBoard}>
+      <View style={styles.broadcastHeader}>
+        <View style={styles.broadcastTitleBlock}>
+          <Text style={styles.broadcastEyebrow}>1V1 STREAM BRACKET • {gameName.toUpperCase()}</Text>
+          <Text style={styles.broadcastTitle}>{tournament.title}</Text>
+          <Text style={styles.broadcastMeta}>
+            {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)} • Auto-refreshes every 15 seconds
+          </Text>
+        </View>
+        <View style={[styles.statusPill, bracket && styles.broadcastStatusPill]}>
+          <View style={[styles.statusDot, bracket && styles.statusDotLive]} />
+          <Text style={styles.statusText}>{bracket?.status === 'complete' ? 'COMPLETE' : bracket ? 'BRACKET LIVE' : 'AWAITING BRACKET'}</Text>
+        </View>
+      </View>
+
+      {!bracket ? (
+        <View style={styles.broadcastEmpty}>
+          <Text style={styles.broadcastEmptyTitle}>Bracket appears after check-in.</Text>
+          <Text style={styles.broadcastEmptyBody}>Registered players and seeded rounds will populate here automatically.</Text>
+        </View>
+      ) : (
+        <View style={styles.broadcastRounds}>
+          {rounds.map((round, roundIndex) => (
+            <View key={round.id || round.title || `round-${roundIndex}`} style={styles.broadcastRound}>
+              <Text style={styles.broadcastRoundLabel}>{round.title || `Round ${roundIndex + 1}`}</Text>
+              <View style={styles.broadcastMatches}>
+                {(round.matches || []).map((match, matchIndex) => {
+                  const winnerName = getMatchWinnerName(match);
+                  const playerLabel = getMatchPlayerLabel(match);
+                  const status = getMatchBroadcastStatus(match);
+
+                  return (
+                    <View key={match.id || match.label || `match-${matchIndex}`} style={styles.broadcastMatch}>
+                      <View style={styles.broadcastMatchTop}>
+                        <Text style={styles.broadcastMatchLabel}>{match.label || `Match ${matchIndex + 1}`}</Text>
+                        <Text style={[styles.broadcastMatchStatus, status === 'Final' && styles.broadcastMatchStatusFinal]}>{status}</Text>
+                      </View>
+                      <Text style={styles.broadcastPlayers}>{playerLabel}</Text>
+                      {winnerName ? <Text style={styles.broadcastWinner}>Winner: {winnerName}</Text> : null}
+                      {status === 'Bye' ? <Text style={styles.broadcastWinner}>Advances by bye</Text> : null}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {champion ? (
+        <View style={styles.broadcastChampion}>
+          <Text style={styles.broadcastChampionLabel}>Champion</Text>
+          <Text style={styles.broadcastChampionName}>{champion}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export default function OverlayScreen({ tournamentSlug = '', variant = 'full' }) {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentState, setHostedTournamentState] = useState({ error: '', loaded: false });
@@ -123,7 +202,9 @@ export default function OverlayScreen({ variant = 'full' }) {
   const hydratedUpcoming = sortTournamentsByDate(
     upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
   );
-  const featuredTournament = getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
+  const featuredTournament = tournamentSlug
+    ? hydratedUpcoming.find((tournament) => tournament.slug === tournamentSlug) || null
+    : getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
   const featuredSlug = featuredTournament?.slug || '';
   const featuredData = eventDataBySlug[featuredSlug] || {};
   const signupSummary = featuredData.signupSummary || { count: 0, signups: [], loading: Boolean(featuredTournament) };
@@ -326,32 +407,7 @@ export default function OverlayScreen({ variant = 'full' }) {
     return (
       <View style={[styles.overlayRoot, styles.bracketRoot]}>
         <View style={[styles.overlayShell, styles.bracketShell]}>
-          <View style={styles.topRow}>
-            <View style={styles.titleBlock}>
-              <Text style={styles.kicker}>{bracket ? 'CURRENT MATCH' : 'NEXT MATCH'}</Text>
-              <Text numberOfLines={1} style={styles.title}>{getMatchPlayerLabel(nextMatch)}</Text>
-              <Text numberOfLines={1} style={styles.dateLine}>
-                {nextMatch?.label || formatDateLine(featuredTournament.date, featuredTournament.timeZone, featuredTournament.timeZoneLabel)}
-              </Text>
-            </View>
-            <View style={styles.statusPill}>
-              <View style={[styles.statusDot, bracket && styles.statusDotLive]} />
-              <Text style={styles.statusText}>{getOverlayStatusLabel(bracket, registrationMeta)}</Text>
-            </View>
-          </View>
-          <View style={styles.bracketInfoRow}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Signed up</Text>
-              <Text style={styles.metricValue}>{signupSummary.loading ? '--' : `${count}/${cap}`}</Text>
-            </View>
-            <View style={styles.matchCard}>
-              <Text style={styles.metricLabel}>Tournament</Text>
-              <Text numberOfLines={1} style={styles.matchText}>{featuredTournament.title}</Text>
-              <Text numberOfLines={1} style={styles.matchMeta}>
-                {bracket ? 'Bracket is live' : `Starts in ${getCountdownLabel(featuredTournament, nowMs)}`}
-              </Text>
-            </View>
-          </View>
+          <StreamBracketBoard bracket={bracket} tournament={featuredTournament} />
         </View>
       </View>
     );
@@ -517,7 +573,9 @@ const styles = StyleSheet.create({
     minHeight: 250,
   },
   bracketShell: {
-    maxWidth: 1100,
+    aspectRatio: 16 / 9,
+    maxWidth: 1600,
+    minHeight: 520,
   },
   bracketInfoRow: {
     flexDirection: 'row',
@@ -695,5 +753,149 @@ const styles = StyleSheet.create({
     color: 'transparent',
     fontSize: 1,
     height: 1,
+  },
+  broadcastBoard: {
+    flex: 1,
+    gap: 18,
+  },
+  broadcastHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  broadcastTitleBlock: {
+    flex: 1,
+    minWidth: 250,
+  },
+  broadcastEyebrow: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  broadcastTitle: {
+    color: theme.colors.text,
+    fontSize: 32,
+    fontWeight: '900',
+    lineHeight: 38,
+    marginTop: 4,
+  },
+  broadcastMeta: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 5,
+  },
+  broadcastStatusPill: {
+    backgroundColor: 'rgba(65, 194, 116, 0.10)',
+    borderColor: 'rgba(65, 194, 116, 0.34)',
+  },
+  broadcastRounds: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flex: 1,
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  broadcastRound: {
+    backgroundColor: 'rgba(244, 239, 230, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: 220,
+    padding: 12,
+  },
+  broadcastRoundLabel: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  broadcastMatches: {
+    gap: 9,
+  },
+  broadcastMatch: {
+    backgroundColor: 'rgba(5, 11, 10, 0.78)',
+    borderColor: 'rgba(214, 162, 78, 0.20)',
+    borderRadius: 7,
+    borderWidth: 1,
+    padding: 10,
+  },
+  broadcastMatchTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  broadcastMatchLabel: {
+    color: theme.colors.muted,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  broadcastMatchStatus: {
+    color: theme.colors.accent,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  broadcastMatchStatusFinal: {
+    color: theme.colors.green,
+  },
+  broadcastPlayers: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  broadcastWinner: {
+    color: theme.colors.green,
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 5,
+  },
+  broadcastChampion: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(214, 162, 78, 0.13)',
+    borderColor: 'rgba(214, 162, 78, 0.40)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+  },
+  broadcastChampionLabel: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  broadcastChampionName: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  broadcastEmpty: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 30,
+  },
+  broadcastEmptyTitle: {
+    color: theme.colors.text,
+    fontSize: 26,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  broadcastEmptyBody: {
+    color: theme.colors.muted,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

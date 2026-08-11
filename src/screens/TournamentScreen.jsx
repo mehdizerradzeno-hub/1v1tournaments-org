@@ -51,10 +51,10 @@ function signupCountLabel(count, loading = false) {
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
 const TOURNAMENT_TABS = [
-  { id: 'play', label: 'Play', body: 'Player status, live path, and main action.' },
-  { id: 'roster', label: 'Roster', body: 'Who is signed up and bracket-ready.' },
+  { id: 'play', label: 'Overview', body: 'Player status, live path, and main action.' },
+  { id: 'roster', label: 'Players', body: 'Who is signed up and bracket-ready.' },
   { id: 'bracket', label: 'Bracket', body: 'Current match flow and table access.' },
-  { id: 'info', label: 'Info', body: 'Rules, agenda, links, and results.' },
+  { id: 'info', label: 'Rules & results', body: 'Rules, agenda, links, and results.' },
 ];
 const TWITCH_VIEWER_COMMANDS = ['!join', '!next', '!match', '!bracket', '!rules', '!discord'];
 
@@ -734,11 +734,7 @@ export default function TournamentScreen({ slug }) {
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead={visibleTournament.detail}
-      subtitle={
-        isPrimaryGame
-          ? `Spades launch event • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`
-          : formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)
-      }
+      subtitle={`${gameName} tournament • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
       stickyActions
       showHero={false}
       showNavigation
@@ -1030,7 +1026,7 @@ export default function TournamentScreen({ slug }) {
                 </View>
                 <Text style={styles.launchTitle}>Open gameplay from your tournament seat</Text>
                 <Text style={styles.launchCopy}>
-                  The hub checks your player account, creates the match ticket, and then sends you to the Spades table.
+                  The hub checks your player account, creates the match ticket, and then sends you to the {gameName} table.
                 </Text>
                 <View style={styles.launchActions}>
                   <ActionButton href={matchStatusPath}>My Match</ActionButton>
@@ -1269,6 +1265,8 @@ function TournamentArrivalRail({
   signInPath,
   tournamentPath,
 }) {
+  const { width } = useWindowDimensions();
+  const usePhoneActionLayout = width > 0 && width <= 430;
   const steps = getArrivalSteps({ isBracketLive, playerHasReadyMatch, registrationMeta });
   const primaryAction = getPlayerPrimaryAction({
     checkInPath,
@@ -1288,10 +1286,10 @@ function TournamentArrivalRail({
           <Text style={styles.arrivalEyebrow}>Arriving from Twitch</Text>
           <Text style={styles.arrivalTitle}>Start here</Text>
         </View>
-        <View style={styles.arrivalActions}>
-          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
-          {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
-          <ActionButton href="/stream" variant="secondary">Watch</ActionButton>
+        <View style={[styles.arrivalActions, usePhoneActionLayout && styles.arrivalActionsPhone]}>
+          <ActionButton href={primaryAction.href} style={styles.arrivalAction}>{primaryAction.label}</ActionButton>
+          {signInAction ? <ActionButton href={signInAction.href} style={styles.arrivalAction} variant="secondary">{signInAction.label}</ActionButton> : null}
+          <ActionButton href="/stream" style={styles.arrivalAction} variant="secondary">Watch</ActionButton>
         </View>
       </View>
 
@@ -2166,10 +2164,17 @@ function LiveBracketBoard({ bracket }) {
 }
 
 const styles = StyleSheet.create({
+  arrivalAction: {
+    minHeight: 44,
+  },
   arrivalActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  arrivalActionsPhone: {
+    flexBasis: '100%',
+    width: '100%',
   },
   arrivalCommandChip: {
     backgroundColor: 'rgba(94, 127, 163, 0.10)',
