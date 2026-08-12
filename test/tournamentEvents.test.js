@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   deleteHostedTournament,
   isHostedTournamentDeleted,
+  listPublicHostedTournaments,
   normalizeHostedTournament,
 } from '../netlify/functions/_tournament-events-utils.mjs';
 
@@ -22,10 +23,34 @@ class MemoryStore {
     return this.records.get(key) || null;
   }
 
+  async list() {
+    return { blobs: [...this.records.keys()].map((key) => ({ key })) };
+  }
+
   async setJSON(key, value) {
     this.records.set(key, structuredClone(value));
   }
 }
+
+test('public event listing excludes private recurrence records without hiding public history', async () => {
+  const store = new MemoryStore({
+    'legacy-public.json': { ...baseEvent, slug: 'legacy-public', status: 'upcoming' },
+    'completed-public.json': { ...baseEvent, slug: 'completed-public', status: 'complete' },
+    'private-event.json': { ...baseEvent, slug: 'private-event', status: 'upcoming', visibility: 'private' },
+    'unlisted-event.json': { ...baseEvent, slug: 'unlisted-event', status: 'upcoming', visibility: 'unlisted' },
+    'opted-out.json': { ...baseEvent, slug: 'opted-out', status: 'upcoming', publicDiscovery: false },
+  });
+  const tournaments = await listPublicHostedTournaments({
+    bracketStore: new MemoryStore(),
+    seriesStore: new MemoryStore(),
+    store,
+  });
+
+  assert.deepEqual(
+    tournaments.map((tournament) => tournament.slug),
+    ['legacy-public', 'completed-public'],
+  );
+});
 
 test('hosted tournament event normalization defaults legacy records to Spades', () => {
   assert.equal(normalizeHostedTournament(baseEvent).gameSlug, 'spades');

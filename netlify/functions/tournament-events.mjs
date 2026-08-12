@@ -5,6 +5,7 @@ import { requireTournamentAdmin } from './_host-auth.mjs';
 import {
   deleteHostedTournament,
   listHostedTournaments,
+  listPublicHostedTournaments,
   loadHostedTournament,
   normalizeHostedTournament,
   saveHostedTournament,
@@ -52,9 +53,23 @@ export async function handler(event) {
         });
       }
 
+      if (cleanText(event.queryStringParameters?.scope).toLowerCase() === 'admin') {
+        const adminCheck = await requireTournamentAdmin(event);
+
+        if (adminCheck.error) {
+          return json(adminCheck.error.statusCode, { error: adminCheck.error.message });
+        }
+
+        return json(200, {
+          ok: true,
+          hostAuth: adminCheck.method,
+          tournaments: await listHostedTournaments(),
+        });
+      }
+
       return json(200, {
         ok: true,
-        tournaments: await listHostedTournaments(),
+        tournaments: await listPublicHostedTournaments(),
       });
     } catch (error) {
       console.error('Tournament events load failed', error);

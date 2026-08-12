@@ -525,6 +525,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentSettingsUtilsSource, /registrationStatus/);
   assert.match(tournamentEventsSource, /requireTournamentAdmin/);
   assert.match(tournamentEventsSource, /listHostedTournaments/);
+  assert.match(tournamentEventsSource, /listPublicHostedTournaments/);
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
@@ -547,7 +548,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(nextScreenSource, /My Match/);
   assert.match(nextScreenSource, /mergeTournamentSettings/);
   assert.match(nextScreenSource, /fetchTournamentEvents/);
-  assert.match(nextScreenSource, /mergeTournamentLists/);
+  assert.match(nextScreenSource, /getPublicTournamentCatalog/);
   assert.match(nextScreenSource, /accountHref="\/account"/);
   assert.doesNotMatch(nextScreenSource, /showHeader=\{false\}/);
   assert.ok(
@@ -623,6 +624,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /clearTournamentData/);
   assert.match(hostingClientSource, /fetchTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentEvents/);
+  assert.match(hostingClientSource, /includePrivate/);
   assert.match(hostingClientSource, /saveTournamentEvent/);
   assert.match(hostingClientSource, /deleteTournamentEvent/);
   assert.match(hostingClientSource, /saveTournamentSettings/);

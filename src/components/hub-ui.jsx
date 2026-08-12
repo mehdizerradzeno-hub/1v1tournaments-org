@@ -6,7 +6,7 @@ import { Link, usePathname } from 'expo-router';
 import { theme } from '../lib/theme.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
 import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
-import { getNextFutureTournament, mergeTournamentLists } from '../lib/tournamentCatalog.js';
+import { getNextFutureTournament, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
 import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
 import { useHydrated } from '../lib/useHydrated.js';
 
@@ -32,7 +32,7 @@ function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
 }
 
 function getNextNavTournamentSlug(hostedTournaments = []) {
-  const tournaments = mergeTournamentLists(getUpcomingTournaments(), hostedTournaments);
+  const tournaments = getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments);
   const liveTournament = tournaments.find((tournament) => tournament.status === 'live');
 
   return liveTournament?.slug

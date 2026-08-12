@@ -11,6 +11,7 @@ import {
   fetchTournamentEvent,
   fetchTournamentEvents,
 } from './tournamentHostingClient.js';
+import { isPublicTournamentVisible } from './tournamentCatalog.js';
 
 function isVisibleTournament(tournament) {
   return Boolean(tournament?.slug) && !tournament.deleted && tournament.status !== 'deleted';
@@ -19,7 +20,7 @@ function isVisibleTournament(tournament) {
 export function mergeHostedTournamentCatalog(hostedTournaments = [], seededTournaments = siteData.tournaments) {
   const tournamentsBySlug = new Map();
 
-  seededTournaments.filter(isVisibleTournament).forEach((tournament) => {
+  seededTournaments.filter(isPublicTournamentVisible).forEach((tournament) => {
     tournamentsBySlug.set(tournament.slug, tournament);
   });
 
@@ -28,7 +29,7 @@ export function mergeHostedTournamentCatalog(hostedTournaments = [], seededTourn
       return;
     }
 
-    if (!isVisibleTournament(tournament)) {
+    if (!isPublicTournamentVisible(tournament)) {
       tournamentsBySlug.delete(tournament.slug);
       return;
     }

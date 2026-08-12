@@ -10,11 +10,57 @@ import {
   getNextPublicTournament,
   getPublicTournamentCatalog,
   getPublicTournamentFeedStatus,
+  isPubliclyDiscoverableTournament,
   mergeTournamentLists,
   normalizeTournamentGameSlug,
   slugifyTournamentTitle,
 } from '../src/lib/tournamentCatalog.js';
 import { canGenerateTournamentMode, getTournamentMode, TOURNAMENT_MODES } from '../src/lib/tournamentModes.js';
+
+test('public discovery excludes private, unlisted, opted-out, and cancelled events', () => {
+  const event = {
+    date: '2026-09-14T22:00:00.000Z',
+    gameSlug: 'spades',
+    hosted: true,
+    status: 'upcoming',
+  };
+  const catalog = getPublicTournamentCatalog([], [
+    { ...event, slug: 'public-event', title: 'Public event', visibility: 'public', publicDiscovery: true },
+    { ...event, slug: 'private-event', title: 'Private event', visibility: 'private', publicDiscovery: true },
+    { ...event, slug: 'unlisted-event', title: 'Unlisted event', visibility: 'unlisted', publicDiscovery: true },
+    { ...event, slug: 'opted-out-event', title: 'Opted out event', visibility: 'public', publicDiscovery: false },
+    { ...event, slug: 'cancelled-event', title: 'Cancelled event', visibility: 'public', publicDiscovery: true, status: 'cancelled' },
+  ]);
+
+  assert.deepEqual(catalog.map((tournament) => tournament.slug), ['public-event']);
+  assert.equal(isPubliclyDiscoverableTournament({ ...event, visibility: 'public', publicDiscovery: false }), false);
+});
+
+test('legacy public events remain discoverable and continue defaulting to Spades', () => {
+  const legacy = createTournamentRecord({
+    date: '2026-08-16T18:00:00-04:00',
+    slug: 'reddit-sunday-spades-20260816',
+    status: 'upcoming',
+    title: 'Reddit Sunday Spades',
+  });
+
+  assert.equal(legacy.gameSlug, 'spades');
+  assert.equal(isPubliclyDiscoverableTournament(legacy), true);
+  assert.deepEqual(getPublicTournamentCatalog([], [legacy]).map((tournament) => tournament.slug), [legacy.slug]);
+});
+
+test('private and unlisted events remain available to admin and intentional direct inspection', () => {
+  const hosted = [
+    { date: '2026-09-14T22:00:00.000Z', slug: 'private-direct', status: 'upcoming', title: 'Private direct', visibility: 'private' },
+    { date: '2026-09-15T22:00:00.000Z', slug: 'unlisted-direct', status: 'upcoming', title: 'Unlisted direct', visibility: 'unlisted' },
+  ];
+  const adminCatalog = mergeTournamentLists([], hosted);
+
+  assert.deepEqual(adminCatalog.map((tournament) => tournament.slug), ['private-direct', 'unlisted-direct']);
+  assert.equal(adminCatalog[0].visibility, 'private');
+  assert.equal(adminCatalog[1].visibility, 'unlisted');
+  assert.deepEqual(getPublicTournamentCatalog([], hosted), []);
+});
 
 test('hosted tournament records get the full public page shape from simple input', () => {
   const tournament = createTournamentRecord({

@@ -3,6 +3,7 @@ import {
   TOURNAMENT_CONTEXT_SCHEMA_VERSION,
   TOURNAMENT_GAME_SLUGS,
   createTournamentRecord,
+  isPublicTournamentVisible,
   normalizeTournamentGameSlug,
   slugifyTournamentTitle,
 } from '../../src/lib/tournamentCatalog.js';
@@ -171,6 +172,10 @@ export async function listHostedTournaments(options = {}) {
     .map((result) => result.value)
     .filter(Boolean)
     .sort(byDateAsc);
+}
+
+export async function listPublicHostedTournaments(options = {}) {
+  return (await listHostedTournaments(options)).filter(isPublicTournamentVisible);
 }
 
 export async function loadHostedTournament(tournamentSlug, options = {}) {

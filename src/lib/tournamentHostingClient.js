@@ -198,9 +198,18 @@ export async function fetchTournamentSettings({ slug }) {
   return result;
 }
 
-export async function fetchTournamentEvents({ slug } = {}) {
-  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${readEndpoint(EVENTS_ENDPOINT)}${query}`);
+export async function fetchTournamentEvents({ slug, token, includePrivate = false } = {}) {
+  const search = new URLSearchParams();
+
+  if (slug) search.set('slug', slug);
+  if (includePrivate) search.set('scope', 'admin');
+
+  const query = search.toString() ? `?${search.toString()}` : '';
+  const endpoint = `${readEndpoint(EVENTS_ENDPOINT)}${query}`;
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
+    headers: adminHeaders(token),
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {

@@ -455,7 +455,7 @@ export default function AdminScreen() {
 
     async function loadHostedTournaments() {
       try {
-        const result = await fetchTournamentEvents();
+        const result = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
@@ -472,7 +472,7 @@ export default function AdminScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [rosterToken]);
 
   useEffect(() => {
     if (!selectedTournament) {
@@ -712,7 +712,7 @@ export default function AdminScreen() {
         ...buildSeriesPayload(),
         previewFingerprint: eventSeriesPreview.fingerprint,
       });
-      const events = await fetchTournamentEvents();
+      const events = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
       setHostedTournaments(events.tournaments || result.tournaments || []);
       setEventRepeatMode('none');
       setEventSeriesPreview(null);
@@ -780,7 +780,7 @@ export default function AdminScreen() {
         } : {},
         previewFingerprint: eventSeriesPreview.fingerprint,
       });
-      const events = await fetchTournamentEvents();
+      const events = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
       setHostedTournaments(events.tournaments || []);
       setEventSeriesPreview(null);
       setEventFeedback(`${result.applied?.length || 0} occurrence(s) updated; ${result.skipped?.length || 0} skipped safely.`, '');
