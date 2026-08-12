@@ -6,6 +6,7 @@ import {
   addAccountAlias,
   createGameAuthorization,
   exchangeGameAuthorization,
+  listAccountAliases,
   lookupCanonicalAccountByAlias,
   sharedIdentityForAccount,
 } from '../netlify/functions/_shared-account-utils.mjs';
@@ -148,6 +149,58 @@ test('legacy aliases are idempotent and reject cross-account collisions', async 
     ),
     (error) => error instanceof SharedAccountContractError && error.code === 'alias_collision',
   );
+});
+
+test('Spades alias repair preserves aliases and is returned by issue and exchange', async () => {
+  const aliasStore = new MemoryStore();
+  const authorizationStore = new MemoryStore();
+  const spadesAlias = { provider: 'spades', legacyAccountId: 'verified-v11-account' };
+
+  await addAccountAlias(
+    account,
+    { provider: 'euchre', legacyAccountId: 'existing-euchre-account' },
+    { store: aliasStore },
+  );
+
+  const attached = await addAccountAlias(account, spadesAlias, { store: aliasStore });
+  const replayed = await addAccountAlias(account, spadesAlias, { store: aliasStore });
+
+  assert.equal(attached.created, true);
+  assert.equal(replayed.created, false);
+  assert.deepEqual(await listAccountAliases(account.canonicalAccountId, { store: aliasStore }), [
+    { provider: 'euchre', legacyAccountId: 'existing-euchre-account' },
+    spadesAlias,
+  ]);
+
+  await assert.rejects(
+    addAccountAlias(
+      { ...account, id: 'acct-collision', canonicalAccountId: 'acct-collision' },
+      spadesAlias,
+      { store: aliasStore },
+    ),
+    (error) => error instanceof SharedAccountContractError && error.code === 'alias_collision',
+  );
+
+  assert.deepEqual(await listAccountAliases(account.canonicalAccountId, { store: aliasStore }), [
+    { provider: 'euchre', legacyAccountId: 'existing-euchre-account' },
+    spadesAlias,
+  ]);
+
+  const identity = await sharedIdentityForAccount(account, { store: aliasStore });
+  const issued = await createGameAuthorization(identity, 'spades', {
+    store: authorizationStore,
+    now: 1_000,
+    codeFactory: () => 'spades-alias-repair-code',
+  });
+  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
+    store: authorizationStore,
+    now: 2_000,
+  });
+
+  assert.deepEqual(exchanged.aliases, [
+    { provider: 'euchre', legacyAccountId: 'existing-euchre-account' },
+    spadesAlias,
+  ]);
 });
 
 test('one-time game authorization validates audience, expiration, and replay', async () => {
