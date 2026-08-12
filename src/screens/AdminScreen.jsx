@@ -2247,11 +2247,11 @@ export default function AdminScreen() {
                 <Badge tone="green">Keeps player accounts</Badge>
               </View>
               <Text style={styles.resetDangerBody}>
-                Clear the roster and bracket for {tournament?.title || rosterSlug}? The event, schedule, registration settings, and player accounts will be preserved.
+                Safely close unfinished game rooms, revoke match access, and clear the roster and bracket for {tournament?.title || rosterSlug}? Completed results cannot be cleared. The event, schedule, registration settings, and player accounts will be preserved.
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                  {clearLoading ? 'Clearing...' : 'Yes, clear roster and bracket'}
+                  {clearLoading ? 'Closing rooms...' : 'Yes, safely close and clear'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel

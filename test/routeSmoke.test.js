@@ -715,7 +715,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /tournamentScrollContent/);
   assert.match(adminScreenSource, /registration settings, and player accounts will be preserved/);
   assert.match(adminScreenSource, /Lifecycle controls moved up/);
-  assert.match(adminScreenSource, /Yes, clear roster and bracket/);
+  assert.match(adminScreenSource, /Yes, safely close and clear/);
   assert.doesNotMatch(homeScreenSource, /HomepageFrontDoor/);
   assert.match(adminScreenSource, /Edit selected tournament/);
   assert.match(adminScreenSource, /Tournament mode/);

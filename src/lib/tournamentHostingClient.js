@@ -426,7 +426,7 @@ export async function clearTournamentData({ token, slug }) {
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify({
-      action: 'clear-tournament',
+      action: 'teardown-tournament',
       tournamentSlug: slug,
     }),
   });
