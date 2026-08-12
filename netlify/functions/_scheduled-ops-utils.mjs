@@ -56,6 +56,7 @@ export function buildReminderMessage(tournament, signup) {
 export function backupStoreNames() {
   return [
     'tournament-events',
+    'tournament-series',
     'tournament-settings',
     'tournament-signups',
     'tournament-brackets',
