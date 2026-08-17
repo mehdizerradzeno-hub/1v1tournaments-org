@@ -83,3 +83,17 @@ test('hosted catalog entries override seeded tournaments and deleted tombstones 
     ['spades-4-man-smoke'],
   );
 });
+
+test('hosted catalog excludes private tournaments while retaining completed public results', () => {
+  const hosted = [
+    { ...hostedTournament, slug: 'completed-public', status: 'complete' },
+    { ...hostedTournament, slug: 'private-result', status: 'complete', visibility: 'private' },
+    { ...hostedTournament, slug: 'unlisted-result', status: 'complete', visibility: 'unlisted' },
+    { ...hostedTournament, slug: 'opted-out-result', status: 'complete', publicDiscovery: false },
+  ];
+
+  assert.deepEqual(
+    mergeHostedTournamentCatalog(hosted, []).map((tournament) => tournament.slug),
+    ['completed-public'],
+  );
+});

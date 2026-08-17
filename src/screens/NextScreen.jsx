@@ -25,10 +25,7 @@ import {
   getUpcomingTournaments,
   siteData,
 } from "../lib/siteData.js";
-import {
-  getNextPublicTournament,
-  mergeTournamentLists,
-} from "../lib/tournamentCatalog.js";
+import { getNextPublicTournament, getPublicTournamentCatalog, mergeTournamentLists } from "../lib/tournamentCatalog.js";
 import {
   findRedditSundayCommunityCup,
   getCommunityCupPrimaryAction,
@@ -330,8 +327,8 @@ export default function NextScreen() {
     () =>
       hostedTournamentsLoaded
         ? mergeTournamentLists(
-            getUpcomingTournaments(),
-            hostedTournaments,
+            getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments),
+            [],
           ).filter((tournament) =>
             ["upcoming", "live"].includes(
               String(tournament?.status || "").toLowerCase(),

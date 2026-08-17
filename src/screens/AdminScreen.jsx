@@ -42,6 +42,8 @@ import {
 } from '../lib/tournamentSettings.js';
 import {
   clearTournamentData,
+  applyTournamentSeriesChange,
+  createTournamentSeries,
   deleteTournamentEvent,
   fetchPlayerAccount,
   fetchTournamentBracket,
@@ -50,6 +52,8 @@ import {
   fetchTournamentSettings,
   generateTournamentBracket,
   reportTournamentMatchWinner,
+  previewTournamentSeries,
+  previewTournamentSeriesChange,
   resetTournamentSettings,
   resetTournamentBracket,
   fetchStreamCommands,
@@ -58,6 +62,7 @@ import {
   saveStreamCommands,
   saveTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
+import { TOURNAMENT_REPEAT_OPTIONS, TOURNAMENT_WEEKDAYS } from '../lib/tournamentRecurrence.js';
 import { hasActiveTournamentMatches } from '../lib/tournamentLifecycle.js';
 import { STREAM_COMMAND_ENDPOINT, buildDefaultStreamCommands } from '../lib/streamCommands.js';
 import {
@@ -329,6 +334,14 @@ export default function AdminScreen() {
   const [eventSaving, setEventSaving] = useState(false);
   const [eventMessage, setEventMessage] = useState('');
   const [eventError, setEventError] = useState('');
+  const [eventRepeatMode, setEventRepeatMode] = useState('none');
+  const [eventRepeatWeekdays, setEventRepeatWeekdays] = useState([]);
+  const [eventRepeatLimitMode, setEventRepeatLimitMode] = useState('count');
+  const [eventRepeatCount, setEventRepeatCount] = useState('4');
+  const [eventRepeatEndDate, setEventRepeatEndDate] = useState('');
+  const [eventSeriesIdempotencyKey, setEventSeriesIdempotencyKey] = useState('');
+  const [eventSeriesPreview, setEventSeriesPreview] = useState(null);
+  const [eventSeriesLoading, setEventSeriesLoading] = useState(false);
   const [rosters, setRosters] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterMessage, setRosterMessage] = useState('');
@@ -442,7 +455,7 @@ export default function AdminScreen() {
 
     async function loadHostedTournaments() {
       try {
-        const result = await fetchTournamentEvents();
+        const result = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
@@ -459,7 +472,7 @@ export default function AdminScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [rosterToken]);
 
   useEffect(() => {
     if (!selectedTournament) {
@@ -576,6 +589,8 @@ export default function AdminScreen() {
     setEventMode(getTournamentMode(tournament.mode).value);
     setEventRosterCap(String(tournament.rosterCap || 8));
     setEventMinimumPlayers(String(tournament.minimumPlayers || 2));
+    setEventRepeatMode('none');
+    setEventSeriesPreview(null);
   }
 
   function handleChangeEventTitle(value) {
@@ -593,6 +608,13 @@ export default function AdminScreen() {
     setEventMode('single-elimination');
     setEventRosterCap('8');
     setEventMinimumPlayers('2');
+    setEventRepeatMode('none');
+    setEventRepeatWeekdays([]);
+    setEventRepeatLimitMode('count');
+    setEventRepeatCount('4');
+    setEventRepeatEndDate('');
+    setEventSeriesIdempotencyKey('');
+    setEventSeriesPreview(null);
     setScheduleDate('');
     setScheduleTime('20:00');
     setScheduleTimeZone('America/New_York');
@@ -601,6 +623,172 @@ export default function AdminScreen() {
     setScheduleCheckInLeadMinutes('30');
     setEventFeedback('Fill in the event title, date, and start time, then save the tournament.', '');
     setScheduleFeedback('', '');
+  }
+
+  function toggleRepeatWeekday(value) {
+    setEventRepeatWeekdays((current) => (
+      current.includes(value)
+        ? current.filter((weekday) => weekday !== value)
+        : [...current, value].sort((left, right) => left - right)
+    ));
+    setEventSeriesPreview(null);
+  }
+
+  function getSeriesIdempotencyKey() {
+    if (eventSeriesIdempotencyKey) return eventSeriesIdempotencyKey;
+    const generated = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setEventSeriesIdempotencyKey(generated);
+    return generated;
+  }
+
+  function buildSeriesPayload() {
+    const selectedMode = getTournamentMode(eventMode);
+    const rosterCap = numberField(eventRosterCap, selectedTournament?.rosterCap || 8);
+    const minimumPlayers = Math.min(numberField(eventMinimumPlayers, selectedTournament?.minimumPlayers || 2), rosterCap);
+    const tournament = createTournamentRecord({
+      bracketFlexPolicy: '',
+      slug: slugifyTournamentTitle(eventSlug || eventTitle),
+      title: eventTitle.trim(),
+      gameSlug: eventGameSlug,
+      mode: selectedMode.value,
+      format: selectedMode.format,
+      date: zonedDateTimeToIso(scheduleDate, scheduleTime, scheduleTimeZone.trim() || 'America/New_York'),
+      timeZone: scheduleTimeZone.trim() || 'America/New_York',
+      timeZoneLabel: scheduleTimeZoneLabel.trim() || 'ET',
+      registrationStatus: scheduleRegistrationStatus,
+      checkInLeadMinutes: scheduleCheckInLeadMinutes,
+      detail: eventSummary,
+      summary: eventSummary,
+      rosterCap,
+      minimumPlayers,
+      badge: 'Host event',
+      status: 'upcoming',
+      links: [],
+    });
+
+    return {
+      idempotencyKey: getSeriesIdempotencyKey(),
+      localTime: scheduleTime,
+      recurrence: {
+        frequency: eventRepeatMode,
+        limitMode: eventRepeatLimitMode,
+        count: eventRepeatCount,
+        endLocalDate: eventRepeatEndDate,
+        weekdays: eventRepeatWeekdays,
+      },
+      startLocalDate: scheduleDate,
+      timeZone: scheduleTimeZone.trim() || 'America/New_York',
+      tournament,
+    };
+  }
+
+  async function handlePreviewTournamentSeries() {
+    if (!hasHostCredential) {
+      setEventFeedback('', 'Sign in with a host-approved account before previewing a series.');
+      return;
+    }
+
+    setEventSeriesLoading(true);
+    setEventSeriesPreview(null);
+    setEventFeedback('', '');
+    try {
+      const result = await previewTournamentSeries({ token: rosterToken.trim(), ...buildSeriesPayload() });
+      setEventSeriesPreview({ kind: 'create', ...result.preview });
+      setEventFeedback(`Review all ${result.preview.occurrenceCount} occurrences, then confirm creation.`, '');
+    } catch (previewError) {
+      setEventFeedback('', previewError instanceof Error ? previewError.message : 'Could not preview this series.');
+    } finally {
+      setEventSeriesLoading(false);
+    }
+  }
+
+  async function handleCreateTournamentSeries() {
+    if (eventSeriesPreview?.kind !== 'create') return;
+    setEventSeriesLoading(true);
+    setEventFeedback('', '');
+    try {
+      const result = await createTournamentSeries({
+        token: rosterToken.trim(),
+        ...buildSeriesPayload(),
+        previewFingerprint: eventSeriesPreview.fingerprint,
+      });
+      const events = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
+      setHostedTournaments(events.tournaments || result.tournaments || []);
+      setEventRepeatMode('none');
+      setEventSeriesPreview(null);
+      setEventSeriesIdempotencyKey('');
+      setEventFeedback(`${result.tournaments?.length || eventSeriesPreview.occurrenceCount} independent tournaments created.`, '');
+    } catch (createError) {
+      setEventFeedback('', createError instanceof Error ? createError.message : 'Could not create this series.');
+    } finally {
+      setEventSeriesLoading(false);
+    }
+  }
+
+  async function handlePreviewSeriesOperation(operation) {
+    const tournament = selectedTournament;
+    if (!tournament?.seriesId) return;
+    setEventSeriesLoading(true);
+    setEventSeriesPreview(null);
+    setEventFeedback('', '');
+    try {
+      const result = await previewTournamentSeriesChange({
+        token: rosterToken.trim(),
+        seriesId: tournament.seriesId,
+        expectedRevision: tournament.seriesRevision,
+        operation,
+        fromLocalDate: tournament.seriesLocalDate,
+        localDate: tournament.seriesLocalDate,
+        patch: operation === 'update-future' ? {
+          detail: eventSummary,
+          localTime: scheduleTime,
+          registrationStatus: scheduleRegistrationStatus,
+          summary: eventSummary,
+          timeZone: scheduleTimeZone,
+          timeZoneLabel: scheduleTimeZoneLabel,
+          title: eventTitle,
+        } : {},
+      });
+      setEventSeriesPreview({ kind: 'operation', ...result.preview });
+      setEventFeedback(`Preview: ${result.preview.eligible.length} change(s), ${result.preview.skipped.length} skipped.`, '');
+    } catch (operationError) {
+      setEventFeedback('', operationError instanceof Error ? operationError.message : 'Could not preview series changes.');
+    } finally {
+      setEventSeriesLoading(false);
+    }
+  }
+
+  async function handleApplySeriesOperation() {
+    if (eventSeriesPreview?.kind !== 'operation') return;
+    setEventSeriesLoading(true);
+    try {
+      const result = await applyTournamentSeriesChange({
+        token: rosterToken.trim(),
+        seriesId: eventSeriesPreview.seriesId,
+        expectedRevision: eventSeriesPreview.expectedRevision,
+        operation: eventSeriesPreview.action,
+        fromLocalDate: selectedTournament.seriesLocalDate,
+        localDate: selectedTournament.seriesLocalDate,
+        patch: eventSeriesPreview.action === 'update-future' ? {
+          detail: eventSummary,
+          localTime: scheduleTime,
+          registrationStatus: scheduleRegistrationStatus,
+          summary: eventSummary,
+          timeZone: scheduleTimeZone,
+          timeZoneLabel: scheduleTimeZoneLabel,
+          title: eventTitle,
+        } : {},
+        previewFingerprint: eventSeriesPreview.fingerprint,
+      });
+      const events = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
+      setHostedTournaments(events.tournaments || []);
+      setEventSeriesPreview(null);
+      setEventFeedback(`${result.applied?.length || 0} occurrence(s) updated; ${result.skipped?.length || 0} skipped safely.`, '');
+    } catch (applyError) {
+      setEventFeedback('', applyError instanceof Error ? applyError.message : 'Could not apply series changes.');
+    } finally {
+      setEventSeriesLoading(false);
+    }
   }
 
   function handleSelectEventGame(gameSlug) {
@@ -875,6 +1063,11 @@ export default function AdminScreen() {
 
     if (!slug) {
       setEventFeedback('', 'Enter a URL slug before saving.');
+      return;
+    }
+
+    if (eventRepeatMode !== 'none' && !selectedTournament?.seriesId) {
+      setEventFeedback('', 'Preview the recurring schedule and confirm the series instead of saving one event.');
       return;
     }
 
@@ -1447,6 +1640,109 @@ export default function AdminScreen() {
             </View>
           </View>
 
+          {!selectedTournament?.seriesId ? (
+            <View style={styles.eventEditorPanel}>
+              <View style={styles.metaRow}>
+                <Badge tone="blue">Repeat</Badge>
+                <Text style={styles.metaText}>Finite series only. Every occurrence becomes an independent tournament.</Text>
+              </View>
+              <View style={styles.tournamentPicker}>
+                {TOURNAMENT_REPEAT_OPTIONS.map((option) => (
+                  <ActionButton
+                    accessibilityState={{ selected: eventRepeatMode === option.value }}
+                    key={option.value}
+                    onPress={() => {
+                      setEventRepeatMode(option.value);
+                      setEventSeriesPreview(null);
+                    }}
+                    variant={eventRepeatMode === option.value ? 'primary' : 'secondary'}>
+                    {option.label}
+                  </ActionButton>
+                ))}
+              </View>
+              {eventRepeatMode === 'weekly' ? (
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Weekly play days</Text>
+                  <View style={styles.tournamentPicker}>
+                    {TOURNAMENT_WEEKDAYS.map((weekday) => (
+                      <ActionButton
+                        accessibilityState={{ selected: eventRepeatWeekdays.includes(weekday.value) }}
+                        key={weekday.value}
+                        onPress={() => toggleRepeatWeekday(weekday.value)}
+                        variant={eventRepeatWeekdays.includes(weekday.value) ? 'primary' : 'secondary'}>
+                        {weekday.label}
+                      </ActionButton>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {eventRepeatMode !== 'none' ? (
+                <>
+                  <View style={styles.tournamentPicker}>
+                    <ActionButton onPress={() => { setEventRepeatLimitMode('count'); setEventSeriesPreview(null); }} variant={eventRepeatLimitMode === 'count' ? 'primary' : 'secondary'}>
+                      Number of events
+                    </ActionButton>
+                    <ActionButton onPress={() => { setEventRepeatLimitMode('end-date'); setEventSeriesPreview(null); }} variant={eventRepeatLimitMode === 'end-date' ? 'primary' : 'secondary'}>
+                      End date
+                    </ActionButton>
+                  </View>
+                  <Text style={styles.fieldLabel}>{eventRepeatLimitMode === 'count' ? 'Occurrences (2-52)' : 'Inclusive end date'}</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    inputMode={eventRepeatLimitMode === 'count' ? 'numeric' : 'text'}
+                    onChangeText={(value) => {
+                      if (eventRepeatLimitMode === 'count') setEventRepeatCount(value);
+                      else setEventRepeatEndDate(value);
+                      setEventSeriesPreview(null);
+                    }}
+                    placeholder={eventRepeatLimitMode === 'count' ? '4' : 'YYYY-MM-DD'}
+                    placeholderTextColor="#6B766F"
+                    style={styles.input}
+                    value={eventRepeatLimitMode === 'count' ? eventRepeatCount : eventRepeatEndDate}
+                  />
+                  <View style={styles.buttonRow}>
+                    <ActionButton disabled={eventSeriesLoading} onPress={handlePreviewTournamentSeries} variant="secondary">
+                      {eventSeriesLoading ? 'Previewing...' : 'Preview every occurrence'}
+                    </ActionButton>
+                    <ActionButton disabled={eventSeriesLoading || eventSeriesPreview?.kind !== 'create'} onPress={handleCreateTournamentSeries}>
+                      Confirm and create series
+                    </ActionButton>
+                  </View>
+                </>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.eventEditorPanel}>
+              <View style={styles.metaRow}>
+                <Badge tone="blue">Series occurrence</Badge>
+                <Text style={styles.metaText}>Edit this event with Save event, or preview a safe future-series action.</Text>
+              </View>
+              <View style={styles.buttonRow}>
+                <ActionButton disabled={eventSeriesLoading} onPress={() => handlePreviewSeriesOperation('update-future')} variant="secondary">Preview edit future</ActionButton>
+                <ActionButton disabled={eventSeriesLoading} onPress={() => handlePreviewSeriesOperation('cancel-occurrence')} variant="danger">Preview cancel this</ActionButton>
+                <ActionButton disabled={eventSeriesLoading} onPress={() => handlePreviewSeriesOperation('cancel-future')} variant="danger">Preview cancel future</ActionButton>
+                <ActionButton disabled={eventSeriesLoading || eventSeriesPreview?.kind !== 'operation'} onPress={handleApplySeriesOperation}>Confirm previewed changes</ActionButton>
+              </View>
+            </View>
+          )}
+
+          {eventSeriesPreview ? (
+            <View style={styles.eventEditorPanel}>
+              <Text style={styles.fieldLabel}>Exact preview</Text>
+              {(eventSeriesPreview.occurrences || eventSeriesPreview.eligible || []).map((occurrence) => (
+                <Text key={occurrence.slug} style={styles.metaText}>
+                  {occurrence.localDate} · {occurrence.slug}{occurrence.date ? ` · ${new Date(occurrence.date).toLocaleString()}` : ''}
+                </Text>
+              ))}
+              {(eventSeriesPreview.skipped || []).map((occurrence) => (
+                <Text key={`${occurrence.slug}-${occurrence.reason}`} style={styles.errorText}>
+                  Skipped {occurrence.localDate}: {occurrence.reason}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
           <View style={styles.publisherWorkflow}>
             <View style={styles.workflowStep}>
               <Badge tone="accent">1</Badge>
@@ -1951,11 +2247,11 @@ export default function AdminScreen() {
                 <Badge tone="green">Keeps player accounts</Badge>
               </View>
               <Text style={styles.resetDangerBody}>
-                Clear the roster and bracket for {tournament?.title || rosterSlug}? The event, schedule, registration settings, and player accounts will be preserved.
+                Safely close unfinished game rooms, revoke match access, and clear the roster and bracket for {tournament?.title || rosterSlug}? Completed results cannot be cleared. The event, schedule, registration settings, and player accounts will be preserved.
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                  {clearLoading ? 'Clearing...' : 'Yes, clear roster and bracket'}
+                  {clearLoading ? 'Closing rooms...' : 'Yes, safely close and clear'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel

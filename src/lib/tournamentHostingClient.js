@@ -8,6 +8,7 @@ const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
+const SERIES_ENDPOINT = '/.netlify/functions/tournament-series';
 const EUCHRE_PILOT_ENDPOINT = '/.netlify/functions/tournament-pilot';
 const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
 const STREAM_COMMANDS_ENDPOINT = '/.netlify/functions/stream-commands';
@@ -197,9 +198,18 @@ export async function fetchTournamentSettings({ slug }) {
   return result;
 }
 
-export async function fetchTournamentEvents({ slug } = {}) {
-  const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${readEndpoint(EVENTS_ENDPOINT)}${query}`);
+export async function fetchTournamentEvents({ slug, token, includePrivate = false } = {}) {
+  const search = new URLSearchParams();
+
+  if (slug) search.set('slug', slug);
+  if (includePrivate) search.set('scope', 'admin');
+
+  const query = search.toString() ? `?${search.toString()}` : '';
+  const endpoint = `${readEndpoint(EVENTS_ENDPOINT)}${query}`;
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
+    headers: adminHeaders(token),
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -207,6 +217,35 @@ export async function fetchTournamentEvents({ slug } = {}) {
   }
 
   return result;
+}
+
+async function postTournamentSeries({ token, ...payload }) {
+  const response = await fetch(SERIES_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) throw new Error(result?.error || 'Tournament series operation failed.');
+  return result;
+}
+
+export function previewTournamentSeries({ token, ...payload }) {
+  return postTournamentSeries({ token, action: 'preview-create', ...payload });
+}
+
+export function createTournamentSeries({ token, ...payload }) {
+  return postTournamentSeries({ token, action: 'create', ...payload });
+}
+
+export function previewTournamentSeriesChange({ token, ...payload }) {
+  return postTournamentSeries({ token, action: 'preview-operation', ...payload });
+}
+
+export function applyTournamentSeriesChange({ token, ...payload }) {
+  return postTournamentSeries({ token, action: 'apply-operation', ...payload });
 }
 
 export async function fetchEuchrePilot({ token, slug }) {
@@ -387,7 +426,7 @@ export async function clearTournamentData({ token, slug }) {
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify({
-      action: 'clear-tournament',
+      action: 'teardown-tournament',
       tournamentSlug: slug,
     }),
   });

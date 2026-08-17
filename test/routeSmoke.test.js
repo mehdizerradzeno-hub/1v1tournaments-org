@@ -525,6 +525,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentSettingsUtilsSource, /registrationStatus/);
   assert.match(tournamentEventsSource, /requireTournamentAdmin/);
   assert.match(tournamentEventsSource, /listHostedTournaments/);
+  assert.match(tournamentEventsSource, /listPublicHostedTournaments/);
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
@@ -547,7 +548,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(nextScreenSource, /My Match/);
   assert.match(nextScreenSource, /mergeTournamentSettings/);
   assert.match(nextScreenSource, /fetchTournamentEvents/);
-  assert.match(nextScreenSource, /mergeTournamentLists/);
+  assert.match(nextScreenSource, /getPublicTournamentCatalog/);
   assert.match(nextScreenSource, /accountHref="\/account"/);
   assert.doesNotMatch(nextScreenSource, /showHeader=\{false\}/);
   assert.ok(
@@ -623,6 +624,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /clearTournamentData/);
   assert.match(hostingClientSource, /fetchTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentEvents/);
+  assert.match(hostingClientSource, /includePrivate/);
   assert.match(hostingClientSource, /saveTournamentEvent/);
   assert.match(hostingClientSource, /deleteTournamentEvent/);
   assert.match(hostingClientSource, /saveTournamentSettings/);
@@ -713,7 +715,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /tournamentScrollContent/);
   assert.match(adminScreenSource, /registration settings, and player accounts will be preserved/);
   assert.match(adminScreenSource, /Lifecycle controls moved up/);
-  assert.match(adminScreenSource, /Yes, clear roster and bracket/);
+  assert.match(adminScreenSource, /Yes, safely close and clear/);
   assert.doesNotMatch(homeScreenSource, /HomepageFrontDoor/);
   assert.match(adminScreenSource, /Edit selected tournament/);
   assert.match(adminScreenSource, /Tournament mode/);
