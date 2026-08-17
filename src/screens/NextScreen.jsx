@@ -27,7 +27,7 @@ import {
 } from "../lib/siteData.js";
 import {
   getNextPublicTournament,
-  getPublicTournamentCatalog,
+  mergeTournamentLists,
 } from "../lib/tournamentCatalog.js";
 import {
   findRedditSundayCommunityCup,
@@ -329,7 +329,7 @@ export default function NextScreen() {
   const publicTournaments = useMemo(
     () =>
       hostedTournamentsLoaded
-        ? getPublicTournamentCatalog(
+        ? mergeTournamentLists(
             getUpcomingTournaments(),
             hostedTournaments,
           ).filter((tournament) =>
