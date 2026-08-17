@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image, Linking, Pressable, Text, View, StyleSheet, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState } from "react";
+import {
+  Image,
+  Linking,
+  Pressable,
+  Text,
+  View,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
 
 import {
   ActionButton,
@@ -11,10 +19,10 @@ import {
   StatPill,
   Surface,
   EmptyState,
-} from '../components/hub-ui.jsx';
-import { formatDateLine, formatShortDate } from '../lib/format.js';
-import { APP_STORE_BADGE_URL, downloadLinks } from '../lib/downloadLinks.js';
-import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
+} from "../components/hub-ui.jsx";
+import { formatDateLine, formatShortDate } from "../lib/format.js";
+import { APP_STORE_BADGE_URL, downloadLinks } from "../lib/downloadLinks.js";
+import { openSharedAccountGame } from "../lib/sharedAccountLaunch.js";
 import {
   buildResultFromTournamentBracket,
   getGames,
@@ -25,25 +33,30 @@ import {
   getUpcomingTournaments,
   mergeResults,
   siteData,
-} from '../lib/siteData.js';
+} from "../lib/siteData.js";
 import {
   getActiveOrFutureTournaments,
   getNextPublicTournament,
   mergeTournamentLists,
-} from '../lib/tournamentCatalog.js';
+} from "../lib/tournamentCatalog.js";
 import {
   getAppleReleaseLabel,
   getFeaturedCompetitionAction,
+  getCompetitionLifecycleLabel,
   PLATFORM_GAME_PRESENTATION,
   PLATFORM_SUBMISSION_STATEMENT,
-} from '../lib/platformPresentation.js';
-import { getEffectiveRegistrationStatus, getRegistrationStatusMeta, mergeTournamentSettings } from '../lib/tournamentSettings.js';
+} from "../lib/platformPresentation.js";
+import {
+  getEffectiveRegistrationStatus,
+  getRegistrationStatusMeta,
+  mergeTournamentSettings,
+} from "../lib/tournamentSettings.js";
 import {
   fetchSignupSummary,
   fetchTournamentBracket,
   fetchTournamentEvents,
   fetchTournamentSettings,
-} from '../lib/tournamentHostingClient.js';
+} from "../lib/tournamentHostingClient.js";
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
@@ -83,22 +96,29 @@ function bracketTargetLabel(tournament) {
 }
 
 function flexibleBracketCopy(tournament) {
-  return tournament?.bracketFlexPolicy
-    || `Advertised ${getRosterCap(tournament)}-player bracket. Runs with ${getMinimumPlayers(tournament)}+ players and fills byes automatically.`;
+  return (
+    tournament?.bracketFlexPolicy ||
+    `Advertised ${getRosterCap(tournament)}-player bracket. Runs with ${getMinimumPlayers(tournament)}+ players and fills byes automatically.`
+  );
 }
 
 function sortTournamentsByDate(tournaments) {
-  return [...tournaments].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+  return [...tournaments].sort(
+    (left, right) =>
+      new Date(left.date).getTime() - new Date(right.date).getTime(),
+  );
 }
 
 function dateKey(value, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timeZone || 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timeZone || "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).formatToParts(new Date(value));
-  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const lookup = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
 
   return `${lookup.year}-${lookup.month}-${lookup.day}`;
 }
@@ -110,7 +130,10 @@ function isTournamentToday(tournament, nowMs) {
     return false;
   }
 
-  return dateKey(startMs, tournament.timeZone) === dateKey(nowMs, tournament.timeZone);
+  return (
+    dateKey(startMs, tournament.timeZone) ===
+    dateKey(nowMs, tournament.timeZone)
+  );
 }
 
 function getCountdownState(tournament, nowMs) {
@@ -121,10 +144,10 @@ function getCountdownState(tournament, nowMs) {
       hasDate: false,
       hasStarted: false,
       parts: [
-        { label: 'Days', value: '--' },
-        { label: 'Hours', value: '--' },
-        { label: 'Minutes', value: '--' },
-        { label: 'Seconds', value: '--' },
+        { label: "Days", value: "--" },
+        { label: "Hours", value: "--" },
+        { label: "Minutes", value: "--" },
+        { label: "Seconds", value: "--" },
       ],
     };
   }
@@ -140,16 +163,16 @@ function getCountdownState(tournament, nowMs) {
     hasDate: true,
     hasStarted: startMs <= nowMs,
     parts: [
-      { label: 'Days', value: String(days) },
-      { label: 'Hours', value: String(hours).padStart(2, '0') },
-      { label: 'Minutes', value: String(minutes).padStart(2, '0') },
-      { label: 'Seconds', value: String(seconds).padStart(2, '0') },
+      { label: "Days", value: String(days) },
+      { label: "Hours", value: String(hours).padStart(2, "0") },
+      { label: "Minutes", value: String(minutes).padStart(2, "0") },
+      { label: "Seconds", value: String(seconds).padStart(2, "0") },
     ],
   };
 }
 
 function isConfiguredUrl(value) {
-  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim());
 }
 
 function openExternalUrl(href) {
@@ -167,27 +190,57 @@ export default function HomeScreen() {
   const games = useMemo(() => getGames(), []);
   const streams = useMemo(() => getStreams(), []);
   const upcoming = useMemo(
-    () => mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter((tournament) => tournament.status === 'upcoming'),
+    () =>
+      mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter(
+        (tournament) => tournament.status === "upcoming",
+      ),
     [hostedTournaments],
   );
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
-  const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join('|');
+  const upcomingSlugs = upcoming.map((tournament) => tournament.slug).join("|");
   const hydratedUpcoming = sortTournamentsByDate(
-    upcoming.map((tournament) => mergeTournamentSettings(tournament, eventDataBySlug[tournament.slug]?.settings || null)),
+    upcoming.map((tournament) =>
+      mergeTournamentSettings(
+        tournament,
+        eventDataBySlug[tournament.slug]?.settings || null,
+      ),
+    ),
   );
-  const visibleUpcoming = getActiveOrFutureTournaments(hydratedUpcoming, eventDataBySlug, nowMs);
-  const featuredTournament = getNextPublicTournament(hydratedUpcoming, eventDataBySlug, nowMs);
-  const seededFeaturedSlug = featuredTournament?.slug || '';
+  const visibleUpcoming = getActiveOrFutureTournaments(
+    hydratedUpcoming,
+    eventDataBySlug,
+    nowMs,
+  );
+  const featuredTournament = getNextPublicTournament(
+    hydratedUpcoming,
+    eventDataBySlug,
+    nowMs,
+  );
+  const seededFeaturedSlug = featuredTournament?.slug || "";
   const featuredEventData = eventDataBySlug[seededFeaturedSlug] || {};
   const featuredBracket = featuredEventData.bracket || null;
-  const featuredSignupSummary = featuredEventData.signupSummary || { count: 0, loading: Boolean(featuredTournament) };
-  const featuredTournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
-  const featuredSignupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
-  const featuredMatchStatusPath = featuredTournament ? `${featuredTournamentPath}#my-match` : featuredTournamentPath;
+  const featuredSignupSummary = featuredEventData.signupSummary || {
+    count: 0,
+    loading: Boolean(featuredTournament),
+  };
+  const featuredTournamentPath = featuredTournament
+    ? getTournamentPath(featuredTournament.slug)
+    : "/";
+  const featuredSignupPath = featuredTournament
+    ? getCheckInPath(featuredTournament.slug)
+    : "/";
+  const featuredMatchStatusPath = featuredTournament
+    ? `${featuredTournamentPath}#my-match`
+    : featuredTournamentPath;
   const featuredRegistrationMeta = featuredTournament
-    ? getEffectiveRegistrationStatus(featuredTournament, { hasLiveBracket: Boolean(featuredBracket) })
-    : getRegistrationStatusMeta('coming-soon');
-  const featuredResult = buildResultFromTournamentBracket(featuredTournament, featuredBracket);
+    ? getEffectiveRegistrationStatus(featuredTournament, {
+        hasLiveBracket: Boolean(featuredBracket),
+      })
+    : getRegistrationStatusMeta("coming-soon");
+  const featuredResult = buildResultFromTournamentBracket(
+    featuredTournament,
+    featuredBracket,
+  );
   const results = mergeResults(getResults(), featuredResult);
   const featuredCountdown = getCountdownState(featuredTournament, nowMs);
 
@@ -225,21 +278,34 @@ export default function HomeScreen() {
     async function loadScheduleData() {
       const settled = await Promise.allSettled(
         upcoming.map(async (tournament) => {
-          const [settingsResult, bracketResult, signupResult] = await Promise.allSettled([
-            fetchTournamentSettings({ slug: tournament.slug }),
-            fetchTournamentBracket({ slug: tournament.slug }),
-            fetchSignupSummary({ slug: tournament.slug }),
-          ]);
+          const [settingsResult, bracketResult, signupResult] =
+            await Promise.allSettled([
+              fetchTournamentSettings({ slug: tournament.slug }),
+              fetchTournamentBracket({ slug: tournament.slug }),
+              fetchSignupSummary({ slug: tournament.slug }),
+            ]);
 
           return {
             slug: tournament.slug,
-            settings: settingsResult.status === 'fulfilled' ? settingsResult.value.settings || null : null,
-            bracket: bracketResult.status === 'fulfilled' ? bracketResult.value.bracket || null : null,
+            settings:
+              settingsResult.status === "fulfilled"
+                ? settingsResult.value.settings || null
+                : null,
+            bracket:
+              bracketResult.status === "fulfilled"
+                ? bracketResult.value.bracket || null
+                : null,
             signupSummary: {
-              count: signupResult.status === 'fulfilled' ? signupResult.value.signupCount || 0 : 0,
-              signups: signupResult.status === 'fulfilled' ? signupResult.value.signups || [] : [],
+              count:
+                signupResult.status === "fulfilled"
+                  ? signupResult.value.signupCount || 0
+                  : 0,
+              signups:
+                signupResult.status === "fulfilled"
+                  ? signupResult.value.signups || []
+                  : [],
               loading: false,
-              unavailable: signupResult.status !== 'fulfilled',
+              unavailable: signupResult.status !== "fulfilled",
             },
           };
         }),
@@ -252,7 +318,7 @@ export default function HomeScreen() {
       setEventDataBySlug(
         Object.fromEntries(
           settled
-            .filter((result) => result.status === 'fulfilled')
+            .filter((result) => result.status === "fulfilled")
             .map((result) => [result.value.slug, result.value]),
         ),
       );
@@ -284,7 +350,8 @@ export default function HomeScreen() {
       lead="One account for competitive Spades and Euchre, tournament assignments, leagues, rankings, and results."
       showHero={false}
       subtitle="One account. Ranked competition. Tournaments."
-      title={siteData.site.name}>
+      title={siteData.site.name}
+    >
       <PlatformIntroHero />
 
       <PremiumDownloadSection />
@@ -313,10 +380,17 @@ export default function HomeScreen() {
       />
 
       <Section
-        action={featuredTournament ? <ActionButton href={featuredTournamentPath}>Open next event</ActionButton> : null}
+        action={
+          featuredTournament ? (
+            <ActionButton href={featuredTournamentPath}>
+              Open next event
+            </ActionButton>
+          ) : null
+        }
         description="Live, tonight, and upcoming public tournaments appear here, soonest first."
         nativeID="next-tournaments"
-        title="All upcoming tournaments">
+        title="All upcoming tournaments"
+      >
         <ScheduleSummaryBar
           eventDataBySlug={eventDataBySlug}
           nowMs={nowMs}
@@ -333,16 +407,22 @@ export default function HomeScreen() {
 
       <Section
         description="Live table and replay links for current events."
-        title="Stream and YouTube links">
+        title="Stream and YouTube links"
+      >
         {streams.map((stream) => (
           <StreamCard key={stream.slug} stream={stream} />
         ))}
       </Section>
 
       <Section
-        action={<ActionButton href="/results" variant="secondary">All results</ActionButton>}
+        action={
+          <ActionButton href="/results" variant="secondary">
+            All results
+          </ActionButton>
+        }
         description="Completed events show here after winners are posted."
-        title="Latest results">
+        title="Latest results"
+      >
         {results.slice(0, 2).map((result) => (
           <View key={result.slug} style={styles.block}>
             <ResultCard result={result} />
@@ -364,23 +444,37 @@ function PlatformIntroHero() {
   const compact = width > 0 && width < 700;
 
   return (
-    <Surface style={[styles.platformHero, compact && styles.platformHeroCompact]}>
+    <Surface
+      style={[styles.platformHero, compact && styles.platformHeroCompact]}
+    >
       <View pointerEvents="none" style={styles.platformHeroBackdrop}>
         <Text style={styles.platformHeroSuit}>♠</Text>
-        <Text style={[styles.platformHeroSuit, styles.platformHeroSuitRight]}>♦</Text>
+        <Text style={[styles.platformHeroSuit, styles.platformHeroSuitRight]}>
+          ♦
+        </Text>
       </View>
       <View style={styles.platformHeroCopy}>
-        <Badge tone="accent">1V1 Competitive</Badge>
-        <Text accessibilityRole="header" style={[styles.platformHeroTitle, compact && styles.platformHeroTitleCompact]}>
-          Spades &amp; Euchre
+        <Badge tone="accent">SEASON 1 · LIVE</Badge>
+        <Text
+          accessibilityRole="header"
+          style={[
+            styles.platformHeroTitle,
+            compact && styles.platformHeroTitleCompact,
+          ]}
+        >
+          COMPETE IN 1V1
         </Text>
-        <Text style={styles.platformHeroLead}>One account. Ranked competition. Tournaments.</Text>
+        <Text style={styles.platformHeroLead}>Spades and Euchre</Text>
         <Text style={styles.platformHeroCallout}>No partner. No excuses.</Text>
       </View>
       <View style={styles.platformHeroActions}>
         <ActionButton href="/games">Compete</ActionButton>
-        <ActionButton href="/tournaments" variant="secondary">Tournaments</ActionButton>
-        <ActionButton href="/leagues" variant="secondary">Leagues</ActionButton>
+        <ActionButton href="/tournaments" variant="secondary">
+          Tournaments
+        </ActionButton>
+        <ActionButton href="/leagues" variant="secondary">
+          Leagues
+        </ActionButton>
       </View>
     </Surface>
   );
@@ -399,8 +493,9 @@ function PremiumCountdownHero({
   tournamentPath,
 }) {
   const isBracketLive = Boolean(bracket);
-  const gameSlug = tournament?.gameSlug || tournament?.game || 'spades';
-  const gamePresentation = PLATFORM_GAME_PRESENTATION[gameSlug] || PLATFORM_GAME_PRESENTATION.spades;
+  const gameSlug = tournament?.gameSlug || tournament?.game || "spades";
+  const gamePresentation =
+    PLATFORM_GAME_PRESENTATION[gameSlug] || PLATFORM_GAME_PRESENTATION.spades;
   const primaryAction = getFeaturedCompetitionAction({
     status: tournament?.status,
     registrationStatus: registrationMeta?.value,
@@ -409,29 +504,38 @@ function PremiumCountdownHero({
     signupPath,
     matchPath: matchStatusPath,
   });
-  const gameWebUrl = gameSlug === 'euchre' ? downloadLinks.webEuchre : downloadLinks.webSpades;
+  const gameWebUrl =
+    gameSlug === "euchre" ? downloadLinks.webEuchre : downloadLinks.webSpades;
   const { width } = useWindowDimensions();
   const isCompact = width > 0 && width < 760;
   const isTight = width > 0 && width < 440;
+  const competitionStatus = getCompetitionLifecycleLabel({
+    status: tournament?.status,
+    hasBracket: isBracketLive,
+  });
   const heroStats = tournament
     ? [
         {
-          label: 'Next event',
-          value: countdown.hasDate ? formatShortDate(tournament.date, tournament.timeZone) : 'TBD',
-          tone: 'accent',
+          label: "Next event",
+          value: countdown.hasDate
+            ? formatShortDate(tournament.date, tournament.timeZone)
+            : "TBD",
+          tone: "accent",
         },
         {
-          label: 'Registered',
+          label: "Registered",
           value: registeredCountLabel(signupSummary, tournament),
-          tone: signupSummary.count ? 'green' : 'blue',
+          tone: signupSummary.count ? "green" : "blue",
         },
         {
-          label: 'Bracket',
-          value: bracket ? `${bracket.participantCount || 0} seeded` : bracketTargetLabel(tournament),
-          tone: bracket ? 'green' : 'accent',
+          label: "Bracket",
+          value: bracket
+            ? `${bracket.participantCount || 0} seeded`
+            : bracketTargetLabel(tournament),
+          tone: bracket ? "green" : "accent",
         },
-        { label: 'Games', value: String(gameCount || 0), tone: 'blue' },
-        { label: 'Events', value: String(eventCount || 0), tone: 'green' },
+        { label: "Games", value: String(gameCount || 0), tone: "blue" },
+        { label: "Events", value: String(eventCount || 0), tone: "green" },
       ]
     : [];
 
@@ -453,31 +557,67 @@ function PremiumCountdownHero({
         <View style={styles.heroGreenGlow} />
       </View>
       <View style={styles.premiumHeroTopRow}>
-        <Badge tone={isBracketLive ? 'green' : registrationMeta.tone}>
-          {isBracketLive ? 'Bracket is live' : registrationMeta.label}
+        <Badge
+          tone={
+            competitionStatus === "LIVE"
+              ? "green"
+              : competitionStatus === "COMPLETE"
+                ? "rose"
+                : "blue"
+          }
+        >
+          {competitionStatus}
         </Badge>
+        <Badge tone="accent">SEASON 1 · LIVE</Badge>
         <Text style={styles.premiumHeroDomain}>Tournament hub</Text>
       </View>
 
       <View style={styles.premiumHeroCopy}>
-        <Text accessibilityRole="header" style={[styles.premiumHeroTitle, isCompact && styles.premiumHeroTitleCompact]}>
+        <Text
+          accessibilityRole="header"
+          style={[
+            styles.premiumHeroTitle,
+            isCompact && styles.premiumHeroTitleCompact,
+          ]}
+        >
           {tournament.title}
         </Text>
-        <Text style={styles.premiumHeroSubtitle}>Free-entry. Account-based. Head-to-head {gamePresentation.name}.</Text>
+        <Text style={styles.premiumHeroSubtitle}>
+          Free-entry. Account-based. Head-to-head {gamePresentation.name}.
+        </Text>
         <Text style={styles.premiumHeroDate}>
-          {countdown.hasDate ? formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel) : 'Date pending'}
+          {countdown.hasDate
+            ? formatDateLine(
+                tournament.date,
+                tournament.timeZone,
+                tournament.timeZoneLabel,
+              )
+            : "Date pending"}
         </Text>
       </View>
 
-      <View style={[styles.countdownFrame, isTight && styles.countdownFrameTight]}>
+      <View
+        style={[styles.countdownFrame, isTight && styles.countdownFrameTight]}
+      >
         <View style={styles.countdownRailRow}>
           <View style={styles.countdownRail} />
           <Text style={styles.countdownFrameLabel}>Tournament starts in</Text>
           <View style={styles.countdownRail} />
         </View>
-        <View style={[styles.countdownGrid, isCompact && styles.countdownGridCompact]}>
+        <View
+          style={[
+            styles.countdownGrid,
+            isCompact && styles.countdownGridCompact,
+          ]}
+        >
           {countdown.parts.map((part) => (
-            <View key={part.label} style={[styles.countdownUnit, isTight && styles.countdownUnitTight]}>
+            <View
+              key={part.label}
+              style={[
+                styles.countdownUnit,
+                isTight && styles.countdownUnitTight,
+              ]}
+            >
               <Text
                 adjustsFontSizeToFit
                 numberOfLines={1}
@@ -485,7 +625,8 @@ function PremiumCountdownHero({
                   styles.countdownValue,
                   isCompact && styles.countdownValueCompact,
                   isTight && styles.countdownValueTight,
-                ]}>
+                ]}
+              >
                 {part.value}
               </Text>
               <Text style={styles.countdownLabel}>{part.label}</Text>
@@ -498,38 +639,70 @@ function PremiumCountdownHero({
         <ActionButton href={primaryAction.href} style={styles.heroActionButton}>
           {primaryAction.label}
         </ActionButton>
-        <ActionButton href={matchStatusPath} style={styles.heroActionButton} variant="secondary">
-          My Match
+        <ActionButton
+          href={matchStatusPath}
+          style={styles.heroActionButton}
+          variant="secondary"
+        >
+          Find My Match
         </ActionButton>
-        <ActionButton href={`${tournamentPath}#live-bracket`} style={styles.heroActionButton} variant="secondary">
+        <ActionButton
+          href={`${tournamentPath}#live-bracket`}
+          style={styles.heroActionButton}
+          variant="secondary"
+        >
           Bracket
         </ActionButton>
       </View>
 
       <View style={styles.heroActionRowSecondary}>
-        <ActionButton href="/stream" style={styles.heroSecondaryButton} variant="secondary">
+        <ActionButton
+          href="/stream"
+          style={styles.heroSecondaryButton}
+          variant="secondary"
+        >
           Watch live
         </ActionButton>
-        <ActionButton href="/results" style={styles.heroSecondaryButton} variant="ghost">
+        <ActionButton
+          href="/results"
+          style={styles.heroSecondaryButton}
+          variant="ghost"
+        >
           Results
         </ActionButton>
       </View>
 
       <View style={styles.rosterPolicyBar}>
-        <Text style={styles.rosterPolicyText}>{flexibleBracketCopy(tournament)}</Text>
+        <Text style={styles.rosterPolicyText}>
+          {flexibleBracketCopy(tournament)}
+        </Text>
       </View>
 
       <View style={styles.heroInfoGrid}>
         {heroStats.map((stat) => (
-          <View key={stat.label} style={[styles.heroInfoTile, styles[`heroInfo${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
+          <View
+            key={stat.label}
+            style={[
+              styles.heroInfoTile,
+              styles[
+                `heroInfo${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`
+              ],
+            ]}
+          >
             <Text style={styles.heroInfoLabel}>{stat.label}</Text>
-            <Text numberOfLines={1} style={styles.heroInfoValue}>{stat.value}</Text>
+            <Text numberOfLines={1} style={styles.heroInfoValue}>
+              {stat.value}
+            </Text>
           </View>
         ))}
       </View>
 
       <View style={styles.heroActionRow}>
-        <PremiumLinkButton gameAudience={gameSlug} href={gameWebUrl} label={`Play ${gamePresentation.name} on the Web`} />
+        <PremiumLinkButton
+          gameAudience={gameSlug}
+          href={gameWebUrl}
+          label={`Play ${gamePresentation.name} on the Web`}
+        />
         <PremiumLinkButton href={downloadLinks.twitch} label="Twitch" />
         <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
         <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
@@ -543,22 +716,22 @@ function PremiumDownloadSection() {
   const euchrePresentation = PLATFORM_GAME_PRESENTATION.euchre;
   const games = [
     {
-      key: 'spades',
+      key: "spades",
       title: spadesPresentation.name,
       eyebrow: getAppleReleaseLabel(spadesPresentation.releaseState),
       body: spadesPresentation.description,
       appStoreUrl: downloadLinks.appStoreSpades,
       webUrl: downloadLinks.webSpades,
-      accent: '#D6A24E',
+      accent: "#D6A24E",
     },
     {
-      key: 'euchre',
+      key: "euchre",
       title: euchrePresentation.name,
       eyebrow: getAppleReleaseLabel(euchrePresentation.releaseState),
       body: euchrePresentation.description,
       appStoreUrl: downloadLinks.appStoreEuchre,
       webUrl: downloadLinks.webEuchre,
-      accent: '#5E7FA3',
+      accent: "#5E7FA3",
     },
   ];
 
@@ -568,7 +741,8 @@ function PremiumDownloadSection() {
         description={PLATFORM_SUBMISSION_STATEMENT}
         eyebrow="The games"
         nativeID="downloads"
-        title="Choose your table">
+        title="Choose your table"
+      >
         <View style={styles.downloadGamesGrid}>
           {games.map((game) => (
             <PremiumGameDownloadCard key={game.key} game={game} />
@@ -579,7 +753,8 @@ function PremiumDownloadSection() {
       <Section
         description="The tournament hub owns signup, event rules, brackets, and public event pages."
         eyebrow="Tournament hub"
-        title="Run the bracket from 1v1Tournaments.org">
+        title="Run the bracket from 1v1Tournaments.org"
+      >
         <View style={styles.tournamentDownloadGrid}>
           <PremiumLinkPanel
             body="Open the public hub for account signup, brackets, event pages, and results."
@@ -620,47 +795,76 @@ function TwitchTournamentBoard({
 
   const signups = signupSummary.signups || [];
   const cap = getRosterCap(tournament);
-  const openSeats = Math.max(cap - (signupSummary.count || signups.length || 0), 0);
+  const openSeats = Math.max(
+    cap - (signupSummary.count || signups.length || 0),
+    0,
+  );
   const signupLoading = Boolean(signupSummary.loading);
   const signupUnavailable = Boolean(signupSummary.unavailable);
-  const registrationOpen = registrationMeta.value === 'open';
   const bracketLive = Boolean(bracket);
+  const competitionStatus = getCompetitionLifecycleLabel({
+    status: tournament?.status,
+    hasBracket: bracketLive,
+  });
+  const statusTone =
+    competitionStatus === "LIVE"
+      ? "green"
+      : competitionStatus === "COMPLETE"
+        ? "rose"
+        : "blue";
+  const primaryAction = getFeaturedCompetitionAction({
+    status: tournament?.status,
+    registrationStatus: registrationMeta?.value,
+    hasBracket: bracketLive,
+    tournamentPath,
+    signupPath,
+    matchPath: matchStatusPath,
+    resultsPath: "/results",
+  });
 
   return (
     <Section
       description="Built for stream viewers: the next event, signup count, and public roster are visible without opening admin tools."
       eyebrow="Twitch ready"
       nativeID="twitch-board"
-      title="Next tournament">
+      title="Next tournament"
+    >
       <Surface style={styles.twitchBoard}>
         <View pointerEvents="none" style={styles.twitchBoardGlow} />
         <View style={styles.twitchBoardMain}>
           <View style={styles.twitchEventCopy}>
             <View style={styles.twitchTopRow}>
-              <Badge tone={bracketLive ? 'green' : registrationMeta.tone}>
-                {bracketLive ? 'Bracket live' : registrationMeta.label}
-              </Badge>
+              <Badge tone={statusTone}>{competitionStatus}</Badge>
               <Text style={styles.twitchLiveTag}>Stream overlay friendly</Text>
             </View>
             <Text style={styles.twitchTitle}>{tournament.title}</Text>
             <Text style={styles.twitchDate}>
-              {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+              {formatDateLine(
+                tournament.date,
+                tournament.timeZone,
+                tournament.timeZoneLabel,
+              )}
             </Text>
             <Text style={styles.twitchSummary}>
-              {tournament.format} • {tournament.location} • {tournament.entryLine}
+              {tournament.format} • {tournament.location} •{" "}
+              {tournament.entryLine}
             </Text>
             <View style={styles.twitchActions}>
-              <ActionButton href={registrationOpen ? signupPath : tournamentPath}>
-                {registrationOpen ? 'Join' : 'Event'}
+              <ActionButton href={primaryAction.href}>
+                {primaryAction.label}
               </ActionButton>
               <ActionButton href={matchStatusPath} variant="secondary">
-                My Match
+                Find My Match
               </ActionButton>
               <ActionButton href="/stream" variant="secondary">
                 Watch
               </ActionButton>
               {isConfiguredUrl(downloadLinks.twitch) ? (
-                <ActionButton external href={downloadLinks.twitch} variant="secondary">
+                <ActionButton
+                  external
+                  href={downloadLinks.twitch}
+                  variant="secondary"
+                >
                   Twitch
                 </ActionButton>
               ) : null}
@@ -671,13 +875,17 @@ function TwitchTournamentBoard({
             <View style={styles.twitchScoreTile}>
               <Text style={styles.twitchScoreLabel}>Signed up</Text>
               <Text style={styles.twitchScoreValue}>
-                {signupLoading ? '--' : signupSummary.count || signups.length || 0}
+                {signupLoading
+                  ? "--"
+                  : signupSummary.count || signups.length || 0}
                 <Text style={styles.twitchScoreSub}> / {cap}</Text>
               </Text>
             </View>
             <View style={styles.twitchScoreTile}>
               <Text style={styles.twitchScoreLabel}>Open seats</Text>
-              <Text style={styles.twitchScoreValue}>{signupLoading ? '--' : openSeats}</Text>
+              <Text style={styles.twitchScoreValue}>
+                {signupLoading ? "--" : openSeats}
+              </Text>
             </View>
           </View>
         </View>
@@ -686,37 +894,49 @@ function TwitchTournamentBoard({
           <View style={styles.twitchRosterHeader}>
             <Text style={styles.twitchRosterTitle}>Public signup roster</Text>
             <Text style={styles.twitchRosterMeta}>
-              {signupUnavailable ? 'Live roster unavailable' : signupLoading ? 'Loading players' : `${signups.length} visible`}
+              {signupUnavailable
+                ? "Live roster unavailable"
+                : signupLoading
+                  ? "Loading players"
+                  : `${signups.length} visible`}
             </Text>
           </View>
           {signupLoading ? (
-            <Text style={styles.twitchRosterEmpty}>Loading registered players...</Text>
+            <Text style={styles.twitchRosterEmpty}>
+              Loading registered players...
+            </Text>
           ) : signups.length ? (
             <View style={styles.twitchRosterGrid}>
               {signups.slice(0, 12).map((signup, index) => (
-                <View key={signup.id || `${signup.playerName}-${index}`} style={styles.twitchRosterRow}>
+                <View
+                  key={signup.id || `${signup.playerName}-${index}`}
+                  style={styles.twitchRosterRow}
+                >
                   <View style={styles.twitchRosterRank}>
                     <Text style={styles.twitchRosterRankText}>{index + 1}</Text>
                   </View>
                   <View style={styles.twitchRosterNameBlock}>
                     <Text numberOfLines={1} style={styles.twitchRosterName}>
-                      {signup.playerName || 'Unnamed player'}
+                      {signup.playerName || "Unnamed player"}
                     </Text>
                     <Text numberOfLines={1} style={styles.twitchRosterHandle}>
-                      {signup.playerHandle || signup.status || 'registered'}
+                      {signup.playerHandle || signup.status || "registered"}
                     </Text>
                   </View>
                 </View>
               ))}
               {signups.length > 12 ? (
                 <View style={styles.twitchRosterMore}>
-                  <Text style={styles.twitchRosterMoreText}>+{signups.length - 12} more players</Text>
+                  <Text style={styles.twitchRosterMoreText}>
+                    +{signups.length - 12} more players
+                  </Text>
                 </View>
               ) : null}
             </View>
           ) : (
             <Text style={styles.twitchRosterEmpty}>
-              No public signups yet. Send viewers to Join Tournament to get the roster started.
+              No public signups yet. Send viewers to Join Tournament to get the
+              roster started.
             </Text>
           )}
         </View>
@@ -729,14 +949,23 @@ function PremiumGameDownloadCard({ game }) {
   return (
     <Surface style={[styles.downloadGameCard, { borderColor: game.accent }]}>
       <View style={styles.downloadGameTopRow}>
-        <Badge tone={game.key === 'spades' ? 'green' : 'blue'}>{game.eyebrow}</Badge>
+        <Badge tone={game.key === "spades" ? "green" : "blue"}>
+          {game.eyebrow}
+        </Badge>
         <Text style={styles.downloadGameMark}>1v1</Text>
       </View>
       <Text style={styles.downloadGameTitle}>{game.title}</Text>
       <Text style={styles.downloadGameBody}>{game.body}</Text>
       <View style={styles.downloadButtonStack}>
-        <AppStoreBadgeButton href={game.appStoreUrl} label={`Download ${game.title} on the App Store`} />
-        <PremiumLinkButton gameAudience={game.key} href={game.webUrl} label="Play on Web" />
+        <AppStoreBadgeButton
+          href={game.appStoreUrl}
+          label={`Download ${game.title} on the App Store`}
+        />
+        <PremiumLinkButton
+          gameAudience={game.key}
+          href={game.webUrl}
+          label="Play on Web"
+        />
       </View>
     </Surface>
   );
@@ -757,21 +986,25 @@ function AppStoreBadgeButton({ href, label, large = false }) {
         large && styles.appStoreBadgeShellLarge,
         hovered && styles.downloadHover,
         pressed && styles.downloadPressed,
-      ]}>
+      ]}
+    >
       <Image
         accessibilityIgnoresInvertColors
         resizeMode="contain"
         source={{ uri: APP_STORE_BADGE_URL }}
-        style={[styles.appStoreBadgeImage, large && styles.appStoreBadgeImageLarge]}
+        style={[
+          styles.appStoreBadgeImage,
+          large && styles.appStoreBadgeImageLarge,
+        ]}
       />
     </Pressable>
   );
 }
 
-function PremiumLinkButton({ href, label, gameAudience = '' }) {
+function PremiumLinkButton({ href, label, gameAudience = "" }) {
   const enabled = isConfiguredUrl(href);
   const [launching, setLaunching] = useState(false);
-  const [launchError, setLaunchError] = useState('');
+  const [launchError, setLaunchError] = useState("");
 
   async function handlePress() {
     if (!gameAudience) {
@@ -780,7 +1013,7 @@ function PremiumLinkButton({ href, label, gameAudience = '' }) {
     }
 
     setLaunching(true);
-    setLaunchError('');
+    setLaunchError("");
     try {
       await openSharedAccountGame({
         audience: gameAudience,
@@ -788,7 +1021,11 @@ function PremiumLinkButton({ href, label, gameAudience = '' }) {
         openUrl: (url) => Linking.openURL(url),
       });
     } catch (error) {
-      setLaunchError(error instanceof Error ? error.message : 'Game launch failed. Try again.');
+      setLaunchError(
+        error instanceof Error
+          ? error.message
+          : "Game launch failed. Try again.",
+      );
     } finally {
       setLaunching(false);
     }
@@ -797,8 +1034,10 @@ function PremiumLinkButton({ href, label, gameAudience = '' }) {
   return (
     <View style={styles.premiumLinkGroup}>
       <Pressable
-        accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
-        accessibilityRole={enabled ? 'link' : 'button'}
+        accessibilityLabel={
+          enabled ? label : `${label} link is not configured yet`
+        }
+        accessibilityRole={enabled ? "link" : "button"}
         disabled={!enabled || launching}
         onPress={handlePress}
         style={({ hovered, pressed }) => [
@@ -806,12 +1045,20 @@ function PremiumLinkButton({ href, label, gameAudience = '' }) {
           !enabled && styles.premiumLinkButtonDisabled,
           hovered && enabled && styles.downloadHover,
           pressed && enabled && styles.downloadPressed,
-        ]}>
-        <Text style={[styles.premiumLinkButtonText, !enabled && styles.premiumLinkButtonTextDisabled]}>
-          {launching ? 'Opening...' : label}
+        ]}
+      >
+        <Text
+          style={[
+            styles.premiumLinkButtonText,
+            !enabled && styles.premiumLinkButtonTextDisabled,
+          ]}
+        >
+          {launching ? "Opening..." : label}
         </Text>
       </Pressable>
-      {launchError ? <Text style={styles.gameLaunchError}>{launchError}</Text> : null}
+      {launchError ? (
+        <Text style={styles.gameLaunchError}>{launchError}</Text>
+      ) : null}
     </View>
   );
 }
@@ -821,8 +1068,10 @@ function PremiumLinkPanel({ body, href, label, tone }) {
 
   return (
     <Pressable
-      accessibilityLabel={enabled ? label : `${label} link is not configured yet`}
-      accessibilityRole={enabled ? 'link' : 'button'}
+      accessibilityLabel={
+        enabled ? label : `${label} link is not configured yet`
+      }
+      accessibilityRole={enabled ? "link" : "button"}
       disabled={!enabled}
       onPress={() => openExternalUrl(href)}
       style={({ hovered, pressed }) => [
@@ -830,7 +1079,8 @@ function PremiumLinkPanel({ body, href, label, tone }) {
         styles[`tournamentLinkPanel${tone[0].toUpperCase()}${tone.slice(1)}`],
         hovered && enabled && styles.downloadHover,
         pressed && enabled && styles.downloadPressed,
-      ]}>
+      ]}
+    >
       <Text style={styles.tournamentLinkLabel}>{label}</Text>
       <Text style={styles.tournamentLinkBody}>{body}</Text>
     </Pressable>
@@ -840,19 +1090,29 @@ function PremiumLinkPanel({ body, href, label, tone }) {
 function ScheduleSummaryBar({ eventDataBySlug, nowMs, tournaments }) {
   const openCount = tournaments.filter((tournament) => {
     const data = eventDataBySlug[tournament.slug] || {};
-    const meta = getEffectiveRegistrationStatus(tournament, { hasLiveBracket: Boolean(data.bracket) });
+    const meta = getEffectiveRegistrationStatus(tournament, {
+      hasLiveBracket: Boolean(data.bracket),
+    });
 
-    return meta.value === 'open';
+    return meta.value === "open";
   }).length;
-  const liveBracketCount = tournaments.filter((tournament) => eventDataBySlug[tournament.slug]?.bracket).length;
-  const tonightCount = tournaments.filter((tournament) => isTournamentToday(tournament, nowMs)).length;
+  const liveBracketCount = tournaments.filter(
+    (tournament) => eventDataBySlug[tournament.slug]?.bracket,
+  ).length;
+  const tonightCount = tournaments.filter((tournament) =>
+    isTournamentToday(tournament, nowMs),
+  ).length;
 
   return (
     <View style={styles.scheduleSummaryGrid}>
-      <View style={[styles.scheduleSummaryTile, styles.scheduleSummaryTileAccent]}>
+      <View
+        style={[styles.scheduleSummaryTile, styles.scheduleSummaryTileAccent]}
+      >
         <Text style={styles.scheduleSummaryLabel}>Next event</Text>
         <Text style={styles.scheduleSummaryValue}>
-          {tournaments[0] ? formatShortDate(tournaments[0].date, tournaments[0].timeZone) : 'TBD'}
+          {tournaments[0]
+            ? formatShortDate(tournaments[0].date, tournaments[0].timeZone)
+            : "TBD"}
         </Text>
       </View>
       <View style={styles.scheduleSummaryTile}>
@@ -900,53 +1160,95 @@ function UpcomingTournamentList({
         const registrationMeta = getEffectiveRegistrationStatus(tournament, {
           hasLiveBracket: Boolean(bracket),
         });
-        const signupSummary = eventData.signupSummary || { count: 0, loading: true };
+        const signupSummary = eventData.signupSummary || {
+          count: 0,
+          loading: true,
+        };
         const signups = signupSummary.signups || [];
         const tournamentPath = getTournamentPath(tournament.slug);
         const signupPath = getCheckInPath(tournament.slug);
         const matchPath = `${tournamentPath}#my-match`;
-        const gameName = gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug;
-        const registrationIsOpen = registrationMeta.value === 'open';
+        const gameName =
+          gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug;
+        const competitionStatus = getCompetitionLifecycleLabel({
+          status: tournament.status,
+          hasBracket: Boolean(bracket),
+        });
+        const statusTone =
+          competitionStatus === "LIVE"
+            ? "green"
+            : competitionStatus === "COMPLETE"
+              ? "rose"
+              : "blue";
+        const action = getFeaturedCompetitionAction({
+          status: tournament.status,
+          registrationStatus: registrationMeta.value,
+          hasBracket: Boolean(bracket),
+          tournamentPath,
+          signupPath,
+          matchPath,
+          resultsPath: "/results",
+        });
         const isToday = isTournamentToday(tournament, nowMs);
 
         return (
-          <Surface key={tournament.slug} style={[styles.upcomingRow, isNext && styles.upcomingRowNext]}>
+          <Surface
+            key={tournament.slug}
+            style={[styles.upcomingRow, isNext && styles.upcomingRowNext]}
+          >
             <View style={styles.upcomingRank}>
               <Text style={styles.upcomingRankText}>{index + 1}</Text>
             </View>
             <View style={styles.upcomingCopy}>
               <View style={styles.upcomingTopLine}>
-                <Badge tone={isNext ? 'green' : registrationMeta.tone}>
-                  {isNext ? 'Next tournament' : registrationMeta.label}
+                <Badge tone={isNext ? "green" : statusTone}>
+                  {isNext ? "Next tournament" : competitionStatus}
                 </Badge>
                 {isToday ? <Badge tone="accent">Tonight</Badge> : null}
                 <Text style={styles.upcomingGame}>{gameName}</Text>
               </View>
               <Text style={styles.upcomingTitle}>{tournament.title}</Text>
-              <Text style={styles.upcomingDate}>{formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}</Text>
-              <Text style={styles.upcomingSummary}>{flexibleBracketCopy(tournament)}</Text>
+              <Text style={styles.upcomingDate}>
+                {formatDateLine(
+                  tournament.date,
+                  tournament.timeZone,
+                  tournament.timeZoneLabel,
+                )}
+              </Text>
+              <Text style={styles.upcomingSummary}>
+                {flexibleBracketCopy(tournament)}
+              </Text>
               <View style={styles.upcomingStats}>
                 <StatPill
                   label="Registered"
                   value={registeredCountLabel(signupSummary, tournament)}
-                  tone={signupSummary.count ? 'green' : 'blue'}
+                  tone={signupSummary.count ? "green" : "blue"}
                 />
                 <StatPill
                   label="Bracket"
-                  value={bracket ? `${bracket.participantCount || 0} seeded` : bracketTargetLabel(tournament)}
-                  tone={bracket ? 'green' : 'accent'}
+                  value={
+                    bracket
+                      ? `${bracket.participantCount || 0} seeded`
+                      : bracketTargetLabel(tournament)
+                  }
+                  tone={bracket ? "green" : "accent"}
                 />
-                <StatPill label="Minimum" value={`${getMinimumPlayers(tournament)} players`} tone="blue" />
+                <StatPill
+                  label="Minimum"
+                  value={`${getMinimumPlayers(tournament)} players`}
+                  tone="blue"
+                />
                 <StatPill label="Entry" value="Free" tone="green" />
               </View>
-              <UpcomingRosterPreview loading={signupSummary.loading} signups={signups} />
+              <UpcomingRosterPreview
+                loading={signupSummary.loading}
+                signups={signups}
+              />
             </View>
             <View style={styles.upcomingActions}>
-              <ActionButton href={registrationIsOpen ? signupPath : tournamentPath}>
-                {registrationIsOpen ? 'Join' : 'Event'}
-              </ActionButton>
+              <ActionButton href={action.href}>{action.label}</ActionButton>
               <ActionButton href={matchPath} variant="secondary">
-                My Match
+                Find My Match
               </ActionButton>
             </View>
           </Surface>
@@ -958,11 +1260,15 @@ function UpcomingTournamentList({
 
 function UpcomingRosterPreview({ loading, signups }) {
   if (loading) {
-    return <Text style={styles.upcomingRosterEmpty}>Loading public roster...</Text>;
+    return (
+      <Text style={styles.upcomingRosterEmpty}>Loading public roster...</Text>
+    );
   }
 
   if (!signups.length) {
-    return <Text style={styles.upcomingRosterEmpty}>No public signups yet.</Text>;
+    return (
+      <Text style={styles.upcomingRosterEmpty}>No public signups yet.</Text>
+    );
   }
 
   return (
@@ -970,15 +1276,20 @@ function UpcomingRosterPreview({ loading, signups }) {
       <Text style={styles.upcomingRosterLabel}>Signed up</Text>
       <View style={styles.upcomingRosterNames}>
         {signups.slice(0, 6).map((signup, index) => (
-          <View key={signup.id || `${signup.playerName}-${index}`} style={styles.upcomingRosterChip}>
+          <View
+            key={signup.id || `${signup.playerName}-${index}`}
+            style={styles.upcomingRosterChip}
+          >
             <Text numberOfLines={1} style={styles.upcomingRosterChipText}>
-              {signup.playerName || 'Unnamed player'}
+              {signup.playerName || "Unnamed player"}
             </Text>
           </View>
         ))}
         {signups.length > 6 ? (
           <View style={styles.upcomingRosterChip}>
-            <Text style={styles.upcomingRosterChipText}>+{signups.length - 6}</Text>
+            <Text style={styles.upcomingRosterChipText}>
+              +{signups.length - 6}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -991,18 +1302,18 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   frontDoorShell: {
-    backgroundColor: '#07110F',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: "#07110F",
+    borderColor: "rgba(214, 162, 78, 0.34)",
     borderRadius: 22,
-    overflow: 'hidden',
+    overflow: "hidden",
     padding: 16,
   },
   frontDoorHeader: {
-    alignItems: 'stretch',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 14,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: 14,
   },
   frontDoorTitleBlock: {
@@ -1010,107 +1321,107 @@ const styles = StyleSheet.create({
     minWidth: 260,
   },
   frontDoorTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 30,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 36,
     marginTop: 10,
   },
   frontDoorMeta: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.7,
     lineHeight: 18,
     marginTop: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   frontDoorCountTile: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.38)',
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.38)",
     borderRadius: 18,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: 104,
     minWidth: 168,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   frontDoorCountLabel: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   frontDoorCountValue: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 38,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 44,
     marginTop: 4,
   },
   frontDoorCountCap: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 18,
   },
   frontDoorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   frontDoorCard: {
-    backgroundColor: 'rgba(17, 29, 26, 0.88)',
-    borderColor: 'rgba(244, 239, 230, 0.14)',
+    backgroundColor: "rgba(17, 29, 26, 0.88)",
+    borderColor: "rgba(244, 239, 230, 0.14)",
     borderRadius: 18,
     flexBasis: 250,
     flexGrow: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     minHeight: 238,
     minWidth: 0,
     padding: 16,
   },
   frontDoorCardAccent: {
-    backgroundColor: 'rgba(214, 162, 78, 0.11)',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: "rgba(214, 162, 78, 0.11)",
+    borderColor: "rgba(214, 162, 78, 0.42)",
   },
   frontDoorCardBlue: {
-    backgroundColor: 'rgba(94, 127, 163, 0.10)',
-    borderColor: 'rgba(94, 127, 163, 0.36)',
+    backgroundColor: "rgba(94, 127, 163, 0.10)",
+    borderColor: "rgba(94, 127, 163, 0.36)",
   },
   frontDoorCardGreen: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
+    backgroundColor: "rgba(214, 162, 78, 0.10)",
+    borderColor: "rgba(214, 162, 78, 0.36)",
   },
   frontDoorCardMeta: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   frontDoorCardTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 29,
     marginTop: 8,
   },
   frontDoorCardBody: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 21,
     marginTop: 8,
   },
@@ -1118,30 +1429,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   frontDoorSecondaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 14,
   },
   twitchBoard: {
-    backgroundColor: '#06100E',
-    borderColor: 'rgba(214, 162, 78, 0.40)',
+    backgroundColor: "#06100E",
+    borderColor: "rgba(214, 162, 78, 0.40)",
     borderRadius: 24,
-    overflow: 'hidden',
+    overflow: "hidden",
     padding: 0,
   },
   twitchBoardGlow: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
+    backgroundColor: "rgba(214, 162, 78, 0.10)",
     borderRadius: 999,
     height: 240,
-    position: 'absolute',
+    position: "absolute",
     right: -90,
     top: -110,
     width: 360,
   },
   twitchBoardMain: {
-    alignItems: 'stretch',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 16,
     padding: 18,
   },
@@ -1150,157 +1461,157 @@ const styles = StyleSheet.create({
     minWidth: 280,
   },
   twitchTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginBottom: 10,
   },
   twitchLiveTag: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   twitchTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 34,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 40,
   },
   twitchDate: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.7,
     lineHeight: 20,
     marginTop: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   twitchSummary: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 22,
     marginTop: 8,
   },
   twitchActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 16,
   },
   twitchScoreStack: {
     flexBasis: 290,
-    flexDirection: 'row',
+    flexDirection: "row",
     flexGrow: 1,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
     gap: 10,
   },
   twitchScoreTile: {
-    backgroundColor: 'rgba(214, 162, 78, 0.13)',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: "rgba(214, 162, 78, 0.13)",
+    borderColor: "rgba(214, 162, 78, 0.42)",
     borderRadius: 18,
     borderWidth: 1,
     flexBasis: 132,
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: 128,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   twitchScoreLabel: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   twitchScoreValue: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 44,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 50,
     marginTop: 6,
   },
   twitchScoreSub: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 22,
   },
   twitchRosterPanel: {
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
-    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    backgroundColor: "rgba(0, 0, 0, 0.22)",
+    borderTopColor: "rgba(244, 239, 230, 0.10)",
     borderTopWidth: 1,
     padding: 18,
   },
   twitchRosterHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   twitchRosterTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 27,
   },
   twitchRosterMeta: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   twitchRosterGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   twitchRosterRow: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(23, 38, 34, 0.82)',
-    borderColor: 'rgba(214, 162, 78, 0.28)',
+    alignItems: "center",
+    backgroundColor: "rgba(23, 38, 34, 0.82)",
+    borderColor: "rgba(214, 162, 78, 0.28)",
     borderRadius: 16,
     borderWidth: 1,
     flexBasis: 230,
-    flexDirection: 'row',
+    flexDirection: "row",
     flexGrow: 1,
     minHeight: 70,
     minWidth: 0,
     padding: 10,
   },
   twitchRosterRank: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.14)',
-    borderColor: 'rgba(214, 162, 78, 0.38)',
+    alignItems: "center",
+    backgroundColor: "rgba(214, 162, 78, 0.14)",
+    borderColor: "rgba(214, 162, 78, 0.38)",
     borderRadius: 999,
     borderWidth: 1,
     height: 42,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginRight: 10,
     width: 42,
   },
   twitchRosterRankText: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 20,
   },
   twitchRosterNameBlock: {
@@ -1308,97 +1619,97 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   twitchRosterName: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 21,
   },
   twitchRosterHandle: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 17,
     marginTop: 2,
   },
   twitchRosterMore: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.35)',
+    alignItems: "center",
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.35)",
     borderRadius: 16,
     borderWidth: 1,
     flexBasis: 230,
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: 70,
     padding: 12,
   },
   twitchRosterMoreText: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.5,
     lineHeight: 18,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   twitchRosterEmpty: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 22,
   },
   downloadGamesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 14,
   },
   downloadGameCard: {
-    backgroundColor: '#08110F',
+    backgroundColor: "#08110F",
     borderRadius: 20,
     flexBasis: 320,
     flexGrow: 1,
     minWidth: 0,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   downloadGameTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   downloadGameMark: {
-    color: '#D6A24E',
-    fontFamily: 'Georgia',
+    color: "#D6A24E",
+    fontFamily: "Georgia",
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
   },
   downloadGameTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 33,
   },
   downloadGameBody: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     lineHeight: 21,
     marginTop: 8,
   },
   downloadButtonStack: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginTop: 16,
   },
   appStoreBadgeShell: {
-    alignItems: 'center',
+    alignItems: "center",
     height: APP_STORE_BADGE_HEIGHT,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: APP_STORE_BADGE_WIDTH,
   },
   appStoreBadgeShellLarge: {
@@ -1414,43 +1725,43 @@ const styles = StyleSheet.create({
     width: 202,
   },
   premiumLinkButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.16)',
-    borderColor: 'rgba(214, 162, 78, 0.62)',
+    alignItems: "center",
+    backgroundColor: "rgba(214, 162, 78, 0.16)",
+    borderColor: "rgba(214, 162, 78, 0.62)",
     borderRadius: 999,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: 48,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    transitionDuration: '160ms',
-    transitionProperty: 'transform, opacity, background-color, border-color',
+    transitionDuration: "160ms",
+    transitionProperty: "transform, opacity, background-color, border-color",
   },
   premiumLinkGroup: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     maxWidth: 280,
   },
   gameLaunchError: {
-    color: '#FCA5A5',
+    color: "#FCA5A5",
     fontSize: 11,
     lineHeight: 16,
     marginTop: 6,
   },
   premiumLinkButtonDisabled: {
-    backgroundColor: 'rgba(244, 239, 230, 0.05)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    backgroundColor: "rgba(244, 239, 230, 0.05)",
+    borderColor: "rgba(244, 239, 230, 0.12)",
     opacity: 0.62,
   },
   premiumLinkButtonText: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.5,
     lineHeight: 17,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   premiumLinkButtonTextDisabled: {
-    color: '#A7A29A',
+    color: "#A7A29A",
   },
   downloadHover: {
     transform: [{ translateY: -2 }],
@@ -1460,13 +1771,13 @@ const styles = StyleSheet.create({
     transform: [{ translateY: 1 }],
   },
   tournamentDownloadGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   tournamentLinkPanel: {
-    backgroundColor: 'rgba(17, 29, 26, 0.88)',
-    borderColor: 'rgba(244, 239, 230, 0.14)',
+    backgroundColor: "rgba(17, 29, 26, 0.88)",
+    borderColor: "rgba(244, 239, 230, 0.14)",
     borderRadius: 18,
     borderWidth: 1,
     flexBasis: 250,
@@ -1474,46 +1785,46 @@ const styles = StyleSheet.create({
     minHeight: 138,
     minWidth: 0,
     padding: 16,
-    transitionDuration: '160ms',
-    transitionProperty: 'transform, opacity, background-color, border-color',
+    transitionDuration: "160ms",
+    transitionProperty: "transform, opacity, background-color, border-color",
   },
   tournamentLinkPanelAccent: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.42)",
   },
   tournamentLinkPanelGreen: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
+    backgroundColor: "rgba(214, 162, 78, 0.10)",
+    borderColor: "rgba(214, 162, 78, 0.36)",
   },
   tournamentLinkPanelBlue: {
-    backgroundColor: 'rgba(94, 127, 163, 0.10)',
-    borderColor: 'rgba(94, 127, 163, 0.36)',
+    backgroundColor: "rgba(94, 127, 163, 0.10)",
+    borderColor: "rgba(94, 127, 163, 0.36)",
   },
   tournamentLinkLabel: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 25,
   },
   tournamentLinkBody: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     lineHeight: 19,
     marginTop: 8,
   },
   premiumHero: {
-    backgroundColor: '#07110F',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: "#07110F",
+    borderColor: "rgba(214, 162, 78, 0.34)",
     borderRadius: 24,
     marginBottom: 22,
-    overflow: 'hidden',
+    overflow: "hidden",
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 20,
-    shadowColor: '#D6A24E',
+    shadowColor: "#D6A24E",
     shadowOpacity: 0.18,
     shadowRadius: 30,
     shadowOffset: { width: 0, height: 18 },
@@ -1524,78 +1835,78 @@ const styles = StyleSheet.create({
   },
   premiumHeroBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   heroSpade: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
-    fontWeight: '800',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
+    fontWeight: "800",
     opacity: 0.035,
-    position: 'absolute',
+    position: "absolute",
   },
   heroSpadeLeft: {
     fontSize: 180,
     left: 28,
     top: 36,
-    transform: [{ rotate: '-8deg' }],
+    transform: [{ rotate: "-8deg" }],
   },
   heroSpadeRight: {
     bottom: 12,
     fontSize: 220,
     right: 34,
-    transform: [{ rotate: '10deg' }],
+    transform: [{ rotate: "10deg" }],
   },
   heroGoldGlow: {
-    position: 'absolute',
-    alignSelf: 'center',
+    position: "absolute",
+    alignSelf: "center",
     top: 132,
     width: 620,
     height: 160,
     borderRadius: 999,
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
   },
   heroGreenGlow: {
-    position: 'absolute',
+    position: "absolute",
     left: -120,
     top: -80,
     width: 320,
     height: 260,
     borderRadius: 999,
-    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    backgroundColor: "rgba(214, 162, 78, 0.08)",
   },
   premiumHeroTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: 14,
   },
   premiumHeroDomain: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     flexShrink: 1,
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 1,
     lineHeight: 18,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   premiumHeroCopy: {
-    alignItems: 'center',
-    alignSelf: 'center',
+    alignItems: "center",
+    alignSelf: "center",
     maxWidth: 820,
-    width: '100%',
+    width: "100%",
   },
   premiumHeroTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 42,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0,
     lineHeight: 48,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textAlign: "center",
+    textShadowColor: "rgba(0, 0, 0, 0.7)",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 14,
   },
@@ -1604,34 +1915,34 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   premiumHeroSubtitle: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 22,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   premiumHeroDate: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 19,
     marginTop: 10,
-    textAlign: 'center',
-    textTransform: 'uppercase',
+    textAlign: "center",
+    textTransform: "uppercase",
   },
   countdownFrame: {
-    borderColor: 'rgba(214, 162, 78, 0.58)',
+    borderColor: "rgba(214, 162, 78, 0.58)",
     borderRadius: 24,
     borderWidth: 1,
     marginTop: 24,
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.18)',
-    shadowColor: '#D6A24E',
+    backgroundColor: "rgba(0, 0, 0, 0.18)",
+    shadowColor: "#D6A24E",
     shadowOpacity: 0.26,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
@@ -1643,46 +1954,46 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   countdownRailRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 12,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginBottom: 14,
   },
   countdownRail: {
-    backgroundColor: 'rgba(214, 162, 78, 0.48)',
+    backgroundColor: "rgba(214, 162, 78, 0.48)",
     flex: 1,
     height: 1,
     maxWidth: 160,
   },
   countdownFrameLabel: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 1,
     lineHeight: 18,
-    textAlign: 'center',
-    textTransform: 'uppercase',
+    textAlign: "center",
+    textTransform: "uppercase",
   },
   countdownGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   countdownGridCompact: {
     gap: 10,
   },
   countdownUnit: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(7, 17, 15, 0.78)',
-    borderColor: 'rgba(214, 162, 78, 0.28)',
+    alignItems: "center",
+    backgroundColor: "rgba(7, 17, 15, 0.78)",
+    borderColor: "rgba(214, 162, 78, 0.28)",
     borderRadius: 18,
     borderWidth: 1,
     flexBasis: 132,
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     maxWidth: 190,
     minHeight: 116,
     minWidth: 118,
@@ -1691,21 +2002,21 @@ const styles = StyleSheet.create({
   },
   countdownUnitTight: {
     flexBasis: 92,
-    maxWidth: '48%',
+    maxWidth: "48%",
     minHeight: 88,
     minWidth: 88,
     paddingHorizontal: 8,
     paddingVertical: 10,
   },
   countdownValue: {
-    color: '#FFD66B',
-    fontFamily: 'monospace',
+    color: "#FFD66B",
+    fontFamily: "monospace",
     fontSize: 56,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 62,
-    textAlign: 'center',
-    textShadowColor: 'rgba(214, 162, 78, 0.92)',
+    textAlign: "center",
+    textShadowColor: "rgba(214, 162, 78, 0.92)",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 18,
   },
@@ -1718,35 +2029,35 @@ const styles = StyleSheet.create({
     lineHeight: 39,
   },
   countdownLabel: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.8,
     lineHeight: 16,
     marginTop: 6,
-    textAlign: 'center',
-    textTransform: 'uppercase',
+    textAlign: "center",
+    textTransform: "uppercase",
   },
   heroActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     marginTop: 18,
     gap: 10,
   },
   heroPrimaryActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 18,
   },
   heroActionRowSecondary: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 12,
   },
   heroActionButton: {
@@ -1756,34 +2067,34 @@ const styles = StyleSheet.create({
     minWidth: 150,
   },
   rosterPolicyBar: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    alignSelf: "center",
+    backgroundColor: "rgba(214, 162, 78, 0.10)",
+    borderColor: "rgba(214, 162, 78, 0.34)",
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 6,
     maxWidth: 780,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    width: '100%',
+    width: "100%",
   },
   rosterPolicyText: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 19,
-    textAlign: 'center',
+    textAlign: "center",
   },
   heroInfoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 8,
   },
   heroInfoTile: {
-    backgroundColor: 'rgba(23, 38, 34, 0.72)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    backgroundColor: "rgba(23, 38, 34, 0.72)",
+    borderColor: "rgba(244, 239, 230, 0.12)",
     borderRadius: 14,
     borderWidth: 1,
     flexBasis: 152,
@@ -1794,42 +2105,42 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   heroInfoAccent: {
-    borderColor: 'rgba(214, 162, 78, 0.45)',
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
+    borderColor: "rgba(214, 162, 78, 0.45)",
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
   },
   heroInfoBlue: {
-    borderColor: 'rgba(94, 127, 163, 0.38)',
-    backgroundColor: 'rgba(94, 127, 163, 0.10)',
+    borderColor: "rgba(94, 127, 163, 0.38)",
+    backgroundColor: "rgba(94, 127, 163, 0.10)",
   },
   heroInfoGreen: {
-    borderColor: 'rgba(214, 162, 78, 0.42)',
-    backgroundColor: 'rgba(214, 162, 78, 0.11)',
+    borderColor: "rgba(214, 162, 78, 0.42)",
+    backgroundColor: "rgba(214, 162, 78, 0.11)",
   },
   heroInfoLabel: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   heroInfoValue: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 21,
     marginTop: 3,
   },
   scheduleSummaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginBottom: 12,
   },
   scheduleSummaryTile: {
-    backgroundColor: 'rgba(23, 38, 34, 0.76)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    backgroundColor: "rgba(23, 38, 34, 0.76)",
+    borderColor: "rgba(244, 239, 230, 0.12)",
     borderRadius: 16,
     borderWidth: 1,
     flexBasis: 150,
@@ -1838,22 +2149,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   scheduleSummaryTileAccent: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.42)",
   },
   scheduleSummaryLabel: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.7,
     lineHeight: 16,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   scheduleSummaryValue: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 24,
     marginTop: 2,
   },
@@ -1861,32 +2172,32 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   upcomingRow: {
-    alignItems: 'stretch',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "stretch",
+    borderColor: "rgba(244, 239, 230, 0.12)",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 14,
   },
   upcomingRowNext: {
-    borderColor: 'rgba(214, 162, 78, 0.34)',
-    backgroundColor: 'rgba(214, 162, 78, 0.06)',
+    borderColor: "rgba(214, 162, 78, 0.34)",
+    backgroundColor: "rgba(214, 162, 78, 0.06)",
   },
   upcomingRank: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.34)",
     borderRadius: 999,
     borderWidth: 1,
     height: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 44,
   },
   upcomingRankText: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 22,
   },
   upcomingCopy: {
@@ -1894,67 +2205,67 @@ const styles = StyleSheet.create({
     minWidth: 260,
   },
   upcomingTopLine: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginBottom: 8,
   },
   upcomingGame: {
-    color: '#A7A29A',
-    fontFamily: 'monospace',
+    color: "#A7A29A",
+    fontFamily: "monospace",
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.7,
     lineHeight: 18,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   upcomingTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 30,
   },
   upcomingDate: {
-    color: '#D6A24E',
+    color: "#D6A24E",
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 20,
     marginTop: 4,
   },
   upcomingSummary: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
   },
   upcomingStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 12,
   },
   upcomingRosterPreview: {
     marginTop: 10,
   },
   upcomingRosterLabel: {
-    color: '#D6A24E',
-    fontFamily: 'monospace',
+    color: "#D6A24E",
+    fontFamily: "monospace",
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
     lineHeight: 16,
     marginBottom: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   upcomingRosterNames: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   upcomingRosterChip: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    backgroundColor: "rgba(214, 162, 78, 0.12)",
+    borderColor: "rgba(214, 162, 78, 0.30)",
     borderRadius: 999,
     borderWidth: 1,
     maxWidth: 180,
@@ -1962,68 +2273,68 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   upcomingRosterChipText: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: "900",
     lineHeight: 15,
   },
   upcomingRosterEmpty: {
-    color: '#A7A29A',
+    color: "#A7A29A",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 19,
     marginTop: 10,
   },
   upcomingActions: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignSelf: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     minWidth: 220,
   },
   spadesSpotlight: {
-    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderColor: "rgba(214, 162, 78, 0.28)",
   },
   spadesTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   spadesPath: {
-    color: '#D6A24E',
+    color: "#D6A24E",
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.8,
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
   },
   spadesTitle: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 30,
     lineHeight: 34,
-    fontWeight: '800',
+    fontWeight: "800",
     marginBottom: 8,
   },
   spadesLead: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 15,
     lineHeight: 23,
     marginBottom: 12,
   },
   spadesStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 4,
   },
   spadesActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 16,
   },
   platformHero: {
-    backgroundColor: '#07110F',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
+    backgroundColor: "#07110F",
+    borderColor: "rgba(214, 162, 78, 0.42)",
     minHeight: 390,
-    overflow: 'hidden',
+    overflow: "hidden",
     paddingHorizontal: 28,
     paddingVertical: 34,
   },
@@ -2036,34 +2347,34 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     opacity: 0.12,
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: 0,
   },
   platformHeroSuit: {
-    color: '#D6A24E',
+    color: "#D6A24E",
     fontSize: 260,
-    fontWeight: '900',
+    fontWeight: "900",
     left: -35,
     lineHeight: 280,
-    position: 'absolute',
+    position: "absolute",
     top: 70,
   },
   platformHeroSuitRight: {
-    color: '#5E7FA3',
-    left: 'auto',
+    color: "#5E7FA3",
+    left: "auto",
     right: -35,
     top: -50,
   },
   platformHeroCopy: {
     maxWidth: 820,
-    position: 'relative',
+    position: "relative",
   },
   platformHeroTitle: {
-    color: '#F4EFE6',
-    fontFamily: 'Georgia',
+    color: "#F4EFE6",
+    fontFamily: "Georgia",
     fontSize: 72,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: -2,
     lineHeight: 78,
     marginTop: 20,
@@ -2074,26 +2385,26 @@ const styles = StyleSheet.create({
     lineHeight: 49,
   },
   platformHeroLead: {
-    color: '#F4EFE6',
+    color: "#F4EFE6",
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 30,
     marginTop: 16,
   },
   platformHeroCallout: {
-    color: '#D6A24E',
-    fontFamily: 'Georgia',
+    color: "#D6A24E",
+    fontFamily: "Georgia",
     fontSize: 27,
-    fontStyle: 'italic',
-    fontWeight: '800',
+    fontStyle: "italic",
+    fontWeight: "800",
     lineHeight: 34,
     marginTop: 9,
   },
   platformHeroActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginTop: 28,
-    position: 'relative',
+    position: "relative",
   },
 });
