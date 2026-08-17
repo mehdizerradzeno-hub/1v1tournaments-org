@@ -25,10 +25,7 @@ import {
   getUpcomingTournaments,
   siteData,
 } from '../lib/siteData.js';
-import {
-  getNextPublicTournament,
-  getPublicTournamentCatalog,
-} from '../lib/tournamentCatalog.js';
+import { getNextPublicTournament, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
 import {
   findRedditSundayCommunityCup,
   getCommunityCupPrimaryAction,
