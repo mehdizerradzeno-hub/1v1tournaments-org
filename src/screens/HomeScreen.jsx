@@ -37,8 +37,8 @@ import {
 import {
   getActiveOrFutureTournaments,
   getNextPublicTournament,
-  mergeTournamentLists,
-} from "../lib/tournamentCatalog.js";
+  getPublicTournamentCatalog,
+} from '../lib/tournamentCatalog.js';
 import {
   getAppleReleaseLabel,
   getFeaturedCompetitionAction,
@@ -190,10 +190,8 @@ export default function HomeScreen() {
   const games = useMemo(() => getGames(), []);
   const streams = useMemo(() => getStreams(), []);
   const upcoming = useMemo(
-    () =>
-      mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter(
-        (tournament) => tournament.status === "upcoming",
-      ),
+    () => getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
+      .filter((tournament) => tournament.status === 'upcoming'),
     [hostedTournaments],
   );
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
