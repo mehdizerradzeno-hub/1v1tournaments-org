@@ -14,6 +14,10 @@ import {
 import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
 import { isHostedTournamentDeleted } from './_tournament-events-utils.mjs';
 import {
+  assertTournamentMatchNotRevoked,
+  loadTournamentMatchRevocation,
+} from './_tournament-teardown-utils.mjs';
+import {
   TOURNAMENT_MATCH_TICKET_TTL_MS,
   TournamentGameContractError,
   assertTournamentTicketAccess,
@@ -256,6 +260,8 @@ async function issueTicket(event, payload) {
     return json(409, { error: 'This match already has a final result.' });
   }
 
+  assertTournamentMatchNotRevoked(await loadTournamentMatchRevocation(matchId));
+
   const readyPlayers = match.players.filter(Boolean);
 
   if (readyPlayers.length !== 2) {
@@ -339,6 +345,8 @@ async function verifyTicket(payload) {
   if (!record) {
     return json(401, { error: 'This match ticket was not found. Open the match from 1v1 Tournaments again.' });
   }
+
+  assertTournamentMatchNotRevoked(await loadTournamentMatchRevocation(record.matchId));
 
   const bracket = await loadBracket(record.tournamentSlug);
   const matchLookup = findMatch(bracket, record.matchId);

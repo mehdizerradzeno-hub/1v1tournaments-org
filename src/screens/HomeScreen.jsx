@@ -37,7 +37,7 @@ import {
 import {
   getActiveOrFutureTournaments,
   getNextPublicTournament,
-  mergeTournamentLists,
+  getPublicTournamentCatalog,
 } from "../lib/tournamentCatalog.js";
 import {
   getAppleReleaseLabel,
@@ -191,7 +191,7 @@ export default function HomeScreen() {
   const streams = useMemo(() => getStreams(), []);
   const upcoming = useMemo(
     () =>
-      mergeTournamentLists(getUpcomingTournaments(), hostedTournaments).filter(
+      getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments).filter(
         (tournament) => tournament.status === "upcoming",
       ),
     [hostedTournaments],

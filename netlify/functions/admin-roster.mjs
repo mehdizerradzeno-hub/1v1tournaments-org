@@ -1,6 +1,14 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import {
+  collectSpadesTeardownTargets,
+  loadTournamentTeardown,
+  markTournamentTeardownComplete,
+  orchestrateSpadesTournamentTeardown,
+  requestSpadesRoomAbandonment,
+  TournamentTeardownError,
+} from './_tournament-teardown-utils.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -107,6 +115,33 @@ async function clearTournament(tournamentSlug) {
   };
 }
 
+async function safelyClearTournament(tournamentSlug, actor) {
+  const previous = await loadTournamentTeardown(tournamentSlug);
+  if (previous?.status === 'completed') {
+    return {
+      deletedSignupCount: 0,
+      rosters: [{ tournamentSlug, signups: [] }],
+      teardown: previous,
+      duplicate: true,
+    };
+  }
+
+  const bracketStore = getBracketStore();
+  const bracket = await bracketStore.get(tournamentSlug + '.json', { type: 'json' });
+  const targets = bracket ? collectSpadesTeardownTargets(bracket) : [];
+  const { operation } = await orchestrateSpadesTournamentTeardown({
+    tournamentSlug,
+    targets,
+    actor,
+    dependencies: {
+      abandonRoom: requestSpadesRoomAbandonment,
+    },
+  });
+  const cleared = await clearTournament(tournamentSlug);
+  const teardown = await markTournamentTeardownComplete(operation);
+  return { ...cleared, teardown, duplicate: false };
+}
+
 export async function handler(event) {
   if (event.blobs) {
     connectLambda(event);
@@ -140,7 +175,7 @@ export async function handler(event) {
 
       const tournamentSlug = cleanSlug(requestedSlug || payload.tournamentSlug);
 
-      if (payload.action !== 'clear-tournament') {
+      if (!['clear-tournament', 'teardown-tournament'].includes(payload.action)) {
         return json(400, { error: 'Choose a supported roster admin action.' });
       }
 
@@ -148,7 +183,7 @@ export async function handler(event) {
         return json(400, { error: 'Choose a tournament before clearing test data.' });
       }
 
-      const result = await clearTournament(tournamentSlug);
+      const result = await safelyClearTournament(tournamentSlug, adminCheck.method);
 
       return json(200, {
         ok: true,
@@ -169,6 +204,13 @@ export async function handler(event) {
         : groupSignups(signups),
     });
   } catch (error) {
+    if (error instanceof TournamentTeardownError) {
+      return json(error.statusCode, {
+        error: error.message,
+        code: error.code,
+        teardown: error.details,
+      });
+    }
     console.error('Admin roster load failed', error);
     return json(500, { error: 'Roster storage is not available yet.' });
   }

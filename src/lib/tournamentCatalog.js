@@ -281,7 +281,28 @@ export function createTournamentRecord(payload = {}) {
     streamSlugs: arrayOfText(payload.streamSlugs, ['main-live', 'replay-archive']),
     links: normalizeLinks(payload.links, slug),
     hosted: Boolean(payload.hosted ?? true),
+    visibility: cleanShortText(payload.visibility, '').toLowerCase(),
+    publicDiscovery: payload.publicDiscovery !== false,
   };
+}
+
+export function isPublicTournamentVisible(tournament) {
+  const visibility = String(tournament?.visibility || '').trim().toLowerCase();
+  const status = String(tournament?.status || '').trim().toLowerCase();
+
+  return Boolean(tournament)
+    && !tournament.deleted
+    && !tournament.cancelledAt
+    && !['private', 'unlisted'].includes(visibility)
+    && tournament.publicDiscovery !== false
+    && !['cancelled', 'deleted'].includes(status);
+}
+
+export function isPubliclyDiscoverableTournament(tournament) {
+  const status = String(tournament?.status || '').trim().toLowerCase();
+
+  return isPublicTournamentVisible(tournament)
+    && !['archived', 'complete', 'completed'].includes(status);
 }
 
 export function getTournamentStartMs(tournament) {
@@ -321,7 +342,8 @@ function hasLiveBracket(tournament, eventDataBySlug = {}) {
 
 export function getActiveOrFutureTournaments(tournaments = [], eventDataBySlug = {}, nowMs = Date.now()) {
   return [...tournaments]
-    .filter((tournament) => isLiveTournament(tournament, eventDataBySlug) || isFutureTournament(tournament, nowMs))
+    .filter((tournament) => isPubliclyDiscoverableTournament(tournament)
+      && (isLiveTournament(tournament, eventDataBySlug) || isFutureTournament(tournament, nowMs)))
     .sort((left, right) => {
       const leftLive = isLiveTournament(left, eventDataBySlug);
       const rightLive = isLiveTournament(right, eventDataBySlug);
@@ -405,7 +427,8 @@ export function mergeTournamentLists(baseTournaments = [], hostedTournaments = [
 
 export function getPublicTournamentCatalog(baseTournaments = [], hostedTournaments = []) {
   return mergeTournamentLists(baseTournaments, hostedTournaments)
-    .filter((tournament) => ['upcoming', 'live'].includes(String(tournament?.status || '').toLowerCase()));
+    .filter((tournament) => isPubliclyDiscoverableTournament(tournament)
+      && ['upcoming', 'live'].includes(String(tournament?.status || '').toLowerCase()));
 }
 
 export function getPublicTournamentFeedStatus({

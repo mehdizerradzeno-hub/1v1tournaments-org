@@ -27,7 +27,7 @@ import {
 } from "../lib/siteData.js";
 import {
   getNextPublicTournament,
-  mergeTournamentLists,
+  getPublicTournamentCatalog,
 } from "../lib/tournamentCatalog.js";
 import {
   findRedditSundayCommunityCup,
@@ -327,15 +327,9 @@ export default function NextScreen() {
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const publicTournaments = useMemo(
-    () =>
-      hostedTournamentsLoaded
-        ? mergeTournamentLists(
-            getUpcomingTournaments(),
-            hostedTournaments,
-          ).filter((tournament) =>
-            ["upcoming", "live"].includes(tournament.status),
-          )
-        : [],
+    () => hostedTournamentsLoaded
+      ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
+      : [],
     [hostedTournaments, hostedTournamentsLoaded],
   );
   const publicTournamentSlugs = publicTournaments
