@@ -783,6 +783,7 @@ export function HubScreen({
             showDockedMobileNav && styles.scrollContentWithMobileNav,
             showStickyActions && showDockedMobileNav && styles.scrollContentWithStickyActionsAndMobileNav,
           ]}
+          style={styles.mainScroll}
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
             {showHeader ? (
@@ -945,6 +946,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 260,
     backgroundColor: 'rgba(94, 127, 163, 0.04)',
+  },
+  mainScroll: {
+    flex: 1,
+    minHeight: 0,
   },
   scrollContent: {
     flexGrow: 1,
