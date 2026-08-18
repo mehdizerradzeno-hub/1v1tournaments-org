@@ -193,10 +193,10 @@ function heroSignupAction(status, checkInPath, tournamentPath) {
   }
 
   if (status.value === 'open') {
-    return { label: 'Join', href: checkInPath };
+    return { label: 'Join Tournament', href: checkInPath };
   }
 
-  return { label: 'Roster', href: `${tournamentPath}#registered-players` };
+  return { label: 'View Roster', href: `${tournamentPath}#registered-players` };
 }
 
 function getSignInPath(checkInPath) {
@@ -230,13 +230,13 @@ function getPlayerPrimaryAction({
   }
 
   if (signup) {
-    return { label: 'My Match', href: matchStatusPath };
+    return { label: 'Check Match Status', href: matchStatusPath };
   }
 
   if (isBracketLive) {
     return account
-      ? { label: 'My Match', href: matchStatusPath }
-      : { label: 'Sign in for Match', href: signInPath };
+      ? { label: 'Check Match Status', href: matchStatusPath }
+      : { label: 'Sign in to Check Match', href: signInPath };
   }
 
   if (registrationMeta.value === 'open') {
@@ -249,7 +249,7 @@ function getPlayerPrimaryAction({
       : { label: 'Sign in to Join', href: signInPath };
   }
 
-  return { label: 'Roster', href: `${tournamentPath}#registered-players` };
+  return { label: 'View Roster', href: `${tournamentPath}#registered-players` };
 }
 
 function getSecondarySignInAction(playerStatus, signInPath) {
@@ -811,7 +811,7 @@ export default function TournamentScreen({ slug }) {
           />
 
           <Section
-            description="Account status, table access, roster size, and bracket state in one scan."
+            description="Your tournament status, match access, field size, and live bracket in one competitive dashboard."
             nativeID="my-match"
             title="Player command center">
             <View style={styles.playerCommandGrid}>
@@ -843,7 +843,7 @@ export default function TournamentScreen({ slug }) {
           </Section>
 
           <Section
-            description="Format, player requirement, and bracket expectations before you join."
+            description="Competition format, field requirements, and bracket structure."
             title="Tournament format">
             <TournamentFormatCard
               advertisedRosterCap={advertisedRosterCap}
@@ -928,7 +928,7 @@ export default function TournamentScreen({ slug }) {
               { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Next', value: getNextPublicMatch(liveBracket)?.label || 'After seed' },
             ]}
-            title="Bracket control"
+            title="Tournament Bracket"
           />
 
           {liveBracket ? (
@@ -980,9 +980,9 @@ export default function TournamentScreen({ slug }) {
               {streams.length ? (
                 <QuickActionCard
                   actionLabel="Watch table"
-                  body="Open the spectator table for the current match."
+                  body="Follow the live tournament broadcast and current match action."
                   href="/stream"
-                  meta="Spectator"
+                  meta="Live Coverage"
                   title="Watch Tournament"
                   tone="blue"
                 />
@@ -1352,7 +1352,7 @@ function TournamentLobbyHero({
     <Surface style={styles.lobbyCard}>
       <View style={styles.lobbyBadgeRow}>
         <Badge tone={isComplete ? 'green' : liveBracket ? 'green' : registrationMeta.tone}>
-          {isComplete ? 'Complete' : liveBracket ? 'Bracket live' : registrationMeta.label}
+          {isComplete ? 'Completed' : liveBracket ? 'Tournament Live' : registrationMeta.label}
         </Badge>
         <Text style={styles.lobbyDate}>
           {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
@@ -1361,11 +1361,11 @@ function TournamentLobbyHero({
 
       <View style={[styles.lobbyCountdownPanel, isPhone && styles.lobbyCountdownPanelPhone]}>
         <View style={styles.lobbyCopy}>
-          <Text style={styles.lobbyCountdownLabel}>{isComplete ? 'Champion' : 'Starts in'}</Text>
+          <Text style={styles.lobbyCountdownLabel}>{isComplete ? 'CHAMPION' : isBracketLive ? 'LIVE NOW' : 'STARTS IN'}</Text>
           <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>
             {isComplete ? championName || 'Results posted' : countdownLabel}
           </Text>
-          <Text style={styles.lobbyTitle}>{isComplete ? 'Tournament complete' : 'Tournament lobby'}</Text>
+          <Text style={styles.lobbyTitle}>{isComplete ? 'Tournament Complete' : isBracketLive ? 'Tournament Live' : tournament.name || 'Tournament Lobby'}</Text>
           <Text style={styles.lobbySummary}>
             {isComplete
               ? result?.summary || 'Final results are posted for this tournament.'
@@ -1376,21 +1376,21 @@ function TournamentLobbyHero({
           <ActionButton href={isComplete ? '/results' : primaryAction.href}>
             {isComplete ? 'View Results' : primaryAction.label}
           </ActionButton>
-          {primaryAction.href !== matchStatusPath ? <ActionButton href={matchStatusPath} variant="secondary">My Match</ActionButton> : null}
+          {primaryAction.href !== matchStatusPath ? <ActionButton href={matchStatusPath} variant="secondary">Check Match Status</ActionButton> : null}
           {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
-          {streams.length ? <ActionButton href="/stream" variant="secondary">Watch</ActionButton> : null}
+          {streams.length ? <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton> : null}
         </View>
       </View>
 
       <View style={styles.lobbyGrid}>
         <View style={styles.lobbyMetric}>
-          <Text style={styles.lobbyMetricLabel}>Signed up</Text>
+          <Text style={styles.lobbyMetricLabel}>Players</Text>
           <Text style={styles.lobbyMetricValue}>
             {signupCount}
           </Text>
         </View>
         <View style={styles.lobbyMetric}>
-          <Text style={styles.lobbyMetricLabel}>Open seats</Text>
+          <Text style={styles.lobbyMetricLabel}>Seats Open</Text>
           <Text style={styles.lobbyMetricValue}>{openSeats}</Text>
         </View>
         <View style={[styles.lobbyMetric, styles.lobbyMatchMetric]}>
@@ -1403,7 +1403,7 @@ function TournamentLobbyHero({
 
       <View style={styles.lobbyRosterPreview}>
         <View style={styles.lobbyRosterHeader}>
-          <Text style={styles.lobbyRosterTitle}>Who is in</Text>
+          <Text style={styles.lobbyRosterTitle}>Competitors</Text>
           <Text style={styles.lobbyRosterMeta}>
             {signupSummary.loading ? 'Loading roster' : `${signups.length} visible`}
           </Text>
@@ -1418,7 +1418,7 @@ function TournamentLobbyHero({
               </View>
             ))
           ) : (
-            <Text style={styles.lobbyEmpty}>No public signups yet. Keep the join link visible.</Text>
+            <Text style={styles.lobbyEmpty}>No competitors registered yet.</Text>
           )}
           {signups.length > 8 ? <Text style={styles.lobbyMore}>+{signups.length - 8} more</Text> : null}
         </View>
@@ -1514,7 +1514,7 @@ function TournamentDashboard({
           <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
           {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
           <ActionButton href={`${tournamentPath}${isBracketLive ? '#live-bracket' : '#registered-players'}`} variant="secondary">
-            {isBracketLive ? 'Bracket' : 'Roster'}
+            {isBracketLive ? 'View Bracket' : 'View Roster'}
           </ActionButton>
           {streams.length ? (
             <ActionButton href="/stream" variant="secondary">
@@ -1526,17 +1526,17 @@ function TournamentDashboard({
 
       <View style={styles.dashboardGrid}>
         <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Registered</Text>
+          <Text style={styles.dashboardTileLabel}>Players</Text>
           <Text style={styles.dashboardTileValue}>{registeredLabel}</Text>
           <Text style={styles.dashboardTileMeta}>advertised seats</Text>
         </View>
         <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Bracket</Text>
+          <Text style={styles.dashboardTileLabel}>Bracket Status</Text>
           <Text style={styles.dashboardTileValue}>{bracketLabel}</Text>
           <Text style={styles.dashboardTileMeta}>{liveBracket ? 'live bracket' : 'actual if seeded now'}</Text>
         </View>
         <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Minimum</Text>
+          <Text style={styles.dashboardTileLabel}>Minimum Players</Text>
           <Text style={styles.dashboardTileValue}>{minimumPlayers}</Text>
           <Text style={styles.dashboardTileMeta}>players to run</Text>
         </View>
@@ -1744,7 +1744,7 @@ function PlayerStatusSpotlight({
       done: Boolean(result),
     },
   ];
-  const actionLabel = currentMatch ? 'Play My Match' : primaryAction?.label || 'Next Step';
+  const actionLabel = currentMatch ? 'Open My Match' : primaryAction?.label || 'Next Step';
   const matchPlayers = currentMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
 
   async function handlePlayMyMatch() {
@@ -1794,7 +1794,7 @@ function PlayerStatusSpotlight({
             <Text style={styles.statusSpotlightMatchPlayers}>{matchPlayers}</Text>
           </View>
           <ActionButton onPress={handlePlayMyMatch} style={styles.statusSpotlightPlayButton}>
-            {opening ? 'Opening...' : 'Play My Match'}
+            {opening ? 'Opening...' : 'Open My Match'}
           </ActionButton>
         </View>
       ) : null}
@@ -1824,9 +1824,9 @@ function PlayerStatusSpotlight({
 
 function playerStatusActionLabel(data, currentMatch) {
   if (currentMatch) return 'Open My Match';
-  if (!data?.account) return 'Sign in to Join';
+  if (!data?.account) return 'Sign In to Join';
   if (!data?.signup) return 'Join Tournament';
-  return 'My Match';
+  return 'Check Match Status';
 }
 
 function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug }) {

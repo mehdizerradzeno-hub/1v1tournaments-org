@@ -211,7 +211,7 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextScreenSource, /heroVariant="compact"/);
   assert.match(nextScreenSource, /stickyActions=\{false\}/);
   assert.match(nextScreenSource, /Starts in/);
-  assert.match(nextScreenSource, /Signed up players/);
+  assert.match(nextScreenSource, /Competitors/);
   assert.match(nextScreenSource, /Twitch commands/);
   assert.match(nextScreenSource, /Scan to join/);
   assert.match(nextScreenSource, /NEXT_CHAT_COMMANDS/);
@@ -545,7 +545,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hubUiSource, /accountHref/);
   assert.match(hubUiSource, /#account-access/);
   assert.match(hubUiSource, /showMobileNav/);
-  assert.match(nextScreenSource, /My Match/);
+  assert.match(nextScreenSource, /Check Match Status/);
   assert.match(nextScreenSource, /mergeTournamentSettings/);
   assert.match(nextScreenSource, /fetchTournamentEvents/);
   assert.match(nextScreenSource, /getPublicTournamentCatalog/);
@@ -557,7 +557,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Overall standings/);
-  assert.match(nextScreenSource, /Find My Match/);
+  assert.match(nextScreenSource, /Check Match Status/);
   assert.doesNotMatch(nextScreenSource, /Host Admin/);
   assert.match(nextScreenSource, /1V1 Community Cups/);
   assert.match(nextScreenSource, /Open stream bracket/);
@@ -581,7 +581,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /Exactly 4 players/);
   assert.match(tournamentScreenSource, /TournamentTabCommandCard/);
   assert.match(tournamentScreenSource, /Roster control/);
-  assert.match(tournamentScreenSource, /Bracket control/);
+  assert.match(tournamentScreenSource, /Tournament Bracket/);
   assert.match(tournamentScreenSource, /heroVariant="compact"/);
   assert.match(tournamentScreenSource, /stickyActions/);
   assert.match(tournamentScreenSource, /title="Match status"/);

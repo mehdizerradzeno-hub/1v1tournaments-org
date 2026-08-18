@@ -645,7 +645,7 @@ function PremiumCountdownHero({
           style={styles.heroActionButton}
           variant="secondary"
         >
-          Find My Match
+          Check Match Status
         </ActionButton>
         <ActionButton
           href={`${tournamentPath}#live-bracket`}
@@ -855,7 +855,7 @@ function TwitchTournamentBoard({
                 {primaryAction.label}
               </ActionButton>
               <ActionButton href={matchStatusPath} variant="secondary">
-                Find My Match
+                Check Match Status
               </ActionButton>
               <ActionButton href="/stream" variant="secondary">
                 Watch
@@ -874,7 +874,7 @@ function TwitchTournamentBoard({
 
           <View style={styles.twitchScoreStack}>
             <View style={styles.twitchScoreTile}>
-              <Text style={styles.twitchScoreLabel}>Signed up</Text>
+              <Text style={styles.twitchScoreLabel}>Players</Text>
               <Text style={styles.twitchScoreValue}>
                 {signupLoading
                   ? "--"
@@ -883,7 +883,7 @@ function TwitchTournamentBoard({
               </Text>
             </View>
             <View style={styles.twitchScoreTile}>
-              <Text style={styles.twitchScoreLabel}>Open seats</Text>
+              <Text style={styles.twitchScoreLabel}>Seats Open</Text>
               <Text style={styles.twitchScoreValue}>
                 {signupLoading ? "--" : openSeats}
               </Text>
@@ -893,7 +893,7 @@ function TwitchTournamentBoard({
 
         <View style={styles.twitchRosterPanel}>
           <View style={styles.twitchRosterHeader}>
-            <Text style={styles.twitchRosterTitle}>Public signup roster</Text>
+            <Text style={styles.twitchRosterTitle}>Competitor Roster</Text>
             <Text style={styles.twitchRosterMeta}>
               {signupUnavailable
                 ? "Live roster unavailable"
@@ -936,8 +936,7 @@ function TwitchTournamentBoard({
             </View>
           ) : (
             <Text style={styles.twitchRosterEmpty}>
-              No public signups yet. Send viewers to Join Tournament to get the
-              roster started.
+              No competitors registered yet.
             </Text>
           )}
         </View>
@@ -1249,7 +1248,7 @@ function UpcomingTournamentList({
             <View style={styles.upcomingActions}>
               <ActionButton href={action.href}>{action.label}</ActionButton>
               <ActionButton href={matchPath} variant="secondary">
-                Find My Match
+                Check Match Status
               </ActionButton>
             </View>
           </Surface>
@@ -1274,7 +1273,7 @@ function UpcomingRosterPreview({ loading, signups }) {
 
   return (
     <View style={styles.upcomingRosterPreview}>
-      <Text style={styles.upcomingRosterLabel}>Signed up</Text>
+      <Text style={styles.upcomingRosterLabel}>Players</Text>
       <View style={styles.upcomingRosterNames}>
         {signups.slice(0, 6).map((signup, index) => (
           <View
