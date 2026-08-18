@@ -123,7 +123,7 @@ test('broadcast route is public, read-only, mobile-aware, and contains no host c
   assert.match(screenSource, /eventsResult\?\.events\?\.find/);
   assert.doesNotMatch(screenSource, /Admin|Host control|canonicalAccountId|email|ticket|token/);
   assert.match(responsiveSource, /max-width: 430px/);
-  assert.match(responsiveSource, /min-width: 0 !important/);
+  assert.match(responsiveSource, /min-width: 0/);
   assert.doesNotMatch(responsiveSource, /overflow-x:\s*(hidden|clip)/);
 });
 

@@ -28,6 +28,7 @@ import {
 import {
   getNextPublicTournament,
   getPublicTournamentCatalog,
+  mergeTournamentLists,
 } from "../lib/tournamentCatalog.js";
 import {
   findRedditSundayCommunityCup,
@@ -327,9 +328,20 @@ export default function NextScreen() {
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const publicTournaments = useMemo(
-    () => hostedTournamentsLoaded
-      ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
-      : [],
+    () =>
+      hostedTournamentsLoaded
+        ? mergeTournamentLists(
+            getPublicTournamentCatalog(
+              getUpcomingTournaments(),
+              hostedTournaments,
+            ),
+            [],
+          ).filter((tournament) =>
+            ["upcoming", "live"].includes(
+              String(tournament?.status || "").toLowerCase(),
+            ),
+          )
+        : [],
     [hostedTournaments, hostedTournamentsLoaded],
   );
   const publicTournamentSlugs = publicTournaments
@@ -607,7 +619,7 @@ export default function NextScreen() {
       actions={[
         { label: primaryAction.label, href: primaryAction.href },
         {
-          label: "Find My Match",
+          label: "Check Match Status",
           href: `${tournamentPath}#my-match`,
           variant: "secondary",
         },
@@ -761,14 +773,14 @@ function NextLobbyHero({
               style={styles.heroExitButton}
               variant="secondary"
             >
-              Find My Match
+              Check Match Status
             </ActionButton>
             <ActionButton
               href="/stream"
               style={styles.heroExitButton}
               variant="secondary"
             >
-              Watch Live
+              Watch Tournament
             </ActionButton>
           </View>
 
@@ -846,7 +858,7 @@ function NextLobbyHero({
             />
             <StatusRow label="Players registered" value={signedUpValue} />
             <StatusRow
-              label="Open seats"
+              label="Seats Open"
               value={String(openSeatsValue)}
               emphasis
             />
@@ -890,7 +902,7 @@ function NextLobbyHero({
                 style={styles.secondaryCtaButton}
                 variant="ghost"
               >
-                Find My Match
+                Check Match Status
               </ActionButton>
               <ActionButton
                 href={tournamentPath}
@@ -919,7 +931,7 @@ function NextLobbyHero({
       <View style={styles.lobbyBottom}>
         <View dataSet={getMotionDataSet("card")} style={styles.rosterPreview}>
           <View style={styles.rosterPreviewHead}>
-            <Text style={styles.rosterPreviewTitle}>Signed up players</Text>
+            <Text style={styles.rosterPreviewTitle}>Competitors</Text>
             <Text style={styles.rosterPreviewMeta}>
               {signupSummary.loading ? "Loading" : `${signups.length} visible`}
             </Text>
@@ -2022,13 +2034,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+    width: "100%",
   },
   hierarchyCard: {
     backgroundColor: "rgba(244, 239, 230, 0.035)",
     borderColor: "rgba(244, 239, 230, 0.10)",
     borderRadius: 14,
     borderWidth: 1,
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 240,
     gap: 5,
     minWidth: 210,
     padding: 15,

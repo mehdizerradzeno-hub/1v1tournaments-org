@@ -12,7 +12,7 @@ import {
 } from '../components/hub-ui.jsx';
 import { getGameBySlug } from '../lib/siteData.js';
 import { buildLeagueRecord, nextLeagueMatch, leagueWeekLabel } from '../lib/leagueCatalog.js';
-import { formatDateLine, formatShortDate } from '../lib/format.js';
+import { formatShortDate } from '../lib/format.js';
 import { useHydrated } from '../lib/useHydrated.js';
 import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
 import {
@@ -74,6 +74,22 @@ function matchPreviewText(match = null) {
   const home = match.homeTeam?.displayName || 'TBD';
   const away = match.awayTeam?.displayName || 'TBD';
   return `${leagueWeekLabel(match.scheduledFor)} · ${home} vs ${away} · ${date}`;
+}
+
+function findMyStanding(league, account) {
+  if (!league || !account) return null;
+
+  const canonical = String(account.canonicalAccountId || '').trim();
+  const accountId = String(account.id || '').trim();
+  const email = String(account.email || '').trim().toLowerCase();
+  const displayName = String(account.playerName || account.playerHandle || '').trim().toLowerCase();
+
+  return (league.standings || []).find((entry) => (
+    Boolean(canonical && entry.canonicalAccountId === canonical)
+    || Boolean(accountId && entry.accountId === accountId)
+    || Boolean(email && String(entry.accountEmail || '').toLowerCase() === email)
+    || Boolean(displayName && String(entry.displayName || '').toLowerCase() === displayName)
+  )) || null;
 }
 
 export default function LeaguesScreen() {
@@ -161,6 +177,11 @@ export default function LeaguesScreen() {
     if (!league || !account) return null;
     return nextLeagueMatch(league, account);
   }, [league, account]);
+
+  const myStanding = useMemo(
+    () => findMyStanding(league, account),
+    [league, account],
+  );
 
   async function refreshLeagues() {
     const next = await fetchLeagues();
@@ -415,16 +436,207 @@ export default function LeaguesScreen() {
   return (
     <HubScreen
       title="Leagues"
-      subtitle="Venue-owned weekly leagues with registration, schedules, standings, and match workflows."
+      subtitle="Competitive weekly leagues. Join, track your standing, and play your scheduled matches."
       actions={[{ label: 'Home', href: '/next', variant: 'ghost' }]}
       heroVariant="compact"
       stickyActions={false}>
 
-      <PlayerRouteStrip title="Player path" body="Join a league, view your next scheduled match, then launch from match history." />
+      <PlayerRouteStrip title="Competition path" body="Join a league, track your standing, then open your scheduled match when it is ready." />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {adminToast ? <Text style={styles.infoText}>{adminToast}</Text> : null}
 
-      <Section title="Admin tools" description="Create and maintain leagues from here.">
+      {!leagues.length ? (
+        <Section>
+          <EmptyState title="No leagues found" body={EMPTY_MSG} />
+        </Section>
+      ) : (
+        <>
+          <Section title="My league" description={league ? `Competing in: ${leagueLabel(league)}` : 'Choose a league to view'}>
+            {league ? (
+              <Surface style={styles.leagueCard}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.leagueName}>{leagueLabel(league)}</Text>
+                  <Badge tone={league.status === 'active' ? 'green' : 'rose'}>{league.status || 'unknown'}</Badge>
+                </View>
+                <Text style={styles.leagueMeta}>
+                  {(league.gameSlug || 'spades').toUpperCase()} • {league.season?.name || 'Season 1'} • {league.weeklyPlayDay || 'Sunday'} {league.weeklyPlayTime || ''}
+                </Text>
+
+                <View style={styles.competitionStats}>
+                  <View style={styles.competitionStat}>
+                    <Text style={styles.competitionStatValue}>
+                      {myStanding?.rank ? `#${myStanding.rank}` : '—'}
+                    </Text>
+                    <Text style={styles.competitionStatLabel}>Rank</Text>
+                  </View>
+                  <View style={styles.competitionStat}>
+                    <Text style={styles.competitionStatValue}>
+                      {myStanding ? `${myStanding.wins || 0}-${myStanding.losses || 0}${myStanding.ties ? `-${myStanding.ties}` : ''}` : '0-0'}
+                    </Text>
+                    <Text style={styles.competitionStatLabel}>Record</Text>
+                  </View>
+                  <View style={styles.competitionStat}>
+                    <Text style={styles.competitionStatValue}>
+                      {myStanding?.currentStreak || membership.participant?.currentStreak || 0}
+                    </Text>
+                    <Text style={styles.competitionStatLabel}>Streak</Text>
+                  </View>
+                </View>
+
+                <View style={styles.competitionStatusRow}>
+                  <Badge tone={league.registrationOpen ? 'green' : 'rose'}>
+                    Registration {league.registrationOpen ? 'Open' : 'Closed'}
+                  </Badge>
+                  <Text style={styles.leagueMeta}>
+                    {displayCount(league.participants, 'enrolled')} / {league.playerCap || 0} players
+                  </Text>
+                </View>
+
+                <Surface style={styles.nextMatchCard}>
+                  <Text style={styles.nextMatchEyebrow}>NEXT MATCH</Text>
+                  <Text style={styles.nextMatchText}>{matchPreviewText(nextMatch)}</Text>
+                </Surface>
+
+                {!account ? (
+                  <ActionButton href="/next#account-access">Sign In to Join</ActionButton>
+                ) : nextMatch?.roomUrl && membership.enrolled ? (
+                  <ActionButton
+                    disabled={actionBusy}
+                    onPress={() => handleOpenAssignedMatch(nextMatch)}>
+                    {actionBusyType === `launch-${nextMatch.id}` ? 'Opening...' : 'Open Match'}
+                  </ActionButton>
+                ) : membership.enrolled ? (
+                  <ActionButton disabled={actionBusy} onPress={handleLeave} variant="secondary">
+                    {actionBusyType === 'leave' ? 'Leaving...' : 'Leave League'}
+                  </ActionButton>
+                ) : (
+                  <ActionButton disabled={actionBusy} onPress={handleJoin}>
+                    {actionBusyType === 'join' ? 'Joining...' : 'Join League'}
+                  </ActionButton>
+                )}
+              </Surface>
+            ) : null}
+
+            <Section title="Standings" description="Record, win rate, point totals, and rank.">
+              {(league?.standings || []).length ? (
+                <View style={styles.standingsTable}>
+                  {(league.standings || []).map((entry) => (
+                    <Surface key={entry.canonicalAccountId || entry.accountId || entry.displayName} style={styles.standingsRow}>
+                      <Text style={styles.standingsName}>{entry.rank}. {entry.displayName}</Text>
+                      <Text style={styles.standingsStat}>{entry.wins}-{entry.losses}-{entry.ties} • Win % {entry.winPercent || 0}%</Text>
+                      <Text style={styles.standingsMeta}>PF {entry.pointsFor || 0} • PA {entry.pointsAgainst || 0} • Diff {entry.pointDifferential || 0} • Streak {entry.currentStreak || 0}</Text>
+                    </Surface>
+                  ))}
+                </View>
+              ) : <EmptyState title="No standings yet" body="Schedule and report results to populate standings." />}
+            </Section>
+
+            {standingsCSV ? (
+              <Section title="Export preview" description="Standings CSV payload for admin workflows.">
+                <Text style={styles.codeBlock}>{standingsCSV}</Text>
+              </Section>
+            ) : null}
+          </Section>
+
+          <Section title="Match Schedule" description="Your weekly matchups, match status, and completed results.">
+            {(league?.matches || []).length ? (
+              league.matches.map((match) => {
+                const isHome = account?.canonicalAccountId === match.homeTeam?.canonicalAccountId;
+                const isAway = account?.canonicalAccountId === match.awayTeam?.canonicalAccountId;
+                const meSeat = isHome || isAway ? (isHome ? 'Home' : 'Away') : null;
+                return (
+                  <Surface key={match.id} style={styles.listRow}>
+                    <Text style={styles.listName}>{match.id}</Text>
+                    <Text style={styles.listMeta}>{match.seasonWeek ? `Week ${match.seasonWeek}` : 'Match'} • {formatShortDate(match.scheduledFor)} • {match.status}</Text>
+                    <Text style={styles.listMeta}>{match.homeTeam?.displayName || 'TBD'} vs {match.awayTeam?.displayName || 'TBD'}</Text>
+                    <Text style={styles.listMeta}>Room: {match.roomUrl || 'No room assigned'}</Text>
+                    {meSeat ? <Text style={styles.listMeta}>You are assigned as {meSeat}</Text> : null}
+                    <Text style={styles.listMeta}>Result: {match.result ? `${match.result.homeScore}-${match.result.awayScore}` : 'not reported'}</Text>
+                    <View style={styles.actionRow}>
+                      {meSeat && match.roomUrl && match.status !== 'complete' ? (
+                        <ActionButton
+                          disabled={actionBusy}
+                          onPress={() => handleOpenAssignedMatch(match)}>
+                          {actionBusyType === `launch-${match.id}` ? 'Opening...' : 'Open Match'}
+                        </ActionButton>
+                      ) : null}
+                      <ActionButton disabled={adminBusy} onPress={() => handleLaunchMatch(match.id, match.roomUrl)} variant="secondary">Set room URL</ActionButton>
+                      <ActionButton disabled={adminBusy} onPress={() => {
+                        setResultMatchId(match.id);
+                      }} variant="secondary">Report result</ActionButton>
+                    </View>
+                  </Surface>
+                );
+              })
+            ) : <EmptyState title="No schedule" body="Generate the schedule to create weekly matches." />}
+
+            {resultMatchId ? (
+              <Surface style={styles.formCard}>
+                <Text style={styles.fieldLabel}>Result entry for {resultMatchId}</Text>
+                <TextInput
+                  value={resultText}
+                  onChangeText={setResultText}
+                  placeholder="home-away e.g. 11-9"
+                  placeholderTextColor="#6b7280"
+                  style={styles.input}
+                />
+                <ActionButton onPress={() => handleSubmitResult(resultMatchId)} variant="secondary">
+                  Save result
+                </ActionButton>
+              </Surface>
+            ) : null}
+          </Section>
+
+          <Section title="Players" description="League competitors, enrollment status, and available seats.">
+            {(league?.participants || []).map((player) => (
+              <Surface key={player.canonicalAccountId || player.accountId || player.displayName} style={styles.listRow}>
+                <View style={styles.listRowTop}>
+                  <Text style={styles.listName}>{player.displayName || 'Player'}</Text>
+                  <Badge tone={player.status === 'enrolled' ? 'green' : 'rose'}>{player.status || 'enrolled'}</Badge>
+                </View>
+                <Text style={styles.listMeta}>{player.accountEmail || player.accountId || 'Guest account'} • {player.division || 'Open'}</Text>
+                <View style={styles.actionRow}>
+                  <ActionButton disabled={adminBusy} onPress={() => handleRemovePlayer(player)} variant="danger">Remove</ActionButton>
+                  {player.status === 'waitlist' ? (
+                    <ActionButton
+                      disabled={adminBusy}
+                      onPress={() => promoteLeagueWaitlist({
+                        token: adminToken,
+                        leagueId: league.id,
+                        canonicalAccountId: player.canonicalAccountId,
+                        accountId: player.accountId,
+                      }).then(async (result) => {
+                        setLeague(buildLeagueRecord(result.league || result));
+                      }).catch((error) => {
+                        setAdminToast(normalizeMessage(error));
+                      })}
+                      variant="secondary"
+                    >
+                      Promote
+                    </ActionButton>
+                  ) : null}
+                </View>
+              </Surface>
+            ))}
+          </Section>
+
+          <Section title="League Directory">
+            {leagues.map((leagueItem) => (
+              <Surface key={leagueItem.id} style={[styles.listRow, league?.id === leagueItem.id ? styles.selectedRow : null]}>
+                <View style={styles.listRowTop}>
+                  <Text style={styles.listName}>{leagueItem.name}</Text>
+                  <Badge tone="blue">{leagueItem.status || 'active'}</Badge>
+                </View>
+                <Text style={styles.listMeta}>{formatShortDate(leagueItem.startDate) || 'Open'} • {leagueItem.participants?.length || 0} players</Text>
+                <ActionButton onPress={() => handleSelectLeague(leagueItem)} variant="secondary">View League</ActionButton>
+              </Surface>
+            ))}
+          </Section>
+        </>
+      )}
+
+      {/* Host-only operations intentionally follow the player experience. */}
+      <Section title="Host Operations" description="Private league administration and competition management.">
         <Surface style={styles.formCard}>
           <Text style={styles.fieldLabel}>Admin token</Text>
           <TextInput
@@ -488,159 +700,6 @@ export default function LeaguesScreen() {
         )}
       </Section>
 
-      {!leagues.length ? (
-        <Section>
-          <EmptyState title="No leagues found" body={EMPTY_MSG} />
-        </Section>
-      ) : (
-        <>
-          <Section title="My league" description={league ? `Selected: ${leagueLabel(league)}` : 'Choose a league to manage'}>
-            {league ? (
-              <Surface style={styles.leagueCard}>
-                <View style={styles.titleRow}>
-                  <Text style={styles.leagueName}>{leagueLabel(league)}</Text>
-                  <Badge tone={league.status === 'active' ? 'green' : 'rose'}>{league.status || 'unknown'}</Badge>
-                </View>
-                <Text style={styles.leagueMeta}>Game: {league.gameSlug || 'spades'} • Day: {league.weeklyPlayDay || 'Sunday'} • Cap: {league.playerCap || 0}</Text>
-                <Text style={styles.leagueMeta}>Start date: {formatDateLine(league.startDate || league.season?.startDate || '') || 'Open'}</Text>
-                <Text style={styles.leagueMeta}>Roster: {(league.participants || []).length} / {league.playerCap || 0}</Text>
-                <Text style={styles.leagueMeta}>Enrolled: {displayCount(league.participants, 'enrolled')} Waitlisted: {displayCount(league.participants, 'waitlist')}</Text>
-
-                <Text style={styles.leagueMeta}>Registration: {league.registrationOpen ? 'open' : 'closed'}</Text>
-                {!account ? (
-                  <ActionButton href="/next#account-access" variant="secondary">Sign in to join</ActionButton>
-                ) : membership.enrolled ? (
-                  <ActionButton disabled={actionBusy} onPress={handleLeave} variant="secondary">
-                    {actionBusyType === 'leave' ? 'Leaving...' : 'Leave league'}
-                  </ActionButton>
-                ) : (
-                  <ActionButton disabled={actionBusy} onPress={handleJoin} variant="secondary">
-                    {actionBusyType === 'join' ? 'Joining...' : 'Join league'}
-                  </ActionButton>
-                )}
-
-                <Text style={styles.leagueMeta}>My next match: {matchPreviewText(nextMatch)}</Text>
-                <Text style={styles.leagueMeta}>Current streak: {membership.participant?.currentStreak || 0}</Text>
-              </Surface>
-            ) : null}
-
-            <Section title="Standings" description="Record, win rate, point totals, and rank.">
-              {(league?.standings || []).length ? (
-                <View style={styles.standingsTable}>
-                  {(league.standings || []).map((entry) => (
-                    <Surface key={entry.canonicalAccountId || entry.accountId || entry.displayName} style={styles.standingsRow}>
-                      <Text style={styles.standingsName}>{entry.rank}. {entry.displayName}</Text>
-                      <Text style={styles.standingsStat}>{entry.wins}-{entry.losses}-{entry.ties} • Win % {entry.winPercent || 0}%</Text>
-                      <Text style={styles.standingsMeta}>PF {entry.pointsFor || 0} • PA {entry.pointsAgainst || 0} • Diff {entry.pointDifferential || 0} • Streak {entry.currentStreak || 0}</Text>
-                    </Surface>
-                  ))}
-                </View>
-              ) : <EmptyState title="No standings yet" body="Schedule and report results to populate standings." />}
-            </Section>
-
-            {standingsCSV ? (
-              <Section title="Export preview" description="Standings CSV payload for admin workflows.">
-                <Text style={styles.codeBlock}>{standingsCSV}</Text>
-              </Section>
-            ) : null}
-          </Section>
-
-          <Section title="Schedule & results" description="Manual round editing, room launch, and result entry for matches.">
-            {(league?.matches || []).length ? (
-              league.matches.map((match) => {
-                const isHome = account?.canonicalAccountId === match.homeTeam?.canonicalAccountId;
-                const isAway = account?.canonicalAccountId === match.awayTeam?.canonicalAccountId;
-                const meSeat = isHome || isAway ? (isHome ? 'Home' : 'Away') : null;
-                return (
-                  <Surface key={match.id} style={styles.listRow}>
-                    <Text style={styles.listName}>{match.id}</Text>
-                    <Text style={styles.listMeta}>{match.seasonWeek ? `Week ${match.seasonWeek}` : 'Match'} • {formatShortDate(match.scheduledFor)} • {match.status}</Text>
-                    <Text style={styles.listMeta}>{match.homeTeam?.displayName || 'TBD'} vs {match.awayTeam?.displayName || 'TBD'}</Text>
-                    <Text style={styles.listMeta}>Room: {match.roomUrl || 'No room assigned'}</Text>
-                    {meSeat ? <Text style={styles.listMeta}>You are assigned as {meSeat}</Text> : null}
-                    <Text style={styles.listMeta}>Result: {match.result ? `${match.result.homeScore}-${match.result.awayScore}` : 'not reported'}</Text>
-                    <View style={styles.actionRow}>
-                      {meSeat && match.roomUrl && match.status !== 'complete' ? (
-                        <ActionButton
-                          disabled={actionBusy}
-                          onPress={() => handleOpenAssignedMatch(match)}>
-                          {actionBusyType === `launch-${match.id}` ? 'Opening...' : 'Launch match'}
-                        </ActionButton>
-                      ) : null}
-                      <ActionButton disabled={adminBusy} onPress={() => handleLaunchMatch(match.id, match.roomUrl)} variant="secondary">Set room URL</ActionButton>
-                      <ActionButton disabled={adminBusy} onPress={() => {
-                        setResultMatchId(match.id);
-                      }} variant="secondary">Report result</ActionButton>
-                    </View>
-                  </Surface>
-                );
-              })
-            ) : <EmptyState title="No schedule" body="Generate the schedule to create weekly matches." />}
-
-            {resultMatchId ? (
-              <Surface style={styles.formCard}>
-                <Text style={styles.fieldLabel}>Result entry for {resultMatchId}</Text>
-                <TextInput
-                  value={resultText}
-                  onChangeText={setResultText}
-                  placeholder="home-away e.g. 11-9"
-                  placeholderTextColor="#6b7280"
-                  style={styles.input}
-                />
-                <ActionButton onPress={() => handleSubmitResult(resultMatchId)} variant="secondary">
-                  Save result
-                </ActionButton>
-              </Surface>
-            ) : null}
-          </Section>
-
-          <Section title="Roster" description="Participant status, leaves, and waitlist promotions.">
-            {(league?.participants || []).map((player) => (
-              <Surface key={player.canonicalAccountId || player.accountId || player.displayName} style={styles.listRow}>
-                <View style={styles.listRowTop}>
-                  <Text style={styles.listName}>{player.displayName || 'Player'}</Text>
-                  <Badge tone={player.status === 'enrolled' ? 'green' : 'rose'}>{player.status || 'enrolled'}</Badge>
-                </View>
-                <Text style={styles.listMeta}>{player.accountEmail || player.accountId || 'Guest account'} • {player.division || 'Open'}</Text>
-                <View style={styles.actionRow}>
-                  <ActionButton disabled={adminBusy} onPress={() => handleRemovePlayer(player)} variant="danger">Remove</ActionButton>
-                  {player.status === 'waitlist' ? (
-                    <ActionButton
-                      disabled={adminBusy}
-                      onPress={() => promoteLeagueWaitlist({
-                        token: adminToken,
-                        leagueId: league.id,
-                        canonicalAccountId: player.canonicalAccountId,
-                        accountId: player.accountId,
-                      }).then(async (result) => {
-                        setLeague(buildLeagueRecord(result.league || result));
-                      }).catch((error) => {
-                        setAdminToast(normalizeMessage(error));
-                      })}
-                      variant="secondary"
-                    >
-                      Promote
-                    </ActionButton>
-                  ) : null}
-                </View>
-              </Surface>
-            ))}
-          </Section>
-
-          <Section title="All leagues">
-            {leagues.map((leagueItem) => (
-              <Surface key={leagueItem.id} style={[styles.listRow, league?.id === leagueItem.id ? styles.selectedRow : null]}>
-                <View style={styles.listRowTop}>
-                  <Text style={styles.listName}>{leagueItem.name}</Text>
-                  <Badge tone="blue">{leagueItem.status || 'active'}</Badge>
-                </View>
-                <Text style={styles.listMeta}>{formatShortDate(leagueItem.startDate) || 'Open'} • {leagueItem.participants?.length || 0} players</Text>
-                <ActionButton onPress={() => handleSelectLeague(leagueItem)} variant="secondary">Open</ActionButton>
-              </Surface>
-            ))}
-          </Section>
-        </>
-      )}
     </HubScreen>
   );
 }
@@ -722,6 +781,60 @@ const styles = StyleSheet.create({
   leagueMeta: {
     color: '#9ca3af',
     marginBottom: 6,
+  },
+  competitionStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 10,
+  },
+  competitionStat: {
+    backgroundColor: '#0f1526',
+    borderColor: '#2c3f5f',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexGrow: 1,
+    minWidth: 88,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  competitionStatValue: {
+    color: '#f8fafc',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  competitionStatLabel: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+    textTransform: 'uppercase',
+  },
+  competitionStatusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
+  },
+  nextMatchCard: {
+    backgroundColor: '#0f1526',
+    borderColor: '#324565',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  nextMatchEyebrow: {
+    color: '#60a5fa',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+  nextMatchText: {
+    color: '#e5e7eb',
+    fontSize: 15,
+    fontWeight: '700',
   },
   standingsTable: {
     gap: 8,
