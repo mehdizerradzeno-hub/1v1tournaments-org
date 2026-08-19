@@ -8,10 +8,13 @@ import {
   clearSessionCookie,
   createPasswordRecord,
   createSession,
+  deleteAccountRecord,
   deleteSession,
+  deleteSessionsForAccount,
   getAccountFromEvent,
   getAccountByEmail,
   getSessionId,
+  markAccountDeleted,
   isEmailLike,
   publicAccount,
   saveAccount,
@@ -20,6 +23,7 @@ import {
   withCookie,
 } from './_account-utils.mjs';
 import { isHostAccount } from './_host-auth.mjs';
+import { deleteCanonicalAccountFootprint } from './_account-deletion.mjs';
 import {
   consumePlayerEmailCode,
   emailProviderConfigured,
@@ -183,6 +187,53 @@ async function logoutAccount(event) {
   return withCookie(json(200, { ok: true, account: null }), clearSessionCookie());
 }
 
+export async function deleteAccount(event, payload, options = {}) {
+  const resolveAccount =
+    options.getAccountFromEvent || getAccountFromEvent;
+  const cleanupAccount =
+    options.deleteCanonicalAccountFootprint || deleteCanonicalAccountFootprint;
+  const tombstoneAccount =
+    options.markAccountDeleted || markAccountDeleted;
+  const removeSessions =
+    options.deleteSessionsForAccount || deleteSessionsForAccount;
+  const removeAccount =
+    options.deleteAccountRecord || deleteAccountRecord;
+
+  const account = await resolveAccount(event);
+
+  if (!account) {
+    return json(401, { error: 'Sign in before deleting your account.' });
+  }
+
+  if (String(payload.confirmation || '').trim().toUpperCase() !== 'DELETE') {
+    return json(400, { error: 'Type DELETE to confirm account deletion.' });
+  }
+
+  const canonicalAccountId = account.canonicalAccountId || account.id;
+
+  const cleanup = await cleanupAccount(account);
+
+  // Prevent a recently issued signed session from being accepted through
+  // the short propagation-grace fallback after deletion.
+  await tombstoneAccount(account.id);
+
+  await removeSessions(account.id);
+  await removeAccount(account);
+
+  return withCookie(
+    json(200, {
+      ok: true,
+      account: null,
+      deleted: true,
+      canonicalAccountId,
+      cleanup,
+      message:
+        'Your 1v1 account credentials have been deleted. Historical competitive results may remain after identifying account information is removed.',
+    }),
+    clearSessionCookie(),
+  );
+}
+
 async function requestEmailCode(payload, purpose) {
   const email = cleanEmail(payload.contactEmail || payload.email);
   const account = isEmailLike(email) ? await getAccountByEmail(email) : null;
@@ -328,6 +379,10 @@ export async function handler(event) {
 
     if (payload.action === 'logout') {
       return logoutAccount(event);
+    }
+
+    if (payload.action === 'delete-account') {
+      return deleteAccount(event, payload);
     }
 
     if (payload.action === 'request-password-reset') {

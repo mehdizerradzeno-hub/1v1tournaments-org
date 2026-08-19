@@ -88,6 +88,25 @@ export async function listAccountAliases(canonicalAccountId, options = {}) {
     .sort((left, right) => `${left.provider}:${left.legacyAccountId}`.localeCompare(`${right.provider}:${right.legacyAccountId}`));
 }
 
+export async function deleteAccountAliases(canonicalAccountId, options = {}) {
+  const canonicalId = cleanText(canonicalAccountId);
+  if (!canonicalId) return 0;
+
+  const store = resolveStore(options.store, ALIAS_STORE_NAME);
+  const { blobs = [] } = await store.list({ prefix: 'by-alias/' });
+  let deleted = 0;
+
+  for (const blob of blobs) {
+    const record = await store.get(blob.key, { type: 'json' });
+    if (cleanText(record?.canonicalAccountId) !== canonicalId) continue;
+
+    await store.delete(blob.key);
+    deleted += 1;
+  }
+
+  return deleted;
+}
+
 export async function addAccountAlias(account, aliasValue, options = {}) {
   const canonicalAccountId = accountCanonicalId(account);
   if (!canonicalAccountId) {
