@@ -245,7 +245,7 @@ export function accountCanonicalId(account) {
 }
 
 export async function getAccountByEmail(email, options = {}) {
-  const accountStore = getStoreWithFallback('player-accounts');
+  const accountStore = options.store || getStoreWithFallback('player-accounts');
 
   if (options.retry) {
     return getJsonWithRetry(accountStore, accountKey(email));
@@ -257,6 +257,51 @@ export async function getAccountByEmail(email, options = {}) {
 export async function saveAccount(account, options = {}) {
   const accountStore = getStoreWithFallback('player-accounts');
   await accountStore.setJSON(accountKey(account.email), account, options);
+}
+
+export async function markAccountDeleted(accountId, options = {}) {
+  const normalized = cleanText(accountId);
+  if (!normalized) return;
+
+  const store = options.store || getStoreWithFallback('player-account-deletions');
+  await store.setJSON(`${identityKey(normalized)}.json`, {
+    accountId: normalized,
+    deletedAt: new Date().toISOString(),
+  });
+}
+
+export async function isAccountDeleted(accountId, options = {}) {
+  const normalized = cleanText(accountId);
+  if (!normalized) return false;
+
+  const store = options.store || getStoreWithFallback('player-account-deletions');
+  const record = await store.get(`${identityKey(normalized)}.json`, { type: 'json' });
+  return Boolean(record);
+}
+
+
+export async function deleteAccountRecord(account, options = {}) {
+  if (!account?.email) return;
+  const accountStore = options.store || getStoreWithFallback('player-accounts');
+  await accountStore.delete(accountKey(account.email));
+}
+
+export async function deleteSessionsForAccount(accountId, options = {}) {
+  const targetAccountId = cleanText(accountId);
+  if (!targetAccountId) return 0;
+
+  const sessionStore = options.store || getStoreWithFallback('player-sessions');
+  const { blobs = [] } = await sessionStore.list();
+  let deleted = 0;
+
+  for (const blob of blobs) {
+    const session = await sessionStore.get(blob.key, { type: 'json' });
+    if (cleanText(session?.accountId) !== targetAccountId) continue;
+    await sessionStore.delete(blob.key);
+    deleted += 1;
+  }
+
+  return deleted;
 }
 
 export async function createSession(account) {
@@ -285,17 +330,17 @@ export async function createSession(account) {
   };
 }
 
-export async function deleteSession(sessionToken) {
+export async function deleteSession(sessionToken, options = {}) {
   if (!sessionToken) return;
 
   const signedSession = parseSignedSessionToken(sessionToken);
   const sessionId = signedSession?.sessionId || sessionToken;
 
-  const sessionStore = getStoreWithFallback('player-sessions');
+  const sessionStore = options.store || getStoreWithFallback('player-sessions');
   await sessionStore.delete(sessionKey(sessionId));
 }
 
-export async function getAccountFromEvent(event) {
+export async function getAccountFromEvent(event, options = {}) {
   const sessionToken = getSessionId(event);
   const smokeProbe = cleanText(event.headers['x-tournament-smoke']);
   const smokeTokenDigest = cleanText(event.headers['x-tournament-smoke-cookie-digest']);
@@ -316,7 +361,7 @@ export async function getAccountFromEvent(event) {
 
   const signedSession = parseSignedSessionToken(sessionToken);
   const sessionId = signedSession?.sessionId || sessionToken;
-  const sessionStore = getStoreWithFallback('player-sessions');
+  const sessionStore = options.sessionStore || getStoreWithFallback('player-sessions');
   const storedSession = await getJsonWithRetry(sessionStore, sessionKey(sessionId));
   let session = storedSession;
   const signedSessionCreatedAt = new Date(signedSession?.sessionCreatedAt).getTime();
@@ -347,12 +392,23 @@ export async function getAccountFromEvent(event) {
   });
 
   if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
-    await deleteSession(sessionToken);
+    await deleteSession(sessionToken, { store: sessionStore });
     logSmokeStage('session-rejected');
     return null;
   }
 
-  const account = await getAccountByEmail(session.accountEmail, { retry: true });
+  if (await isAccountDeleted(session.accountId, {
+    store: options.deletionStore,
+  })) {
+    await deleteSession(sessionToken, { store: sessionStore });
+    logSmokeStage('account-deleted');
+    return null;
+  }
+
+  const account = await getAccountByEmail(session.accountEmail, {
+    retry: true,
+    store: options.accountStore,
+  });
 
   if (!account && signedSessionInGrace && signedSession.accountId === session.accountId) {
     logSmokeStage('signed-claims-fallback');

@@ -11,6 +11,7 @@ import {
 import { ActionButton, Badge, Surface } from '../components/hub-ui.jsx';
 import {
   createPlayerAccount,
+  deletePlayerAccount,
   fetchPlayerAccount,
   loginPlayerAccount,
   logoutPlayerAccount,
@@ -66,6 +67,7 @@ export function GameAccountConnectScreen({
   const [recoveryCode, setRecoveryCode] = useState('');
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const handoffStartedRef = useRef(false);
 
   useEffect(() => {
@@ -194,6 +196,50 @@ export function GameAccountConnectScreen({
     }
   };
 
+  const deleteAccount = async () => {
+    if (deleteConfirmation.trim().toUpperCase() !== 'DELETE') {
+      setError('Type DELETE to confirm permanent account deletion.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const result = await deletePlayerAccount(deleteConfirmation);
+
+      if (!result?.deleted || result?.account) {
+        throw new Error('Account deletion could not be confirmed.');
+      }
+
+      handoffStartedRef.current = false;
+      setAccount(null);
+      setMode('signin');
+      setPlayerName('');
+      setPlayerHandle('');
+      setContactEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setRecoveryRequested(false);
+      setRecoveryCode('');
+      setRecoveryPassword('');
+      setRecoveryConfirmPassword('');
+      setDeleteConfirmation('');
+      setMessage(
+        'Your 1v1 account has been deleted. Historical competitive results may remain without your identifying account information.',
+      );
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : 'Account deletion could not be completed.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const signOut = async () => {
     setSubmitting(true);
     setError('');
@@ -213,6 +259,7 @@ export function GameAccountConnectScreen({
       setRecoveryCode('');
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
+      setDeleteConfirmation('');
       setMessage(`Signed out. Sign in with the account you want to use with ${gameName}.`);
       if (returnAfterSignOut) {
         returnToGameWithoutAccountChange(destination);
@@ -257,6 +304,33 @@ export function GameAccountConnectScreen({
             <ActionButton disabled={submitting} onPress={signOut} variant="danger">
               {submitting ? 'Signing out...' : 'Sign Out'}
             </ActionButton>
+
+            <View style={styles.deleteSection}>
+              <Text style={styles.deleteTitle}>Delete Account</Text>
+              <Text style={styles.muted}>
+                Permanently delete your shared 1v1 account credentials and remove
+                identifying account information from retained competitive history.
+                This cannot be undone.
+              </Text>
+
+              <Text style={styles.fieldLabel}>Type DELETE to confirm</Text>
+              <TextInput
+                {...inputProps(setDeleteConfirmation)}
+                autoCapitalize="characters"
+                placeholder="DELETE"
+                value={deleteConfirmation}
+              />
+
+              <ActionButton
+                disabled={
+                  submitting
+                  || deleteConfirmation.trim().toUpperCase() !== 'DELETE'
+                }
+                onPress={deleteAccount}
+                variant="danger">
+                {submitting ? 'Deleting...' : 'Delete Account Permanently'}
+              </ActionButton>
+            </View>
           </>
         ) : (
           <>
@@ -365,4 +439,16 @@ const styles = StyleSheet.create({
   muted: { color: theme.colors.muted, fontSize: 14, lineHeight: 20 },
   message: { color: theme.colors.success, fontSize: 14, lineHeight: 20 },
   error: { color: '#FF9A9A', fontSize: 14, lineHeight: 20 },
+  deleteSection: {
+    marginTop: 18,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#6D3131',
+    gap: 10,
+  },
+  deleteTitle: {
+    color: '#FF9A9A',
+    fontSize: 16,
+    fontWeight: '800',
+  },
 });

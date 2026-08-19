@@ -9,6 +9,7 @@ import {
 } from '../src/lib/spadesAccountConnect.js';
 import {
   createPlayerAccount,
+  deletePlayerAccount,
   loginPlayerAccount,
   logoutPlayerAccount,
   requestPlayerPasswordReset,
@@ -116,4 +117,17 @@ test('Sign Out uses the authoritative shared player-account logout action', asyn
 
   assert.deepEqual(body, { action: 'logout' });
   assert.equal(verifiedAccountReturnCopy('Spades'), 'Your verified 1v1 account is ready to return to Spades.');
+});
+
+
+test('Delete Account uses the canonical shared account deletion action', async () => {
+  const body = await captureAccountAction(
+    () => deletePlayerAccount('DELETE'),
+    { ok: true, account: null, deleted: true },
+  );
+
+  assert.deepEqual(body, {
+    action: 'delete-account',
+    confirmation: 'DELETE',
+  });
 });

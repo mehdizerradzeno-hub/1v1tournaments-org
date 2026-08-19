@@ -137,6 +137,12 @@ export async function logoutPlayerAccount() {
   return result;
 }
 
+export function deletePlayerAccount(confirmation = 'DELETE') {
+  return postPlayerAccountAction('delete-account', {
+    confirmation,
+  });
+}
+
 async function postPlayerAccountAction(action, payload = {}) {
   const response = await fetch(ACCOUNT_ENDPOINT, {
     method: 'POST',
