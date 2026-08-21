@@ -605,6 +605,15 @@ export default function NextScreen() {
         title="Next tournament"
       >
         <EmptyState
+          action={(
+            <View style={styles.emptyStateActions}>
+              {downloadLinks.discord ? (
+                <ActionButton external href={downloadLinks.discord}>Get event alerts</ActionButton>
+              ) : null}
+              <ActionButton href="/leagues">Join league play</ActionButton>
+              <ActionButton href="/results" variant="secondary">View past results</ActionButton>
+            </View>
+          )}
           body="No public event is open right now. Explore league play or review completed events while the next bracket is prepared."
           title="Next bracket coming soon"
         />
@@ -2127,5 +2136,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(244, 239, 230, 0.035)",
     borderRadius: 14,
     padding: 18,
+  },
+  emptyStateActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
 });

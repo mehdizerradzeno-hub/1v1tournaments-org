@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -54,7 +54,8 @@ const TOURNAMENT_TABS = [
   { id: 'play', label: 'Overview', body: 'Player status, live path, and main action.' },
   { id: 'roster', label: 'Players', body: 'Who is signed up and bracket-ready.' },
   { id: 'bracket', label: 'Bracket', body: 'Current match flow and table access.' },
-  { id: 'info', label: 'Rules & results', body: 'Rules, agenda, links, and results.' },
+  { id: 'info', label: 'Schedule & rules', body: 'Agenda, format, links, and competition rules.' },
+  { id: 'results', label: 'Results', body: 'Final placement and the permanent event record.' },
 ];
 const TWITCH_VIEWER_COMMANDS = ['!join', '!next', '!match', '!bracket', '!rules', '!discord'];
 
@@ -260,15 +261,29 @@ function getSecondarySignInAction(playerStatus, signInPath) {
 
 function tabFromHash(hash) {
   switch (String(hash || '').replace(/^#/, '')) {
+    case 'overview':
+      return 'play';
     case 'my-match':
       return 'play';
     case 'registered-players':
       return 'roster';
     case 'live-bracket':
       return 'bracket';
+    case 'rules':
+      return 'info';
+    case 'results':
+      return 'results';
     default:
       return '';
   }
+}
+
+function hashFromTab(tab) {
+  if (tab === 'roster') return '#registered-players';
+  if (tab === 'bracket') return '#live-bracket';
+  if (tab === 'info') return '#rules';
+  if (tab === 'results') return '#results';
+  return '#overview';
 }
 
 function getOpenSeats(count, size) {
@@ -727,6 +742,18 @@ export default function TournamentScreen({ slug }) {
   const liveBracketSize = bracketSizeFromBracket(liveBracket, liveBracket?.participantCount || 0);
   const rosterBracketSize = actualBracketSizeFromSignups(signupSummary.count, minimumPlayers);
 
+  function handleSelectTab(tab) {
+    setActiveTab(tab);
+
+    if (globalThis.history?.replaceState && globalThis.location) {
+      globalThis.history.replaceState(
+        null,
+        '',
+        `${globalThis.location.pathname}${globalThis.location.search}${hashFromTab(tab)}`,
+      );
+    }
+  }
+
   return (
     <HubScreen
       actions={heroActions}
@@ -783,7 +810,7 @@ export default function TournamentScreen({ slug }) {
         advertisedRosterCap={advertisedRosterCap}
         isBracketLive={isBracketLive}
         liveBracket={liveBracket}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         playerHasReadyMatch={playerHasReadyMatch}
         registrationMeta={registrationMeta}
         result={result}
@@ -793,7 +820,10 @@ export default function TournamentScreen({ slug }) {
       <SponsorSoftwareStrip />
 
       {activeTab === 'play' ? (
-        <>
+        <View
+          accessibilityRole="tabpanel"
+          aria-labelledby="tournament-tab-play"
+          nativeID="tournament-panel-play">
           <LiveBroadcastStrip
             isBracketLive={isBracketLive}
             nextMatch={getNextPublicMatch(liveBracket)}
@@ -855,11 +885,14 @@ export default function TournamentScreen({ slug }) {
               tournament={visibleTournament}
             />
           </Section>
-        </>
+        </View>
       ) : null}
 
       {activeTab === 'roster' ? (
-        <>
+        <View
+          accessibilityRole="tabpanel"
+          aria-labelledby="tournament-tab-roster"
+          nativeID="tournament-panel-roster">
           <TournamentTabCommandCard
             body={
               isBracketLive
@@ -910,11 +943,14 @@ export default function TournamentScreen({ slug }) {
               />
             </Section>
           ) : null}
-        </>
+        </View>
       ) : null}
 
       {activeTab === 'bracket' ? (
-        <>
+        <View
+          accessibilityRole="tabpanel"
+          aria-labelledby="tournament-tab-bracket"
+          nativeID="tournament-panel-bracket">
           <TournamentTabCommandCard
             body={
               isBracketLive
@@ -989,11 +1025,14 @@ export default function TournamentScreen({ slug }) {
               ) : null}
             </View>
           </Section>
-        </>
+        </View>
       ) : null}
 
       {activeTab === 'info' ? (
-        <>
+        <View
+          accessibilityRole="tabpanel"
+          aria-labelledby="tournament-tab-info"
+          nativeID="tournament-panel-info">
           <Section description="Format, entry rules, and event notes." title="Event snapshot">
             <Surface style={styles.snapshotCard}>
               <Text style={styles.snapshotLabel}>{visibleTournament.summary}</Text>
@@ -1069,26 +1108,49 @@ export default function TournamentScreen({ slug }) {
             ) : null}
           </Section>
 
-          <Section description="Rules stay close to the event so admins can update one record at a time." title="Game rules">
+          <Section description="Rules stay close to the event so admins can update one record at a time." nativeID="rules" title="Game rules">
             {game?.ruleSections?.map((section) => (
               <View key={section.title} style={styles.block}>
                 <RuleBlock section={section} />
               </View>
             ))}
           </Section>
+        </View>
+      ) : null}
 
-          <Section description="Completed events show final standings here." title="Results">
+      {activeTab === 'results' ? (
+        <View
+          accessibilityRole="tabpanel"
+          aria-labelledby="tournament-tab-results"
+          nativeID="tournament-panel-results">
+          <TournamentTabCommandCard
+            body={result
+              ? 'Review the champion, final placements, and recorded outcome for this event.'
+              : 'This permanent event record will publish after the final match is complete.'}
+            primary={{ label: 'Results archive', href: '/results' }}
+            secondary={{ label: 'Bracket', href: `${tournamentPath}#live-bracket` }}
+            stats={[
+              { label: 'Event', value: isBracketComplete ? 'Complete' : 'In progress' },
+              { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} players` : 'Pending' },
+              { label: 'Record', value: result ? 'Published' : 'Awaiting final' },
+            ]}
+            title="Event results"
+          />
+          <Section
+            description="Completed events publish final standings as a permanent competition record."
+            nativeID="results"
+            title="Results">
             {result ? (
               <ResultCard result={result} />
             ) : (
               <EmptyState
-                action={<ActionButton href="/results">Open results page</ActionButton>}
-                body="Results will appear here once the tournament closes and the result record is added."
+                action={<ActionButton href="/results">Open results archive</ActionButton>}
+                body="Results will appear here after the tournament closes and the final is recorded."
                 title="Results are not posted yet"
               />
             )}
           </Section>
-        </>
+        </View>
       ) : null}
     </HubScreen>
   );
@@ -1201,19 +1263,29 @@ function TournamentEventConsole({
 
 function TournamentTabs({ activeTab, onSelectTab }) {
   return (
-    <View style={styles.tournamentTabBar}>
+    <View accessibilityRole="tablist" style={styles.tournamentTabBar}>
       {TOURNAMENT_TABS.map((tab) => {
         const selected = activeTab === tab.id;
 
         return (
-          <ActionButton
+          <Pressable
+            aria-controls={`tournament-panel-${tab.id}`}
+            aria-selected={selected}
+            accessibilityLabel={`${tab.label}. ${tab.body}`}
+            accessibilityRole="tab"
             accessibilityState={{ selected }}
             key={tab.id}
+            nativeID={`tournament-tab-${tab.id}`}
             onPress={() => onSelectTab(tab.id)}
-            style={styles.tournamentTabButton}
-            variant={selected ? 'primary' : 'secondary'}>
-            {tab.label}
-          </ActionButton>
+            style={({ pressed }) => [
+              styles.tournamentTabButton,
+              selected && styles.tournamentTabButtonSelected,
+              pressed && styles.tournamentTabButtonPressed,
+            ]}>
+            <Text style={[styles.tournamentTabLabel, selected && styles.tournamentTabLabelSelected]}>
+              {tab.label}
+            </Text>
+          </Pressable>
         );
       })}
     </View>
@@ -2675,11 +2747,36 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   tournamentTabButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderRadius: 999,
+    borderWidth: 1,
     flexBasis: 104,
     flexGrow: 1,
+    justifyContent: 'center',
     marginBottom: 0,
     marginRight: 0,
+    minHeight: 46,
     minWidth: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  tournamentTabButtonSelected: {
+    backgroundColor: 'rgba(214, 162, 78, 0.14)',
+    borderColor: 'rgba(214, 162, 78, 0.58)',
+  },
+  tournamentTabButtonPressed: {
+    opacity: 0.82,
+  },
+  tournamentTabLabel: {
+    color: '#A7A29A',
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  tournamentTabLabelSelected: {
+    color: '#F0C86A',
   },
   dashboardCard: {
     borderColor: 'rgba(214, 162, 78, 0.34)',
