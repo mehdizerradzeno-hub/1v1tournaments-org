@@ -573,7 +573,6 @@ export default function NextScreen() {
         actions={[{ label: "Home", href: "/" }]}
         eyebrow="Next"
         lead="Loading the live tournament schedule."
-        showNavigation={false}
         stickyActions={false}
         subtitle="Checking events"
         title="Next tournament"
@@ -595,18 +594,19 @@ export default function NextScreen() {
     return (
       <HubScreen
         accountHref="/account"
-        actions={[{ label: "Home", href: "/" }]}
+        actions={[
+          { label: "View leagues", href: "/leagues" },
+          { label: "Past results", href: "/results", variant: "secondary" },
+        ]}
         eyebrow="Next"
         lead="The next public event will appear here when it is scheduled."
-        showNavigation={false}
         stickyActions={false}
         subtitle="No upcoming tournament is published yet"
         title="Next tournament"
       >
         <EmptyState
-          action={<ActionButton href="/">Back home</ActionButton>}
-          body="Add or publish a tournament and this page becomes the public lobby."
-          title="No event ready"
+          body="No public event is open right now. Explore league play or review completed events while the next bracket is prepared."
+          title="Next bracket coming soon"
         />
         <CommunityCupsSection tournament={null} />
       </HubScreen>
@@ -633,7 +633,6 @@ export default function NextScreen() {
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
       showHero={false}
-      showNavigation={false}
       subtitle={formatDateLine(
         tournament.date,
         tournament.timeZone,
@@ -1024,8 +1023,8 @@ function CommunityCupsSection({
             A clear path from open cups to championships.
           </Text>
           <Text style={styles.communityBody}>
-            Community competitions live under the 1V1 platform, alongside future
-            leagues and the permanent results archive.
+            Community competitions live under the 1V1 platform, alongside league
+            seasons and the permanent results archive.
           </Text>
         </View>
         <Badge tone="accent">Community-run competition</Badge>
@@ -1045,9 +1044,12 @@ function CommunityCupsSection({
           </Text>
         </View>
         <View style={styles.hierarchyCard}>
-          <Text style={styles.hierarchyLabel}>Future Leagues</Text>
-          <Text style={styles.hierarchyValue}>Recurring seasons</Text>
-          <Text style={styles.hierarchyMeta}>Schedules and standings.</Text>
+          <Text style={styles.hierarchyLabel}>League Seasons</Text>
+          <Text style={styles.hierarchyValue}>Recurring competition</Text>
+          <Text style={styles.hierarchyMeta}>Weekly schedules and standings.</Text>
+          <ActionButton href="/leagues" variant="ghost">
+            Open leagues
+          </ActionButton>
         </View>
         <View style={styles.hierarchyCard}>
           <Text style={styles.hierarchyLabel}>Results & Champions</Text>

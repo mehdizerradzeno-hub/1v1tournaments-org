@@ -42,6 +42,7 @@ const streamModeScreenFile = fileURLToPath(new URL('../src/screens/StreamModeScr
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
 const tournamentLandingRouteFile = fileURLToPath(new URL('../src/screens/TournamentLandingRoute.jsx', import.meta.url));
 const leaguesRouteScreenFile = fileURLToPath(new URL('../src/screens/LeaguesRouteScreen.jsx', import.meta.url));
+const leaguesScreenFile = fileURLToPath(new URL('../src/screens/LeaguesScreen.jsx', import.meta.url));
 const overlayScreenFile = fileURLToPath(new URL('../src/screens/OverlayScreen.jsx', import.meta.url));
 const broadcastBracketScreenFile = fileURLToPath(new URL('../src/screens/BroadcastBracketScreen.jsx', import.meta.url));
 const resultsScreenFile = fileURLToPath(new URL('../src/screens/ResultsScreen.jsx', import.meta.url));
@@ -232,7 +233,7 @@ test('/tournaments stays wired to the public tournament hub instead of the unmat
   assert.doesNotMatch(tournamentsIndexRouteSource, /Redirect/);
 });
 
-test('/leagues routes keep a deterministic loading shell for the first render', () => {
+test('/leagues routes reuse the hydration-aware league screen', () => {
   assert.ok(existsSync(leaguesRouteFile));
   assert.ok(existsSync(adminLeaguesRouteFile));
   assert.ok(existsSync(leaguesRouteScreenFile));
@@ -240,16 +241,16 @@ test('/leagues routes keep a deterministic loading shell for the first render', 
   const leaguesRouteSource = readFileSync(leaguesRouteFile, 'utf8');
   const adminLeaguesRouteSource = readFileSync(adminLeaguesRouteFile, 'utf8');
   const leaguesRouteScreenSource = readFileSync(leaguesRouteScreenFile, 'utf8');
+  const leaguesScreenSource = readFileSync(leaguesScreenFile, 'utf8');
 
   assert.match(leaguesRouteSource, /LeaguesRouteScreen/);
   assert.match(adminLeaguesRouteSource, /LeaguesRouteScreen/);
-  assert.match(leaguesRouteScreenSource, /useHydrated/);
-  assert.match(leaguesRouteScreenSource, /showHeader=\{false\}/);
-  assert.match(leaguesRouteScreenSource, /showNavigation=\{false\}/);
-  assert.match(leaguesRouteScreenSource, /stickyActions=\{false\}/);
-  assert.match(leaguesRouteScreenSource, /Loading league data\./);
-  assert.match(leaguesRouteScreenSource, /Please wait while leagues load\./);
   assert.match(leaguesRouteScreenSource, /LeaguesScreen/);
+  assert.doesNotMatch(leaguesRouteScreenSource, /useHydrated/);
+  assert.match(leaguesScreenSource, /const isHydrated = useHydrated\(\)/);
+  assert.match(leaguesScreenSource, /if \(loading\)/);
+  assert.match(leaguesScreenSource, /Loading league data\./);
+  assert.match(leaguesScreenSource, /Please wait while leagues load\./);
 });
 
 test('/live stays wired to stream-day command tools', () => {

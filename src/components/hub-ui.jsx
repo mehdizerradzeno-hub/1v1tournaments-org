@@ -795,7 +795,7 @@ export function HubScreen({
                     </View>
                     <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
                       <Text style={styles.brandTitle}>1v1 Tournaments</Text>
-                      <Text style={styles.brandDomain}>Spades • Euchre • Tournaments</Text>
+                      <Text style={styles.brandDomain}>Spades • Euchre • Competitive Play</Text>
                     </View>
                   </Pressable>
                 </Link>

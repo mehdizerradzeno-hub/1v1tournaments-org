@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'expo-router';
 import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -6,7 +7,6 @@ import {
   Badge,
   EmptyState,
   HubScreen,
-  PlayerRouteStrip,
   Section,
   Surface,
 } from '../components/hub-ui.jsx';
@@ -70,7 +70,7 @@ function parsePlayerStatus(league, account) {
 
 function matchPreviewText(match = null) {
   if (!match) return 'No scheduled match.';
-  const date = match.scheduledFor ? formatShortDate(match.scheduledFor) : 'TBD';
+  const date = match.scheduledFor ? formatShortDate(match.scheduledFor) || 'TBD' : 'TBD';
   const home = match.homeTeam?.displayName || 'TBD';
   const away = match.awayTeam?.displayName || 'TBD';
   return `${leagueWeekLabel(match.scheduledFor)} · ${home} vs ${away} · ${date}`;
@@ -93,6 +93,8 @@ function findMyStanding(league, account) {
 }
 
 export default function LeaguesScreen() {
+  const pathname = usePathname();
+  const isAdminRoute = pathname.startsWith('/admin/leagues');
   const isHydrated = useHydrated();
   const [league, setLeague] = useState(null);
   const [leagues, setLeagues] = useState([]);
@@ -182,6 +184,7 @@ export default function LeaguesScreen() {
     () => findMyStanding(league, account),
     [league, account],
   );
+  const canManageLeague = Boolean(isAdminRoute && account?.hostApproved);
 
   async function refreshLeagues() {
     const next = await fetchLeagues();
@@ -427,7 +430,9 @@ export default function LeaguesScreen() {
 
   if (loading) {
     return (
-      <HubScreen title="Leagues" subtitle="Loading league data.">
+      <HubScreen
+        title={isAdminRoute ? 'League operations' : 'Leagues'}
+        subtitle="Loading league data.">
         <EmptyState title="Loading" body="Please wait while leagues load." />
       </HubScreen>
     );
@@ -435,13 +440,26 @@ export default function LeaguesScreen() {
 
   return (
     <HubScreen
-      title="Leagues"
-      subtitle="Competitive weekly leagues. Join, track your standing, and play your scheduled matches."
-      actions={[{ label: 'Home', href: '/next', variant: 'ghost' }]}
+      accountHref="/account"
+      title={isAdminRoute ? 'League operations' : 'Leagues'}
+      subtitle={isAdminRoute
+        ? 'Private tools for schedules, registration, rooms, results, and competitors.'
+        : 'Competitive weekly leagues. Join, track your standing, and play your scheduled matches.'}
+      actions={isAdminRoute
+        ? [
+            { label: 'Public leagues', href: '/leagues', variant: 'secondary' },
+            { label: 'Admin home', href: '/admin', variant: 'ghost' },
+          ]
+        : [
+            { label: 'Tournaments', href: '/tournaments', variant: 'secondary' },
+            { label: 'Results', href: '/results', variant: 'ghost' },
+            account?.hostApproved
+              ? { label: 'Host operations', href: '/admin/leagues', variant: 'ghost' }
+              : null,
+          ].filter(Boolean)}
       heroVariant="compact"
       stickyActions={false}>
 
-      <PlayerRouteStrip title="Competition path" body="Join a league, track your standing, then open your scheduled match when it is ready." />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {adminToast ? <Text style={styles.infoText}>{adminToast}</Text> : null}
 
@@ -451,7 +469,15 @@ export default function LeaguesScreen() {
         </Section>
       ) : (
         <>
-          <Section title="My league" description={league ? `Competing in: ${leagueLabel(league)}` : 'Choose a league to view'}>
+          <Section
+            title={membership.enrolled || membership.waitlisted ? 'My league' : 'Featured league'}
+            description={league
+              ? membership.enrolled
+                ? `Competing in: ${leagueLabel(league)}`
+                : membership.waitlisted
+                  ? `Waitlisted for: ${leagueLabel(league)}`
+                  : `Open competition: ${leagueLabel(league)}`
+              : 'Choose a league to view'}>
             {league ? (
               <Surface style={styles.leagueCard}>
                 <View style={styles.titleRow}>
@@ -498,7 +524,7 @@ export default function LeaguesScreen() {
                 </Surface>
 
                 {!account ? (
-                  <ActionButton href="/next#account-access">Sign In to Join</ActionButton>
+                  <ActionButton href="/account">Sign In to Join</ActionButton>
                 ) : nextMatch?.roomUrl && membership.enrolled ? (
                   <ActionButton
                     disabled={actionBusy}
@@ -528,7 +554,7 @@ export default function LeaguesScreen() {
                     </Surface>
                   ))}
                 </View>
-              ) : <EmptyState title="No standings yet" body="Schedule and report results to populate standings." />}
+              ) : <EmptyState title="No standings yet" body="Standings appear after the first results are recorded." />}
             </Section>
 
             {standingsCSV ? (
@@ -547,7 +573,7 @@ export default function LeaguesScreen() {
                 return (
                   <Surface key={match.id} style={styles.listRow}>
                     <Text style={styles.listName}>{match.id}</Text>
-                    <Text style={styles.listMeta}>{match.seasonWeek ? `Week ${match.seasonWeek}` : 'Match'} • {formatShortDate(match.scheduledFor)} • {match.status}</Text>
+                    <Text style={styles.listMeta}>{match.seasonWeek ? `Week ${match.seasonWeek}` : 'Match'} • {formatShortDate(match.scheduledFor) || 'TBD'} • {match.status}</Text>
                     <Text style={styles.listMeta}>{match.homeTeam?.displayName || 'TBD'} vs {match.awayTeam?.displayName || 'TBD'}</Text>
                     <Text style={styles.listMeta}>Room: {match.roomUrl || 'No room assigned'}</Text>
                     {meSeat ? <Text style={styles.listMeta}>You are assigned as {meSeat}</Text> : null}
@@ -560,17 +586,21 @@ export default function LeaguesScreen() {
                           {actionBusyType === `launch-${match.id}` ? 'Opening...' : 'Open Match'}
                         </ActionButton>
                       ) : null}
-                      <ActionButton disabled={adminBusy} onPress={() => handleLaunchMatch(match.id, match.roomUrl)} variant="secondary">Set room URL</ActionButton>
-                      <ActionButton disabled={adminBusy} onPress={() => {
-                        setResultMatchId(match.id);
-                      }} variant="secondary">Report result</ActionButton>
+                      {canManageLeague ? (
+                        <>
+                          <ActionButton disabled={adminBusy} onPress={() => handleLaunchMatch(match.id, match.roomUrl)} variant="secondary">Set room URL</ActionButton>
+                          <ActionButton disabled={adminBusy} onPress={() => {
+                            setResultMatchId(match.id);
+                          }} variant="secondary">Report result</ActionButton>
+                        </>
+                      ) : null}
                     </View>
                   </Surface>
                 );
               })
-            ) : <EmptyState title="No schedule" body="Generate the schedule to create weekly matches." />}
+            ) : <EmptyState title="No schedule" body="Weekly matchups will appear here when the schedule is published." />}
 
-            {resultMatchId ? (
+            {canManageLeague && resultMatchId ? (
               <Surface style={styles.formCard}>
                 <Text style={styles.fieldLabel}>Result entry for {resultMatchId}</Text>
                 <TextInput
@@ -588,36 +618,42 @@ export default function LeaguesScreen() {
           </Section>
 
           <Section title="Players" description="League competitors, enrollment status, and available seats.">
-            {(league?.participants || []).map((player) => (
+            {(league?.participants || []).length ? (league?.participants || []).map((player) => (
               <Surface key={player.canonicalAccountId || player.accountId || player.displayName} style={styles.listRow}>
                 <View style={styles.listRowTop}>
                   <Text style={styles.listName}>{player.displayName || 'Player'}</Text>
                   <Badge tone={player.status === 'enrolled' ? 'green' : 'rose'}>{player.status || 'enrolled'}</Badge>
                 </View>
-                <Text style={styles.listMeta}>{player.accountEmail || player.accountId || 'Guest account'} • {player.division || 'Open'}</Text>
-                <View style={styles.actionRow}>
-                  <ActionButton disabled={adminBusy} onPress={() => handleRemovePlayer(player)} variant="danger">Remove</ActionButton>
-                  {player.status === 'waitlist' ? (
-                    <ActionButton
-                      disabled={adminBusy}
-                      onPress={() => promoteLeagueWaitlist({
-                        token: adminToken,
-                        leagueId: league.id,
-                        canonicalAccountId: player.canonicalAccountId,
-                        accountId: player.accountId,
-                      }).then(async (result) => {
-                        setLeague(buildLeagueRecord(result.league || result));
-                      }).catch((error) => {
-                        setAdminToast(normalizeMessage(error));
-                      })}
-                      variant="secondary"
-                    >
-                      Promote
-                    </ActionButton>
-                  ) : null}
-                </View>
+                <Text style={styles.listMeta}>
+                  {canManageLeague
+                    ? `${player.accountEmail || player.accountId || 'Guest account'} • ${player.division || 'Open'}`
+                    : player.division || 'Open division'}
+                </Text>
+                {canManageLeague ? (
+                  <View style={styles.actionRow}>
+                    <ActionButton disabled={adminBusy} onPress={() => handleRemovePlayer(player)} variant="danger">Remove</ActionButton>
+                    {player.status === 'waitlist' ? (
+                      <ActionButton
+                        disabled={adminBusy}
+                        onPress={() => promoteLeagueWaitlist({
+                          token: adminToken,
+                          leagueId: league.id,
+                          canonicalAccountId: player.canonicalAccountId,
+                          accountId: player.accountId,
+                        }).then(async (result) => {
+                          setLeague(buildLeagueRecord(result.league || result));
+                        }).catch((error) => {
+                          setAdminToast(normalizeMessage(error));
+                        })}
+                        variant="secondary"
+                      >
+                        Promote
+                      </ActionButton>
+                    ) : null}
+                  </View>
+                ) : null}
               </Surface>
-            ))}
+            )) : <EmptyState title="No players yet" body="Registration is open for the first competitors." />}
           </Section>
 
           <Section title="League Directory">
@@ -635,8 +671,8 @@ export default function LeaguesScreen() {
         </>
       )}
 
-      {/* Host-only operations intentionally follow the player experience. */}
-      <Section title="Host Operations" description="Private league administration and competition management.">
+      {canManageLeague ? (
+        <Section title="Host Operations" description="Private league administration and competition management.">
         <Surface style={styles.formCard}>
           <Text style={styles.fieldLabel}>Admin token</Text>
           <TextInput
@@ -698,7 +734,8 @@ export default function LeaguesScreen() {
             </ActionButton>
           </View>
         )}
-      </Section>
+        </Section>
+      ) : null}
 
     </HubScreen>
   );

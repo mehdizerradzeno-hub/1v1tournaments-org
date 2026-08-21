@@ -1,11 +1,26 @@
 const DEFAULT_TIME_ZONE = 'America/New_York';
 
 function toDate(value) {
-  return value instanceof Date ? value : new Date(value);
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function formatByOptions(value, options) {
-  return new Intl.DateTimeFormat('en-US', options).format(toDate(value));
+  const date = toDate(value);
+
+  if (!date) {
+    return '';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('en-US', options).format(date);
+  } catch {
+    return '';
+  }
 }
 
 export function formatLongDate(value, timeZone = DEFAULT_TIME_ZONE) {
@@ -35,7 +50,14 @@ export function formatTime(value, timeZone = DEFAULT_TIME_ZONE) {
 }
 
 export function formatDateLine(value, timeZone = DEFAULT_TIME_ZONE, timeZoneLabel = 'ET') {
-  return `${formatLongDate(value, timeZone)} • ${formatTime(value, timeZone)} ${timeZoneLabel}`;
+  const date = formatLongDate(value, timeZone);
+  const time = formatTime(value, timeZone);
+
+  if (!date || !time) {
+    return 'Schedule TBD';
+  }
+
+  return `${date} • ${time} ${timeZoneLabel}`;
 }
 
 export function formatDateHeader(value, timeZone = DEFAULT_TIME_ZONE) {
