@@ -29,6 +29,8 @@ import {
   fetchTournamentSettings,
 } from '../lib/tournamentHostingClient.js';
 import { theme } from '../lib/theme.js';
+import { startVisibilityAwarePolling } from '../lib/visibilityPoller.js';
+import { useVisibleNow } from '../lib/useVisibleNow.js';
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
@@ -182,7 +184,7 @@ export default function StreamModeScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentState, setHostedTournamentState] = useState({ error: '', loaded: false });
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const nowMs = useVisibleNow(15000);
   const upcoming = useMemo(
     () => hostedTournamentState.loaded
       ? getPublicTournamentCatalog(getUpcomingTournaments(), hostedTournaments)
@@ -248,12 +250,11 @@ export default function StreamModeScreen() {
       }
     }
 
-    loadHostedTournaments();
-    const refreshTimer = setInterval(loadHostedTournaments, 15000);
+    const stopPolling = startVisibilityAwarePolling(loadHostedTournaments, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
   }, []);
 
@@ -332,24 +333,13 @@ export default function StreamModeScreen() {
       refreshing = false;
     }
 
-    loadEventData();
-    const refreshTimer = setInterval(loadEventData, 15000);
+    const stopPolling = startVisibilityAwarePolling(loadEventData, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
   }, [upcoming, upcomingSlugs]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 15000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
 
   return (
     <HubScreen
@@ -384,7 +374,7 @@ export default function StreamModeScreen() {
         <>
           <View style={[styles.heroGrid, isWide && styles.heroGridWide]}>
             <Surface style={styles.nextCard}>
-              <View pointerEvents="none" style={styles.glow} />
+              <View style={styles.glow} />
               <View style={styles.eventTopRow}>
                 <Badge tone={featuredBracket ? 'green' : registrationMeta.tone}>
                   {featuredBracket ? 'Bracket live' : registrationMeta.label}
@@ -624,6 +614,7 @@ const styles = StyleSheet.create({
     borderRadius: 180,
     height: 220,
     position: 'absolute',
+    pointerEvents: 'none',
     right: -84,
     top: -92,
     width: 220,

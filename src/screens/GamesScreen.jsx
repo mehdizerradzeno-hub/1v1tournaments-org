@@ -1,6 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, EmptyState, GameCard, HubScreen, Section, Surface } from '../components/hub-ui.jsx';
+import {
+  ActionButton,
+  EmptyState,
+  GameCard,
+  HubScreen,
+  PlayerRouteStrip,
+  QuickActionCard,
+  Section,
+  Surface,
+} from '../components/hub-ui.jsx';
 import { getGamePath, getGames, siteData } from '../lib/siteData.js';
 
 export default function GamesScreen() {
@@ -12,22 +21,28 @@ export default function GamesScreen() {
   return (
     <HubScreen
       actions={[
-        { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug) },
-        { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Live', href: '/live', variant: 'ghost' },
+        { label: 'Next tournament', href: '/next' },
+        { label: 'Leagues', href: '/leagues', variant: 'secondary' },
+        { label: 'Profile', href: '/account', variant: 'ghost' },
       ]}
       eyebrow="Game directory"
       footerNote={siteData.site.adminNote}
-      lead="This page gives both current game slots a stable home, with Spades featured first and Euchre marked as coming soon."
+      heroVariant="compact"
+      lead="Choose a game, then enter tournament or league competition through the same shared 1V1 account."
       stats={[
         { label: 'Games', value: String(games.length), tone: 'accent' },
         { label: 'Live', value: String(activeGames.length), tone: 'green' },
         { label: 'Coming soon', value: String(comingSoonGames.length), tone: 'blue' },
       ]}
-      subtitle="Browse the current card-game lineup"
-      title="All games">
+      stickyActions={false}
+      subtitle="One account across competitive card games"
+      title="Compete">
+      <PlayerRouteStrip
+        body="Choose a game for its formats and rules, or go directly to the next tournament when you are ready to play."
+      />
+
       <Section
-        description="Spades is live today. Euchre is coming soon."
+        description="Spades is the current public competition game. Euchre remains visible while its public event rollout is prepared."
         title="Current lineup">
         {games.map((game) => (
           <View key={game.slug} style={styles.block}>
@@ -36,13 +51,44 @@ export default function GamesScreen() {
         ))}
       </Section>
 
-      <Section description="The active game is ready now. Future games will use the same tournament flow." title="Lineup note">
+      <Section
+        description="Pick the competition path that matches what you want to do now."
+        title="Choose your competition">
+        <View style={styles.pathGrid}>
+          <QuickActionCard
+            actionLabel="Open next event"
+            body="See the current signup state, countdown, roster, and bracket path."
+            href="/next"
+            meta="Fastest path"
+            title="Tournament play"
+            tone="accent"
+          />
+          <QuickActionCard
+            actionLabel="Browse leagues"
+            body="Join recurring weekly competition and track standings across a season."
+            href="/leagues"
+            meta="Season play"
+            title="League play"
+            tone="blue"
+          />
+          <QuickActionCard
+            actionLabel="Open profile"
+            body="Use one account for registration, match assignments, and competitive history."
+            href="/account"
+            meta="Shared account"
+            title="Your player profile"
+            tone="green"
+          />
+        </View>
+      </Section>
+
+      <Section description="Availability labels distinguish public competition from apps still moving through release rollout." title="Release status">
         <Surface style={styles.noteCard}>
           <Text style={styles.noteCopy}>
-            Spades is the current live game. Euchre is reserved for a later launch.
+            Spades currently owns public tournament and league play. Euchre keeps its game page and shared-account path without advertising public events before they are ready.
           </Text>
-          <ActionButton href="/rules" variant="secondary">
-            Keep the format notes nearby
+          <ActionButton href={getGamePath(siteData.site.primaryGameSlug)} variant="secondary">
+            Open Spades
           </ActionButton>
         </Surface>
       </Section>
@@ -59,6 +105,11 @@ export default function GamesScreen() {
 }
 
 const styles = StyleSheet.create({
+  pathGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   block: {
     marginBottom: 14,
   },

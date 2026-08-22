@@ -24,7 +24,7 @@ const DEFAULT_CHECK_IN = {
   title: 'Signup',
   status: 'Registration open',
   preview: '30 min early',
-  window: 'Opens 30 minutes before the start time.',
+  window: 'Check-in opens 30 minutes before the start time.',
   note: 'Submit the form once. The host uses this roster to generate your match link.',
   steps: [
     'Create or sign in to your player account.',

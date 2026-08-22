@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
   ActionButton,
   Badge,
+  CompetitionFilterTabs,
   EmptyState,
   HubScreen,
   PlayerRouteStrip,
@@ -14,14 +15,39 @@ import {
 import { formatPlacement, formatResultDate } from '../lib/format.js';
 import { getGames, getGamePath, getResults } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
-import { buildTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
+import { buildTournamentLeaderboard, summarizeTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
 
 export default function LeaderboardScreen() {
   const games = getGames();
   const results = useMergedLiveResults(getResults());
-  const entries = useMemo(() => buildTournamentLeaderboard(results), [results]);
+  const [activeGame, setActiveGame] = useState('all');
+  const filteredResults = useMemo(
+    () => activeGame === 'all'
+      ? results
+      : results.filter((result) => result.gameSlug === activeGame),
+    [activeGame, results],
+  );
+  const entries = useMemo(
+    () => buildTournamentLeaderboard(filteredResults),
+    [filteredResults],
+  );
+  const summary = useMemo(
+    () => summarizeTournamentLeaderboard(entries, filteredResults),
+    [entries, filteredResults],
+  );
   const leader = entries[0] || null;
+  const activeGameLabel = activeGame === 'all'
+    ? 'All games'
+    : games.find((game) => game.slug === activeGame)?.name || 'Game';
+  const filterItems = [
+    { id: 'all', label: 'All games', count: results.length },
+    ...games.map((game) => ({
+      id: game.slug,
+      label: game.name,
+      count: results.filter((result) => result.gameSlug === game.slug).length,
+    })),
+  ];
 
   return (
     <HubScreen
@@ -40,14 +66,38 @@ export default function LeaderboardScreen() {
         body="Rankings are for after results post. During an event, use the next tournament page, your match status, or the live view."
       />
 
+      <CompetitionFilterTabs
+        activeId={activeGame}
+        items={filterItems}
+        label="Filter tournament rankings by game"
+        onSelect={setActiveGame}
+      />
+
+      <Surface
+        accessibilityRole="tabpanel"
+        aria-labelledby={`competition-filter-${activeGame}`}
+        nativeID="competition-filter-panel"
+        style={styles.summaryCard}>
+        <View style={styles.summaryCopy}>
+          <Text style={styles.summaryEyebrow}>{activeGameLabel}</Text>
+          <Text style={styles.summaryTitle}>Tournament ranking snapshot</Text>
+          <Text style={styles.summaryBody}>Every posted placement and bracket record contributes to this table.</Text>
+        </View>
+        <View style={styles.summaryStats}>
+          <StatPill label="Ranked players" value={String(summary.playerCount)} tone="accent" />
+          <StatPill label="Completed events" value={String(summary.eventCount)} tone="green" />
+          <StatPill label="Current leader" value={summary.topPlayer} tone="blue" />
+        </View>
+      </Surface>
+
       <Section
-        description="The top player card shows the current tournament resume. It updates as completed event results are posted."
-        title="Current leader">
+        description={`The top ${activeGameLabel.toLowerCase()} player updates as completed event results are posted.`}
+        title={`${activeGameLabel} leader`}>
         {leader ? (
           <LeaderboardHero entry={leader} />
         ) : (
           <EmptyState
-            action={<ActionButton href="/tournaments/spades-summer-series">Open tournament</ActionButton>}
+            action={<ActionButton href="/next">Open next tournament</ActionButton>}
             body="Run and complete the first tournament, then the standings will appear here automatically."
             title="No tournament standings yet"
           />
@@ -57,7 +107,7 @@ export default function LeaderboardScreen() {
       <Section
         action={<ActionButton href="/results" variant="secondary">Recent results</ActionButton>}
         description="Ranked by tournament wins first, then finals, bracket match wins, and losses."
-        title="Overall standings">
+        title={`${activeGameLabel} standings`}>
         {entries.length ? (
           <View style={styles.table}>
             {entries.map((entry) => (
@@ -176,6 +226,42 @@ function CompactStat({ label, value }) {
 }
 
 const styles = StyleSheet.create({
+  summaryCard: {
+    alignItems: 'center',
+    borderColor: theme.colors.lineStrong,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+    marginBottom: 22,
+  },
+  summaryCopy: {
+    flex: 1,
+    minWidth: 230,
+  },
+  summaryEyebrow: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  summaryTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 5,
+  },
+  summaryBody: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 5,
+  },
+  summaryStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
   heroCard: {
     borderColor: theme.colors.accent,
   },

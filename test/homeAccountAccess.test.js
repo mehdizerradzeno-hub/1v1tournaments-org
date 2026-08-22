@@ -29,6 +29,8 @@ test('Tournament Hub account route reuses the existing authoritative account flo
   assert.match(accountScreenSource, /SHARED_ACCOUNT_ACTIONS/);
   assert.match(accountScreenSource, /destination=\{TOURNAMENT_HOME_DESTINATION\}/);
   assert.match(accountScreenSource, /returnAfterSignOut/);
+  assert.match(accountScreenSource, /useHubShell/);
+  assert.match(sharedAccountScreenSource, /title="Profile"/);
   assert.match(sharedAccountScreenSource, /fetchPlayerAccount/);
   assert.match(sharedAccountScreenSource, /loginPlayerAccount/);
   assert.match(sharedAccountScreenSource, /logoutPlayerAccount/);

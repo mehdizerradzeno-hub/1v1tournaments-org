@@ -1011,7 +1011,7 @@ export default function SponsorAdminScreen() {
       title="Sponsor CRM">
       {!canUseAdmin ? (
         <EmptyState
-          action={<ActionButton href="/check-in/spades-summer-series?mode=signin">Sign in</ActionButton>}
+          action={<ActionButton href="/account">Sign in</ActionButton>}
           body={hostState.loading
             ? 'Checking whether your account has sponsor admin access.'
             : hostState.error || 'Sign in with a host-approved account before managing sponsor prospects.'}

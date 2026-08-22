@@ -15,6 +15,7 @@ import { buildLeagueRecord, nextLeagueMatch, leagueWeekLabel } from '../lib/leag
 import { formatShortDate } from '../lib/format.js';
 import { useHydrated } from '../lib/useHydrated.js';
 import { openSharedAccountGame } from '../lib/sharedAccountLaunch.js';
+import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import {
   archiveLeague,
   exportLeagueStandingsAction,
@@ -39,6 +40,11 @@ const LEAGUE_VIEWS = [
   { id: 'schedule', label: 'Schedule' },
   { id: 'players', label: 'Players' },
 ];
+
+function leagueViewFromHash(hash) {
+  const value = String(hash || '').replace(/^#/, '');
+  return LEAGUE_VIEWS.some((view) => view.id === value) ? value : null;
+}
 
 function humanizeFormat(value, fallback = 'Weekly head-to-head') {
   const normalized = String(value || '').trim();
@@ -144,6 +150,18 @@ export default function LeaguesScreen() {
   const [resultText, setResultText] = useState('');
   const [resultMatchId, setResultMatchId] = useState('');
   const [activeView, setActiveView] = useState('overview');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  useEffect(() => {
+    function syncViewToHash() {
+      const nextView = leagueViewFromHash(globalThis.location?.hash);
+      if (nextView) setActiveView(nextView);
+    }
+
+    syncViewToHash();
+    globalThis.addEventListener?.('hashchange', syncViewToHash);
+    return () => globalThis.removeEventListener?.('hashchange', syncViewToHash);
+  }, []);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -202,7 +220,7 @@ export default function LeaguesScreen() {
     return () => {
       active = false;
     };
-  }, [isHydrated]);
+  }, [isHydrated, loadAttempt]);
 
   const membership = useMemo(() => parsePlayerStatus(league, account), [league, account]);
   const nextMatch = useMemo(() => {
@@ -263,6 +281,24 @@ export default function LeaguesScreen() {
       setActionBusy(false);
       setActionBusyType('');
     }
+  }
+
+  function handleSelectView(viewId) {
+    setActiveView(viewId);
+
+    if (globalThis.history?.replaceState && globalThis.location) {
+      globalThis.history.replaceState(
+        null,
+        '',
+        `${globalThis.location.pathname}${globalThis.location.search}#${viewId}`,
+      );
+    }
+  }
+
+  function handleRetryLoad() {
+    setError('');
+    setLoading(true);
+    setLoadAttempt((attempt) => attempt + 1);
   }
 
   async function handleCreateLeague() {
@@ -529,12 +565,21 @@ export default function LeaguesScreen() {
       heroVariant="compact"
       stickyActions={false}>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {adminToast ? <Text style={styles.infoText}>{adminToast}</Text> : null}
+      {error ? (
+        <Surface accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+          <ActionButton onPress={handleRetryLoad} variant="secondary">Try again</ActionButton>
+        </Surface>
+      ) : null}
+      {adminToast ? <Text accessibilityLiveRegion="polite" style={styles.infoText}>{adminToast}</Text> : null}
 
       {!leagues.length ? (
         <Section>
           <EmptyState title="No leagues found" body={EMPTY_MSG} />
+          <View style={styles.actionRow}>
+            <ActionButton href="/tournaments">Browse tournaments</ActionButton>
+            <ActionButton href="/results" variant="secondary">Recent results</ActionButton>
+          </View>
         </Section>
       ) : (
         <>
@@ -644,7 +689,13 @@ export default function LeaguesScreen() {
                   accessibilityState={{ selected }}
                   key={view.id}
                   nativeID={`league-tab-${view.id}`}
-                  onPress={() => setActiveView(view.id)}
+                  onKeyDown={(event) => handleTabKeyNavigation(event, {
+                    activeId: activeView,
+                    idPrefix: 'league-tab-',
+                    onSelect: handleSelectView,
+                    tabIds: LEAGUE_VIEWS.map((item) => item.id),
+                  })}
+                  onPress={() => handleSelectView(view.id)}
                   style={[styles.viewTab, selected && styles.viewTabSelected]}>
                   <Text style={[styles.viewTabLabel, selected && styles.viewTabLabelSelected]}>
                     {view.label}
@@ -962,7 +1013,11 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 12,
+  },
+  errorCard: {
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 18,
   },
   infoText: {
     color: '#60a5fa',

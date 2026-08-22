@@ -3648,10 +3648,7 @@ const styles = StyleSheet.create({
   },
   publisherPanel: {
     borderColor: 'rgba(214, 162, 78, 0.42)',
-    shadowColor: '#D6A24E',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.16,
-    shadowRadius: 26,
+    boxShadow: '0 12px 26px rgba(214, 162, 78, 0.16)',
   },
   publisherHero: {
     flexDirection: 'row',
@@ -3828,10 +3825,7 @@ const styles = StyleSheet.create({
   },
   quickControlPanel: {
     borderColor: 'rgba(214, 162, 78, 0.48)',
-    shadowColor: '#D6A24E',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    boxShadow: '0 10px 24px rgba(214, 162, 78, 0.12)',
   },
   quickControlHeader: {
     flexDirection: 'row',

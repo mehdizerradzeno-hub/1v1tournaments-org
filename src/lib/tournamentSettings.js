@@ -121,10 +121,10 @@ function formatLeadWindow(minutes) {
 
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
-    return `Opens ${hours} hour${hours === 1 ? '' : 's'} before the start time.`;
+    return `Check-in opens ${hours} hour${hours === 1 ? '' : 's'} before the start time.`;
   }
 
-  return `Opens ${minutes} minutes before the start time.`;
+  return `Check-in opens ${minutes} minutes before the start time.`;
 }
 
 function normalizeLeagueText(value, fallback = '') {
@@ -171,7 +171,7 @@ function formatCallout(minutes, status) {
     return 'Registration opens when the host is ready.';
   }
 
-  return `Check-in ${formatLeadWindow(minutes).toLowerCase()}`;
+  return formatLeadWindow(minutes);
 }
 
 function dateParts(value, timeZone) {

@@ -2,17 +2,20 @@ import { startTransition, useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, usePathname } from 'expo-router';
+import Head from 'expo-router/head';
 
 import { theme } from '../lib/theme.js';
+import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
 import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
 import { getNextFutureTournament, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
-import { getCheckInPath, getTournamentPath, getUpcomingTournaments, siteData } from '../lib/siteData.js';
+import { getCheckInPath, getTournamentPath, getUpcomingTournaments } from '../lib/siteData.js';
+import { ensureSitePerformanceTracking, trackSiteEvent } from '../lib/siteObservability.js';
 import { useHydrated } from '../lib/useHydrated.js';
 
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
-function buildPrimaryPaths(slug = siteData.site.primaryTournamentSlug) {
+function buildPrimaryPaths(slug = null) {
   if (!slug) {
     return {
       tournamentPath: '/next',
@@ -107,6 +110,14 @@ function shortAccountName(account) {
   return name.length > 18 ? `${name.slice(0, 17)}...` : name;
 }
 
+function getDocumentTitle(title) {
+  const cleanTitle = String(title || '1v1 Tournaments').trim();
+
+  return cleanTitle.toLowerCase().includes('1v1 tournaments')
+    ? cleanTitle
+    : `${cleanTitle} | 1v1 Tournaments`;
+}
+
 function LinkShell({ href, children, style, accessibilityLabel, accessibilityState, onPress, variant = 'primary', external = false, disabled = false }) {
   const linkStyles = ({ pressed }) => [
     styles.button,
@@ -120,7 +131,18 @@ function LinkShell({ href, children, style, accessibilityLabel, accessibilitySta
   if (href && isInternalHref(href) && !external && !disabled) {
     return (
       <Link accessibilityLabel={accessibilityLabel} href={href} asChild>
-        <Pressable accessibilityRole="link" accessibilityState={accessibilityState} style={linkStyles}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityState={accessibilityState}
+          onPress={() => {
+            trackSiteEvent('link_click', {
+              external: false,
+              from: globalThis.location?.pathname || '/',
+              to: href,
+            });
+            onPress?.();
+          }}
+          style={linkStyles}>
           {children}
         </Pressable>
       </Link>
@@ -144,6 +166,11 @@ function LinkShell({ href, children, style, accessibilityLabel, accessibilitySta
         }
 
         if (href) {
+          trackSiteEvent('link_click', {
+            external: true,
+            from: globalThis.location?.pathname || '/',
+            to: href,
+          });
           Linking.openURL(href).catch(() => {});
         }
       }}
@@ -256,7 +283,7 @@ function HeaderAccountChip({ account, loading, href }) {
 
 function MobileNav({ items, pathname, style }) {
   return (
-    <View style={style}>
+    <View accessibilityLabel="Primary" accessibilityRole="navigation" style={style}>
       {items.map((item) => {
         const active = isNavItemActive(pathname, item);
 
@@ -299,6 +326,55 @@ export function Section({ eyebrow, title, description, action, children, style, 
         {action ? <View style={styles.sectionAction}>{action}</View> : null}
       </View>
       {children}
+    </View>
+  );
+}
+
+export function CompetitionFilterTabs({
+  activeId,
+  idPrefix = 'competition-filter-',
+  items,
+  label = 'Competition filter',
+  onSelect,
+}) {
+  const tabIds = items.map((item) => item.id);
+
+  return (
+    <View accessibilityLabel={label} accessibilityRole="tablist" style={styles.filterTabs}>
+      {items.map((item) => {
+        const selected = item.id === activeId;
+
+        return (
+          <Pressable
+            aria-controls="competition-filter-panel"
+            aria-selected={selected}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            key={item.id}
+            nativeID={`${idPrefix}${item.id}`}
+            onKeyDown={(event) => handleTabKeyNavigation(event, {
+              activeId,
+              idPrefix,
+              onSelect,
+              tabIds,
+            })}
+            onPress={() => onSelect(item.id)}
+            style={({ pressed }) => [
+              styles.filterTab,
+              selected && styles.filterTabSelected,
+              pressed && styles.filterTabPressed,
+            ]}>
+            <Text style={[styles.filterTabLabel, selected && styles.filterTabLabelSelected]}>
+              {item.label}
+            </Text>
+            {Number.isFinite(item.count) ? (
+              <Text style={[styles.filterTabCount, selected && styles.filterTabCountSelected]}>
+                {item.count}
+              </Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -628,6 +704,7 @@ export function RuleBlock({ section }) {
 }
 
 export function HubScreen({
+  accountOverride,
   accountHref = null,
   eyebrow,
   title,
@@ -650,9 +727,11 @@ export function HubScreen({
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
+  const resolvedPlayerAccount = accountOverride !== undefined ? accountOverride : playerAccount;
+  const resolvedPlayerAccountLoading = accountOverride !== undefined ? false : playerAccountLoading;
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
   const fallbackAccountPath = navTournamentSlug
-    ? playerAccount
+    ? resolvedPlayerAccount
       ? `${primaryPaths.checkInPath}#account-access`
       : `${primaryPaths.checkInPath}?mode=signin#account-access`
     : '/next';
@@ -670,9 +749,20 @@ export function HubScreen({
   const showInlineMobileNav = false;
   const showStickyActionCopy = hasHydratedViewport && width >= 430;
   const compactHero = heroVariant === 'compact';
+  const documentTitle = getDocumentTitle(title);
+  const description = String(lead || subtitle || 'Competitive Spades and Euchre tournaments.').trim();
+  const canonicalPath = pathname === '/' ? '' : pathname;
+  const canonicalUrl = `https://1v1tournaments.org${canonicalPath}`;
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated) return;
+
+    trackSiteEvent('page_view', { path: pathname });
+    ensureSitePerformanceTracking(pathname);
+  }, [isHydrated, pathname]);
+
+  useEffect(() => {
+    if (!isHydrated || accountOverride !== undefined) {
       return undefined;
     }
 
@@ -735,7 +825,7 @@ export function HubScreen({
         globalThis.removeEventListener(PLAYER_ACCOUNT_CHANGED_EVENT, refreshPlayerAccount);
       }
     };
-  }, [isHydrated]);
+  }, [accountOverride, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -770,8 +860,18 @@ export function HubScreen({
   }, [isHydrated]);
 
   return (
-    <View style={styles.root}>
-      <View pointerEvents="none" style={styles.backdrop}>
+    <>
+      <Head>
+        <title>{documentTitle}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={documentTitle} />
+        <meta property="og:description" content={description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={canonicalUrl} />
+        <link rel="canonical" href={canonicalUrl} />
+      </Head>
+      <View style={styles.root}>
+      <View style={styles.backdrop}>
         <View style={styles.backdropBandTop} />
         <View style={styles.backdropBandBottom} />
       </View>
@@ -800,12 +900,12 @@ export function HubScreen({
                   </Pressable>
                 </Link>
                 <View style={styles.brandUtility}>
-                  {playerAccount?.hostApproved ? (
+                  {resolvedPlayerAccount?.hostApproved ? (
                     <ActionButton href="/admin" variant="secondary" style={styles.brandButton}>
                       Admin
                     </ActionButton>
                   ) : null}
-                  <HeaderAccountChip account={playerAccount} href={accountPath} loading={playerAccountLoading} />
+                  <HeaderAccountChip account={resolvedPlayerAccount} href={accountPath} loading={resolvedPlayerAccountLoading} />
                 </View>
               </View>
             ) : null}
@@ -905,29 +1005,82 @@ export function HubScreen({
           </View>
         </View>
       ) : null}
-    </View>
+      </View>
+    </>
   );
 }
 
 const sharedCardShadow = {
-  shadowColor: '#000',
-  shadowOpacity: 0.28,
-  shadowRadius: 24,
-  shadowOffset: { width: 0, height: 12 },
+  boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
   elevation: 8,
 };
 
 const styles = StyleSheet.create({
+  filterTabs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  filterTab: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderColor: theme.colors.line,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    minWidth: 112,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  filterTabSelected: {
+    backgroundColor: theme.colors.accentSoft,
+    borderColor: theme.colors.accentGlow,
+  },
+  filterTabPressed: {
+    opacity: 0.82,
+  },
+  filterTabLabel: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  filterTabLabelSelected: {
+    color: theme.colors.text,
+  },
+  filterTabCount: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 999,
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
+    minWidth: 24,
+    overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    textAlign: 'center',
+  },
+  filterTabCountSelected: {
+    backgroundColor: theme.colors.accentGlow,
+    color: theme.colors.text,
+  },
   root: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
   safeArea: {
     flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+    pointerEvents: 'none',
   },
   backdropBandTop: {
     position: 'absolute',
@@ -959,7 +1112,7 @@ const styles = StyleSheet.create({
     paddingBottom: 108,
   },
   scrollContentWithMobileNav: {
-    paddingBottom: 96,
+    paddingBottom: 32,
   },
   scrollContentWithStickyActionsAndMobileNav: {
     paddingBottom: 166,
@@ -1146,10 +1299,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   mobileBottomNav: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 10,
+    flexShrink: 0,
+    marginBottom: 10,
+    marginHorizontal: 14,
     zIndex: 20,
     flexDirection: 'row',
     alignItems: 'center',

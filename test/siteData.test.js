@@ -89,7 +89,7 @@ test('public tournaments expose the signup and bracket flow', () => {
 
   assert.equal(getCheckInPath('spades-summer-series'), '/check-in/spades-summer-series');
   assert.equal(tournament?.checkIn?.preview, '30 min early');
-  assert.equal(tournament?.checkIn?.window, 'Opens 30 minutes before the start time.');
+  assert.equal(tournament?.checkIn?.window, 'Check-in opens 30 minutes before the start time.');
   assert.match(tournament?.checkIn?.note || '', /match link/i);
   assert.ok((tournament?.bracket?.rounds || []).length > 0);
 });

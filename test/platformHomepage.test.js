@@ -21,6 +21,12 @@ test("root route renders the multi-game platform hub", () => {
   assert.match(homeScreen, /Spades and Euchre/);
   assert.match(homeScreen, /No partner\. No excuses\./);
   assert.match(homeScreen, /PLATFORM_GAME_PRESENTATION/);
+  assert.doesNotMatch(homeScreen, /TwitchTournamentBoard/);
+  assert.doesNotMatch(homeScreen, /StreamCard/);
+  assert.match(homeScreen, /homeUpcoming\.length/);
+  assert.match(homeScreen, /laterTournaments\.slice\(0, 2\)/);
+  assert.match(homeScreen, /aria-level=\{1\}/);
+  assert.match(homeScreen, /aria-level=\{2\}/);
 });
 
 test("platform navigation keeps competition, account, and My Match visible", () => {
@@ -35,7 +41,7 @@ test("platform navigation keeps competition, account, and My Match visible", () 
   ]) {
     assert.match(hubUi, new RegExp(`label: '${label}'`));
   }
-  assert.match(hubUi, /playerAccount\?\.hostApproved/);
+  assert.match(hubUi, /resolvedPlayerAccount\?\.hostApproved/);
 });
 
 test("homepage does not advertise public Euchre discovery or invent an App Store URL", () => {

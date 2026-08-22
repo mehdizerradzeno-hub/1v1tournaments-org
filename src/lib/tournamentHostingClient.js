@@ -17,6 +17,7 @@ const SPONSOR_INQUIRIES_ENDPOINT = '/.netlify/functions/sponsor-inquiries';
 const SPONSOR_PROSPECTS_ENDPOINT = '/.netlify/functions/sponsor-prospects';
 const SPONSOR_COLLATERAL_ENDPOINT = '/.netlify/functions/sponsor-collateral';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
+const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
 
 function isLocalStaticPreview() {
   const hostname = globalThis.location?.hostname;
@@ -38,9 +39,33 @@ async function readJsonResponse(response) {
   try {
     return text ? JSON.parse(text) : {};
   } catch {
-    return { error: text || 'The server returned an unreadable response.' };
+    return { error: 'The server returned an unreadable response.' };
   }
 }
+
+async function fetchWithTimeout(input, init = {}) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller
+    ? globalThis.setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
+    : null;
+
+  try {
+    return await globalThis.fetch(input, {
+      ...init,
+      signal: controller?.signal || init.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The tournament service took too long to respond.');
+    }
+
+    throw error;
+  } finally {
+    if (timeoutId) globalThis.clearTimeout(timeoutId);
+  }
+}
+
+const fetch = fetchWithTimeout;
 
 function adminHeaders(token, headers = {}) {
   const nextHeaders = { ...headers };
@@ -481,8 +506,9 @@ export async function fetchTournamentMatch({ slug, matchId }) {
 
 export async function fetchTournamentPlayerStatus({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${PLAYER_STATUS_ENDPOINT}${query}`, {
-    credentials: 'include',
+  const endpoint = `${readEndpoint(PLAYER_STATUS_ENDPOINT)}${query}`;
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
   });
   const result = await readJsonResponse(response);
 

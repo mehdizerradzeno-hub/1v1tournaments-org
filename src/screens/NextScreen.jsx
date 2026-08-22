@@ -11,7 +11,6 @@ import {
 import {
   ActionButton,
   Badge,
-  BulletList,
   EmptyState,
   HubScreen,
   Surface,
@@ -20,7 +19,6 @@ import { formatDateLine } from "../lib/format.js";
 import { downloadLinks } from "../lib/downloadLinks.js";
 import {
   getCheckInPath,
-  getSponsorSoftware,
   getTournamentPath,
   getUpcomingTournaments,
   siteData,
@@ -48,6 +46,8 @@ import {
   fetchTournamentPlayerStatus,
   fetchTournamentSettings,
 } from "../lib/tournamentHostingClient.js";
+import { startVisibilityAwarePolling } from "../lib/visibilityPoller.js";
+import { useVisibleNow } from "../lib/useVisibleNow.js";
 
 const DEFAULT_ROSTER_CAP = 8;
 const NEXT_CHAT_COMMANDS = [
@@ -317,16 +317,18 @@ function getNextMatchLabel(bracket) {
   return match.teams?.join(" vs ") || "Players appear after seeding";
 }
 
-export default function NextScreen() {
+export default function NextScreen({ showDiscovery = false }) {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentsLoaded, setHostedTournamentsLoaded] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleRequestId, setScheduleRequestId] = useState(0);
   const [communityPlayerStatus, setCommunityPlayerStatus] = useState({
     data: null,
     error: "",
     loading: false,
   });
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const nowMs = useVisibleNow(1000);
   const publicTournaments = useMemo(
     () =>
       hostedTournamentsLoaded
@@ -417,17 +419,28 @@ export default function NextScreen() {
     let active = true;
 
     async function loadHostedTournaments() {
+      if (active) {
+        setHostedTournamentsLoaded(false);
+        setScheduleError("");
+      }
+
       try {
         const result = await fetchTournamentEvents();
 
         if (active) {
           setHostedTournaments(result.tournaments || []);
           setHostedTournamentsLoaded(true);
+          setScheduleError("");
         }
-      } catch {
+      } catch (error) {
         if (active) {
           setHostedTournaments([]);
           setHostedTournamentsLoaded(true);
+          setScheduleError(
+            error instanceof Error
+              ? error.message
+              : "The live tournament schedule could not be loaded.",
+          );
         }
       }
     }
@@ -437,7 +450,7 @@ export default function NextScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [scheduleRequestId]);
 
   useEffect(() => {
     if (!publicTournaments.length) {
@@ -504,27 +517,16 @@ export default function NextScreen() {
       refreshing = false;
     }
 
-    loadEventData();
-    const refreshTimer = setInterval(loadEventData, 15000);
+    const stopPolling = startVisibilityAwarePolling(loadEventData, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
   }, [publicTournaments, publicTournamentSlugs]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!communityTournament?.slug) {
+    if (!showDiscovery || !communityTournament?.slug) {
       return undefined;
     }
 
@@ -557,25 +559,24 @@ export default function NextScreen() {
       }
     }
 
-    loadCommunityPlayerStatus();
-    const refreshTimer = setInterval(loadCommunityPlayerStatus, 15000);
+    const stopPolling = startVisibilityAwarePolling(loadCommunityPlayerStatus, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
-  }, [communityTournament?.slug]);
+  }, [communityTournament?.slug, showDiscovery]);
 
   if (!hostedTournamentsLoaded) {
     return (
       <HubScreen
         accountHref="/account"
         actions={[{ label: "Home", href: "/" }]}
-        eyebrow="Next"
+        eyebrow={showDiscovery ? "Tournaments" : "Next"}
         lead="Loading the live tournament schedule."
         stickyActions={false}
         subtitle="Checking events"
-        title="Next tournament"
+        title={showDiscovery ? "Tournaments" : "Next tournament"}
       >
         <Surface style={styles.loadingLobby}>
           <Text style={styles.loadingLabel}>Checking schedule</Text>
@@ -591,6 +592,8 @@ export default function NextScreen() {
   }
 
   if (!tournament) {
+    const scheduleUnavailable = Boolean(scheduleError);
+
     return (
       <HubScreen
         accountHref="/account"
@@ -598,15 +601,24 @@ export default function NextScreen() {
           { label: "View leagues", href: "/leagues" },
           { label: "Past results", href: "/results", variant: "secondary" },
         ]}
-        eyebrow="Next"
-        lead="The next public event will appear here when it is scheduled."
+        eyebrow={showDiscovery ? "Tournaments" : "Next"}
+        lead={scheduleUnavailable
+          ? "The live schedule is temporarily unavailable."
+          : "The next public event will appear here when it is scheduled."}
         stickyActions={false}
-        subtitle="No upcoming tournament is published yet"
-        title="Next tournament"
+        subtitle={scheduleUnavailable
+          ? "The fallback schedule has no upcoming event"
+          : "No upcoming tournament is published yet"}
+        title={showDiscovery ? "Tournaments" : "Next tournament"}
       >
         <EmptyState
           action={(
             <View style={styles.emptyStateActions}>
+              {scheduleUnavailable ? (
+                <ActionButton onPress={() => setScheduleRequestId((current) => current + 1)}>
+                  Retry schedule
+                </ActionButton>
+              ) : null}
               {downloadLinks.discord ? (
                 <ActionButton external href={downloadLinks.discord}>Get event alerts</ActionButton>
               ) : null}
@@ -614,10 +626,12 @@ export default function NextScreen() {
               <ActionButton href="/results" variant="secondary">View past results</ActionButton>
             </View>
           )}
-          body="No public event is open right now. Explore league play or review completed events while the next bracket is prepared."
-          title="Next bracket coming soon"
+          body={scheduleUnavailable
+            ? `${scheduleError} Retry the live schedule or use league play and past results in the meantime.`
+            : "No public event is open right now. Explore league play or review completed events while the next bracket is prepared."}
+          title={scheduleUnavailable ? "Schedule temporarily unavailable" : "Next bracket coming soon"}
         />
-        <CommunityCupsSection tournament={null} />
+        {showDiscovery ? <CommunityCupsSection tournament={null} /> : null}
       </HubScreen>
     );
   }
@@ -637,7 +651,7 @@ export default function NextScreen() {
           : null,
         { label: "Rules", href: "/rules", variant: "ghost" },
       ].filter(Boolean)}
-      eyebrow="Next event"
+      eyebrow={showDiscovery ? "Tournaments" : "Next event"}
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
@@ -648,8 +662,26 @@ export default function NextScreen() {
         tournament.timeZoneLabel,
       )}
       stickyActions={false}
-      title={tournament.title}
+      title={showDiscovery ? "Tournaments" : tournament.title}
     >
+      {scheduleError ? (
+        <Surface style={styles.scheduleNotice}>
+          <View style={styles.scheduleNoticeCopy}>
+            <Text accessibilityRole="alert" style={styles.scheduleNoticeTitle}>
+              Live schedule refresh failed
+            </Text>
+            <Text style={styles.scheduleNoticeText}>
+              Showing the last safe fallback schedule. {scheduleError}
+            </Text>
+          </View>
+          <ActionButton
+            onPress={() => setScheduleRequestId((current) => current + 1)}
+            variant="secondary"
+          >
+            Retry
+          </ActionButton>
+        </Surface>
+      ) : null}
       <NextLobbyHero
         bracket={bracket}
         countdownParts={getCountdownParts(tournament, nowMs)}
@@ -665,13 +697,14 @@ export default function NextScreen() {
         tournamentPath={tournamentPath}
         statusTone={statusTone}
       />
-      <CommunityCupsSection
-        bracket={communityEventData.bracket || null}
-        playerStatus={communityPlayerStatus}
-        registrationMeta={communityRegistrationMeta}
-        tournament={communityTournament}
-      />
-      <SponsorSoftwareShowcase />
+      {showDiscovery ? (
+        <CommunityCupsSection
+          bracket={communityEventData.bracket || null}
+          playerStatus={communityPlayerStatus}
+          registrationMeta={communityRegistrationMeta}
+          tournament={communityTournament}
+        />
+      ) : null}
     </HubScreen>
   );
 }
@@ -752,10 +785,9 @@ function NextLobbyHero({
               {countdownParts.clockLabel}
             </Text>
           </View>
-          {isPhone ? (
-            <StreamQrGrid appStoreUrl={appStoreUrl} isPhone joinUrl={joinUrl} />
-          ) : null}
           <Text
+            accessibilityRole="heading"
+            aria-level={1}
             dataSet={getMotionDataSet("title")}
             style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}
           >
@@ -1193,62 +1225,6 @@ function PresentedBy({ sponsor }) {
   );
 }
 
-function SponsorSoftwareShowcase() {
-  const software = getSponsorSoftware();
-
-  if (!software) {
-    return null;
-  }
-
-  return (
-    <Surface style={styles.sponsorSoftwarePanel}>
-      <View style={styles.sponsorSoftwareGlow} pointerEvents="none" />
-      <View style={styles.sponsorSoftwareGrid}>
-        <View style={styles.sponsorSoftwareCopy}>
-          <Badge tone="accent">{software.eyebrow}</Badge>
-          <Text style={styles.sponsorSoftwareTitle}>{software.title}</Text>
-          <Text style={styles.sponsorSoftwareSummary}>{software.summary}</Text>
-          <BulletList compact items={software.highlights} tone="green" />
-        </View>
-        <View style={styles.sponsorSoftwareConsole}>
-          <Text style={styles.sponsorSoftwareConsoleLabel}>Sponsor stack</Text>
-          <View style={styles.sponsorSoftwareStats}>
-            {software.stats.map((stat) => (
-              <View key={stat.label} style={styles.sponsorSoftwareStat}>
-                <Text style={styles.sponsorSoftwareStatLabel}>
-                  {stat.label}
-                </Text>
-                <Text style={styles.sponsorSoftwareStatValue}>
-                  {stat.value}
-                </Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.sponsorSoftwareNote}>{software.note}</Text>
-          <View style={styles.sponsorSoftwareActions}>
-            {software.links
-              .filter((link) => !link.href.startsWith("/admin"))
-              .map((link, index) => (
-                <ActionButton
-                  key={link.href}
-                  href={
-                    link.href === "/sponsors"
-                      ? "/sponsors#sponsor-inquiry"
-                      : link.href
-                  }
-                  style={styles.sponsorSoftwareAction}
-                  variant={index === 0 ? "primary" : "secondary"}
-                >
-                  {link.href === "/sponsors" ? "Sponsor inquiry" : link.label}
-                </ActionButton>
-              ))}
-          </View>
-        </View>
-      </View>
-    </Surface>
-  );
-}
-
 function StatusRow({ label, value, emphasis = false }) {
   return (
     <View style={styles.statusRow}>
@@ -1264,6 +1240,29 @@ function StatusRow({ label, value, emphasis = false }) {
 }
 
 const styles = StyleSheet.create({
+  scheduleNotice: {
+    alignItems: "center",
+    borderColor: "rgba(214, 162, 78, 0.35)",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    justifyContent: "space-between",
+  },
+  scheduleNoticeCopy: {
+    flex: 1,
+    minWidth: 220,
+  },
+  scheduleNoticeText: {
+    color: "#A9A39A",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 4,
+  },
+  scheduleNoticeTitle: {
+    color: "#F4EFE6",
+    fontSize: 15,
+    fontWeight: "800",
+  },
   countdownCopy: {
     flex: 1.45,
     minWidth: 280,
@@ -1314,9 +1313,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: "clamp(3.8rem, 10.4vw, 7.85rem)",
-    textShadowColor: "rgba(214, 162, 78, 0.22)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadow: "0 0 18px rgba(214, 162, 78, 0.22)",
     whiteSpace: "nowrap",
     width: "100%",
   },
@@ -1332,9 +1329,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: "clamp(3rem, 8vw, 6rem)",
     minWidth: 0,
-    textShadowColor: "rgba(214, 162, 78, 0.22)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadow: "0 0 18px rgba(214, 162, 78, 0.22)",
     whiteSpace: "nowrap",
     width: "100%",
   },

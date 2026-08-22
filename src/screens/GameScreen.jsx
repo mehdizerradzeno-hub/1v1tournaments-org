@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -23,14 +24,43 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import { useLiveTournamentResult } from '../lib/liveResults.js';
+import { getActiveOrFutureTournaments, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
+import { fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
 
 export default function GameScreen({ gameSlug }) {
+  const [hostedTournaments, setHostedTournaments] = useState([]);
   const game = getGameBySlug(gameSlug);
-  const tournaments = game ? getTournamentsForGame(game.slug) : [];
+  const tournaments = useMemo(() => {
+    if (!game) {
+      return [];
+    }
+
+    return getActiveOrFutureTournaments(
+      getPublicTournamentCatalog(getTournamentsForGame(game.slug), hostedTournaments)
+        .filter((tournament) => tournament.gameSlug === game.slug),
+    );
+  }, [game, hostedTournaments]);
   const featuredTournament = game?.featuredTournamentSlug
     ? tournaments.find((tournament) => tournament.slug === game.featuredTournamentSlug) || null
-    : tournaments[0] || null;
-  const liveResult = useLiveTournamentResult(featuredTournament?.slug || '');
+    : null;
+  const currentTournament = featuredTournament || tournaments[0] || null;
+  const liveResult = useLiveTournamentResult(currentTournament?.slug || '');
+
+  useEffect(() => {
+    let active = true;
+
+    fetchTournamentEvents()
+      .then((result) => {
+        if (active) setHostedTournaments(result.tournaments || []);
+      })
+      .catch(() => {
+        if (active) setHostedTournaments([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!game) {
     return (
@@ -53,14 +83,14 @@ export default function GameScreen({ gameSlug }) {
     getResultsForGame(game.slug),
     liveResult?.gameSlug === game.slug ? liveResult : null,
   );
-  const featuredStreams = featuredTournament?.streamSlugs
-    ? featuredTournament.streamSlugs
+  const featuredStreams = currentTournament?.streamSlugs
+    ? currentTournament.streamSlugs
         .map((streamSlug) => getStreamBySlug(streamSlug))
         .filter(Boolean)
     : [];
   const upcomingTournaments = tournaments.filter((tournament) => tournament.status === 'upcoming');
-  const visibleUpcomingTournaments = featuredTournament
-    ? upcomingTournaments.filter((tournament) => tournament.slug !== featuredTournament.slug)
+  const visibleUpcomingTournaments = currentTournament
+    ? upcomingTournaments.filter((tournament) => tournament.slug !== currentTournament.slug)
     : upcomingTournaments;
   const isPrimaryGame = game.slug === siteData.site.primaryGameSlug;
 
@@ -71,9 +101,9 @@ export default function GameScreen({ gameSlug }) {
   ];
 
   const actions = [];
-  if (featuredTournament) {
-    actions.push({ label: 'Event', href: getTournamentPath(featuredTournament.slug) });
-    actions.push({ label: 'Join', href: getCheckInPath(featuredTournament.slug), variant: 'secondary' });
+  if (currentTournament) {
+    actions.push({ label: 'Event', href: getTournamentPath(currentTournament.slug) });
+    actions.push({ label: 'Join', href: getCheckInPath(currentTournament.slug), variant: 'secondary' });
   }
   actions.push({ label: 'Rules', href: '/rules', variant: 'secondary' });
   actions.push({ label: 'Results', href: '/results', variant: 'ghost' });
@@ -90,7 +120,7 @@ export default function GameScreen({ gameSlug }) {
           ? 'Launch game'
           : game.status === 'active'
             ? 'Currently featured'
-            : featuredTournament
+            : currentTournament
               ? 'Featured event available'
               : 'Coming soon'
       }
@@ -102,7 +132,7 @@ export default function GameScreen({ gameSlug }) {
         </Surface>
       </Section>
 
-      {featuredTournament ? (
+      {currentTournament ? (
         <Section
           description={
             isPrimaryGame
@@ -112,18 +142,18 @@ export default function GameScreen({ gameSlug }) {
           title={isPrimaryGame ? 'Launch coverage' : 'Featured event'}>
           <Surface style={styles.featuredCard}>
             <View style={styles.featuredHeader}>
-              <Text style={styles.featuredBadge}>{featuredTournament.badge}</Text>
-              <Text style={styles.featuredMeta}>{featuredTournament.format}</Text>
+              <Text style={styles.featuredBadge}>{currentTournament.badge}</Text>
+              <Text style={styles.featuredMeta}>{currentTournament.format}</Text>
             </View>
-            <Text style={styles.featuredTitle}>{featuredTournament.title}</Text>
+            <Text style={styles.featuredTitle}>{currentTournament.title}</Text>
             {game.shortPath ? <Text style={styles.featuredPath}>{game.shortPath}</Text> : null}
-            <Text style={styles.featuredLead}>{featuredTournament.detail}</Text>
-            <Text style={styles.featuredEntry}>{featuredTournament.entryLine}</Text>
-            {featuredTournament.callout ? <Text style={styles.featuredCallout}>{featuredTournament.callout}</Text> : null}
-            <BulletList items={featuredTournament.highlights} tone="accent" />
+            <Text style={styles.featuredLead}>{currentTournament.detail}</Text>
+            <Text style={styles.featuredEntry}>{currentTournament.entryLine}</Text>
+            {currentTournament.callout ? <Text style={styles.featuredCallout}>{currentTournament.callout}</Text> : null}
+            <BulletList items={currentTournament.highlights} tone="accent" />
             <View style={styles.featuredActions}>
-              <ActionButton href={getTournamentPath(featuredTournament.slug)}>Event</ActionButton>
-              <ActionButton href={getCheckInPath(featuredTournament.slug)} variant="secondary">
+              <ActionButton href={getTournamentPath(currentTournament.slug)}>Event</ActionButton>
+              <ActionButton href={getCheckInPath(currentTournament.slug)} variant="secondary">
                 Join
               </ActionButton>
               <ActionButton href="/stream" variant="secondary">

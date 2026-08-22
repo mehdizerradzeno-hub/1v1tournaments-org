@@ -21,6 +21,7 @@ export default function TournamentAccountScreen({ initialMode = 'signin' }) {
       prepareReturn={prepareTournamentAccountReturn}
       returnAfterSignOut
       signedOutManageFallback
+      useHubShell
     />
   );
 }

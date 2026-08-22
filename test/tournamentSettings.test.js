@@ -17,7 +17,7 @@ const tournament = {
   checkIn: {
     status: 'Registration open',
     preview: '30 min early',
-    window: 'Opens 30 minutes before the start time.',
+    window: 'Check-in opens 30 minutes before the start time.',
   },
   agenda: [],
 };

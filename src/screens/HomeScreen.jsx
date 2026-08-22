@@ -15,7 +15,6 @@ import {
   HubScreen,
   ResultCard,
   Section,
-  StreamCard,
   StatPill,
   Surface,
   EmptyState,
@@ -27,7 +26,6 @@ import {
   buildResultFromTournamentBracket,
   getGames,
   getResults,
-  getStreams,
   getCheckInPath,
   getTournamentPath,
   getUpcomingTournaments,
@@ -57,6 +55,7 @@ import {
   fetchTournamentEvents,
   fetchTournamentSettings,
 } from "../lib/tournamentHostingClient.js";
+import { useVisibleNow } from "../lib/useVisibleNow.js";
 
 const DEFAULT_ROSTER_CAP = 8;
 const DEFAULT_MINIMUM_PLAYERS = 2;
@@ -186,9 +185,8 @@ function openExternalUrl(href) {
 export default function HomeScreen() {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const nowMs = useVisibleNow(1000);
   const games = useMemo(() => getGames(), []);
-  const streams = useMemo(() => getStreams(), []);
   const upcoming = useMemo(
     () =>
       getPublicTournamentCatalog(
@@ -244,6 +242,10 @@ export default function HomeScreen() {
   );
   const results = mergeResults(getResults(), featuredResult);
   const featuredCountdown = getCountdownState(featuredTournament, nowMs);
+  const laterTournaments = visibleUpcoming.filter(
+    (tournament) => tournament.slug !== featuredTournament?.slug,
+  );
+  const homeUpcoming = laterTournaments.slice(0, 2);
 
   useEffect(() => {
     let active = true;
@@ -332,30 +334,17 @@ export default function HomeScreen() {
     };
   }, [upcoming, upcomingSlugs]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
-
   return (
     <HubScreen
       accountHref="/account"
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
-      forceTopNav
       lead="One account for competitive Spades and Euchre, tournament assignments, leagues, rankings, and results."
       showHero={false}
       subtitle="One account. Ranked competition. Tournaments."
       title={siteData.site.name}
     >
       <PlatformIntroHero />
-
-      <PremiumDownloadSection />
 
       <PremiumCountdownHero
         bracket={featuredBracket}
@@ -370,50 +359,28 @@ export default function HomeScreen() {
         tournamentPath={featuredTournamentPath}
       />
 
-      <TwitchTournamentBoard
-        bracket={featuredBracket}
-        matchStatusPath={featuredMatchStatusPath}
-        registrationMeta={featuredRegistrationMeta}
-        signupPath={featuredSignupPath}
-        signupSummary={featuredSignupSummary}
-        tournament={featuredTournament}
-        tournamentPath={featuredTournamentPath}
-      />
+      <PremiumDownloadSection />
 
-      <Section
-        action={
-          featuredTournament ? (
-            <ActionButton href={featuredTournamentPath}>
-              Open next event
+      {homeUpcoming.length ? (
+        <Section
+          action={
+            <ActionButton href="/tournaments" variant="secondary">
+              All tournaments
             </ActionButton>
-          ) : null
-        }
-        description="Live, tonight, and upcoming public tournaments appear here, soonest first."
-        nativeID="next-tournaments"
-        title="All upcoming tournaments"
-      >
-        <ScheduleSummaryBar
-          eventDataBySlug={eventDataBySlug}
-          nowMs={nowMs}
-          tournaments={visibleUpcoming}
-        />
-        <UpcomingTournamentList
-          featuredTournament={featuredTournament}
-          eventDataBySlug={eventDataBySlug}
-          gameLookup={gameLookup}
-          nowMs={nowMs}
-          tournaments={visibleUpcoming}
-        />
-      </Section>
-
-      <Section
-        description="Live table and replay links for current events."
-        title="Stream and YouTube links"
-      >
-        {streams.map((stream) => (
-          <StreamCard key={stream.slug} stream={stream} />
-        ))}
-      </Section>
+          }
+          description="Events after the featured tournament, listed soonest first."
+          nativeID="next-tournaments"
+          title="More upcoming tournaments"
+        >
+          <UpcomingTournamentList
+            featuredTournament={featuredTournament}
+            eventDataBySlug={eventDataBySlug}
+            gameLookup={gameLookup}
+            nowMs={nowMs}
+            tournaments={homeUpcoming}
+          />
+        </Section>
+      ) : null}
 
       <Section
         action={
@@ -443,12 +410,13 @@ export default function HomeScreen() {
 function PlatformIntroHero() {
   const { width } = useWindowDimensions();
   const compact = width > 0 && width < 700;
+  const tight = width > 0 && width < 440;
 
   return (
     <Surface
       style={[styles.platformHero, compact && styles.platformHeroCompact]}
     >
-      <View pointerEvents="none" style={styles.platformHeroBackdrop}>
+      <View style={styles.platformHeroBackdrop}>
         <Text style={styles.platformHeroSuit}>♠</Text>
         <Text style={[styles.platformHeroSuit, styles.platformHeroSuitRight]}>
           ♦
@@ -457,10 +425,12 @@ function PlatformIntroHero() {
       <View style={styles.platformHeroCopy}>
         <Badge tone="accent">SEASON 1 · LIVE</Badge>
         <Text
+          aria-level={1}
           accessibilityRole="header"
           style={[
             styles.platformHeroTitle,
             compact && styles.platformHeroTitleCompact,
+            tight && styles.platformHeroTitleTight,
           ]}
         >
           COMPETE IN 1V1
@@ -551,7 +521,7 @@ function PremiumCountdownHero({
 
   return (
     <Surface style={[styles.premiumHero, isTight && styles.premiumHeroTight]}>
-      <View pointerEvents="none" style={styles.premiumHeroBackdrop}>
+      <View style={styles.premiumHeroBackdrop}>
         <Text style={[styles.heroSpade, styles.heroSpadeLeft]}>♠</Text>
         <Text style={[styles.heroSpade, styles.heroSpadeRight]}>♠</Text>
         <View style={styles.heroGoldGlow} />
@@ -575,6 +545,7 @@ function PremiumCountdownHero({
 
       <View style={styles.premiumHeroCopy}>
         <Text
+          aria-level={2}
           accessibilityRole="header"
           style={[
             styles.premiumHeroTitle,
@@ -737,210 +708,17 @@ function PremiumDownloadSection() {
   ];
 
   return (
-    <>
-      <Section
-        description={PLATFORM_SUBMISSION_STATEMENT}
-        eyebrow="The games"
-        nativeID="downloads"
-        title="Choose your table"
-      >
-        <View style={styles.downloadGamesGrid}>
-          {games.map((game) => (
-            <PremiumGameDownloadCard key={game.key} game={game} />
-          ))}
-        </View>
-      </Section>
-
-      <Section
-        description="The tournament hub owns signup, event rules, brackets, and public event pages."
-        eyebrow="Tournament hub"
-        title="Run the bracket from 1v1Tournaments.org"
-      >
-        <View style={styles.tournamentDownloadGrid}>
-          <PremiumLinkPanel
-            body="Open the public hub for account signup, brackets, event pages, and results."
-            href={downloadLinks.tournaments}
-            label="Visit 1v1Tournaments.org"
-            tone="accent"
-          />
-          <PremiumLinkPanel
-            body="Jump to the next posted tournament and check the current schedule."
-            href={`${downloadLinks.tournaments}/#next-tournaments`}
-            label="Upcoming Events"
-            tone="green"
-          />
-          <PremiumLinkPanel
-            body="Review free-entry event rules, match flow, and platform notes."
-            href={`${downloadLinks.tournaments}/rules`}
-            label="Tournament Rules"
-            tone="blue"
-          />
-        </View>
-      </Section>
-    </>
-  );
-}
-
-function TwitchTournamentBoard({
-  bracket,
-  matchStatusPath,
-  registrationMeta,
-  signupPath,
-  signupSummary,
-  tournament,
-  tournamentPath,
-}) {
-  if (!tournament) {
-    return null;
-  }
-
-  const signups = signupSummary.signups || [];
-  const cap = getRosterCap(tournament);
-  const openSeats = Math.max(
-    cap - (signupSummary.count || signups.length || 0),
-    0,
-  );
-  const signupLoading = Boolean(signupSummary.loading);
-  const signupUnavailable = Boolean(signupSummary.unavailable);
-  const bracketLive = Boolean(bracket);
-  const competitionStatus = getCompetitionLifecycleLabel({
-    status: tournament?.status,
-    hasBracket: bracketLive,
-  });
-  const statusTone =
-    competitionStatus === "LIVE"
-      ? "green"
-      : competitionStatus === "COMPLETE"
-        ? "rose"
-        : "blue";
-  const primaryAction = getFeaturedCompetitionAction({
-    status: tournament?.status,
-    registrationStatus: registrationMeta?.value,
-    hasBracket: bracketLive,
-    tournamentPath,
-    signupPath,
-    matchPath: matchStatusPath,
-    resultsPath: "/results",
-  });
-
-  return (
     <Section
-      description="Built for stream viewers: the next event, signup count, and public roster are visible without opening admin tools."
-      eyebrow="Twitch ready"
-      nativeID="twitch-board"
-      title="Next tournament"
+      description={PLATFORM_SUBMISSION_STATEMENT}
+      eyebrow="The games"
+      nativeID="downloads"
+      title="Choose your table"
     >
-      <Surface style={styles.twitchBoard}>
-        <View pointerEvents="none" style={styles.twitchBoardGlow} />
-        <View style={styles.twitchBoardMain}>
-          <View style={styles.twitchEventCopy}>
-            <View style={styles.twitchTopRow}>
-              <Badge tone={statusTone}>{competitionStatus}</Badge>
-              <Text style={styles.twitchLiveTag}>Stream overlay friendly</Text>
-            </View>
-            <Text style={styles.twitchTitle}>{tournament.title}</Text>
-            <Text style={styles.twitchDate}>
-              {formatDateLine(
-                tournament.date,
-                tournament.timeZone,
-                tournament.timeZoneLabel,
-              )}
-            </Text>
-            <Text style={styles.twitchSummary}>
-              {tournament.format} • {tournament.location} •{" "}
-              {tournament.entryLine}
-            </Text>
-            <View style={styles.twitchActions}>
-              <ActionButton href={primaryAction.href}>
-                {primaryAction.label}
-              </ActionButton>
-              <ActionButton href={matchStatusPath} variant="secondary">
-                Check Match Status
-              </ActionButton>
-              <ActionButton href="/stream" variant="secondary">
-                Watch
-              </ActionButton>
-              {isConfiguredUrl(downloadLinks.twitch) ? (
-                <ActionButton
-                  external
-                  href={downloadLinks.twitch}
-                  variant="secondary"
-                >
-                  Twitch
-                </ActionButton>
-              ) : null}
-            </View>
-          </View>
-
-          <View style={styles.twitchScoreStack}>
-            <View style={styles.twitchScoreTile}>
-              <Text style={styles.twitchScoreLabel}>Players</Text>
-              <Text style={styles.twitchScoreValue}>
-                {signupLoading
-                  ? "--"
-                  : signupSummary.count || signups.length || 0}
-                <Text style={styles.twitchScoreSub}> / {cap}</Text>
-              </Text>
-            </View>
-            <View style={styles.twitchScoreTile}>
-              <Text style={styles.twitchScoreLabel}>Seats Open</Text>
-              <Text style={styles.twitchScoreValue}>
-                {signupLoading ? "--" : openSeats}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.twitchRosterPanel}>
-          <View style={styles.twitchRosterHeader}>
-            <Text style={styles.twitchRosterTitle}>Competitor Roster</Text>
-            <Text style={styles.twitchRosterMeta}>
-              {signupUnavailable
-                ? "Live roster unavailable"
-                : signupLoading
-                  ? "Loading players"
-                  : `${signups.length} visible`}
-            </Text>
-          </View>
-          {signupLoading ? (
-            <Text style={styles.twitchRosterEmpty}>
-              Loading registered players...
-            </Text>
-          ) : signups.length ? (
-            <View style={styles.twitchRosterGrid}>
-              {signups.slice(0, 12).map((signup, index) => (
-                <View
-                  key={signup.id || `${signup.playerName}-${index}`}
-                  style={styles.twitchRosterRow}
-                >
-                  <View style={styles.twitchRosterRank}>
-                    <Text style={styles.twitchRosterRankText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.twitchRosterNameBlock}>
-                    <Text numberOfLines={1} style={styles.twitchRosterName}>
-                      {signup.playerName || "Unnamed player"}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.twitchRosterHandle}>
-                      {signup.playerHandle || signup.status || "registered"}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-              {signups.length > 12 ? (
-                <View style={styles.twitchRosterMore}>
-                  <Text style={styles.twitchRosterMoreText}>
-                    +{signups.length - 12} more players
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <Text style={styles.twitchRosterEmpty}>
-              No competitors registered yet.
-            </Text>
-          )}
-        </View>
-      </Surface>
+      <View style={styles.downloadGamesGrid}>
+        {games.map((game) => (
+          <PremiumGameDownloadCard key={game.key} game={game} />
+        ))}
+      </View>
     </Section>
   );
 }
@@ -1059,78 +837,6 @@ function PremiumLinkButton({ href, label, gameAudience = "" }) {
       {launchError ? (
         <Text style={styles.gameLaunchError}>{launchError}</Text>
       ) : null}
-    </View>
-  );
-}
-
-function PremiumLinkPanel({ body, href, label, tone }) {
-  const enabled = isConfiguredUrl(href);
-
-  return (
-    <Pressable
-      accessibilityLabel={
-        enabled ? label : `${label} link is not configured yet`
-      }
-      accessibilityRole={enabled ? "link" : "button"}
-      disabled={!enabled}
-      onPress={() => openExternalUrl(href)}
-      style={({ hovered, pressed }) => [
-        styles.tournamentLinkPanel,
-        styles[`tournamentLinkPanel${tone[0].toUpperCase()}${tone.slice(1)}`],
-        hovered && enabled && styles.downloadHover,
-        pressed && enabled && styles.downloadPressed,
-      ]}
-    >
-      <Text style={styles.tournamentLinkLabel}>{label}</Text>
-      <Text style={styles.tournamentLinkBody}>{body}</Text>
-    </Pressable>
-  );
-}
-
-function ScheduleSummaryBar({ eventDataBySlug, nowMs, tournaments }) {
-  const openCount = tournaments.filter((tournament) => {
-    const data = eventDataBySlug[tournament.slug] || {};
-    const meta = getEffectiveRegistrationStatus(tournament, {
-      hasLiveBracket: Boolean(data.bracket),
-    });
-
-    return meta.value === "open";
-  }).length;
-  const liveBracketCount = tournaments.filter(
-    (tournament) => eventDataBySlug[tournament.slug]?.bracket,
-  ).length;
-  const tonightCount = tournaments.filter((tournament) =>
-    isTournamentToday(tournament, nowMs),
-  ).length;
-
-  return (
-    <View style={styles.scheduleSummaryGrid}>
-      <View
-        style={[styles.scheduleSummaryTile, styles.scheduleSummaryTileAccent]}
-      >
-        <Text style={styles.scheduleSummaryLabel}>Next event</Text>
-        <Text style={styles.scheduleSummaryValue}>
-          {tournaments[0]
-            ? formatShortDate(tournaments[0].date, tournaments[0].timeZone)
-            : "TBD"}
-        </Text>
-      </View>
-      <View style={styles.scheduleSummaryTile}>
-        <Text style={styles.scheduleSummaryLabel}>Tonight</Text>
-        <Text style={styles.scheduleSummaryValue}>{tonightCount}</Text>
-      </View>
-      <View style={styles.scheduleSummaryTile}>
-        <Text style={styles.scheduleSummaryLabel}>Open signups</Text>
-        <Text style={styles.scheduleSummaryValue}>{openCount}</Text>
-      </View>
-      <View style={styles.scheduleSummaryTile}>
-        <Text style={styles.scheduleSummaryLabel}>Live brackets</Text>
-        <Text style={styles.scheduleSummaryValue}>{liveBracketCount}</Text>
-      </View>
-      <View style={styles.scheduleSummaryTile}>
-        <Text style={styles.scheduleSummaryLabel}>Upcoming</Text>
-        <Text style={styles.scheduleSummaryValue}>{tournaments.length}</Text>
-      </View>
     </View>
   );
 }
@@ -1824,10 +1530,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 20,
-    shadowColor: "#D6A24E",
-    shadowOpacity: 0.18,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 18 },
+    boxShadow: "0 18px 30px rgba(214, 162, 78, 0.18)",
   },
   premiumHeroTight: {
     paddingHorizontal: 12,
@@ -1836,6 +1539,7 @@ const styles = StyleSheet.create({
   premiumHeroBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
+    pointerEvents: "none",
   },
   heroSpade: {
     color: "#F4EFE6",
@@ -1906,9 +1610,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 48,
     textAlign: "center",
-    textShadowColor: "rgba(0, 0, 0, 0.7)",
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 14,
+    textShadow: "0 4px 14px rgba(0, 0, 0, 0.7)",
   },
   premiumHeroTitleCompact: {
     fontSize: 32,
@@ -1942,10 +1644,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 16,
     backgroundColor: "rgba(0, 0, 0, 0.18)",
-    shadowColor: "#D6A24E",
-    shadowOpacity: 0.26,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
+    boxShadow: "0 8px 24px rgba(214, 162, 78, 0.26)",
   },
   countdownFrameTight: {
     borderRadius: 18,
@@ -2016,9 +1715,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 62,
     textAlign: "center",
-    textShadowColor: "rgba(214, 162, 78, 0.92)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadow: "0 0 18px rgba(214, 162, 78, 0.92)",
   },
   countdownValueCompact: {
     fontSize: 42,
@@ -2348,6 +2045,7 @@ const styles = StyleSheet.create({
     left: 0,
     opacity: 0.12,
     position: "absolute",
+    pointerEvents: "none",
     right: 0,
     top: 0,
   },
@@ -2383,6 +2081,10 @@ const styles = StyleSheet.create({
     fontSize: 44,
     letterSpacing: -1,
     lineHeight: 49,
+  },
+  platformHeroTitleTight: {
+    fontSize: 38,
+    lineHeight: 43,
   },
   platformHeroLead: {
     color: "#F4EFE6",

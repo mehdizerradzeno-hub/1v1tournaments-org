@@ -11,6 +11,7 @@ import {
 import { buildBroadcastBracketModel, formatBroadcastDate } from '../lib/broadcastBracketPresentation';
 import { fetchTournamentBracket, fetchTournamentEvents } from '../lib/tournamentHostingClient';
 import { useHydrated } from '../lib/useHydrated';
+import { startVisibilityAwarePolling } from '../lib/visibilityPoller';
 
 const COLORS = {
   black: '#050505',
@@ -192,11 +193,10 @@ export default function BroadcastBracketScreen({ tournamentSlug = '' }) {
       }
     };
 
-    load();
-    const interval = setInterval(load, 15_000);
+    const stopPolling = startVisibilityAwarePolling(load, 15_000);
     return () => {
       active = false;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [tournamentSlug]);
 

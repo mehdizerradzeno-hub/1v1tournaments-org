@@ -1,13 +1,16 @@
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
   ActionButton,
   Badge,
+  CompetitionFilterTabs,
   EmptyState,
   HubScreen,
   PlayerRouteStrip,
   ResultCard,
   Section,
+  StatPill,
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatResultDate } from '../lib/format.js';
@@ -17,6 +20,25 @@ import { useMergedLiveResults } from '../lib/liveResults.js';
 export default function ResultsScreen() {
   const games = getGames();
   const results = useMergedLiveResults(getResults());
+  const [activeGame, setActiveGame] = useState('all');
+  const filteredResults = useMemo(
+    () => activeGame === 'all'
+      ? results
+      : results.filter((result) => result.gameSlug === activeGame),
+    [activeGame, results],
+  );
+  const activeGameLabel = activeGame === 'all'
+    ? 'All games'
+    : games.find((game) => game.slug === activeGame)?.name || 'Game';
+  const championCount = new Set(filteredResults.map((result) => result.winner).filter(Boolean)).size;
+  const filterItems = [
+    { id: 'all', label: 'All games', count: results.length },
+    ...games.map((game) => ({
+      id: game.slug,
+      label: game.name,
+      count: results.filter((result) => result.gameSlug === game.slug).length,
+    })),
+  ];
   const latestTournamentPath = results[0]?.tournamentSlug
     ? getTournamentPath(results[0].tournamentSlug)
     : '/next';
@@ -38,21 +60,48 @@ export default function ResultsScreen() {
         body="Results are the archive. If you are here before or during an event, go straight to the next tournament, your match, or the live table."
       />
 
+      <CompetitionFilterTabs
+        activeId={activeGame}
+        items={filterItems}
+        label="Filter tournament results by game"
+        onSelect={setActiveGame}
+      />
+
+      <Surface
+        accessibilityRole="tabpanel"
+        aria-labelledby={`competition-filter-${activeGame}`}
+        nativeID="competition-filter-panel"
+        style={styles.summaryCard}>
+        <View style={styles.summaryCopy}>
+          <Text style={styles.summaryEyebrow}>{activeGameLabel}</Text>
+          <Text style={styles.summaryTitle}>Permanent competition record</Text>
+          <Text style={styles.summaryBody}>Final placements stay attached to their event page and ranking history.</Text>
+        </View>
+        <View style={styles.summaryStats}>
+          <StatPill label="Events" value={String(filteredResults.length)} tone="accent" />
+          <StatPill label="Champions" value={String(championCount)} tone="green" />
+          <StatPill label="Latest" value={filteredResults[0] ? formatResultDate(filteredResults[0].date) : 'Pending'} tone="blue" />
+        </View>
+      </Surface>
+
       <Section
         action={<ActionButton href={latestTournamentPath}>Open latest tournament</ActionButton>}
         description="Completed finals, placements, and posting notes appear here in newest-first order."
         nativeID="recent-results"
         title="Recent results">
-        {results.map((result) => (
+        {filteredResults.map((result) => (
           <View key={result.slug} style={styles.block}>
-            <ResultCard result={result} />
+            <ResultCard
+              href={result.tournamentSlug ? getTournamentPath(result.tournamentSlug) : undefined}
+              result={result}
+            />
           </View>
         ))}
-        {!results.length ? (
+        {!filteredResults.length ? (
           <EmptyState
-            action={<ActionButton href="/spades">View Spades</ActionButton>}
-            body="Completed events will appear here after winners are posted."
-            title="No results recorded yet"
+            action={<ActionButton href="/next">Open next tournament</ActionButton>}
+            body={`${activeGameLabel} results will appear here after a bracket closes and the final is recorded.`}
+            title={`No ${activeGameLabel.toLowerCase()} results yet`}
           />
         ) : null}
       </Section>
@@ -128,6 +177,42 @@ function GameArchiveCard({ game, latestResult, resultCount }) {
 }
 
 const styles = StyleSheet.create({
+  summaryCard: {
+    alignItems: 'center',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+    marginBottom: 22,
+  },
+  summaryCopy: {
+    flex: 1,
+    minWidth: 230,
+  },
+  summaryEyebrow: {
+    color: '#D6A24E',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  summaryTitle: {
+    color: '#F4EFE6',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
+    marginTop: 5,
+  },
+  summaryBody: {
+    color: '#A7A29A',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 5,
+  },
+  summaryStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
   block: {
     marginBottom: 14,
   },

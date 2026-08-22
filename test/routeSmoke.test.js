@@ -182,6 +182,9 @@ test('public support pages keep players routed back to active tournament flow', 
 
   assert.match(hubUiSource, /PlayerRouteStrip/);
   assert.match(hubUiSource, /getNextNavTournamentSlug/);
+  assert.match(hubUiSource, /expo-router\/head/);
+  assert.match(hubUiSource, /rel="canonical"/);
+  assert.match(hubUiSource, /property="og:title"/);
   assert.match(hubUiSource, /My Match/);
   assert.match(hubUiSource, /Player path/);
   assert.match(resultsScreenSource, /PlayerRouteStrip/);
@@ -207,6 +210,8 @@ test('/next stays wired to the public next-event lobby', () => {
 
   assert.match(nextRouteSource, /TournamentLandingRoute/);
   assert.match(tournamentLandingRouteSource, /NextScreen/);
+  assert.match(tournamentLandingRouteSource, /showDiscovery=\{pathname === '\/tournaments'\}/);
+  assert.match(nextScreenSource, /showDiscovery = false/);
   assert.doesNotMatch(nextRouteSource, /Redirect/);
   assert.match(nextScreenSource, /Tournament status/);
   assert.match(nextScreenSource, /heroVariant="compact"/);
@@ -216,9 +221,9 @@ test('/next stays wired to the public next-event lobby', () => {
   assert.match(nextScreenSource, /Twitch commands/);
   assert.match(nextScreenSource, /Scan to join/);
   assert.match(nextScreenSource, /NEXT_CHAT_COMMANDS/);
-  assert.match(nextScreenSource, /setInterval\(loadEventData, 15000\)/);
-  assert.match(nextScreenSource, /SponsorSoftwareShowcase/);
-  assert.match(nextScreenSource, /getSponsorSoftware/);
+  assert.match(nextScreenSource, /startVisibilityAwarePolling\(loadEventData, 15000\)/);
+  assert.doesNotMatch(nextScreenSource, /SponsorSoftwareShowcase/);
+  assert.doesNotMatch(nextScreenSource, /getSponsorSoftware/);
   assert.doesNotMatch(netlifyConfigSource, /from = "\/next"[\s\S]*status = 302/);
 });
 
@@ -230,6 +235,7 @@ test('/tournaments stays wired to the public tournament hub instead of the unmat
 
   assert.match(tournamentsIndexRouteSource, /TournamentLandingRoute/);
   assert.match(tournamentLandingRouteSource, /NextScreen/);
+  assert.match(tournamentLandingRouteSource, /pathname === '\/tournaments'/);
   assert.doesNotMatch(tournamentsIndexRouteSource, /Redirect/);
 });
 
@@ -293,7 +299,7 @@ test('/live stays wired to stream-day command tools', () => {
   assert.match(liveScreenSource, /fetchTournamentEvents/);
   assert.match(liveScreenSource, /getPublicTournamentCatalog/);
   assert.match(liveScreenSource, /getNextPublicTournament/);
-  assert.match(liveScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
+  assert.match(liveScreenSource, /startVisibilityAwarePolling\(loadHostedTournaments, 15000\)/);
   assert.match(liveScreenSource, /Event announcements stay disabled/);
   assert.match(liveScreenSource, /Render bot online/);
   assert.match(liveScreenSource, /Last heartbeat/);
@@ -336,8 +342,8 @@ test('/stream waits for and refreshes the hosted tournament feed', () => {
   assert.match(streamModeScreenSource, /getPublicTournamentFeedStatus/);
   assert.match(streamModeScreenSource, /Loading tournament schedule/);
   assert.match(streamModeScreenSource, /Tournament schedule unavailable/);
-  assert.match(streamModeScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
-  assert.match(streamModeScreenSource, /setInterval\(loadEventData, 15000\)/);
+  assert.match(streamModeScreenSource, /startVisibilityAwarePolling\(loadHostedTournaments, 15000\)/);
+  assert.match(streamModeScreenSource, /startVisibilityAwarePolling\(loadEventData, 15000\)/);
 });
 
 test('overlay routes stay wired to OBS browser sources', () => {
@@ -357,8 +363,8 @@ test('overlay routes stay wired to OBS browser sources', () => {
   assert.match(compactRouteSource, /variant="compact"/);
   assert.match(overlayScreenSource, /getPublicTournamentCatalog/);
   assert.match(overlayScreenSource, /getPublicTournamentFeedStatus/);
-  assert.match(overlayScreenSource, /setInterval\(loadHostedTournaments, 15000\)/);
-  assert.match(overlayScreenSource, /setInterval\(loadEventData, 15000\)/);
+  assert.match(overlayScreenSource, /startVisibilityAwarePolling\(loadHostedTournaments, 15000\)/);
+  assert.match(overlayScreenSource, /startVisibilityAwarePolling\(loadEventData, 15000\)/);
   assert.match(overlayScreenSource, /getOverlayStatusLabel/);
   assert.match(broadcastBracketScreenSource, /LIVE DATA \/ 15S REFRESH/);
   assert.match(broadcastBracketScreenSource, /mobileRoundTabs/);
@@ -557,7 +563,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
     '/next must keep the countdown panel above supporting event badges',
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
-  assert.match(leaderboardScreenSource, /Overall standings/);
+  assert.match(leaderboardScreenSource, /CompetitionFilterTabs/);
+  assert.match(leaderboardScreenSource, /Tournament ranking snapshot/);
   assert.match(nextScreenSource, /Check Match Status/);
   assert.doesNotMatch(nextScreenSource, /Host Admin/);
   assert.match(nextScreenSource, /1V1 Community Cups/);

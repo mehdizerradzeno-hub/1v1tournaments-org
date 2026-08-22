@@ -23,7 +23,6 @@ import {
   getGameBySlug,
   getGamePath,
   getCheckInPath,
-  getSponsorSoftware,
   getResultByTournamentSlug,
   getResultsForGame,
   getStreamBySlug,
@@ -42,6 +41,9 @@ import {
   issueTournamentMatchTicket,
 } from '../lib/tournamentHostingClient.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
+import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
+import { useVisibleNow } from '../lib/useVisibleNow.js';
+import { startVisibilityAwarePolling } from '../lib/visibilityPoller.js';
 
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
@@ -478,7 +480,7 @@ export default function TournamentScreen({ slug }) {
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const [hostedTournament, setHostedTournament] = useState(null);
   const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '' });
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const nowMs = useVisibleNow(15000);
   const seededTournament = getTournamentBySlug(slug);
   const tournament = useMemo(
     () => (hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament),
@@ -548,8 +550,6 @@ export default function TournamentScreen({ slug }) {
       }
     }
 
-    loadBracket();
-
     async function loadSignupSummary({ silent = false } = {}) {
       if (!silent) {
         setSignupSummary((current) => ({ ...current, loading: true, error: '' }));
@@ -580,8 +580,6 @@ export default function TournamentScreen({ slug }) {
       }
     }
 
-    loadSignupSummary();
-
     async function loadPlayerStatus({ silent = false } = {}) {
       if (!silent) {
         setPlayerStatus((current) => ({ ...current, loading: true, error: '' }));
@@ -604,28 +602,22 @@ export default function TournamentScreen({ slug }) {
       }
     }
 
-    loadPlayerStatus();
-    const refreshTimer = setInterval(() => {
-      loadBracket({ silent: true });
-      loadSignupSummary({ silent: true });
-      loadPlayerStatus({ silent: true });
+    let firstRefresh = true;
+    const stopPolling = startVisibilityAwarePolling(() => {
+      const silent = !firstRefresh;
+      firstRefresh = false;
+      return Promise.all([
+        loadBracket({ silent }),
+        loadSignupSummary({ silent }),
+        loadPlayerStatus({ silent }),
+      ]);
     }, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
   }, [slug, seededTournament]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 15000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
 
   useEffect(() => {
     function syncTabToHash() {
@@ -816,8 +808,6 @@ export default function TournamentScreen({ slug }) {
         result={result}
         signupSummary={signupSummary}
       />
-
-      <SponsorSoftwareStrip />
 
       {activeTab === 'play' ? (
         <View
@@ -1130,7 +1120,16 @@ export default function TournamentScreen({ slug }) {
             primary={{ label: 'Results archive', href: '/results' }}
             secondary={{ label: 'Bracket', href: `${tournamentPath}#live-bracket` }}
             stats={[
-              { label: 'Event', value: isBracketComplete ? 'Complete' : 'In progress' },
+              {
+                label: 'Event',
+                value: isBracketComplete
+                  ? 'Complete'
+                  : isBracketLive
+                    ? 'Live'
+                    : registrationMeta.value === 'open'
+                      ? 'Upcoming'
+                      : registrationMeta.label,
+              },
               { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} players` : 'Pending' },
               { label: 'Record', value: result ? 'Published' : 'Awaiting final' },
             ]}
@@ -1153,30 +1152,6 @@ export default function TournamentScreen({ slug }) {
         </View>
       ) : null}
     </HubScreen>
-  );
-}
-
-function SponsorSoftwareStrip() {
-  const software = getSponsorSoftware();
-
-  if (!software) {
-    return null;
-  }
-
-  return (
-    <Surface style={styles.sponsorSoftwareStrip}>
-      <View style={styles.sponsorSoftwareCopy}>
-        <Badge tone="accent">League sponsorship</Badge>
-        <Text style={styles.sponsorSoftwareTitle}>Sponsor the Raleigh 1v1 Spades League</Text>
-        <Text style={styles.sponsorSoftwareBody}>
-          {software.summary} Approved partners can appear around event pages, stream nights, and results while tournaments remain free-entry with no wagering or buy-ins.
-        </Text>
-      </View>
-      <View style={styles.sponsorSoftwareActions}>
-        <ActionButton href="/sponsors#sponsor-inquiry">Sponsor inquiry</ActionButton>
-        <ActionButton href="/media-kit" variant="secondary">Media kit</ActionButton>
-      </View>
-    </Surface>
   );
 }
 
@@ -1262,6 +1237,10 @@ function TournamentEventConsole({
 }
 
 function TournamentTabs({ activeTab, onSelectTab }) {
+  const { width } = useWindowDimensions();
+  const compact = width > 0 && width < 520;
+  const tabIds = TOURNAMENT_TABS.map((tab) => tab.id);
+
   return (
     <View accessibilityRole="tablist" style={styles.tournamentTabBar}>
       {TOURNAMENT_TABS.map((tab) => {
@@ -1276,6 +1255,12 @@ function TournamentTabs({ activeTab, onSelectTab }) {
             accessibilityState={{ selected }}
             key={tab.id}
             nativeID={`tournament-tab-${tab.id}`}
+            onKeyDown={(event) => handleTabKeyNavigation(event, {
+              activeId: activeTab,
+              idPrefix: 'tournament-tab-',
+              onSelect: onSelectTab,
+              tabIds,
+            })}
             onPress={() => onSelectTab(tab.id)}
             style={({ pressed }) => [
               styles.tournamentTabButton,
@@ -1283,7 +1268,7 @@ function TournamentTabs({ activeTab, onSelectTab }) {
               pressed && styles.tournamentTabButtonPressed,
             ]}>
             <Text style={[styles.tournamentTabLabel, selected && styles.tournamentTabLabelSelected]}>
-              {tab.label}
+              {compact && tab.id === 'info' ? 'Details' : tab.label}
             </Text>
           </Pressable>
         );
@@ -1437,7 +1422,9 @@ function TournamentLobbyHero({
           <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>
             {isComplete ? championName || 'Results posted' : countdownLabel}
           </Text>
-          <Text style={styles.lobbyTitle}>{isComplete ? 'Tournament Complete' : isBracketLive ? 'Tournament Live' : tournament.name || 'Tournament Lobby'}</Text>
+          <Text accessibilityRole="heading" aria-level={1} style={styles.lobbyTitle}>
+            {isComplete ? 'Tournament Complete' : isBracketLive ? 'Tournament Live' : tournament.name || 'Tournament Lobby'}
+          </Text>
           <Text style={styles.lobbySummary}>
             {isComplete
               ? result?.summary || 'Final results are posted for this tournament.'
@@ -3280,9 +3267,7 @@ const styles = StyleSheet.create({
   statusSpotlightReady: {
     backgroundColor: 'rgba(20, 45, 32, 0.96)',
     borderColor: 'rgba(77, 217, 133, 0.58)',
-    shadowColor: '#4DD985',
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    boxShadow: '0 0 24px rgba(77, 217, 133, 0.18)',
   },
   statusSpotlightTopRow: {
     alignItems: 'stretch',

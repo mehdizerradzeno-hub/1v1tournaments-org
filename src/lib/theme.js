@@ -47,17 +47,11 @@ export const theme = {
   },
   shadow: {
     card: {
-      shadowColor: '#000',
-      shadowOpacity: 0.28,
-      shadowRadius: 24,
-      shadowOffset: { width: 0, height: 12 },
+      boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
       elevation: 8,
     },
     premium: {
-      shadowColor: '#D6A24E',
-      shadowOpacity: 0.14,
-      shadowRadius: 30,
-      shadowOffset: { width: 0, height: 16 },
+      boxShadow: '0 16px 30px rgba(214, 162, 78, 0.14)',
       elevation: 10,
     },
   },

@@ -25,6 +25,7 @@ import {
   fetchTournamentEvents,
   sendDiscordAlert,
 } from '../lib/tournamentHostingClient.js';
+import { startVisibilityAwarePolling } from '../lib/visibilityPoller.js';
 
 function isConfiguredUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -236,12 +237,11 @@ export default function LiveScreen() {
       }
     }
 
-    loadHostedTournaments();
-    const refreshTimer = setInterval(loadHostedTournaments, 15000);
+    const stopPolling = startVisibilityAwarePolling(loadHostedTournaments, 15000);
 
     return () => {
       active = false;
-      clearInterval(refreshTimer);
+      stopPolling();
     };
   }, []);
 
@@ -315,12 +315,11 @@ export default function LiveScreen() {
       }
     }
 
-    loadRuntimeHealth();
-    const timer = setInterval(loadRuntimeHealth, 30_000);
+    const stopPolling = startVisibilityAwarePolling(loadRuntimeHealth, 30_000);
 
     return () => {
       active = false;
-      clearInterval(timer);
+      stopPolling();
     };
   }, []);
 

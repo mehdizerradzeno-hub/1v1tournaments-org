@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { ActionButton, Badge, Surface } from '../components/hub-ui.jsx';
+import { ActionButton, Badge, HubScreen, Surface } from '../components/hub-ui.jsx';
 import {
   createPlayerAccount,
   deletePlayerAccount,
@@ -32,14 +33,42 @@ import {
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
 
-function inputProps(setValue) {
+function inputProps(setValue, {
+  autoComplete = 'off',
+  label,
+  name,
+  textContentType = 'none',
+} = {}) {
   return {
+    accessibilityLabel: label,
     autoCapitalize: 'none',
+    autoComplete,
     autoCorrect: false,
+    nativeID: name ? `account-${name}` : undefined,
     onChangeText: setValue,
     placeholderTextColor: '#6B766F',
     style: styles.input,
+    textContentType,
+    ...(Platform.OS === 'web' && name ? { name } : {}),
   };
+}
+
+function AccountForm({ children, onSubmit }) {
+  if (Platform.OS === 'web') {
+    return createElement('form', {
+      onSubmit: (event) => {
+        event.preventDefault();
+        onSubmit?.();
+      },
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      },
+    }, children);
+  }
+
+  return <View style={styles.accountForm}>{children}</View>;
 }
 
 export function GameAccountConnectScreen({
@@ -51,6 +80,7 @@ export function GameAccountConnectScreen({
   prepareReturn = prepareSpadesAccountReturn,
   returnAfterSignOut = false,
   signedOutManageFallback = false,
+  useHubShell = false,
 }) {
   const [mode, setMode] = useState(initialMode);
   const [account, setAccount] = useState(null);
@@ -68,6 +98,7 @@ export function GameAccountConnectScreen({
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteExpanded, setDeleteExpanded] = useState(false);
   const handoffStartedRef = useRef(false);
 
   useEffect(() => {
@@ -99,6 +130,22 @@ export function GameAccountConnectScreen({
     setError('');
     setMessage('');
     if (nextMode !== 'reset') setRecoveryRequested(false);
+  };
+
+  const submitAccountForm = () => {
+    if (submitting) return;
+
+    if (mode === 'create') {
+      void createAccount();
+      return;
+    }
+
+    if (mode === 'reset') {
+      void (recoveryRequested ? resetPassword() : requestReset());
+      return;
+    }
+
+    void signIn();
   };
 
   const returnToGame = async () => {
@@ -226,6 +273,7 @@ export function GameAccountConnectScreen({
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
+      setDeleteExpanded(false);
       setMessage(
         'Your 1v1 account has been deleted. Historical competitive results may remain without your identifying account information.',
       );
@@ -260,6 +308,7 @@ export function GameAccountConnectScreen({
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
+      setDeleteExpanded(false);
       setMessage(`Signed out. Sign in with the account you want to use with ${gameName}.`);
       if (returnAfterSignOut) {
         returnToGameWithoutAccountChange(destination);
@@ -272,6 +321,26 @@ export function GameAccountConnectScreen({
   };
 
   if (loading) {
+    if (useHubShell) {
+      return (
+        <HubScreen
+          accountOverride={null}
+          accountHref="/account"
+          actions={[{ label: 'Next tournament', href: '/next' }]}
+          eyebrow="Player profile"
+          heroVariant="compact"
+          lead="Opening your shared account and competitive identity."
+          stickyActions={false}
+          subtitle="One account for tournaments, leagues, and game access"
+          title="Profile">
+          <Surface style={styles.hubLoading}>
+            <ActivityIndicator color={theme.colors.accent} size="large" />
+            <Text accessibilityLiveRegion="polite" style={styles.muted}>Opening your shared 1v1 account...</Text>
+          </Surface>
+        </HubScreen>
+      );
+    }
+
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={theme.colors.accent} size="large" />
@@ -280,8 +349,8 @@ export function GameAccountConnectScreen({
     );
   }
 
-  return (
-    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+  const accountContent = (
+    <>
       <View style={styles.heading}>
         <Badge tone="accent">{badgeLabel}</Badge>
         <Text style={styles.title}>{account ? 'Manage Account' : 'Connect your shared account'}</Text>
@@ -306,34 +375,56 @@ export function GameAccountConnectScreen({
             </ActionButton>
 
             <View style={styles.deleteSection}>
-              <Text style={styles.deleteTitle}>Delete Account</Text>
+              <Text style={styles.deleteTitle}>Danger zone</Text>
               <Text style={styles.muted}>
-                Permanently delete your shared 1v1 account credentials and remove
-                identifying account information from retained competitive history.
-                This cannot be undone.
+                Permanently deleting your account cannot be undone.
               </Text>
-
-              <Text style={styles.fieldLabel}>Type DELETE to confirm</Text>
-              <TextInput
-                {...inputProps(setDeleteConfirmation)}
-                autoCapitalize="characters"
-                placeholder="DELETE"
-                value={deleteConfirmation}
-              />
-
-              <ActionButton
-                disabled={
-                  submitting
-                  || deleteConfirmation.trim().toUpperCase() !== 'DELETE'
-                }
-                onPress={deleteAccount}
-                variant="danger">
-                {submitting ? 'Deleting...' : 'Delete Account Permanently'}
-              </ActionButton>
+              {deleteExpanded ? (
+                <>
+                  <Text style={styles.muted}>
+                    This removes shared 1v1 account credentials and identifying account information from retained competitive history.
+                  </Text>
+                  <Text style={styles.fieldLabel}>Type DELETE to confirm</Text>
+                  <TextInput
+                    {...inputProps(setDeleteConfirmation, {
+                      autoComplete: 'off',
+                      label: 'Type DELETE to confirm permanent account deletion',
+                      name: 'delete-confirmation',
+                    })}
+                    autoCapitalize="characters"
+                    placeholder="DELETE"
+                    value={deleteConfirmation}
+                  />
+                  <View style={styles.actionRow}>
+                    <ActionButton
+                      disabled={
+                        submitting
+                        || deleteConfirmation.trim().toUpperCase() !== 'DELETE'
+                      }
+                      onPress={deleteAccount}
+                      variant="danger">
+                      {submitting ? 'Deleting...' : 'Delete Account Permanently'}
+                    </ActionButton>
+                    <ActionButton
+                      disabled={submitting}
+                      onPress={() => {
+                        setDeleteConfirmation('');
+                        setDeleteExpanded(false);
+                      }}
+                      variant="ghost">
+                      Cancel
+                    </ActionButton>
+                  </View>
+                </>
+              ) : (
+                <ActionButton onPress={() => setDeleteExpanded(true)} variant="ghost">
+                  Review account deletion
+                </ActionButton>
+              )}
             </View>
           </>
         ) : (
-          <>
+          <AccountForm onSubmit={submitAccountForm}>
             <View style={styles.actionRow}>
               {accountActions.map((action) => (
                 <ActionButton
@@ -351,26 +442,75 @@ export function GameAccountConnectScreen({
             {mode === 'create' ? (
               <>
                 <Text style={styles.fieldLabel}>Display name</Text>
-                <TextInput {...inputProps(setPlayerName)} autoCapitalize="words" placeholder="Name shown across 1v1" value={playerName} />
+                <TextInput
+                  {...inputProps(setPlayerName, {
+                    autoComplete: 'name',
+                    label: 'Display name',
+                    name: 'display-name',
+                    textContentType: 'name',
+                  })}
+                  autoCapitalize="words"
+                  placeholder="Name shown across 1v1"
+                  value={playerName}
+                />
                 <Text style={styles.fieldLabel}>Optional handle</Text>
-                <TextInput {...inputProps(setPlayerHandle)} placeholder="Spades or Discord handle" value={playerHandle} />
+                <TextInput
+                  {...inputProps(setPlayerHandle, {
+                    autoComplete: 'nickname',
+                    label: 'Optional handle',
+                    name: 'player-handle',
+                    textContentType: 'nickname',
+                  })}
+                  placeholder="Spades or Discord handle"
+                  value={playerHandle}
+                />
               </>
             ) : null}
 
             <Text style={styles.fieldLabel}>Account email</Text>
-            <TextInput {...inputProps(setContactEmail)} inputMode="email" placeholder="you@example.com" value={contactEmail} />
+            <TextInput
+              {...inputProps(setContactEmail, {
+                autoComplete: 'email',
+                label: 'Account email',
+                name: 'email',
+                textContentType: 'emailAddress',
+              })}
+              inputMode="email"
+              placeholder="you@example.com"
+              value={contactEmail}
+            />
 
             {mode === 'signin' || mode === 'create' ? (
               <>
                 <Text style={styles.fieldLabel}>Password</Text>
-                <TextInput {...inputProps(setPassword)} placeholder="At least 8 characters" secureTextEntry value={password} />
+                <TextInput
+                  {...inputProps(setPassword, {
+                    autoComplete: mode === 'create' ? 'new-password' : 'current-password',
+                    label: 'Password',
+                    name: 'password',
+                    textContentType: mode === 'create' ? 'newPassword' : 'password',
+                  })}
+                  placeholder="At least 8 characters"
+                  secureTextEntry
+                  value={password}
+                />
               </>
             ) : null}
 
             {mode === 'create' ? (
               <>
                 <Text style={styles.fieldLabel}>Confirm password</Text>
-                <TextInput {...inputProps(setConfirmPassword)} placeholder="Type it again" secureTextEntry value={confirmPassword} />
+                <TextInput
+                  {...inputProps(setConfirmPassword, {
+                    autoComplete: 'new-password',
+                    label: 'Confirm password',
+                    name: 'confirm-password',
+                    textContentType: 'newPassword',
+                  })}
+                  placeholder="Type it again"
+                  secureTextEntry
+                  value={confirmPassword}
+                />
                 <ActionButton disabled={submitting} onPress={createAccount}>
                   {submitting ? 'Creating...' : 'Create Account'}
                 </ActionButton>
@@ -392,11 +532,42 @@ export function GameAccountConnectScreen({
                 ) : (
                   <>
                     <Text style={styles.fieldLabel}>Reset code</Text>
-                    <TextInput {...inputProps(setRecoveryCode)} inputMode="numeric" maxLength={6} placeholder="000000" value={recoveryCode} />
+                    <TextInput
+                      {...inputProps(setRecoveryCode, {
+                        autoComplete: 'one-time-code',
+                        label: 'Reset code',
+                        name: 'reset-code',
+                        textContentType: 'oneTimeCode',
+                      })}
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={recoveryCode}
+                    />
                     <Text style={styles.fieldLabel}>New password</Text>
-                    <TextInput {...inputProps(setRecoveryPassword)} placeholder="At least 8 characters" secureTextEntry value={recoveryPassword} />
+                    <TextInput
+                      {...inputProps(setRecoveryPassword, {
+                        autoComplete: 'new-password',
+                        label: 'New password',
+                        name: 'new-password',
+                        textContentType: 'newPassword',
+                      })}
+                      placeholder="At least 8 characters"
+                      secureTextEntry
+                      value={recoveryPassword}
+                    />
                     <Text style={styles.fieldLabel}>Confirm new password</Text>
-                    <TextInput {...inputProps(setRecoveryConfirmPassword)} placeholder="Type it again" secureTextEntry value={recoveryConfirmPassword} />
+                    <TextInput
+                      {...inputProps(setRecoveryConfirmPassword, {
+                        autoComplete: 'new-password',
+                        label: 'Confirm new password',
+                        name: 'confirm-new-password',
+                        textContentType: 'newPassword',
+                      })}
+                      placeholder="Type it again"
+                      secureTextEntry
+                      value={recoveryConfirmPassword}
+                    />
                     <ActionButton disabled={submitting} onPress={resetPassword}>
                       {submitting ? 'Updating...' : 'Reset Password'}
                     </ActionButton>
@@ -404,11 +575,11 @@ export function GameAccountConnectScreen({
                 )}
               </>
             ) : null}
-          </>
+          </AccountForm>
         )}
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
+        {error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <ActionButton
           disabled={submitting}
           onPress={() => returnToGameWithoutAccountChange(destination)}
@@ -416,6 +587,33 @@ export function GameAccountConnectScreen({
           Return to {gameName}
         </ActionButton>
       </Surface>
+    </>
+  );
+
+  if (useHubShell) {
+    return (
+      <HubScreen
+        accountOverride={account}
+        accountHref="/account"
+        actions={[
+          { label: 'Next tournament', href: '/next' },
+          { label: 'Leagues', href: '/leagues', variant: 'secondary' },
+          { label: 'Results', href: '/results', variant: 'ghost' },
+        ]}
+        eyebrow="Player profile"
+        heroVariant="compact"
+        lead="Manage the shared identity used for tournament registration, league membership, and match access."
+        stickyActions={false}
+        subtitle="One account across competitive play"
+        title="Profile">
+        <View style={styles.hubAccountContent}>{accountContent}</View>
+      </HubScreen>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      {accountContent}
     </ScrollView>
   );
 }
@@ -426,12 +624,15 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
 
 const styles = StyleSheet.create({
   page: { minHeight: '100%', backgroundColor: theme.colors.background, padding: 20, paddingTop: 32, gap: 18 },
+  hubAccountContent: { gap: 18 },
+  hubLoading: { alignItems: 'center', gap: 14, justifyContent: 'center', minHeight: 240 },
   loading: { flex: 1, minHeight: 480, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: theme.colors.background },
   heading: { width: '100%', maxWidth: 620, alignSelf: 'center', gap: 10 },
   title: { color: theme.colors.text, fontSize: 28, lineHeight: 34, fontWeight: '800' },
   subtitle: { color: theme.colors.muted, fontSize: 15, lineHeight: 22 },
   card: { width: '100%', maxWidth: 620, alignSelf: 'center', gap: 12 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  accountForm: { gap: 12 },
   modeButton: { flexGrow: 1 },
   sectionTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '800' },
   fieldLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '700', marginTop: 4 },

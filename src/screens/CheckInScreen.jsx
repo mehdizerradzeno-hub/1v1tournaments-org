@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ActionButton,
@@ -88,6 +88,21 @@ const SIGNUP_AUTH_RETRY_DELAY_MS = 450;
 const SESSION_CONFIRM_RETRY_DELAYS_MS = [0, 300, 700, 1200, 1800];
 const SIGNUP_AUTH_RETRY_DELAYS_MS = [350, 800, 1400, 2200];
 const ACCOUNT_ACCESS_SECTION_ID = 'account-access';
+
+function formFieldProps({
+  autoComplete = 'off',
+  label,
+  name,
+  textContentType = 'none',
+}) {
+  return {
+    accessibilityLabel: label,
+    autoComplete,
+    nativeID: `tournament-${name}`,
+    textContentType,
+    ...(Platform.OS === 'web' ? { name } : {}),
+  };
+}
 
 function waitForSignupRetry(delay = SIGNUP_AUTH_RETRY_DELAY_MS) {
   return new Promise((resolve) => {
@@ -1077,6 +1092,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     <View style={styles.fieldGroup}>
                       <Text style={styles.fieldLabel}>Verification code</Text>
                       <TextInput
+                        {...formFieldProps({
+                          autoComplete: 'one-time-code',
+                          label: 'Verification code',
+                          name: 'verification-code',
+                          textContentType: 'oneTimeCode',
+                        })}
                         inputMode="numeric"
                         maxLength={6}
                         onChangeText={setVerificationCode}
@@ -1115,6 +1136,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Notes</Text>
                 <TextInput
+                  {...formFieldProps({
+                    label: 'Optional availability note',
+                    name: 'notes',
+                  })}
                   multiline
                   onChangeText={setNotes}
                   placeholder="Optional availability note"
@@ -1163,6 +1188,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Tournament display name</Text>
                   <TextInput
+                    {...formFieldProps({
+                      autoComplete: 'name',
+                      label: 'Tournament display name',
+                      name: 'display-name',
+                      textContentType: 'name',
+                    })}
                     autoCapitalize="words"
                     onChangeText={setPlayerName}
                     placeholder="Name shown on roster and bracket"
@@ -1177,6 +1208,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Account email</Text>
                 <TextInput
+                  {...formFieldProps({
+                    autoComplete: 'email',
+                    label: 'Account email',
+                    name: 'email',
+                    textContentType: 'emailAddress',
+                  })}
                   autoCapitalize="none"
                   autoCorrect={false}
                   inputMode="email"
@@ -1192,6 +1229,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Password</Text>
                 <TextInput
+                  {...formFieldProps({
+                    autoComplete: accountMode === 'create' ? 'new-password' : 'current-password',
+                    label: 'Password',
+                    name: 'password',
+                    textContentType: accountMode === 'create' ? 'newPassword' : 'password',
+                  })}
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={setPassword}
@@ -1214,6 +1257,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.fieldLabel}>Confirm password</Text>
                     <TextInput
+                      {...formFieldProps({
+                        autoComplete: 'new-password',
+                        label: 'Confirm password',
+                        name: 'confirm-password',
+                        textContentType: 'newPassword',
+                      })}
                       autoCapitalize="none"
                       autoCorrect={false}
                       onChangeText={setConfirmPassword}
@@ -1249,6 +1298,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Optional handle</Text>
                   <TextInput
+                    {...formFieldProps({
+                      autoComplete: 'nickname',
+                      label: `Optional Discord or ${gameName} handle`,
+                      name: 'player-handle',
+                      textContentType: 'nickname',
+                    })}
                     autoCapitalize="none"
                     autoCorrect={false}
                     onChangeText={setPlayerHandle}
@@ -1327,6 +1382,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>Recovery code</Text>
                         <TextInput
+                          {...formFieldProps({
+                            autoComplete: 'one-time-code',
+                            label: 'Recovery code',
+                            name: 'recovery-code',
+                            textContentType: 'oneTimeCode',
+                          })}
                           inputMode="numeric"
                           maxLength={6}
                           onChangeText={setRecoveryCode}
@@ -1339,6 +1400,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>New password</Text>
                         <TextInput
+                          {...formFieldProps({
+                            autoComplete: 'new-password',
+                            label: 'New password',
+                            name: 'new-password',
+                            textContentType: 'newPassword',
+                          })}
                           autoCapitalize="none"
                           autoCorrect={false}
                           onChangeText={setRecoveryPassword}
@@ -1352,6 +1419,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>Confirm new password</Text>
                         <TextInput
+                          {...formFieldProps({
+                            autoComplete: 'new-password',
+                            label: 'Confirm new password',
+                            name: 'confirm-new-password',
+                            textContentType: 'newPassword',
+                          })}
                           autoCapitalize="none"
                           autoCorrect={false}
                           onChangeText={setRecoveryConfirmPassword}

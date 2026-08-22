@@ -41,6 +41,11 @@ test('every Twitch arrival action preserves a 44px minimum touch target', () => 
   assert.match(tournamentScreenSource, /arrivalAction:\s*\{\s*minHeight: 44,\s*\}/);
 });
 
+test('the longest tournament tab uses a compact phone label', () => {
+  assert.match(tournamentScreenSource, /const compact = width > 0 && width < 520;/);
+  assert.match(tournamentScreenSource, /compact && tab\.id === 'info' \? 'Details' : tab\.label/);
+});
+
 test('homepage and event routes defer viewport-dependent markup until after hydration', () => {
   const routeSources = [
     readFileSync(fileURLToPath(new URL('../app/index.jsx', import.meta.url)), 'utf8'),
@@ -55,6 +60,8 @@ test('homepage and event routes defer viewport-dependent markup until after hydr
   assert.match(hubUiSource, /showLaptopLayout = [^;]*hasHydratedViewport && width >= 1360;/);
   assert.match(hubUiSource, /showTinyHeader = hasHydratedViewport && width < 520;/);
   assert.match(hubUiSource, /showStickyActionCopy = hasHydratedViewport && width >= 430;/);
+  assert.match(hubUiSource, /accessibilityRole="navigation"/);
+  assert.match(hubUiSource, /safeArea:\s*\{[\s\S]*?minHeight: 0,[\s\S]*?overflow: 'hidden'/);
 
   for (const route of ['homepage', 'reddit event']) {
     for (const width of [390, 1920]) {

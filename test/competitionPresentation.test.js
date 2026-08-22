@@ -15,6 +15,7 @@ test('Tournaments keeps platform navigation and routes empty-state players to ac
   assert.match(nextScreenSource, /Get event alerts/);
   assert.match(nextScreenSource, /League Seasons/);
   assert.match(hubUiSource, /Spades • Euchre • Competitive Play/);
+  assert.match(nextScreenSource, /aria-level=\{1\}/);
 });
 
 test('public Leagues stays player-focused while host controls remain on the admin route', () => {
@@ -32,6 +33,9 @@ test('Leagues presents compact competition tabs and honest registration actions'
   assert.match(leaguesScreenSource, /Season overview/);
   assert.match(leaguesScreenSource, /Season finish/);
   assert.match(leaguesScreenSource, /accessibilityRole="tab"/);
+  assert.match(leaguesScreenSource, /handleTabKeyNavigation/);
+  assert.match(leaguesScreenSource, /handleRetryLoad/);
+  assert.match(leaguesScreenSource, /Browse tournaments/);
   assert.match(leaguesScreenSource, /Leave Waitlist/);
   assert.match(leaguesScreenSource, /Registration Closed/);
   assert.match(leaguesScreenSource, /Join Waitlist/);
@@ -51,4 +55,5 @@ test('Tournament detail uses accessible, shareable competition tabs', () => {
   assert.match(tournamentScreenSource, /aria-selected=\{selected\}/);
   assert.match(tournamentScreenSource, /globalThis\.history\.replaceState/);
   assert.match(tournamentScreenSource, /nativeID="results"/);
+  assert.match(tournamentScreenSource, /aria-level=\{1\}/);
 });
