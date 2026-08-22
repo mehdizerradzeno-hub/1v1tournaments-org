@@ -5,6 +5,7 @@ import {
   SharedAccountContractError,
   createGameAuthorization,
   exchangeGameAuthorization,
+  resolveGameAccountIdentities,
   sharedIdentityForAccount,
   validateGameAuthorizationCaller,
 } from './_shared-account-utils.mjs';
@@ -33,6 +34,7 @@ export async function handleSharedAccountRequest(event, dependencies = {}) {
   const resolveIdentity = dependencies.sharedIdentityForAccount || sharedIdentityForAccount;
   const issueAuthorization = dependencies.createGameAuthorization || createGameAuthorization;
   const exchangeAuthorization = dependencies.exchangeGameAuthorization || exchangeGameAuthorization;
+  const resolveGameIdentities = dependencies.resolveGameAccountIdentities || resolveGameAccountIdentities;
   const authorizeGame = dependencies.validateGameAuthorizationCaller || validateGameAuthorizationCaller;
 
   if (event.httpMethod === 'OPTIONS') return json(204, {});
@@ -62,6 +64,12 @@ export async function handleSharedAccountRequest(event, dependencies = {}) {
     const audience = authorizeGame(event, payload.audience);
     const identity = await exchangeAuthorization(payload.authorizationCode, audience);
     return json(200, { ok: true, identity });
+  }
+
+  if (payload.action === 'resolve-game-identities') {
+    const audience = authorizeGame(event, payload.audience);
+    const identities = await resolveGameIdentities(payload.identityKeys, audience);
+    return json(200, { ok: true, identities });
   }
 
   return json(400, { error: 'Choose a supported shared account action.' });

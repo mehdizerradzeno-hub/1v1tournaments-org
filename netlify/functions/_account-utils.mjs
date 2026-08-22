@@ -254,6 +254,41 @@ export async function getAccountByEmail(email, options = {}) {
   return accountStore.get(accountKey(email), { type: 'json' });
 }
 
+export async function listAccountsByCanonicalIds(canonicalAccountIds, options = {}) {
+  const requestedIds = new Set(
+    (Array.isArray(canonicalAccountIds) ? canonicalAccountIds : [])
+      .map((value) => cleanText(value))
+      .filter(Boolean),
+  );
+  if (!requestedIds.size) return [];
+
+  const accountStore = options.store || getStoreWithFallback('player-accounts');
+  const accounts = new Map();
+  let cursor;
+
+  do {
+    const page = await accountStore.list(cursor ? { cursor } : {});
+    const records = await Promise.all(
+      (page.blobs || []).map((blob) =>
+        accountStore.get(blob.key, { type: 'json' }),
+      ),
+    );
+
+    for (const account of records) {
+      const canonicalAccountId = accountCanonicalId(account);
+      if (requestedIds.has(canonicalAccountId)) {
+        accounts.set(canonicalAccountId, account);
+      }
+    }
+
+    cursor = page.hasMore ? cleanText(page.cursor) : '';
+  } while (cursor && accounts.size < requestedIds.size);
+
+  return [...requestedIds]
+    .map((canonicalAccountId) => accounts.get(canonicalAccountId))
+    .filter(Boolean);
+}
+
 export async function saveAccount(account, options = {}) {
   const accountStore = getStoreWithFallback('player-accounts');
   await accountStore.setJSON(accountKey(account.email), account, options);
