@@ -5,6 +5,7 @@ import {
   accountCanonicalId,
   cleanText,
   getStoreWithFallback,
+  listAccountsByCanonicalIds,
 } from './_account-utils.mjs';
 
 export const SHARED_IDENTITY_PROTOCOL_VERSION = '2026-08-04';
@@ -177,6 +178,81 @@ export async function sharedIdentityForAccount(account, options = {}) {
     emailVerified: account.emailVerified !== false,
     aliases: await listAccountAliases(canonicalAccountId, options),
   };
+}
+
+export async function resolveGameAccountIdentities(identityKeysValue, audienceValue, options = {}) {
+  const audience = normalizeGameAudience(audienceValue);
+  if (!audience) {
+    throw new SharedAccountContractError(
+      'Choose a supported game audience.',
+      400,
+      'invalid_audience',
+    );
+  }
+  if (!Array.isArray(identityKeysValue)) {
+    throw new SharedAccountContractError(
+      'Identity keys must be an array.',
+      400,
+      'invalid_identity_lookup',
+    );
+  }
+
+  const identityKeys = [...new Set(identityKeysValue.map((value) => {
+    const identityKeyValue = typeof value === 'string' ? value.trim() : '';
+    if (!identityKeyValue || identityKeyValue.length > 128) {
+      throw new SharedAccountContractError(
+        'Identity keys must be non-empty strings of at most 128 characters.',
+        400,
+        'invalid_identity_lookup',
+      );
+    }
+    return identityKeyValue;
+  }))];
+  if (identityKeys.length > 100) {
+    throw new SharedAccountContractError(
+      'At most 100 identities can be resolved at once.',
+      400,
+      'identity_lookup_limit',
+    );
+  }
+  if (!identityKeys.length) return [];
+
+  const aliasPairs = await Promise.all(identityKeys.map(async (identityKeyValue) => [
+    identityKeyValue,
+    await lookupCanonicalAccountByAlias(audience, identityKeyValue, {
+      store: options.aliasStore,
+    }),
+  ]));
+  const canonicalByIdentityKey = new Map(aliasPairs);
+  const candidateCanonicalIds = new Set(identityKeys);
+  for (const canonicalAccountId of canonicalByIdentityKey.values()) {
+    if (canonicalAccountId) candidateCanonicalIds.add(canonicalAccountId);
+  }
+
+  const accounts = await listAccountsByCanonicalIds(
+    [...candidateCanonicalIds],
+    { store: options.accountStore },
+  );
+  const accountByCanonicalId = new Map(
+    accounts.map((account) => [accountCanonicalId(account), account]),
+  );
+  const resolvedCanonicalIds = new Set();
+  const identities = [];
+
+  for (const identityKeyValue of identityKeys) {
+    const canonicalAccountId = canonicalByIdentityKey.get(identityKeyValue) || identityKeyValue;
+    if (resolvedCanonicalIds.has(canonicalAccountId)) continue;
+    const account = accountByCanonicalId.get(canonicalAccountId);
+    if (!account) continue;
+    const identity = await sharedIdentityForAccount(account, {
+      store: options.aliasStore,
+    });
+    if (!identity) continue;
+    identities.push(identity);
+    resolvedCanonicalIds.add(canonicalAccountId);
+  }
+
+  return identities;
 }
 
 export async function createGameAuthorization(identity, audienceValue, options = {}) {

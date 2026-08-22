@@ -8,6 +8,7 @@ import {
   exchangeGameAuthorization,
   listAccountAliases,
   lookupCanonicalAccountByAlias,
+  resolveGameAccountIdentities,
   sharedIdentityForAccount,
 } from '../netlify/functions/_shared-account-utils.mjs';
 import { handleSharedAccountRequest } from '../netlify/functions/shared-account.mjs';
@@ -235,6 +236,66 @@ test('one-time game authorization validates audience, expiration, and replay', a
     exchangeGameAuthorization(expired.authorizationCode, 'spades', { store, now: 6_001 }),
     (error) => error.code === 'authorization_expired',
   );
+});
+
+test('authenticated game identity lookup resolves canonical and legacy rating keys without name matching', async () => {
+  const accountStore = new MemoryStore();
+  const aliasStore = new MemoryStore();
+  const similarAccount = {
+    ...account,
+    id: 'acct-similar-player',
+    canonicalAccountId: 'acct-similar-player',
+    email: 'similar@example.com',
+    playerName: 'Shared Player',
+    playerHandle: '@shared2',
+  };
+  accountStore.records.set('account-one.json', structuredClone(account));
+  accountStore.records.set('account-two.json', structuredClone(similarAccount));
+  await addAccountAlias(
+    account,
+    { provider: 'spades', legacyAccountId: 'legacy-spades' },
+    { store: aliasStore },
+  );
+
+  const identities = await resolveGameAccountIdentities(
+    ['legacy-spades', similarAccount.canonicalAccountId],
+    'spades',
+    { accountStore, aliasStore },
+  );
+
+  assert.deepEqual(
+    identities.map((identity) => [identity.canonicalAccountId, identity.handle]),
+    [
+      [account.canonicalAccountId, account.playerHandle],
+      [similarAccount.canonicalAccountId, similarAccount.playerHandle],
+    ],
+  );
+  assert.equal(identities[0].aliases[0].legacyAccountId, 'legacy-spades');
+});
+
+test('game identity lookup endpoint is server-authenticated and returns only public identity fields', async () => {
+  const calls = [];
+  const response = await handleSharedAccountRequest({
+    httpMethod: 'POST',
+    headers: { authorization: 'Bearer server-secret' },
+    body: JSON.stringify({
+      action: 'resolve-game-identities',
+      audience: 'spades',
+      identityKeys: ['acct-shared-player'],
+    }),
+  }, {
+    validateGameAuthorizationCaller: (_event, audience) => audience,
+    resolveGameAccountIdentities: async (identityKeys, audience) => {
+      calls.push({ identityKeys, audience });
+      return [await sharedIdentityForAccount(account, { store: new MemoryStore() })];
+    },
+  });
+  const body = JSON.parse(response.body);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls, [{ identityKeys: ['acct-shared-player'], audience: 'spades' }]);
+  assert.equal(body.identities[0].handle, account.playerHandle);
+  assert.equal(JSON.stringify(body).includes(account.email), false);
 });
 
 test('tournament signup and match access payloads expose canonical identity with legacy IDs', () => {
