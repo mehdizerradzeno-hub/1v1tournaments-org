@@ -13,7 +13,12 @@ export const GAME_AUTHORIZATION_TTL_MS = 2 * 60 * 1000;
 
 const ALIAS_STORE_NAME = 'shared-account-aliases';
 const AUTHORIZATION_STORE_NAME = 'shared-account-authorizations';
-const SUPPORTED_GAMES = new Set(['spades', 'euchre']);
+const SUPPORTED_GAMES = new Set(['spades', 'euchre', 'gin']);
+const GAME_SECRET_ENVIRONMENT_KEYS = Object.freeze({
+  spades: 'SHARED_ACCOUNT_SPADES_SECRET',
+  euchre: 'SHARED_ACCOUNT_EUCHRE_SECRET',
+  gin: 'SHARED_ACCOUNT_GIN_SECRET',
+});
 
 export class SharedAccountContractError extends Error {
   constructor(message, statusCode = 400, code = 'shared_account_error') {
@@ -325,9 +330,7 @@ export async function exchangeGameAuthorization(authorizationCode, audienceValue
 }
 
 function configuredGameSecret(audience) {
-  const variableName = audience === 'spades'
-    ? 'SHARED_ACCOUNT_SPADES_SECRET'
-    : 'SHARED_ACCOUNT_EUCHRE_SECRET';
+  const variableName = GAME_SECRET_ENVIRONMENT_KEYS[audience];
   return String(process.env[variableName] || '').trim();
 }
 

@@ -2,7 +2,7 @@ export const SHARED_ACCOUNT_CODE_QUERY_PARAMETER = 'sharedAccountCode';
 export const SHARED_ACCOUNT_LAUNCH_PROTOCOL_VERSION = '2026-08-04';
 export const SHARED_ACCOUNT_ENDPOINT = '/.netlify/functions/shared-account';
 
-const SUPPORTED_GAME_AUDIENCES = new Set(['spades', 'euchre']);
+const SUPPORTED_GAME_AUDIENCES = new Set(['spades', 'euchre', 'gin']);
 
 export class SharedAccountLaunchError extends Error {
   constructor(message, options = {}) {
@@ -50,7 +50,7 @@ async function readJsonResponse(response) {
 export async function issueSharedAccountAuthorization({ audience: audienceValue, fetchImpl = globalThis.fetch }) {
   const audience = normalizeAudience(audienceValue);
   if (!audience) {
-    throw new SharedAccountLaunchError('Shared account launch supports only Spades or Euchre.', {
+    throw new SharedAccountLaunchError('Shared account launch supports only configured games.', {
       code: 'unsupported_audience',
     });
   }
@@ -126,7 +126,7 @@ export async function prepareSharedAccountLaunch({
   const audience = normalizeAudience(audienceValue);
   const destination = parseLaunchUrl(destinationUrl);
   if (!audience) {
-    throw new SharedAccountLaunchError('Shared account launch supports only Spades or Euchre.', {
+    throw new SharedAccountLaunchError('Shared account launch supports only configured games.', {
       code: 'unsupported_audience',
     });
   }

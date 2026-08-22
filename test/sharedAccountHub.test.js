@@ -238,6 +238,20 @@ test('one-time game authorization validates audience, expiration, and replay', a
   );
 });
 
+test('Gin is a supported isolated game audience for one-time authorizations', async () => {
+  const store = new MemoryStore();
+  const identity = await sharedIdentityForAccount(account, { store: new MemoryStore() });
+  const issued = await createGameAuthorization(identity, 'gin', {
+    store,
+    now: 1_000,
+    codeFactory: () => 'gin-single-use-code',
+  });
+
+  assert.equal(issued.audience, 'gin');
+  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'gin', { store, now: 2_000 });
+  assert.equal(exchanged.canonicalAccountId, account.id);
+});
+
 test('authenticated game identity lookup resolves canonical and legacy rating keys without name matching', async () => {
   const accountStore = new MemoryStore();
   const aliasStore = new MemoryStore();

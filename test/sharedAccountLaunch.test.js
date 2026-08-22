@@ -64,6 +64,21 @@ test('authenticated Euchre uses only the Euchre audience', async () => {
   assert.equal(launch.url.includes('1v1spades.com'), false);
 });
 
+test('authenticated Gin uses only the Gin audience', async () => {
+  let requestBody;
+  const launch = await prepareSharedAccountLaunch({
+    audience: 'gin',
+    destinationUrl: 'https://onev1-gin-staging.onrender.com/',
+    fetchImpl: async (_endpoint, options) => {
+      requestBody = JSON.parse(options.body);
+      return issueResponse('gin', 'gin-code');
+    },
+  });
+
+  assert.equal(requestBody.audience, 'gin');
+  assert.equal(new URL(launch.url).searchParams.get('sharedAccountCode'), 'gin-code');
+});
+
 test('tournament launch preserves ticket and URL-encodes a distinct account code', async () => {
   const launch = await prepareSharedAccountLaunch({
     audience: 'spades',
