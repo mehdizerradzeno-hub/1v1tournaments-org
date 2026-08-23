@@ -1,5 +1,5 @@
 export const APP_STORE_SPADES_URL = 'https://apps.apple.com/us/app/1v1-spades/id6776721716?uo=4';
-export const APP_STORE_EUCHRE_URL = '';
+export const APP_STORE_EUCHRE_URL = 'https://apps.apple.com/us/app/euchre-1v1/id6788707299';
 export const WEB_SPADES_URL = 'https://1v1spades.com';
 export const WEB_EUCHRE_URL = 'https://1v1euchre.com';
 export const TOURNAMENTS_URL = 'https://1v1tournaments.org';

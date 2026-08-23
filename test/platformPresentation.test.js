@@ -9,29 +9,29 @@ import {
   getFeaturedCompetitionAction,
   getTournamentBroadcastPath,
   PLATFORM_GAME_PRESENTATION,
-  PLATFORM_SUBMISSION_STATEMENT,
+  PLATFORM_APP_STORE_STATEMENT,
 } from "../src/lib/platformPresentation.js";
 
-test("platform presentation reports both games as submitted to Apple", () => {
+test("platform presentation reports both games as available on the App Store", () => {
   assert.equal(
-    PLATFORM_SUBMISSION_STATEMENT,
-    "Spades and Euchre submitted to Apple.",
+    PLATFORM_APP_STORE_STATEMENT,
+    "Spades and Euchre are available on the App Store.",
   );
   assert.equal(
     PLATFORM_GAME_PRESENTATION.spades.releaseState,
-    APPLE_RELEASE_STATES.SUBMITTED,
+    APPLE_RELEASE_STATES.AVAILABLE,
   );
   assert.equal(
     PLATFORM_GAME_PRESENTATION.euchre.releaseState,
-    APPLE_RELEASE_STATES.SUBMITTED,
+    APPLE_RELEASE_STATES.AVAILABLE,
   );
   assert.equal(
     getAppleReleaseLabel(PLATFORM_GAME_PRESENTATION.spades.releaseState),
-    "Submitted to Apple",
+    "Available on App Store",
   );
   assert.equal(
     getAppleReleaseLabel(PLATFORM_GAME_PRESENTATION.euchre.releaseState),
-    "Submitted to Apple",
+    "Available on App Store",
   );
   assert.ok(
     !PLATFORM_GAME_PRESENTATION.euchre.capabilities.includes(

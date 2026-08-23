@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import {
+  APP_STORE_EUCHRE_URL,
+  APP_STORE_SPADES_URL,
+} from "../src/lib/downloadLinks.js";
+
 const rootRoute = await readFile(
   new URL("../app/index.jsx", import.meta.url),
   "utf8",
@@ -44,8 +49,18 @@ test("platform navigation keeps competition, account, and My Match visible", () 
   assert.match(hubUi, /resolvedPlayerAccount\?\.hostApproved/);
 });
 
-test("homepage does not advertise public Euchre discovery or invent an App Store URL", () => {
+test("homepage keeps Euchre invitation-only and gives both games App Store buttons", () => {
   assert.doesNotMatch(homeScreen, /Euchre.*Public tournaments/s);
-  assert.doesNotMatch(homeScreen, /apps\.apple\.com[^'\"\s]*euchre/i);
-  assert.match(homeScreen, /PLATFORM_SUBMISSION_STATEMENT/);
+  assert.equal(
+    APP_STORE_SPADES_URL,
+    "https://apps.apple.com/us/app/1v1-spades/id6776721716?uo=4",
+  );
+  assert.equal(
+    APP_STORE_EUCHRE_URL,
+    "https://apps.apple.com/us/app/euchre-1v1/id6788707299",
+  );
+  assert.match(homeScreen, /appStoreSpades/);
+  assert.match(homeScreen, /appStoreEuchre/);
+  assert.match(homeScreen, /PLATFORM_APP_STORE_STATEMENT/);
+  assert.match(homeScreen, /Download \$\{game\.title\} on the App Store/);
 });

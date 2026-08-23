@@ -42,7 +42,7 @@ import {
   getFeaturedCompetitionAction,
   getCompetitionLifecycleLabel,
   PLATFORM_GAME_PRESENTATION,
-  PLATFORM_SUBMISSION_STATEMENT,
+  PLATFORM_APP_STORE_STATEMENT,
 } from "../lib/platformPresentation.js";
 import {
   getEffectiveRegistrationStatus,
@@ -709,7 +709,7 @@ function PremiumDownloadSection() {
 
   return (
     <Section
-      description={PLATFORM_SUBMISSION_STATEMENT}
+      description={PLATFORM_APP_STORE_STATEMENT}
       eyebrow="The games"
       nativeID="downloads"
       title="Choose your table"

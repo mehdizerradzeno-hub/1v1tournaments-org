@@ -15,14 +15,14 @@ export const APPLE_RELEASE_LABELS = Object.freeze({
     "Current version available — update pending",
 });
 
-export const PLATFORM_SUBMISSION_STATEMENT =
-  "Spades and Euchre submitted to Apple.";
+export const PLATFORM_APP_STORE_STATEMENT =
+  "Spades and Euchre are available on the App Store.";
 
 export const PLATFORM_GAME_PRESENTATION = Object.freeze({
   spades: Object.freeze({
     slug: "spades",
     name: "1v1 Spades",
-    releaseState: APPLE_RELEASE_STATES.SUBMITTED,
+    releaseState: APPLE_RELEASE_STATES.AVAILABLE,
     description:
       "Head-to-head Spades with ranked play, bot practice, and tournament assignments.",
     capabilities: Object.freeze([
@@ -34,7 +34,7 @@ export const PLATFORM_GAME_PRESENTATION = Object.freeze({
   euchre: Object.freeze({
     slug: "euchre",
     name: "1v1 Euchre",
-    releaseState: APPLE_RELEASE_STATES.SUBMITTED,
+    releaseState: APPLE_RELEASE_STATES.AVAILABLE,
     description:
       "Server-authoritative head-to-head Euchre with ranked play and invited competition.",
     capabilities: Object.freeze([
