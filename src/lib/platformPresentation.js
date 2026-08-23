@@ -21,7 +21,7 @@ export const PLATFORM_APP_STORE_STATEMENT =
 export const PLATFORM_GAME_PRESENTATION = Object.freeze({
   spades: Object.freeze({
     slug: "spades",
-    name: "1v1 Spades",
+    name: "Spades 1V1",
     releaseState: APPLE_RELEASE_STATES.AVAILABLE,
     description:
       "Head-to-head Spades with ranked play, bot practice, and tournament assignments.",
@@ -33,7 +33,7 @@ export const PLATFORM_GAME_PRESENTATION = Object.freeze({
   }),
   euchre: Object.freeze({
     slug: "euchre",
-    name: "1v1 Euchre",
+    name: "Euchre 1V1",
     releaseState: APPLE_RELEASE_STATES.AVAILABLE,
     description:
       "Server-authoritative head-to-head Euchre with ranked play and invited competition.",

@@ -21,10 +21,12 @@ test("platform presentation reports both games as available on the App Store", (
     PLATFORM_GAME_PRESENTATION.spades.releaseState,
     APPLE_RELEASE_STATES.AVAILABLE,
   );
+  assert.equal(PLATFORM_GAME_PRESENTATION.spades.name, "Spades 1V1");
   assert.equal(
     PLATFORM_GAME_PRESENTATION.euchre.releaseState,
     APPLE_RELEASE_STATES.AVAILABLE,
   );
+  assert.equal(PLATFORM_GAME_PRESENTATION.euchre.name, "Euchre 1V1");
   assert.equal(
     getAppleReleaseLabel(PLATFORM_GAME_PRESENTATION.spades.releaseState),
     "Available on App Store",
