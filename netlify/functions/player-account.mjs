@@ -416,7 +416,9 @@ export async function handler(event) {
     }
 
     if (payload.action === 'reset-password') {
-      return resetAccountPassword(payload);
+      // Await inside this try block so a runtime storage failure becomes the
+      // controlled JSON error below instead of escaping as a platform 502.
+      return await resetAccountPassword(payload);
     }
 
     if (payload.action === 'request-email-verification') {

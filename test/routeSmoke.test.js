@@ -473,6 +473,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(playerAccountSource, /number or symbol/);
   assert.match(playerAccountSource, /hostApproved/);
   assert.match(playerAccountSource, /request-password-reset/);
+  assert.match(playerAccountSource, /return await resetAccountPassword\(payload\)/);
   assert.match(playerAccountSource, /verify-email/);
   assert.match(playerAccountSource, /enforceRateLimit/);
   assert.match(playerEmailSource, /RESEND_API_KEY/);
