@@ -18,15 +18,23 @@ const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
-export function getStoreWithFallback(name) {
-  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
-  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+export function getStoreWithFallback(name, options = {}) {
+  const createStore = options.getStore || getStore;
+  const siteID = options.siteID || process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID;
+  const token = options.token || process.env.BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
 
-  if (siteID && token) {
-    return getStore({ name, siteID, token });
+  try {
+    // Netlify's connected runtime context includes the uncached edge URL that
+    // strong-consistency reads require. Prefer it even when credential env
+    // variables are also present.
+    return createStore(name);
+  } catch (error) {
+    if (siteID && token) {
+      return createStore({ name, siteID, token });
+    }
+
+    throw error;
   }
-
-  return getStore(name);
 }
 
 function wait(delayMs) {

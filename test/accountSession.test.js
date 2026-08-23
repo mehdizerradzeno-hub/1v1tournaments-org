@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   clearSessionCookie,
   createSignedSessionToken,
+  getStoreWithFallback,
   getSessionId,
   parseSignedSessionToken,
 } from '../netlify/functions/_account-utils.mjs';
@@ -106,4 +107,46 @@ test('sign out expires only the authoritative Tournaments player session cookie'
   assert.match(cookie, /SameSite=Lax/);
   assert.match(cookie, /Max-Age=0/);
   assert.doesNotMatch(cookie, /spades|euchre/i);
+});
+
+test('blob stores prefer the connected Netlify runtime context', () => {
+  const calls = [];
+  const runtimeStore = { source: 'connected-runtime' };
+  const store = getStoreWithFallback('player-account-codes', {
+    getStore: (input) => {
+      calls.push(input);
+      return runtimeStore;
+    },
+    siteID: 'fallback-site-id',
+    token: 'fallback-token',
+  });
+
+  assert.equal(store, runtimeStore);
+  assert.deepEqual(calls, ['player-account-codes']);
+});
+
+test('blob stores retain explicit credentials as a non-runtime fallback', () => {
+  const calls = [];
+  const fallbackStore = { source: 'explicit-credentials' };
+  const store = getStoreWithFallback('player-account-codes', {
+    getStore: (input) => {
+      calls.push(input);
+      if (typeof input === 'string') {
+        throw new Error('No connected runtime context');
+      }
+      return fallbackStore;
+    },
+    siteID: 'fallback-site-id',
+    token: 'fallback-token',
+  });
+
+  assert.equal(store, fallbackStore);
+  assert.deepEqual(calls, [
+    'player-account-codes',
+    {
+      name: 'player-account-codes',
+      siteID: 'fallback-site-id',
+      token: 'fallback-token',
+    },
+  ]);
 });
