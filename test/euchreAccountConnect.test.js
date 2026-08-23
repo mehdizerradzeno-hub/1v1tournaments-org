@@ -56,12 +56,13 @@ test('successful Euchre auth issues only the established one-time Euchre handoff
     audience: 'euchre',
   });
   assert.equal(launch.authorized, true);
-  assert.equal(new URL(launch.url).origin, 'https://onev1-euchre-preview.onrender.com');
+  assert.equal(new URL(launch.url).origin, 'https://1v1euchre.com');
   assert.equal(new URL(launch.url).searchParams.get('sharedAccountCode'), 'opaque-one-time-euchre-code');
 });
 
 test('Euchre return target is fixed and never falls back to Tournaments root or an arbitrary redirect', () => {
-  assert.equal(EUCHRE_ACCOUNT_DESTINATION, 'https://onev1-euchre-preview.onrender.com/');
+  assert.equal(EUCHRE_ACCOUNT_DESTINATION, 'https://1v1euchre.com/');
+  assert.notEqual(EUCHRE_ACCOUNT_DESTINATION, 'https://onev1-euchre-preview.onrender.com/');
   assert.notEqual(EUCHRE_ACCOUNT_DESTINATION, 'https://1v1tournaments.org/');
   assert.equal(prepareEuchreAccountReturn.length, 0);
 });
