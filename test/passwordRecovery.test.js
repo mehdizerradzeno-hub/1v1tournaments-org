@@ -128,6 +128,25 @@ test('valid reset credential is atomically single-use and concurrent reuse is re
   assert.equal(await attempt(), false);
 });
 
+test('atomic recovery claims do not require an unavailable Lambda strong-read URL', async () => {
+  const { store, token } = await issueReset({ token: 'F'.repeat(43) });
+  const getWithMetadata = store.getWithMetadata.bind(store);
+
+  store.getWithMetadata = async (key, options) => {
+    assert.deepEqual(options, { consistency: 'eventual', type: 'json' });
+    return getWithMetadata(key, options);
+  };
+
+  assert.equal(await consumePlayerEmailCode({
+    email,
+    purpose: 'reset-password',
+    token,
+  }, {
+    now: () => baseTime + 1_000,
+    store,
+  }), true);
+});
+
 test('missing, malformed, wrong, and expired reset credentials fail safely', async () => {
   const missing = await issueReset({ token: 'B'.repeat(43) });
   assert.equal(await consumePlayerEmailCode({

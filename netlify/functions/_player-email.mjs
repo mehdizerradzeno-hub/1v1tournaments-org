@@ -152,10 +152,16 @@ export async function consumePlayerEmailCode(
   const store = options.store || getStoreWithFallback(CODE_STORE);
   const key = codeKey(purpose, email);
   const supportsAtomicClaim = typeof store.getWithMetadata === 'function';
+  // Newly created blobs are immediately available under Netlify's eventual
+  // consistency model. Use the returned ETag for the conditional claim below
+  // so stale edge reads still cannot make a recovery credential reusable.
+  // Lambda-compatible Blob contexts do not expose the uncached edge URL that
+  // the client requires for an explicit strong-consistency read.
+  const readOptions = { consistency: 'eventual', type: 'json' };
   const loaded = supportsAtomicClaim
-    ? await store.getWithMetadata(key, { consistency: 'strong', type: 'json' })
+    ? await store.getWithMetadata(key, readOptions)
     : null;
-  const record = loaded?.data || await store.get(key, { consistency: 'strong', type: 'json' });
+  const record = loaded?.data || await store.get(key, readOptions);
   const expiresAt = new Date(record?.expiresAt || 0).getTime();
   const suppliedCredential = String(token || code || '').trim().slice(0, MAX_CREDENTIAL_LENGTH);
   const suppliedHash = codeHash(purpose, email, suppliedCredential);
