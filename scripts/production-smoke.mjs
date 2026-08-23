@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 const baseUrl = String(process.env.SMOKE_BASE_URL || 'https://1v1tournaments.org').replace(/\/$/, '');
 
 const pageChecks = [
-  { path: '/', markers: ['Next tournament', 'Checking schedule'] },
+  { path: '/', markers: ['COMPETE IN 1V1', 'Choose your table'] },
   { path: '/next', markers: ['Next tournament'] },
   { path: '/live', markers: ['Control room', 'Broadcast hub'] },
   { path: '/admin', markers: ['Private admin unavailable', 'Sponsors'] },
