@@ -14,7 +14,7 @@ import {
 const STORE_NAME = 'site-analytics';
 const DAILY_PREFIX = 'day/';
 const MAX_BODY_BYTES = 2_048;
-const MAX_WRITE_ATTEMPTS = 6;
+const WRITE_RETRY_DELAYS_MS = [0, 25, 75, 150, 300, 600, 1_200, 2_000];
 
 function requestOrigin(event) {
   const value = event.headers?.origin || event.headers?.Origin || '';
@@ -96,13 +96,21 @@ function analyticsStore() {
   return getStoreWithFallback(STORE_NAME);
 }
 
-async function updateDailyAggregate(store, normalizedEvent, now = new Date()) {
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function updateDailyAggregate(store, normalizedEvent, now = new Date(), options = {}) {
   const date = now.toISOString().slice(0, 10);
   const key = `${DAILY_PREFIX}${date}.json`;
+  const retryDelays = options.retryDelays || WRITE_RETRY_DELAYS_MS;
 
-  for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
+  for (const delayMs of retryDelays) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+
     const current = await store.getWithMetadata(key, {
-      consistency: 'strong',
       type: 'json',
     });
     const aggregate = applySiteAnalyticsEvent(
@@ -140,7 +148,7 @@ async function loadRecentAggregates(store, days) {
     .sort()
     .slice(-days);
   const records = await Promise.all(keys.map((key) => (
-    store.get(key, { consistency: 'strong', type: 'json' })
+    store.get(key, { type: 'json' })
   )));
 
   return records.filter(Boolean);

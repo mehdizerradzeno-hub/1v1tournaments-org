@@ -7,6 +7,7 @@ import {
   normalizeSiteAnalyticsEvent,
   summarizeSiteAnalytics,
 } from '../netlify/functions/_site-analytics-utils.mjs';
+import { updateDailyAggregate } from '../netlify/functions/site-analytics.mjs';
 
 test('site analytics receiver keeps only the anonymous allowlisted event contract', () => {
   const normalized = normalizeSiteAnalyticsEvent({
@@ -155,4 +156,39 @@ test('site analytics caps distinct daily link buckets without losing click total
   assert.equal(record.counts.linkClicks, 205);
   assert.equal(record.links.length, 200);
   assert.equal(record.links.find((link) => link.to === '/other')?.count, 6);
+});
+
+test('site analytics uses supported cached reads and retries ETag conflicts', async () => {
+  const reads = [];
+  const writes = [];
+  let attempt = 0;
+  const store = {
+    async getWithMetadata(key, options) {
+      reads.push({ key, options });
+      return attempt === 0
+        ? null
+        : { data: createDailySiteAnalytics('2026-08-22'), etag: 'current-etag' };
+    },
+    async setJSON(key, value, options) {
+      writes.push({ key, options, value });
+      attempt += 1;
+      return { modified: attempt > 1 };
+    },
+  };
+  const event = normalizeSiteAnalyticsEvent({
+    event: 'page_view',
+    properties: { path: '/leaderboard' },
+  });
+
+  const aggregate = await updateDailyAggregate(
+    store,
+    event,
+    new Date('2026-08-22T21:30:00.000Z'),
+    { retryDelays: [0, 0] },
+  );
+
+  assert.deepEqual(reads.map((read) => read.options), [{ type: 'json' }, { type: 'json' }]);
+  assert.equal(writes[0].options.onlyIfNew, true);
+  assert.equal(writes[1].options.onlyIfMatch, 'current-etag');
+  assert.equal(aggregate.pages['/leaderboard'], 1);
 });

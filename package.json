@@ -28,7 +28,7 @@
     "bot:twitch:logs": "node scripts/twitch-bot-service.mjs logs"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.9",
+    "@netlify/blobs": "^10.7.13",
     "expo": "~56.0.12",
     "expo-router": "~56.2.11",
     "expo-status-bar": "~56.0.4",
