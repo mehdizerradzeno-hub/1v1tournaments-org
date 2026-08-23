@@ -10,14 +10,20 @@ async function prepareTournamentAccountReturn() {
   };
 }
 
-export default function TournamentAccountScreen({ initialMode = 'signin' }) {
+export default function TournamentAccountScreen({
+  initialEmail = '',
+  initialMode = 'signin',
+  initialRecoveryToken = '',
+}) {
   return (
     <GameAccountConnectScreen
       accountActions={SHARED_ACCOUNT_ACTIONS}
       badgeLabel="1V1 ACCOUNT"
       destination={TOURNAMENT_HOME_DESTINATION}
       gameName="Tournament Hub"
+      initialEmail={initialEmail}
       initialMode={initialMode}
+      initialRecoveryToken={initialRecoveryToken}
       prepareReturn={prepareTournamentAccountReturn}
       returnAfterSignOut
       signedOutManageFallback

@@ -159,7 +159,7 @@ async function createAccount(payload) {
   }), sessionCookie(session.token || session.id));
 }
 
-async function loginAccount(payload) {
+export async function loginAccount(payload, options = {}) {
   const email = cleanEmail(payload.contactEmail || payload.email);
   const password = String(payload.password || '');
 
@@ -167,13 +167,15 @@ async function loginAccount(payload) {
     return json(400, { error: 'Enter your account email and password.' });
   }
 
-  const account = await getAccountByEmail(email);
+  const resolveAccount = options.getAccountByEmail || getAccountByEmail;
+  const startSession = options.createSession || createSession;
+  const account = await resolveAccount(email);
 
   if (!account || !verifyPassword(password, account.password)) {
     return json(401, { error: 'That email and password did not match a player account.' });
   }
 
-  const session = await createSession(account);
+  const session = await startSession(account);
 
   return withCookie(
     json(200, { ok: true, account: publicPlayerAccount(account) }),
@@ -234,23 +236,36 @@ export async function deleteAccount(event, payload, options = {}) {
   );
 }
 
-async function requestEmailCode(payload, purpose) {
+export async function requestEmailCode(payload, purpose, options = {}) {
   const email = cleanEmail(payload.contactEmail || payload.email);
-  const account = isEmailLike(email) ? await getAccountByEmail(email) : null;
+  const resolveAccount = options.getAccountByEmail || getAccountByEmail;
+  const issueCode = options.issuePlayerEmailCode || issuePlayerEmailCode;
+  const providerConfigured = options.emailProviderConfigured || emailProviderConfigured;
+  const account = isEmailLike(email) ? await resolveAccount(email) : null;
 
   if (account) {
-    await issuePlayerEmailCode({
-      email,
-      playerName: account.playerName,
-      purpose,
-    });
+    try {
+      await issueCode({
+        email,
+        playerName: account.playerName,
+        purpose,
+      });
+    } catch {
+      const logError = options.logError || console.error;
+      logError('Player email delivery failed', { purpose });
+    }
   }
+
+  const configured = providerConfigured();
+  const recoveryMessage = purpose === 'reset-password'
+    ? 'If that player account exists, a password reset link was sent.'
+    : 'If that player account exists, a verification code was sent.';
 
   return json(200, {
     ok: true,
-    configured: emailProviderConfigured(),
-    message: emailProviderConfigured()
-      ? 'If that player account exists, a code was sent.'
+    configured,
+    message: configured
+      ? recoveryMessage
       : 'Email recovery is not configured yet. Contact the tournament host.',
   });
 }
@@ -278,7 +293,7 @@ async function verifyAccountEmail(payload) {
   return json(200, { ok: true, account: publicPlayerAccount(updated) });
 }
 
-async function resetAccountPassword(payload) {
+export async function resetAccountPassword(payload, options = {}) {
   const email = cleanEmail(payload.contactEmail || payload.email);
   const passwordCheck = requirePassword(payload.password, payload.confirmPassword);
 
@@ -286,11 +301,17 @@ async function resetAccountPassword(payload) {
     return json(400, { error: passwordCheck.error });
   }
 
-  const account = await getAccountByEmail(email);
-  const valid = account && await consumePlayerEmailCode({
+  const resolveAccount = options.getAccountByEmail || getAccountByEmail;
+  const consumeCode = options.consumePlayerEmailCode || consumePlayerEmailCode;
+  const persistAccount = options.saveAccount || saveAccount;
+  const removeSessions = options.deleteSessionsForAccount || deleteSessionsForAccount;
+  const hashPassword = options.createPasswordRecord || createPasswordRecord;
+  const account = await resolveAccount(email);
+  const valid = account && await consumeCode({
     code: payload.code,
     email,
     purpose: 'reset-password',
+    token: payload.token,
   });
 
   if (!valid) {
@@ -299,16 +320,21 @@ async function resetAccountPassword(payload) {
 
   const updated = {
     ...account,
-    password: createPasswordRecord(passwordCheck.password),
+    password: hashPassword(passwordCheck.password),
+    passwordChangedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  await saveAccount(updated);
-  const session = await createSession(updated);
+  await persistAccount(updated);
+  await removeSessions(updated.id);
 
   return withCookie(
-    json(200, { ok: true, account: publicPlayerAccount(updated) }),
-    sessionCookie(session.token || session.id),
+    json(200, {
+      ok: true,
+      account: null,
+      message: 'Password updated. Sign in with your new password.',
+    }),
+    clearSessionCookie(),
   );
 }
 

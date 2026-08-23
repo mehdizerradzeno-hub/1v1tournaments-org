@@ -4,6 +4,35 @@ export const SHARED_ACCOUNT_ACTIONS = Object.freeze([
   { id: 'reset', label: 'Reset Password' },
 ]);
 
+export function normalizeTournamentAccountMode(value) {
+  const mode = Array.isArray(value) ? value[0] : value;
+  return mode === 'create' || mode === 'reset' || mode === 'manage' ? mode : 'signin';
+}
+
+export function readPasswordRecoveryFragment(hash = globalThis.location?.hash || '') {
+  const fragment = String(hash || '').replace(/^#/, '');
+  const params = new URLSearchParams(fragment);
+
+  return {
+    email: String(params.get('email') || '').trim().toLowerCase().slice(0, 500),
+    token: String(params.get('token') || '').trim().slice(0, 512),
+  };
+}
+
+export function clearPasswordRecoveryFragment(
+  history = globalThis.history,
+  location = globalThis.location,
+) {
+  if (!history?.replaceState || !location?.hash) return false;
+
+  const search = new URLSearchParams(location.search || '');
+  if (search.get('mode') === 'reset') search.delete('mode');
+  const query = search.toString();
+
+  history.replaceState(null, '', `${location.pathname || '/account'}${query ? `?${query}` : ''}`);
+  return true;
+}
+
 export async function runAccountHandoffOnce(handoffRef, operation) {
   if (handoffRef.current) {
     return { executed: false, value: null };

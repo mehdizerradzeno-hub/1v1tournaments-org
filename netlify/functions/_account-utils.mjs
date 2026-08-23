@@ -103,6 +103,7 @@ export function createSignedSessionToken(session, account) {
     expiresAt: session.expiresAt,
     playerHandle: account.playerHandle || '',
     playerName: account.playerName,
+    passwordChangedAt: account.passwordChangedAt || '',
     sessionCreatedAt: session.createdAt,
     sessionId: session.id,
   };
@@ -455,11 +456,25 @@ export async function getAccountFromEvent(event, options = {}) {
       canonicalAccountId: signedSession.canonicalAccountId || signedSession.accountId,
       playerHandle: signedSession.playerHandle || '',
       playerName: signedSession.playerName,
+      passwordChangedAt: signedSession.passwordChangedAt || '',
     };
   }
 
   if (!account || account.id !== session.accountId) {
     logSmokeStage('account-rejected', { storedAccountFound: Boolean(account) });
+    return null;
+  }
+
+  const passwordChangedAt = new Date(account.passwordChangedAt || 0).getTime();
+  const sessionCreatedAt = new Date(session.createdAt || signedSession?.sessionCreatedAt || 0).getTime();
+
+  if (
+    Number.isFinite(passwordChangedAt)
+    && passwordChangedAt > 0
+    && (!Number.isFinite(sessionCreatedAt) || sessionCreatedAt <= passwordChangedAt)
+  ) {
+    await deleteSession(sessionToken, { store: sessionStore });
+    logSmokeStage('password-changed');
     return null;
   }
 

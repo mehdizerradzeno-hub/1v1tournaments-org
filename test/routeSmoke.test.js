@@ -477,6 +477,9 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(playerAccountSource, /enforceRateLimit/);
   assert.match(playerEmailSource, /RESEND_API_KEY/);
   assert.match(playerEmailSource, /Idempotency-Key/);
+  assert.match(playerEmailSource, /randomBytes/);
+  assert.match(playerEmailSource, /buildPasswordResetUrl/);
+  assert.match(playerEmailSource, /onlyIfMatch/);
   assert.match(rateLimitSource, /rate-limits/);
   assert.match(scheduledOpsUtilsSource, /TOURNAMENT_REMINDERS_ENABLED/);
   assert.match(reminderSource, /schedule: '\*\/5 \* \* \* \*'/);
@@ -625,7 +628,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(checkInScreenSource, /onSubmitEditing/);
   assert.match(checkInScreenSource, /returnKeyType="go"/);
   assert.match(checkInScreenSource, /Forgot password\?/);
-  assert.match(checkInScreenSource, /Reset and sign in/);
+  assert.match(checkInScreenSource, /Send reset link/);
   assert.match(checkInScreenSource, /Email verification/);
   assert.doesNotMatch(checkInScreenSource, /Sign In & Join Tournament/);
   assert.doesNotMatch(checkInScreenSource, /Create Account & Join Tournament/);

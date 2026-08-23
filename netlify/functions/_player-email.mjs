@@ -1,10 +1,18 @@
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
 import { accountKey, cleanEmail, getStoreWithFallback } from './_account-utils.mjs';
 
 const CODE_STORE = 'player-account-codes';
 const CODE_TTL_MS = 15 * 60 * 1000;
+const PASSWORD_RECOVERY_ORIGIN = 'https://1v1tournaments.org';
+const RESET_TOKEN_BYTES = 32;
+const MAX_CREDENTIAL_LENGTH = 512;
 
 function codeKey(purpose, email) {
   return `${purpose}/${accountKey(cleanEmail(email))}`;
@@ -58,21 +66,45 @@ export async function sendPlayerEmail({ to, subject, text, idempotencyKey = '' }
   return { configured: true, id: body.id || '', ok: true };
 }
 
-export async function issuePlayerEmailCode({ email, playerName = 'Player', purpose }) {
-  if (!emailProviderConfigured()) {
+export function buildPasswordResetUrl({ email, token }) {
+  const url = new URL('/account?mode=reset', PASSWORD_RECOVERY_ORIGIN);
+  url.hash = new URLSearchParams({
+    email: cleanEmail(email),
+    token: String(token || '').trim(),
+  }).toString();
+  return url.toString();
+}
+
+function recoveryCredential(purpose, options = {}) {
+  if (purpose === 'reset-password') {
+    return options.createResetToken?.()
+      || randomBytes(RESET_TOKEN_BYTES).toString('base64url');
+  }
+
+  return String(options.createEmailCode?.() || randomInt(100000, 1000000));
+}
+
+export async function issuePlayerEmailCode(
+  { email, playerName = 'Player', purpose },
+  options = {},
+) {
+  const providerConfigured = options.providerConfigured ?? emailProviderConfigured();
+
+  if (!providerConfigured) {
     return { configured: false, ok: false };
   }
 
-  const code = String(randomInt(100000, 1000000));
-  const now = Date.now();
+  const credential = recoveryCredential(purpose, options);
+  const now = options.now?.() ?? Date.now();
   const record = {
     email: cleanEmail(email),
     purpose,
-    codeHash: codeHash(purpose, email, code),
+    codeHash: codeHash(purpose, email, credential),
+    credentialType: purpose === 'reset-password' ? 'opaque-link-token' : 'six-digit-code',
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + CODE_TTL_MS).toISOString(),
   };
-  const store = getStoreWithFallback(CODE_STORE);
+  const store = options.store || getStoreWithFallback(CODE_STORE);
   const key = codeKey(purpose, email);
 
   await store.setJSON(key, record, {
@@ -82,14 +114,29 @@ export async function issuePlayerEmailCode({ email, playerName = 'Player', purpo
     },
   });
 
-  const purposeCopy = purpose === 'verify-email' ? 'verify your player email' : 'reset your player password';
-
   try {
-    const delivery = await sendPlayerEmail({
-      to: email,
-      subject: `1v1 Tournaments code: ${code}`,
-      text: `Hi ${playerName || 'Player'},\n\nUse code ${code} to ${purposeCopy}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
-    });
+    const deliver = options.sendPlayerEmail || sendPlayerEmail;
+    const delivery = purpose === 'reset-password'
+      ? await deliver({
+        to: email,
+        subject: 'Reset your 1v1 Tournaments password',
+        text: [
+          `Hi ${playerName || 'Player'},`,
+          '',
+          'Use this secure, one-time link to reset your 1v1 Tournaments password:',
+          buildPasswordResetUrl({ email, token: credential }),
+          '',
+          'This link expires in 15 minutes and can be used only once.',
+          'If it expires, request a new reset link from 1v1tournaments.org/account.',
+          '',
+          'If you did not request this, you can ignore this email.',
+        ].join('\n'),
+      })
+      : await deliver({
+        to: email,
+        subject: 'Verify your 1v1 Tournaments email',
+        text: `Hi ${playerName || 'Player'},\n\nUse code ${credential} to verify your player email. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
+      });
 
     return { ...delivery, expiresAt: record.expiresAt };
   } catch (error) {
@@ -98,15 +145,50 @@ export async function issuePlayerEmailCode({ email, playerName = 'Player', purpo
   }
 }
 
-export async function consumePlayerEmailCode({ email, purpose, code }) {
-  const store = getStoreWithFallback(CODE_STORE);
+export async function consumePlayerEmailCode(
+  { email, purpose, code, token },
+  options = {},
+) {
+  const store = options.store || getStoreWithFallback(CODE_STORE);
   const key = codeKey(purpose, email);
-  const record = await store.get(key, { type: 'json' });
+  const supportsAtomicClaim = typeof store.getWithMetadata === 'function';
+  const loaded = supportsAtomicClaim
+    ? await store.getWithMetadata(key, { consistency: 'strong', type: 'json' })
+    : null;
+  const record = loaded?.data || await store.get(key, { consistency: 'strong', type: 'json' });
   const expiresAt = new Date(record?.expiresAt || 0).getTime();
-  const suppliedHash = codeHash(purpose, email, code);
+  const suppliedCredential = String(token || code || '').trim().slice(0, MAX_CREDENTIAL_LENGTH);
+  const suppliedHash = codeHash(purpose, email, suppliedCredential);
 
-  if (!record || !Number.isFinite(expiresAt) || expiresAt <= Date.now() || !safeEqual(record.codeHash, suppliedHash)) {
+  if (
+    !record
+    || record.consumedAt
+    || !suppliedCredential
+    || !Number.isFinite(expiresAt)
+    || expiresAt <= (options.now?.() ?? Date.now())
+    || !safeEqual(record.codeHash, suppliedHash)
+  ) {
     return false;
+  }
+
+  if (supportsAtomicClaim && !loaded?.etag) {
+    return false;
+  }
+
+  if (loaded?.etag) {
+    const claimed = await store.setJSON(key, {
+      ...record,
+      consumedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
+    }, {
+      onlyIfMatch: loaded.etag,
+      metadata: {
+        consumed: true,
+        expiresAt: record.expiresAt,
+        purpose,
+      },
+    });
+
+    return claimed?.modified === true;
   }
 
   await store.delete(key);
