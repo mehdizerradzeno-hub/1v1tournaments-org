@@ -5,6 +5,7 @@ import {
   buildSiteEvent,
   sanitizeLinkDestination,
   sanitizeSitePath,
+  siteTelemetryAllowed,
 } from '../src/lib/siteObservability.js';
 
 test('site telemetry strips query strings, hashes, and external URL details', () => {
@@ -27,4 +28,10 @@ test('site telemetry only accepts an anonymous allowlisted schema', () => {
     to: '/check-in/event',
   });
   assert.equal(buildSiteEvent('player_identity', { playerName: 'Private Player' }), null);
+});
+
+test('site telemetry respects browser privacy signals', () => {
+  assert.equal(siteTelemetryAllowed({ doNotTrack: '1' }), false);
+  assert.equal(siteTelemetryAllowed({ globalPrivacyControl: true }), false);
+  assert.equal(siteTelemetryAllowed({ doNotTrack: '0', globalPrivacyControl: false }), true);
 });

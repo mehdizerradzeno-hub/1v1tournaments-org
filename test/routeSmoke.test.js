@@ -30,9 +30,11 @@ const overlayCompactRouteFile = fileURLToPath(new URL('../app/overlay/compact.js
 const tournamentRouteFile = fileURLToPath(new URL('../app/tournaments/[slug].jsx', import.meta.url));
 const checkInRouteFile = fileURLToPath(new URL('../app/check-in/[slug].jsx', import.meta.url));
 const adminRouteFile = fileURLToPath(new URL('../app/admin.jsx', import.meta.url));
+const adminAnalyticsRouteFile = fileURLToPath(new URL('../app/admin/analytics.jsx', import.meta.url));
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
 const indexRouteFile = fileURLToPath(new URL('../app/index.jsx', import.meta.url));
 const adminScreenFile = fileURLToPath(new URL('../src/screens/AdminScreen.jsx', import.meta.url));
+const analyticsAdminScreenFile = fileURLToPath(new URL('../src/screens/AnalyticsAdminScreen.jsx', import.meta.url));
 const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', import.meta.url));
 const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
 const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
@@ -69,6 +71,8 @@ const tournamentEventsUtilsFile = fileURLToPath(new URL('../netlify/functions/_t
 const discordAlertFunctionFile = fileURLToPath(new URL('../netlify/functions/discord-alert.mjs', import.meta.url));
 const streamCommandsFunctionFile = fileURLToPath(new URL('../netlify/functions/stream-commands.mjs', import.meta.url));
 const healthFunctionFile = fileURLToPath(new URL('../netlify/functions/health.mjs', import.meta.url));
+const siteAnalyticsFunctionFile = fileURLToPath(new URL('../netlify/functions/site-analytics.mjs', import.meta.url));
+const siteAnalyticsUtilsFile = fileURLToPath(new URL('../netlify/functions/_site-analytics-utils.mjs', import.meta.url));
 const sponsorInquiriesFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-inquiries.mjs', import.meta.url));
 const sponsorProspectsFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-prospects.mjs', import.meta.url));
 const sponsorCollateralFunctionFile = fileURLToPath(new URL('../netlify/functions/sponsor-collateral.mjs', import.meta.url));
@@ -564,7 +568,10 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /CompetitionFilterTabs/);
-  assert.match(leaderboardScreenSource, /Tournament ranking snapshot/);
+  assert.match(leaderboardScreenSource, /Current competition snapshot/);
+  assert.match(leaderboardScreenSource, /title="Podium"/);
+  assert.match(leaderboardScreenSource, /Search ranked players/);
+  assert.match(leaderboardScreenSource, /title="How ranking works"/);
   assert.match(nextScreenSource, /Check Match Status/);
   assert.doesNotMatch(nextScreenSource, /Host Admin/);
   assert.match(nextScreenSource, /1V1 Community Cups/);
@@ -717,6 +724,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /handleCopyPlayerInstructions/);
   assert.match(adminScreenSource, /Tournament controls/);
   assert.match(adminScreenSource, /Edit selected event/);
+  assert.match(adminScreenSource, /Site analytics/);
   assert.match(adminScreenSource, /Select tournament/);
   assert.match(adminScreenSource, /Refresh roster/);
   assert.match(adminScreenSource, /Clear roster only/);
@@ -749,4 +757,31 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(hostingClientSource, /saveStreamCommands/);
   assert.match(hostingClientSource, /adminHeaders/);
   assert.match(hostingClientSource, /credentials: 'include'/);
+});
+
+test('host analytics stays private and aggregate-only', () => {
+  assert.ok(existsSync(adminAnalyticsRouteFile));
+  assert.ok(existsSync(analyticsAdminScreenFile));
+  assert.ok(existsSync(siteAnalyticsFunctionFile));
+  assert.ok(existsSync(siteAnalyticsUtilsFile));
+
+  const routeSource = readFileSync(adminAnalyticsRouteFile, 'utf8');
+  const screenSource = readFileSync(analyticsAdminScreenFile, 'utf8');
+  const functionSource = readFileSync(siteAnalyticsFunctionFile, 'utf8');
+  const utilsSource = readFileSync(siteAnalyticsUtilsFile, 'utf8');
+  const hostingClientSource = readFileSync(hostingClientFile, 'utf8');
+
+  assert.match(routeSource, /AnalyticsAdminScreen/);
+  assert.match(screenSource, /Site performance analytics/);
+  assert.match(screenSource, /Host access required/);
+  assert.match(screenSource, /No personal or raw data|Personal or raw data/);
+  assert.match(screenSource, /fetchSiteAnalytics/);
+  assert.match(functionSource, /requireTournamentAdmin/);
+  assert.match(functionSource, /anonymous-daily-aggregate/);
+  assert.match(functionSource, /onlyIfMatch/);
+  assert.match(functionSource, /rawEventsStored: false/);
+  assert.match(utilsSource, /MAX_PAGE_BUCKETS/);
+  assert.match(utilsSource, /normalizeSiteAnalyticsEvent/);
+  assert.match(hostingClientSource, /SITE_ANALYTICS_ENDPOINT/);
+  assert.match(hostingClientSource, /fetchSiteAnalytics/);
 });

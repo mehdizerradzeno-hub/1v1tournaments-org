@@ -1,5 +1,9 @@
 function cleanName(value) {
-  return String(value || '').trim();
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function playerKey(value) {
+  return cleanName(value).toLocaleLowerCase('en-US');
 }
 
 function resultDateMs(result) {
@@ -24,16 +28,17 @@ function createEntry(name) {
 
 function ensureEntry(entriesByName, name) {
   const clean = cleanName(name);
+  const key = playerKey(clean);
 
-  if (!clean) {
+  if (!key) {
     return null;
   }
 
-  if (!entriesByName.has(clean)) {
-    entriesByName.set(clean, createEntry(clean));
+  if (!entriesByName.has(key)) {
+    entriesByName.set(key, createEntry(clean));
   }
 
-  return entriesByName.get(clean);
+  return entriesByName.get(key);
 }
 
 function applyPlacement(entry, result, placement) {
@@ -121,7 +126,16 @@ export function buildTournamentLeaderboard(results = [], options = {}) {
   });
 
   filteredResults.forEach((result) => {
+    const placedPlayers = new Set();
+
     result.placements.forEach((placement) => {
+      const key = playerKey(placement.name);
+
+      if (!key || placedPlayers.has(key)) {
+        return;
+      }
+
+      placedPlayers.add(key);
       const entry = ensureEntry(entriesByName, placement.name);
       if (entry) {
         applyPlacement(entry, result, placement);
@@ -153,11 +167,11 @@ export function buildTournamentLeaderboard(results = [], options = {}) {
       };
     })
     .sort((left, right) =>
-      right.score - left.score
-      || right.tournamentWins - left.tournamentWins
+      right.tournamentWins - left.tournamentWins
       || right.finalsMade - left.finalsMade
       || right.matchWins - left.matchWins
       || left.matchLosses - right.matchLosses
+      || right.eventsPlayed - left.eventsPlayed
       || left.name.localeCompare(right.name),
     )
     .map((entry, index) => ({ ...entry, rank: index + 1 }));

@@ -16,6 +16,7 @@ const HEALTH_ENDPOINT = '/.netlify/functions/health';
 const SPONSOR_INQUIRIES_ENDPOINT = '/.netlify/functions/sponsor-inquiries';
 const SPONSOR_PROSPECTS_ENDPOINT = '/.netlify/functions/sponsor-prospects';
 const SPONSOR_COLLATERAL_ENDPOINT = '/.netlify/functions/sponsor-collateral';
+const SITE_ANALYTICS_ENDPOINT = '/.netlify/functions/site-analytics';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
 
@@ -103,6 +104,21 @@ export async function fetchPlayerAccount() {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Player account could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchSiteAnalytics({ days = 30, token = '' } = {}) {
+  const safeDays = Math.max(1, Math.min(90, Math.round(Number(days) || 30)));
+  const response = await fetch(`${SITE_ANALYTICS_ENDPOINT}?days=${safeDays}`, {
+    credentials: 'include',
+    headers: adminHeaders(token),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Site analytics could not be loaded.');
   }
 
   return result;

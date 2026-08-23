@@ -18,6 +18,17 @@ function configuredTelemetryEndpoint() {
     ? process.env.EXPO_PUBLIC_SITE_TELEMETRY_ENDPOINT || ''
     : '';
 
+  if (!value) {
+    const location = globalThis.location;
+    const isProductionSite = location?.protocol === 'https:' && (
+      location.hostname === '1v1tournaments.org'
+      || location.hostname === 'www.1v1tournaments.org'
+      || location.hostname.endsWith('.netlify.app')
+    );
+
+    return isProductionSite ? '/.netlify/functions/site-analytics' : '';
+  }
+
   if (value.startsWith('/')) {
     return value;
   }
@@ -28,6 +39,11 @@ function configuredTelemetryEndpoint() {
   } catch {
     return '';
   }
+}
+
+export function siteTelemetryAllowed(navigatorValue = globalThis.navigator) {
+  return navigatorValue?.globalPrivacyControl !== true
+    && navigatorValue?.doNotTrack !== '1';
 }
 
 export function sanitizeSitePath(value) {
@@ -96,7 +112,6 @@ export function buildSiteEvent(eventName, properties = {}) {
   return {
     event: eventName,
     properties: sanitizeProperties(eventName, properties),
-    timestamp: new Date().toISOString(),
   };
 }
 
@@ -111,12 +126,13 @@ export function trackSiteEvent(eventName, properties = {}) {
     globalThis.dispatchEvent(new globalThis.CustomEvent(SITE_EVENT_NAME, { detail: event }));
   }
 
-  const endpoint = configuredTelemetryEndpoint();
+  const endpoint = siteTelemetryAllowed() ? configuredTelemetryEndpoint() : '';
 
   if (endpoint && typeof globalThis.fetch === 'function') {
     globalThis.fetch(endpoint, {
       method: 'POST',
       credentials: 'omit',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event),
       keepalive: true,

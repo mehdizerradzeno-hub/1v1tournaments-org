@@ -2149,6 +2149,9 @@ export default function AdminScreen() {
             <ActionButton href="/admin#edit-tournament" style={styles.quickActionButton}>
               Edit selected event
             </ActionButton>
+            <ActionButton href="/admin/analytics" style={styles.quickActionButton} variant="secondary">
+              Site analytics
+            </ActionButton>
             <ActionButton href={tournamentPath} style={styles.quickActionButton} variant="secondary">
               Open event page
             </ActionButton>

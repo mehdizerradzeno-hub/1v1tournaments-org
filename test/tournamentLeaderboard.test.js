@@ -79,3 +79,43 @@ test('tournament leaderboard can filter by game', () => {
   assert.equal(spadesOnly[0].name, 'Spades Player');
   assert.equal(spadesOnly[0].eventsPlayed, 1);
 });
+
+test('a tournament championship outranks volume without a title', () => {
+  const results = [
+    {
+      slug: 'championship-event',
+      gameSlug: 'spades',
+      title: 'Championship Event',
+      date: '2026-08-01T20:00:00Z',
+      placements: [
+        { place: 1, name: 'One-Time Champion' },
+        { place: 2, name: 'Frequent Finalist' },
+      ],
+      matchRecords: [
+        { name: 'One-Time Champion', wins: 1, losses: 0 },
+        { name: 'Frequent Finalist', wins: 8, losses: 1 },
+      ],
+    },
+    ...Array.from({ length: 5 }, (_, index) => ({
+      slug: `finalist-event-${index}`,
+      gameSlug: 'spades',
+      title: `Finalist Event ${index}`,
+      date: `2026-08-${String(index + 2).padStart(2, '0')}T20:00:00Z`,
+      placements: [
+        { place: 1, name: `Other Champion ${index}` },
+        { place: 2, name: 'Frequent Finalist' },
+      ],
+      matchRecords: [
+        { name: `Other Champion ${index}`, wins: 1, losses: 0 },
+        { name: 'Frequent Finalist', wins: 8, losses: 1 },
+      ],
+    })),
+  ];
+
+  const leaderboard = buildTournamentLeaderboard(results);
+
+  assert.ok(
+    leaderboard.findIndex((entry) => entry.name === 'One-Time Champion')
+      < leaderboard.findIndex((entry) => entry.name === 'Frequent Finalist'),
+  );
+});

@@ -564,8 +564,8 @@ export function ResultCard({ result, href }) {
       </View>
       <Text style={styles.resultDate}>{dateLabel}</Text>
       <View style={styles.placementList}>
-        {placements.map((placement) => (
-          <View key={`${result.slug}-${placement.place}`} style={styles.placementRow}>
+        {placements.map((placement, index) => (
+          <View key={`${result.slug}-${placement.place}-${placement.name}-${index}`} style={styles.placementRow}>
             <Text style={styles.placementLabel}>{formatPlacement(placement.place)}</Text>
             <Text style={styles.placementName}>{placement.name}</Text>
           </View>
