@@ -1,7 +1,7 @@
 import { prepareSharedAccountLaunch } from './sharedAccountLaunch.js';
 
 export const EUCHRE_ACCOUNT_ENTRY_ROUTE = '/connect/euchre';
-export const EUCHRE_ACCOUNT_DESTINATION = 'https://onev1-euchre-preview.onrender.com/';
+export const EUCHRE_ACCOUNT_DESTINATION = 'https://1v1euchre.com/';
 export const EUCHRE_SIGNED_OUT_ACCOUNT_ACTIONS = Object.freeze([
   { id: 'signin', label: 'Sign In' },
   { id: 'create', label: 'Create Account' },
