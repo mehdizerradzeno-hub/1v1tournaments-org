@@ -99,14 +99,14 @@ test('Forgot and Reset Password use the existing recovery actions', async () => 
   );
   const resetBody = await captureAccountAction(() => resetPlayerPassword({
     contactEmail: 'player@example.com',
-    code: '123456',
+    token: 'opaque-recovery-token',
     password: 'new-safe-password',
     confirmPassword: 'new-safe-password',
   }));
 
   assert.equal(requestBody.action, 'request-password-reset');
   assert.equal(resetBody.action, 'reset-password');
-  assert.equal(resetBody.code, '123456');
+  assert.equal(resetBody.token, 'opaque-recovery-token');
 });
 
 test('Sign Out uses the authoritative shared player-account logout action', async () => {

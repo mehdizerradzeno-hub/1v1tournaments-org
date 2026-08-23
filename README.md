@@ -78,9 +78,13 @@ Future edits:
 
 ## Account Recovery And Verification
 
-Player passwords are stored as salted scrypt hashes. Password reset and optional email
-verification use six-digit, single-use codes that expire after 15 minutes. Account actions
-are rate-limited by a hashed network/account fingerprint.
+Player passwords are stored as salted scrypt hashes. Password reset uses a hashed,
+256-bit single-use credential in a production `https://1v1tournaments.org/account`
+link. The credential stays in the URL fragment so it is not sent in the page request or
+referrer. Optional email verification continues to use a six-digit single-use code.
+Both credentials expire after 15 minutes. Account actions are rate-limited by a hashed
+network/account fingerprint, and a successful password reset invalidates existing player
+sessions before the user signs in with the new password.
 
 Configure these Netlify environment variables to enable email delivery:
 

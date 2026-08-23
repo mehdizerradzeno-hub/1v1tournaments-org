@@ -25,6 +25,7 @@ import {
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../lib/spadesAccountConnect.js';
 import {
+  clearPasswordRecoveryFragment,
   resolveAccountConnectMode,
   returnToGameWithoutAccountChange,
   runAccountHandoffOnce,
@@ -73,6 +74,8 @@ function AccountForm({ children, onSubmit }) {
 
 export function GameAccountConnectScreen({
   initialMode = 'signin',
+  initialEmail = '',
+  initialRecoveryToken = '',
   gameName = 'Spades',
   badgeLabel = '1V1 SPADES',
   destination = SPADES_ACCOUNT_DESTINATION,
@@ -90,11 +93,11 @@ export function GameAccountConnectScreen({
   const [message, setMessage] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
+  const [contactEmail, setContactEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [recoveryRequested, setRecoveryRequested] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryRequested, setRecoveryRequested] = useState(Boolean(initialRecoveryToken));
+  const [recoveryToken, setRecoveryToken] = useState(initialRecoveryToken);
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -129,7 +132,11 @@ export function GameAccountConnectScreen({
     setMode(nextMode);
     setError('');
     setMessage('');
-    if (nextMode !== 'reset') setRecoveryRequested(false);
+    if (nextMode !== 'reset') {
+      setRecoveryRequested(false);
+      setRecoveryToken('');
+      clearPasswordRecoveryFragment();
+    }
   };
 
   const submitAccountForm = () => {
@@ -207,7 +214,12 @@ export function GameAccountConnectScreen({
     try {
       const result = await requestPlayerPasswordReset({ contactEmail });
       setRecoveryRequested(Boolean(result.configured));
-      setMessage(result.message || 'If that account exists, password reset instructions were sent.');
+      if (result.configured) {
+        setMessage(result.message || 'If that account exists, password reset instructions were sent.');
+      } else {
+        setMessage('');
+        setError(result.message || 'Email recovery is not configured. Contact the tournament host.');
+      }
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Password reset could not be requested.');
     } finally {
@@ -225,16 +237,17 @@ export function GameAccountConnectScreen({
     try {
       await resetPlayerPassword({
         contactEmail,
-        code: recoveryCode,
+        token: recoveryToken,
         password: recoveryPassword,
         confirmPassword: recoveryConfirmPassword,
       });
       setPassword('');
-      setRecoveryCode('');
+      setRecoveryToken('');
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setRecoveryRequested(false);
       setMode('signin');
+      clearPasswordRecoveryFragment();
       setMessage('Password updated. Sign in with your new password.');
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Password reset could not be completed.');
@@ -269,7 +282,7 @@ export function GameAccountConnectScreen({
       setPassword('');
       setConfirmPassword('');
       setRecoveryRequested(false);
-      setRecoveryCode('');
+      setRecoveryToken('');
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
@@ -304,7 +317,7 @@ export function GameAccountConnectScreen({
       setPassword('');
       setConfirmPassword('');
       setRecoveryRequested(false);
-      setRecoveryCode('');
+      setRecoveryToken('');
       setRecoveryPassword('');
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
@@ -525,25 +538,12 @@ export function GameAccountConnectScreen({
 
             {mode === 'reset' ? (
               <>
-                {!recoveryRequested ? (
+                {!recoveryToken ? (
                   <ActionButton disabled={submitting} onPress={requestReset}>
-                    {submitting ? 'Sending...' : 'Send Reset Code'}
+                    {submitting ? 'Sending...' : recoveryRequested ? 'Send Another Reset Link' : 'Send Reset Link'}
                   </ActionButton>
                 ) : (
                   <>
-                    <Text style={styles.fieldLabel}>Reset code</Text>
-                    <TextInput
-                      {...inputProps(setRecoveryCode, {
-                        autoComplete: 'one-time-code',
-                        label: 'Reset code',
-                        name: 'reset-code',
-                        textContentType: 'oneTimeCode',
-                      })}
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="000000"
-                      value={recoveryCode}
-                    />
                     <Text style={styles.fieldLabel}>New password</Text>
                     <TextInput
                       {...inputProps(setRecoveryPassword, {
@@ -570,6 +570,18 @@ export function GameAccountConnectScreen({
                     />
                     <ActionButton disabled={submitting} onPress={resetPassword}>
                       {submitting ? 'Updating...' : 'Reset Password'}
+                    </ActionButton>
+                    <ActionButton
+                      disabled={submitting}
+                      onPress={() => {
+                        setRecoveryRequested(false);
+                        setRecoveryToken('');
+                        setError('');
+                        setMessage('Request a new reset link for this account email.');
+                        clearPasswordRecoveryFragment();
+                      }}
+                      variant="secondary">
+                      Request a New Reset Link
                     </ActionButton>
                   </>
                 )}

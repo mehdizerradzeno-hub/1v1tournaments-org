@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import {
+  normalizeTournamentAccountMode,
+  readPasswordRecoveryFragment,
+} from '../src/lib/accountConnect.js';
+
 const homeSource = await readFile(new URL('../src/screens/HomeScreen.jsx', import.meta.url), 'utf8');
 const nextSource = await readFile(new URL('../src/screens/NextScreen.jsx', import.meta.url), 'utf8');
 const hubSource = await readFile(new URL('../src/components/hub-ui.jsx', import.meta.url), 'utf8');
@@ -34,6 +39,11 @@ test('Tournament Hub account route reuses the existing authoritative account flo
   assert.match(sharedAccountScreenSource, /fetchPlayerAccount/);
   assert.match(sharedAccountScreenSource, /loginPlayerAccount/);
   assert.match(sharedAccountScreenSource, /logoutPlayerAccount/);
+  assert.equal(normalizeTournamentAccountMode('reset'), 'reset');
+  assert.deepEqual(
+    readPasswordRecoveryFragment('#email=player%40example.com&token=opaque-token'),
+    { email: 'player@example.com', token: 'opaque-token' },
+  );
 });
 
 test('mobile header remains compact and exposes only one Sign Out action', () => {

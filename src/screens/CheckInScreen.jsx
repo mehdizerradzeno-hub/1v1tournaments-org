@@ -24,7 +24,6 @@ import {
   logoutPlayerAccount,
   requestPlayerEmailVerification,
   requestPlayerPasswordReset,
-  resetPlayerPassword,
   submitTournamentSignup,
   verifyPlayerEmail,
 } from '../lib/tournamentHostingClient.js';
@@ -366,9 +365,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [emailRecoveryConfigured, setEmailRecoveryConfigured] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [recoveryRequested, setRecoveryRequested] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState('');
-  const [recoveryPassword, setRecoveryPassword] = useState('');
-  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [recoverySubmitting, setRecoverySubmitting] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [verificationRequested, setVerificationRequested] = useState(false);
@@ -776,54 +772,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     try {
       const result = await requestPlayerPasswordReset({ contactEmail });
       setRecoveryRequested(Boolean(result.configured));
-      setAccountMessage(result.message || 'Check your email for a recovery code.');
+      setAccountMessage(result.message || 'Check your email for a password reset link.');
     } catch (recoveryError) {
-      setAccountError(recoveryError instanceof Error ? recoveryError.message : 'A recovery code could not be requested.');
+      setAccountError(recoveryError instanceof Error ? recoveryError.message : 'A recovery link could not be requested.');
     } finally {
       setRecoverySubmitting(false);
-    }
-  }
-
-  async function handleResetPassword() {
-    const passwordError = getPasswordError(recoveryPassword, recoveryConfirmPassword);
-
-    if (!recoveryCode.trim()) {
-      setAccountError('Enter the recovery code from your email.');
-      return;
-    }
-
-    if (passwordError) {
-      setAccountError(passwordError);
-      return;
-    }
-
-    setRecoverySubmitting(true);
-    setAccountError('');
-    setAccountMessage('');
-
-    try {
-      const result = await resetPlayerPassword({
-        contactEmail,
-        code: recoveryCode,
-        password: recoveryPassword,
-        confirmPassword: recoveryConfirmPassword,
-      });
-      const nextAccount = await loadConfirmedAccount(result.account);
-
-      setAccount(nextAccount);
-      notifyPlayerAccountChanged(nextAccount);
-      setRecoveryOpen(false);
-      setRecoveryRequested(false);
-      setRecoveryCode('');
-      setRecoveryPassword('');
-      setRecoveryConfirmPassword('');
-      setPassword('');
-      setAccountMessage(`Password updated. Signed in as ${nextAccount?.playerName || contactEmail}.`);
-    } catch (recoveryError) {
-      setAccountError(recoveryError instanceof Error ? recoveryError.message : 'The password could not be reset.');
-    } finally {
-      setRecoverySubmitting(false);
-      setAccountLoading(false);
     }
   }
 
@@ -1375,83 +1328,17 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   <Badge tone="blue">Account recovery</Badge>
                   <Text style={styles.recoveryTitle}>Reset your password</Text>
                   <Text style={styles.recoveryCopy}>
-                    We will send a six-digit code to the account email above. Codes expire after 15 minutes.
+                    We will send a secure, one-time link to the account email above. The link expires after 15 minutes.
                   </Text>
                   {recoveryRequested ? (
-                    <>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Recovery code</Text>
-                        <TextInput
-                          {...formFieldProps({
-                            autoComplete: 'one-time-code',
-                            label: 'Recovery code',
-                            name: 'recovery-code',
-                            textContentType: 'oneTimeCode',
-                          })}
-                          inputMode="numeric"
-                          maxLength={6}
-                          onChangeText={setRecoveryCode}
-                          placeholder="000000"
-                          placeholderTextColor="#6B766F"
-                          style={styles.input}
-                          value={recoveryCode}
-                        />
-                      </View>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>New password</Text>
-                        <TextInput
-                          {...formFieldProps({
-                            autoComplete: 'new-password',
-                            label: 'New password',
-                            name: 'new-password',
-                            textContentType: 'newPassword',
-                          })}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          onChangeText={setRecoveryPassword}
-                          placeholder="At least 8 characters"
-                          placeholderTextColor="#6B766F"
-                          secureTextEntry
-                          style={styles.input}
-                          value={recoveryPassword}
-                        />
-                      </View>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Confirm new password</Text>
-                        <TextInput
-                          {...formFieldProps({
-                            autoComplete: 'new-password',
-                            label: 'Confirm new password',
-                            name: 'confirm-new-password',
-                            textContentType: 'newPassword',
-                          })}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          onChangeText={setRecoveryConfirmPassword}
-                          onSubmitEditing={() => {
-                            if (!recoverySubmitting) {
-                              handleResetPassword();
-                            }
-                          }}
-                          placeholder="Type it again"
-                          placeholderTextColor="#6B766F"
-                          returnKeyType="go"
-                          secureTextEntry
-                          style={styles.input}
-                          value={recoveryConfirmPassword}
-                        />
-                      </View>
-                    </>
+                    <Text accessibilityLiveRegion="polite" style={styles.recoveryCopy}>
+                      Check your email and open the reset link. If it expires, request another link here.
+                    </Text>
                   ) : null}
                   <View style={styles.buttonRow}>
                     <ActionButton disabled={recoverySubmitting} onPress={handleRequestPasswordReset} variant="secondary">
-                      {recoverySubmitting ? 'Sending...' : recoveryRequested ? 'Send another code' : 'Send recovery code'}
+                      {recoverySubmitting ? 'Sending...' : recoveryRequested ? 'Send another reset link' : 'Send reset link'}
                     </ActionButton>
-                    {recoveryRequested ? (
-                      <ActionButton disabled={recoverySubmitting} onPress={handleResetPassword}>
-                        Reset and sign in
-                      </ActionButton>
-                    ) : null}
                   </View>
                 </View>
               ) : null}
