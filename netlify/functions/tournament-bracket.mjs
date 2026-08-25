@@ -19,7 +19,71 @@ import {
   normalizeTournamentResultCallback,
 } from './_tournament-game-contract.mjs';
 
-const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
+const PRODUCTION_SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
+const PRODUCTION_TOURNAMENT_HUB_ORIGIN = 'https://1v1tournaments.org';
+
+function configuredHttpsUrl(value, fallback, environmentKey, {
+  forbiddenQaHosts = [],
+  originOnly = false,
+  qaEnvironment = false,
+} = {}) {
+  const configured = cleanText(value);
+  if (qaEnvironment && !configured) {
+    throw new Error(`${environmentKey} is required in QA.`);
+  }
+  const candidate = configured || fallback;
+  let url;
+
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error(`${environmentKey} must be a valid HTTPS URL.`);
+  }
+
+  if (
+    url.protocol !== 'https:'
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+    || (originOnly && url.pathname !== '/')
+    || (qaEnvironment && forbiddenQaHosts.includes(url.hostname))
+  ) {
+    throw new Error(`${environmentKey} must be a credential-free HTTPS ${originOnly ? 'origin' : 'URL'}.`);
+  }
+
+  return originOnly ? url.origin : `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+}
+
+export function spadesMatchBaseUrl(env = process.env) {
+  const qaEnvironment = cleanText(env.APP_ENV).toLowerCase().includes('qa');
+  return configuredHttpsUrl(
+    env.SPADES_MATCH_BASE_URL,
+    PRODUCTION_SPADES_MATCH_BASE_URL,
+    'SPADES_MATCH_BASE_URL',
+    { forbiddenQaHosts: ['1v1spades.com', 'www.1v1spades.com'], qaEnvironment },
+  );
+}
+
+export function tournamentHubOrigin(env = process.env) {
+  const qaEnvironment = cleanText(env.APP_ENV).toLowerCase().includes('qa');
+  return configuredHttpsUrl(
+    env.TOURNAMENT_HUB_ORIGIN,
+    PRODUCTION_TOURNAMENT_HUB_ORIGIN,
+    'TOURNAMENT_HUB_ORIGIN',
+    {
+      forbiddenQaHosts: ['1v1tournaments.org', 'www.1v1tournaments.org'],
+      originOnly: true,
+      qaEnvironment,
+    },
+  );
+}
+
+export function tournamentResultCallbackEndpoint(tournamentSlug, env = process.env) {
+  const endpoint = new URL('/.netlify/functions/tournament-bracket', tournamentHubOrigin(env));
+  endpoint.searchParams.set('slug', tournamentSlug);
+  return endpoint.toString();
+}
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -110,7 +174,7 @@ function roomUrl(tournamentSlug, roundIndex, matchIndex, gameSlug = 'spades') {
     return '';
   }
 
-  return `${SPADES_MATCH_BASE_URL}/${tournamentSlug}-r${roundIndex}-m${matchIndex}`;
+  return `${spadesMatchBaseUrl()}/${tournamentSlug}-r${roundIndex}-m${matchIndex}`;
 }
 
 function pairSlots(participants, size) {
@@ -351,7 +415,7 @@ export function buildBracket({ tournamentSlug, signups, includeAdminFields = fal
     status: 'published',
     format: 'single-elimination',
     gameSlug: normalizedGame,
-    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
+    matchBaseUrl: normalizedGame === 'spades' ? spadesMatchBaseUrl() : '',
     participantCount: participants.length,
     participants,
     rounds,
@@ -498,7 +562,7 @@ export function buildFourPlayerDoubleEliminationBracket({ tournamentSlug, signup
     status: 'published',
     format: 'four-player-double-elimination',
     gameSlug: normalizedGame,
-    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
+    matchBaseUrl: normalizedGame === 'spades' ? spadesMatchBaseUrl() : '',
     participantCount: participants.length,
     participants,
     rounds,
@@ -595,7 +659,7 @@ export function buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includ
     status: 'published',
     format: 'three-player-two-life',
     gameSlug: normalizedGame,
-    matchBaseUrl: normalizedGame === 'spades' ? SPADES_MATCH_BASE_URL : '',
+    matchBaseUrl: normalizedGame === 'spades' ? spadesMatchBaseUrl() : '',
     participantCount: participants.length,
     participants,
     standings: participants.map((participant) => ({
@@ -688,7 +752,7 @@ function publicMatchDetails(bracket, matchId) {
           ),
         },
         resultCallback: {
-          endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
+          endpoint: tournamentResultCallbackEndpoint(bracket.tournamentSlug),
           method: 'POST',
           tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
           bodyTemplate: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'

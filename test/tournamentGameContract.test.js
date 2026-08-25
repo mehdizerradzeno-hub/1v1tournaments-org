@@ -15,6 +15,9 @@ import {
   buildBracket,
   findMatch,
   handler as bracketHandler,
+  spadesMatchBaseUrl,
+  tournamentHubOrigin,
+  tournamentResultCallbackEndpoint,
 } from '../netlify/functions/tournament-bracket.mjs';
 import { matchAccessPayload, ticketKey } from '../netlify/functions/tournament-match-access.mjs';
 
@@ -112,6 +115,50 @@ test('Spades launch path and opaque ticket hashing remain unchanged', () => {
   assert.equal(launch.searchParams.get('ticket'), 'opaque-ticket');
   assert.equal(launch.searchParams.has('tournamentReturnPath'), false);
   assert.equal(ticketKey('opaque-ticket'), 'f13ee9b2677f32949e09f039d588b7b401291659f611ee9a1881283f5a3ba481.json');
+});
+
+test('tournament deployment targets keep production defaults and accept only explicit HTTPS QA targets', () => {
+  assert.equal(spadesMatchBaseUrl({}), 'https://1v1spades.com/match');
+  assert.equal(tournamentHubOrigin({}), 'https://1v1tournaments.org');
+
+  const qaEnvironment = {
+    APP_ENV: 'qa-preview',
+    SPADES_MATCH_BASE_URL: 'https://onev1-spades-phase3c-qa.onrender.com/match/',
+    TOURNAMENT_HUB_ORIGIN: 'https://1v1tournaments-spades-qa-20260825.netlify.app',
+  };
+
+  assert.equal(
+    spadesMatchBaseUrl(qaEnvironment),
+    'https://onev1-spades-phase3c-qa.onrender.com/match',
+  );
+  assert.equal(
+    tournamentHubOrigin(qaEnvironment),
+    'https://1v1tournaments-spades-qa-20260825.netlify.app',
+  );
+  assert.equal(
+    tournamentResultCallbackEndpoint('qa-bracket', qaEnvironment),
+    'https://1v1tournaments-spades-qa-20260825.netlify.app/.netlify/functions/tournament-bracket?slug=qa-bracket',
+  );
+
+  assert.throws(
+    () => spadesMatchBaseUrl({ SPADES_MATCH_BASE_URL: 'http://10.0.2.2:10000/match' }),
+    /credential-free HTTPS URL/,
+  );
+  assert.throws(
+    () => tournamentHubOrigin({ TOURNAMENT_HUB_ORIGIN: 'https://qa.example/path' }),
+    /credential-free HTTPS origin/,
+  );
+  assert.throws(
+    () => spadesMatchBaseUrl({ APP_ENV: 'qa-preview' }),
+    /SPADES_MATCH_BASE_URL is required in QA/,
+  );
+  assert.throws(
+    () => tournamentHubOrigin({
+      APP_ENV: 'qa-preview',
+      TOURNAMENT_HUB_ORIGIN: 'https://1v1tournaments.org',
+    }),
+    /credential-free HTTPS origin/,
+  );
 });
 
 test('verified Euchre match access returns the same safe tournament context stored with the ticket', () => {

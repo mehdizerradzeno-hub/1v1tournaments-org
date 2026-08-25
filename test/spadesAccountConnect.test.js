@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   normalizeSpadesAccountMode,
   prepareSpadesAccountReturn,
+  spadesAccountDestination,
   SPADES_ACCOUNT_ENTRY_ROUTE,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../src/lib/spadesAccountConnect.js';
@@ -43,6 +44,35 @@ test('Spades account entry exposes the three required signed-out actions', () =>
   assert.equal(normalizeSpadesAccountMode('create'), 'create');
   assert.equal(normalizeSpadesAccountMode('reset'), 'reset');
   assert.equal(normalizeSpadesAccountMode('unknown'), 'signin');
+});
+
+test('Spades account destination preserves production by default and accepts only a QA HTTPS origin', () => {
+  assert.equal(spadesAccountDestination(undefined), 'https://1v1spades.com/');
+  assert.equal(
+    spadesAccountDestination('https://onev1-spades-tournament-qa.onrender.com', true),
+    'https://onev1-spades-tournament-qa.onrender.com/',
+  );
+
+  assert.throws(
+    () => spadesAccountDestination(undefined, true),
+    /required in QA/,
+  );
+
+  for (const invalid of [
+    'http://onev1-spades-tournament-qa.onrender.com',
+    'https://user:password@onev1-spades-tournament-qa.onrender.com',
+    'https://onev1-spades-tournament-qa.onrender.com/account',
+    'https://onev1-spades-tournament-qa.onrender.com/?redirect=production',
+  ]) {
+    assert.throws(
+      () => spadesAccountDestination(invalid),
+      /Invalid EXPO_PUBLIC_SPADES_ACCOUNT_DESTINATION/,
+    );
+  }
+  assert.throws(
+    () => spadesAccountDestination('https://1v1spades.com', true),
+    /Invalid EXPO_PUBLIC_SPADES_ACCOUNT_DESTINATION/,
+  );
 });
 
 test('successful account auth issues the established one-time Spades handoff', async () => {
