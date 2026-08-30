@@ -8,6 +8,7 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import { buildTournamentReturnPath } from './_tournament-game-contract.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -147,6 +148,24 @@ async function loadTournamentSignups(tournamentSlug) {
   });
 }
 
+async function loadAllTournamentSignups() {
+  const store = getStoreWithFallback('tournament-signups');
+  const signups = [];
+  let cursor;
+
+  do {
+    const page = await store.list(cursor ? { cursor } : {});
+    const records = await Promise.all(
+      (page.blobs || []).map((blob) => store.get(blob.key, { type: 'json' })),
+    );
+
+    signups.push(...records.filter(Boolean));
+    cursor = page.hasMore ? cleanText(page.cursor) : '';
+  } while (cursor);
+
+  return signups;
+}
+
 async function loadBracket(tournamentSlug) {
   const store = getStoreWithFallback('tournament-brackets');
   return store.get(`${tournamentSlug}.json`, { type: 'json' });
@@ -174,6 +193,83 @@ function signupMatchesAccount(signup, account) {
         || cleanEmail(signup.contactEmail) === accountEmail
       ),
   );
+}
+
+function activeMatchMetadata(tournamentSlug, bracket, currentMatch) {
+  if (!tournamentSlug || !currentMatch?.id || currentMatch.status !== 'ready') {
+    return null;
+  }
+
+  let tournamentPath;
+
+  try {
+    tournamentPath = buildTournamentReturnPath(tournamentSlug);
+  } catch {
+    return null;
+  }
+
+  return {
+    tournamentSlug,
+    matchId: currentMatch.id,
+    bracketStatus: bracket?.status || null,
+    tournamentPath,
+    matchPath: `${tournamentPath}#my-match`,
+    updatedAt: bracket?.updatedAt || bracket?.createdAt || '',
+  };
+}
+
+export async function findActivePlayerMatches(account, dependencies = {}) {
+  if (!account) return [];
+
+  const listSignups = dependencies.loadAllTournamentSignups || loadAllTournamentSignups;
+  const readBracket = dependencies.loadBracket || loadBracket;
+  const signups = await listSignups();
+  const ownedSignupsByTournament = new Map();
+
+  for (const signup of signups) {
+    const tournamentSlug = cleanText(signup?.tournamentSlug);
+
+    if (tournamentSlug && signupMatchesAccount(signup, account)) {
+      const tournamentSignups = ownedSignupsByTournament.get(tournamentSlug) || [];
+      tournamentSignups.push(signup);
+      ownedSignupsByTournament.set(tournamentSlug, tournamentSignups);
+    }
+  }
+
+  const bracketResults = await Promise.allSettled(
+    [...ownedSignupsByTournament.entries()].map(async ([tournamentSlug, tournamentSignups]) => {
+      const bracket = await readBracket(tournamentSlug);
+
+      if (!bracket || bracket.status === 'complete') {
+        return null;
+      }
+
+      for (const signup of tournamentSignups) {
+        const matchStatus = findPlayerMatchStatus(bracket, signup);
+        const metadata = activeMatchMetadata(tournamentSlug, bracket, matchStatus.currentMatch);
+
+        if (metadata) return metadata;
+      }
+
+      return null;
+    }),
+  );
+
+  return bracketResults
+    .filter((result) => result.status === 'fulfilled' && result.value)
+    .map((result) => result.value)
+    .sort((first, second) => {
+      return String(second.updatedAt || '').localeCompare(String(first.updatedAt || ''))
+        || first.tournamentSlug.localeCompare(second.tournamentSlug)
+        || first.matchId.localeCompare(second.matchId);
+    })
+    .map((candidate) => ({
+      tournamentSlug: candidate.tournamentSlug,
+      matchId: candidate.matchId,
+      bracketStatus: candidate.bracketStatus,
+      tournamentPath: candidate.tournamentPath,
+      matchPath: candidate.matchPath,
+    }));
 }
 
 export function findPlayerMatchStatus(bracket, signup) {
@@ -262,12 +358,14 @@ function statusLabel(nextStep) {
       return 'You won this tournament.';
     case 'complete':
       return 'This tournament is complete.';
+    case 'no-active-match':
+      return 'You do not have an unresolved tournament match right now.';
     default:
       return 'You are signed up. Wait for the host to publish your match.';
   }
 }
 
-export async function handler(event) {
+export async function handler(event, dependencies = {}) {
   if (event.blobs) {
     connectLambda(event);
   }
@@ -282,12 +380,42 @@ export async function handler(event) {
 
   const tournamentSlug = cleanText(event.queryStringParameters?.slug);
 
-  if (!tournamentSlug) {
-    return json(400, { error: 'Choose a tournament before loading player status.' });
-  }
-
   try {
-    const account = await getAccountFromEvent(event);
+    const resolveAccount = dependencies.getAccountFromEvent || getAccountFromEvent;
+    const readTournamentSignups = dependencies.loadTournamentSignups || loadTournamentSignups;
+    const readBracket = dependencies.loadBracket || loadBracket;
+    const account = await resolveAccount(event);
+
+    if (!tournamentSlug) {
+      if (!account) {
+        return json(200, {
+          ok: true,
+          scope: 'active-match',
+          account: null,
+          activeMatch: null,
+          activeMatchCount: 0,
+          nextStep: 'sign-in',
+          statusLabel: statusLabel('sign-in'),
+        });
+      }
+
+      const activeMatches = await findActivePlayerMatches(account, {
+        loadAllTournamentSignups: dependencies.loadAllTournamentSignups,
+        loadBracket: readBracket,
+      });
+      const activeMatch = activeMatches[0] || null;
+      const nextStep = activeMatch ? 'ready-match' : 'no-active-match';
+
+      return json(200, {
+        ok: true,
+        scope: 'active-match',
+        account: publicAccount(account),
+        activeMatch,
+        activeMatchCount: activeMatches.length,
+        nextStep,
+        statusLabel: statusLabel(nextStep),
+      });
+    }
 
     if (!account) {
       return json(200, {
@@ -306,8 +434,8 @@ export async function handler(event) {
     }
 
     const [signups, bracket] = await Promise.all([
-      loadTournamentSignups(tournamentSlug),
-      loadBracket(tournamentSlug),
+      readTournamentSignups(tournamentSlug),
+      readBracket(tournamentSlug),
     ]);
     const signup = signups.find((item) => signupMatchesAccount(item, account)) || null;
     const matchStatus = findPlayerMatchStatus(bracket, signup);

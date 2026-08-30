@@ -1,13 +1,24 @@
-import { startTransition, useEffect, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 
 import { theme } from '../lib/theme.js';
+import {
+  createTournamentRestoreLauncher,
+  getActiveTournamentMatchPath,
+  getActiveTournamentPath,
+  getColdStartRestoreRequest,
+} from '../lib/activeTournamentMatch.js';
 import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
-import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
+import {
+  fetchPlayerAccount,
+  fetchTournamentEvents,
+  fetchTournamentPlayerStatus,
+  issueTournamentMatchTicket,
+} from '../lib/tournamentHostingClient.js';
 import { getNextFutureTournament, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
 import { getCheckInPath, getTournamentPath, getUpcomingTournaments } from '../lib/siteData.js';
 import { ensureSitePerformanceTracking, trackSiteEvent } from '../lib/siteObservability.js';
@@ -15,22 +26,27 @@ import { useHydrated } from '../lib/useHydrated.js';
 
 const PLAYER_ACCOUNT_CHANGED_EVENT = 'one-v-one-tournaments-player-account-changed';
 
-function buildPrimaryPaths(slug = null) {
+function buildPrimaryPaths(slug = null, activeMatch = null) {
   if (!slug) {
+    const matchPath = getActiveTournamentMatchPath(activeMatch, '/next');
+
     return {
       tournamentPath: '/next',
       checkInPath: '/next',
-      matchPath: '/next',
+      matchPath,
+      matchActivePath: getActiveTournamentPath(activeMatch, '/next'),
     };
   }
 
   const tournamentPath = getTournamentPath(slug);
   const checkInPath = getCheckInPath(slug);
+  const fallbackMatchPath = `${tournamentPath}#my-match`;
 
   return {
     tournamentPath,
     checkInPath,
-    matchPath: `${tournamentPath}#my-match`,
+    matchPath: getActiveTournamentMatchPath(activeMatch, fallbackMatchPath),
+    matchActivePath: getActiveTournamentPath(activeMatch, tournamentPath),
   };
 }
 
@@ -51,14 +67,14 @@ function getNavItems(paths) {
     { label: 'Rankings', href: '/leaderboard' },
     { label: 'Results', href: '/results' },
     { label: 'Profile', href: '/account' },
-    { label: 'My Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'My Match', href: paths.matchPath, activePath: paths.matchActivePath },
   ];
 }
 
 function getMobileNavItems(paths) {
   return [
     { label: 'Compete', href: '/games' },
-    { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Match', href: paths.matchPath, activePath: paths.matchActivePath },
     { label: 'Events', href: '/tournaments' },
     { label: 'Leagues', href: '/leagues' },
     { label: 'Profile', href: '/account' },
@@ -68,7 +84,7 @@ function getMobileNavItems(paths) {
 function getStickyActionItems(paths) {
   return [
     { label: 'Join', href: paths.checkInPath, tone: 'primary' },
-    { label: 'My Match', href: paths.matchPath, tone: 'secondary', activePath: paths.tournamentPath },
+    { label: 'My Match', href: paths.matchPath, tone: 'secondary', activePath: paths.matchActivePath },
     { label: 'Watch', href: '/stream', tone: 'secondary' },
   ];
 }
@@ -727,9 +743,28 @@ export function HubScreen({
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
+  const [activeMatchDiscovery, setActiveMatchDiscovery] = useState({
+    accountId: '',
+    activeMatch: null,
+    activeMatchCount: 0,
+    nextStep: '',
+    scope: '',
+  });
+  const restoreContextKeyRef = useRef('');
+  const [coldStartRestoreLauncher] = useState(createTournamentRestoreLauncher);
   const resolvedPlayerAccount = accountOverride !== undefined ? accountOverride : playerAccount;
   const resolvedPlayerAccountLoading = accountOverride !== undefined ? false : playerAccountLoading;
-  const primaryPaths = buildPrimaryPaths(navTournamentSlug);
+  const resolvedPlayerAccountId = resolvedPlayerAccount?.id || '';
+  const navActiveMatch = activeMatchDiscovery.accountId === resolvedPlayerAccountId
+    && activeMatchDiscovery.activeMatchCount === 1
+    ? activeMatchDiscovery.activeMatch
+    : null;
+  const coldStartRestoreRequest = useMemo(() => getColdStartRestoreRequest({
+    accountId: resolvedPlayerAccountId,
+    discovery: activeMatchDiscovery,
+    pathname,
+  }), [activeMatchDiscovery, pathname, resolvedPlayerAccountId]);
+  const primaryPaths = buildPrimaryPaths(navTournamentSlug, navActiveMatch);
   const fallbackAccountPath = navTournamentSlug
     ? resolvedPlayerAccount
       ? `${primaryPaths.checkInPath}#account-access`
@@ -858,6 +893,83 @@ export function HubScreen({
       active = false;
     };
   }, [isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated || resolvedPlayerAccountLoading) {
+      return undefined;
+    }
+
+    if (!resolvedPlayerAccountId) {
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadActiveMatch() {
+      try {
+        const result = await fetchTournamentPlayerStatus({});
+
+        if (active) {
+          startTransition(() => {
+            setActiveMatchDiscovery({
+              accountId: result.account?.id || '',
+              activeMatch: result.activeMatch || null,
+              activeMatchCount: Number(result.activeMatchCount) || 0,
+              nextStep: result.nextStep || '',
+              scope: result.scope || '',
+            });
+          });
+        }
+      } catch {
+        if (active) {
+          startTransition(() => {
+            setActiveMatchDiscovery({
+              accountId: resolvedPlayerAccountId,
+              activeMatch: null,
+              activeMatchCount: 0,
+              nextStep: '',
+              scope: '',
+            });
+          });
+        }
+      }
+    }
+
+    loadActiveMatch();
+
+    return () => {
+      active = false;
+    };
+  }, [isHydrated, pathname, resolvedPlayerAccountId, resolvedPlayerAccountLoading]);
+
+  useEffect(() => {
+    if (!coldStartRestoreRequest) {
+      restoreContextKeyRef.current = '';
+      return undefined;
+    }
+
+    restoreContextKeyRef.current = coldStartRestoreRequest.key;
+
+    coldStartRestoreLauncher.launch(coldStartRestoreRequest, {
+      isCurrent: () => restoreContextKeyRef.current === coldStartRestoreRequest.key,
+      issueTicket: issueTournamentMatchTicket,
+      navigate(roomUrl) {
+        if (!globalThis.location?.assign) {
+          throw new Error('Match navigation is not available.');
+        }
+
+        globalThis.location.assign(roomUrl);
+      },
+    }).catch(() => {
+      // Normal Hub controls remain available when match access is stale, revoked, or unavailable.
+    });
+
+    return () => {
+      if (restoreContextKeyRef.current === coldStartRestoreRequest.key) {
+        restoreContextKeyRef.current = '';
+      }
+    };
+  }, [coldStartRestoreLauncher, coldStartRestoreRequest]);
 
   return (
     <>
