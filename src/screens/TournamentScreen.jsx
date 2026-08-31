@@ -17,11 +17,11 @@ import {
   StreamCard,
   Surface,
 } from '../components/hub-ui.jsx';
+import { TournamentJourney } from '../components/tournament-master-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
 import {
   buildResultFromTournamentBracket,
   getGameBySlug,
-  getGamePath,
   getCheckInPath,
   getResultByTournamentSlug,
   getResultsForGame,
@@ -33,6 +33,10 @@ import {
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getTournamentGameName } from '../lib/tournamentCatalog.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
+import {
+  getTournamentPlayerPresentation,
+  TOURNAMENT_PLAYER_PRESENTATION_STATES,
+} from '../lib/tournamentJourneyPresentation.js';
 import {
   fetchTournamentPlayerStatus,
   fetchSignupSummary,
@@ -59,7 +63,6 @@ const TOURNAMENT_TABS = [
   { id: 'info', label: 'Schedule & rules', body: 'Agenda, format, links, and competition rules.' },
   { id: 'results', label: 'Results', body: 'Final placement and the permanent event record.' },
 ];
-const TWITCH_VIEWER_COMMANDS = ['!join', '!next', '!match', '!bracket', '!rules', '!discord'];
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -190,18 +193,6 @@ function actualBracketPreviewLabel(count, minimumPlayers, loading = false) {
   return `${bracketSizeLabel(actualBracketSizeFromSignups(count, minimumPlayers))} actual`;
 }
 
-function heroSignupAction(status, checkInPath, tournamentPath) {
-  if (status.reason === 'bracket-live') {
-    return { label: 'View Bracket', href: `${tournamentPath}#live-bracket` };
-  }
-
-  if (status.value === 'open') {
-    return { label: 'Join Tournament', href: checkInPath };
-  }
-
-  return { label: 'View Roster', href: `${tournamentPath}#registered-players` };
-}
-
 function getSignInPath(checkInPath) {
   return `${checkInPath}?mode=signin#account-access`;
 }
@@ -229,36 +220,32 @@ function getPlayerPrimaryAction({
   const { account, currentMatch, loading, signup } = getPlayerAccountState(playerStatus);
 
   if (currentMatch) {
-    return { label: 'Open My Match', href: matchStatusPath };
+    return { label: 'Your Match', href: matchStatusPath };
   }
 
   if (signup) {
-    return { label: 'Check Match Status', href: matchStatusPath };
+    return isBracketLive
+      ? { label: 'View Bracket', href: `${tournamentPath}#live-bracket` }
+      : { label: 'Registered', href: `${tournamentPath}#registered-players` };
   }
 
   if (isBracketLive) {
     return account
-      ? { label: 'Check Match Status', href: matchStatusPath }
-      : { label: 'Sign in to Check Match', href: signInPath };
+      ? { label: 'View Bracket', href: `${tournamentPath}#live-bracket` }
+      : { label: 'Sign In', href: signInPath };
   }
 
   if (registrationMeta.value === 'open') {
     if (loading) {
-      return { label: 'Join Tournament', href: checkInPath };
+      return { label: 'Sign Up', href: checkInPath };
     }
 
     return account
-      ? { label: 'Join Tournament', href: checkInPath }
-      : { label: 'Sign in to Join', href: signInPath };
+      ? { label: 'Sign Up', href: checkInPath }
+      : { label: 'Sign In', href: signInPath };
   }
 
   return { label: 'View Roster', href: `${tournamentPath}#registered-players` };
-}
-
-function getSecondarySignInAction(playerStatus, signInPath) {
-  const { account, loading } = getPlayerAccountState(playerStatus);
-
-  return !loading && !account ? { label: 'Sign in', href: signInPath, variant: 'secondary' } : null;
 }
 
 function tabFromHash(hash) {
@@ -352,73 +339,6 @@ function getMatchPlayerRows(match) {
   return [
     { key: `${match?.id || 'match'}-slot-1`, label: 'TBD', isWinner: false, seed: 1 },
     { key: `${match?.id || 'match'}-slot-2`, label: 'TBD', isWinner: false, seed: 2 },
-  ];
-}
-
-function buildTournamentTimeline({ isBracketLive, liveBracket, registrationMeta, playerHasReadyMatch, result }) {
-  return [
-    {
-      key: 'signup',
-      label: 'Signups',
-      value: registrationMeta.value === 'open' ? 'Open' : registrationMeta.label,
-      state: registrationMeta.value === 'open' && !isBracketLive ? 'active' : 'done',
-    },
-    {
-      key: 'check-in',
-      label: 'Check-in',
-      value: isBracketLive || liveBracket ? 'Locked' : 'Roster building',
-      state: isBracketLive || liveBracket ? 'done' : 'active',
-    },
-    {
-      key: 'bracket',
-      label: 'Bracket',
-      value: liveBracket ? 'Live' : 'Pending',
-      state: liveBracket ? 'active' : 'waiting',
-    },
-    {
-      key: 'match',
-      label: 'Match links',
-      value: playerHasReadyMatch ? 'Ready' : liveBracket ? 'Watch page' : 'After seed',
-      state: playerHasReadyMatch ? 'active' : liveBracket ? 'done' : 'waiting',
-    },
-    {
-      key: 'results',
-      label: 'Results',
-      value: result ? 'Posted' : 'After final',
-      state: result ? 'done' : 'waiting',
-    },
-  ];
-}
-
-function getArrivalSteps({ isBracketLive, playerHasReadyMatch, registrationMeta }) {
-  if (playerHasReadyMatch) {
-    return [
-      { label: 'Now', title: 'Play your match', body: 'Your account has an assigned table ready.' },
-      { label: 'Then', title: 'Report result', body: 'Winner advances from the tournament page.' },
-      { label: 'Watch', title: 'Keep Twitch open', body: 'Chat commands stay live for links.' },
-    ];
-  }
-
-  if (isBracketLive) {
-    return [
-      { label: 'Now', title: 'Check match status', body: 'Sign in and open your tournament status for table access.' },
-      { label: 'View', title: 'Follow bracket', body: 'Bracket cards show current and completed matches.' },
-      { label: 'Chat', title: 'Use !match', body: 'Twitch chat can send players back here.' },
-    ];
-  }
-
-  if (registrationMeta.value === 'open') {
-    return [
-      { label: 'Step 1', title: 'Join tournament', body: 'Create or open your account and reserve your seat.' },
-      { label: 'Step 2', title: 'Confirm name', body: 'Your public player name appears in the roster.' },
-      { label: 'Step 3', title: 'Wait for bracket', body: 'Match links appear after the host seeds.' },
-    ];
-  }
-
-  return [
-    { label: 'Now', title: 'Review event', body: 'Check rules, format, and current roster status.' },
-    { label: 'Later', title: 'Watch for updates', body: 'The bracket appears here after the host starts.' },
-    { label: 'Chat', title: 'Use !next', body: 'Twitch commands point viewers to this page.' },
   ];
 }
 
@@ -677,8 +597,6 @@ export default function TournamentScreen({ slug }) {
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
   const gameName = getTournamentGameName(visibleTournament.gameSlug);
-  const isPrimaryGame = game?.slug === siteData.site.primaryGameSlug;
-  const gamePath = game ? getGamePath(game.slug) : null;
   const streams = (visibleTournament.streamSlugs || [])
     .map((streamSlug) => getStreamBySlug(streamSlug))
     .filter(Boolean);
@@ -709,24 +627,6 @@ export default function TournamentScreen({ slug }) {
     signInPath,
     tournamentPath,
   });
-  const secondarySignInAction = getSecondarySignInAction(playerStatus, signInPath);
-  const playerMatchAction = {
-    label: playerHasReadyMatch ? 'Open My Match' : 'My Match',
-    href: matchStatusPath,
-    variant: primaryPlayerAction.href === matchStatusPath ? 'primary' : 'secondary',
-  };
-  const tournamentAction = isBracketLive
-    ? { label: 'View Bracket', href: `${tournamentPath}#live-bracket`, variant: 'secondary' }
-    : heroSignupAction(registrationMeta, checkInPath, tournamentPath);
-
-  const heroActions = [
-    primaryPlayerAction,
-    primaryPlayerAction.href !== playerMatchAction.href ? (isBracketLive ? tournamentAction : playerMatchAction) : null,
-    secondarySignInAction,
-    streams.length ? { label: 'Watch', href: '/stream', variant: 'secondary' } : null,
-    { label: 'Rules', href: '/rules', variant: 'secondary' },
-  ].filter(Boolean);
-
   const quickLinks = (visibleTournament.links || []).filter((link) => link.href !== `/tournaments/${visibleTournament.slug}`);
   const advertisedRosterCap = getAdvertisedRosterCap(visibleTournament);
   const minimumPlayers = getMinimumPlayers(visibleTournament);
@@ -748,53 +648,41 @@ export default function TournamentScreen({ slug }) {
 
   return (
     <HubScreen
-      actions={heroActions}
       eyebrow={game?.badge || 'Tournament'}
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead={visibleTournament.detail}
+      pageDataSet={{ tournamentPage: 'true' }}
       subtitle={`${gameName} tournament • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
-      stickyActions
+      stickyActions={false}
       showHero={false}
       showNavigation
       title={visibleTournament.title}>
+      <TournamentJourney compact />
       <TournamentLobbyHero
         advertisedRosterCap={advertisedRosterCap}
-        checkInPath={checkInPath}
         countdownLabel={getCountdownLabel(visibleTournament, nowMs)}
         isBracketLive={isBracketLive}
         liveBracket={liveBracket}
-        matchStatusPath={matchStatusPath}
-        playerStatus={playerStatus}
         registrationMeta={registrationMeta}
         result={result}
-        signInPath={signInPath}
         signupSummary={signupSummary}
         streams={streams}
         tournament={visibleTournament}
-        tournamentPath={tournamentPath}
       />
 
       <PlayerStatusSpotlight
-        gameName={gameName}
-        isBracketLive={isBracketLive}
+        bracketPath={`${tournamentPath}#live-bracket`}
+        checkInWindow={visibleTournament.checkIn?.window || visibleTournament.checkIn?.preview || ''}
         liveBracket={liveBracket}
+        matchPath={matchStatusPath}
         playerStatus={playerStatus}
-        primaryAction={primaryPlayerAction}
         registrationMeta={registrationMeta}
         result={result}
-        slug={visibleTournament.slug}
-      />
-
-      <TournamentArrivalRail
-        checkInPath={checkInPath}
-        isBracketLive={isBracketLive}
-        matchStatusPath={matchStatusPath}
-        playerHasReadyMatch={playerHasReadyMatch}
-        playerStatus={playerStatus}
-        registrationMeta={registrationMeta}
         signInPath={signInPath}
-        tournamentPath={tournamentPath}
+        slug={visibleTournament.slug}
+        signupPath={checkInPath}
+        tournamentStatus={visibleTournament.status}
       />
 
       <TournamentEventConsole
@@ -819,48 +707,6 @@ export default function TournamentScreen({ slug }) {
             nextMatch={getNextPublicMatch(liveBracket)}
             streams={streams}
           />
-
-          <TournamentTimeline
-            steps={buildTournamentTimeline({
-              isBracketLive,
-              liveBracket,
-              playerHasReadyMatch,
-              registrationMeta,
-              result,
-            })}
-          />
-
-          <Section
-            description="Your tournament status, match access, field size, and live bracket in one competitive dashboard."
-            nativeID="my-match"
-            title="Player command center">
-            <View style={styles.playerCommandGrid}>
-              <View style={styles.playerCommandStatus}>
-                <PlayerTournamentStatus
-                  checkInPath={checkInPath}
-                  playerStatus={playerStatus}
-                  signInPath={signInPath}
-                  slug={visibleTournament.slug}
-                />
-              </View>
-              <View style={styles.playerCommandDashboard}>
-                <TournamentDashboard
-                  advertisedRosterCap={advertisedRosterCap}
-                  checkInPath={checkInPath}
-                  isBracketLive={isBracketLive}
-                  liveBracket={liveBracket}
-                  matchStatusPath={matchStatusPath}
-                  minimumPlayers={minimumPlayers}
-                  playerStatus={playerStatus}
-                  registrationMeta={registrationMeta}
-                  signInPath={signInPath}
-                  signupSummary={signupSummary}
-                  streams={streams}
-                  tournament={visibleTournament}
-                />
-              </View>
-            </View>
-          </Section>
 
           <Section
             description="Competition format, field requirements, and bracket structure."
@@ -889,8 +735,10 @@ export default function TournamentScreen({ slug }) {
                 ? 'Confirm who made the published bracket, then jump to your match or the live view.'
                 : 'Use this roster to confirm signups before the host seeds the bracket.'
             }
-            primary={primaryPlayerAction}
-            secondary={{ label: 'My Match', href: matchStatusPath }}
+            primary={!playerStatus.data?.signup && !isBracketLive ? primaryPlayerAction : null}
+            secondary={isBracketLive
+              ? { label: 'View Bracket', href: `${tournamentPath}#live-bracket` }
+              : { label: 'View Roster', href: `${tournamentPath}#registered-players` }}
             stats={[
               { label: 'Registered', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(rosterBracketSize) },
@@ -947,7 +795,7 @@ export default function TournamentScreen({ slug }) {
                 ? 'Follow the active match flow, table links, winners, and bracket status.'
                 : 'Bracket preview is ready. Live table links appear after the host publishes the bracket.'
             }
-            primary={primaryPlayerAction.href === matchStatusPath ? primaryPlayerAction : { label: 'My Match', href: matchStatusPath }}
+            primary={null}
             secondary={streams.length ? { label: 'Watch', href: '/stream' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
             stats={[
               { label: 'Bracket', value: isBracketComplete ? 'Complete' : liveBracket ? 'Live' : 'Preview' },
@@ -991,18 +839,6 @@ export default function TournamentScreen({ slug }) {
                   tone="green"
                 />
               ) : null}
-              <QuickActionCard
-                actionLabel={playerHasReadyMatch ? 'Open My Match' : 'My Match'}
-                body={
-                  isBracketLive
-                    ? 'Open your assigned table from your signed-in tournament account.'
-                    : 'Jump to your account-linked status card and current match once the bracket is live.'
-                }
-                href={matchStatusPath}
-                meta="Player"
-                title="Match status"
-                tone="green"
-              />
               {streams.length ? (
                 <QuickActionCard
                   actionLabel="Watch table"
@@ -1043,29 +879,6 @@ export default function TournamentScreen({ slug }) {
               tournament={visibleTournament}
             />
           </Section>
-
-          {isPrimaryGame && gamePath ? (
-            <Section
-              description="Use the account-linked match card once the bracket is live."
-              title="Match access">
-              <Surface style={styles.launchCard}>
-                <View style={styles.launchTopRow}>
-                  <Badge tone="accent">Ticket path</Badge>
-                  <Text style={styles.launchPath}>Match status</Text>
-                </View>
-                <Text style={styles.launchTitle}>Open gameplay from your tournament seat</Text>
-                <Text style={styles.launchCopy}>
-                  The hub checks your player account, creates the match ticket, and then sends you to the {gameName} table.
-                </Text>
-                <View style={styles.launchActions}>
-                  <ActionButton href={matchStatusPath}>My Match</ActionButton>
-                  <ActionButton href="/stream" variant="secondary">
-                    Watch
-                  </ActionButton>
-                </View>
-              </Surface>
-            </Section>
-          ) : null}
 
           {quickLinks.length ? (
             <Section description="Useful tournament paths in one place." title="Quick links">
@@ -1277,114 +1090,16 @@ function TournamentTabs({ activeTab, onSelectTab }) {
   );
 }
 
-function TournamentTimeline({ steps }) {
-  return (
-    <Surface style={styles.timelineCard}>
-      <View style={styles.timelineTrack}>
-        {steps.map((step, index) => (
-          <View key={step.key} style={styles.timelineStep}>
-            <View style={[
-              styles.timelineMarker,
-              step.state === 'done' && styles.timelineMarkerDone,
-              step.state === 'active' && styles.timelineMarkerActive,
-            ]}>
-              <Text style={[
-                styles.timelineMarkerText,
-                step.state === 'active' && styles.timelineMarkerTextActive,
-              ]}>
-                {index + 1}
-              </Text>
-            </View>
-            <View style={styles.timelineCopy}>
-              <Text style={styles.timelineLabel}>{step.label}</Text>
-              <Text style={[
-                styles.timelineValue,
-                step.state === 'active' && styles.timelineValueActive,
-                step.state === 'done' && styles.timelineValueDone,
-              ]}>
-                {step.value}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </Surface>
-  );
-}
-
-function TournamentArrivalRail({
-  checkInPath,
-  isBracketLive,
-  matchStatusPath,
-  playerHasReadyMatch,
-  playerStatus,
-  registrationMeta,
-  signInPath,
-  tournamentPath,
-}) {
-  const { width } = useWindowDimensions();
-  const usePhoneActionLayout = width > 0 && width <= 430;
-  const steps = getArrivalSteps({ isBracketLive, playerHasReadyMatch, registrationMeta });
-  const primaryAction = getPlayerPrimaryAction({
-    checkInPath,
-    isBracketLive,
-    matchStatusPath,
-    playerStatus,
-    registrationMeta,
-    signInPath,
-    tournamentPath,
-  });
-  const signInAction = getSecondarySignInAction(playerStatus, signInPath);
-
-  return (
-    <Surface style={styles.arrivalRail}>
-      <View style={styles.arrivalHeader}>
-        <View style={styles.arrivalHeaderCopy}>
-          <Text style={styles.arrivalEyebrow}>Arriving from Twitch</Text>
-          <Text style={styles.arrivalTitle}>Start here</Text>
-        </View>
-        <View style={[styles.arrivalActions, usePhoneActionLayout && styles.arrivalActionsPhone]}>
-          <ActionButton href={primaryAction.href} style={styles.arrivalAction}>{primaryAction.label}</ActionButton>
-          {signInAction ? <ActionButton href={signInAction.href} style={styles.arrivalAction} variant="secondary">{signInAction.label}</ActionButton> : null}
-          <ActionButton href="/stream" style={styles.arrivalAction} variant="secondary">Watch</ActionButton>
-        </View>
-      </View>
-
-      <View style={styles.arrivalGrid}>
-        {steps.map((step) => (
-          <View key={step.title} style={styles.arrivalStep}>
-            <Text style={styles.arrivalStepLabel}>{step.label}</Text>
-            <Text style={styles.arrivalStepTitle}>{step.title}</Text>
-            <Text style={styles.arrivalStepBody}>{step.body}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.arrivalCommandRow}>
-        <Text style={styles.arrivalCommandLabel}>Twitch commands</Text>
-        {TWITCH_VIEWER_COMMANDS.map((command) => (
-          <Text key={command} selectable style={styles.arrivalCommandChip}>{command}</Text>
-        ))}
-      </View>
-    </Surface>
-  );
-}
-
 function TournamentLobbyHero({
   advertisedRosterCap,
-  checkInPath,
   countdownLabel,
   isBracketLive,
   liveBracket,
-  matchStatusPath,
-  playerStatus,
   registrationMeta,
   result,
-  signInPath,
   signupSummary,
   streams,
   tournament,
-  tournamentPath,
 }) {
   const { width } = useWindowDimensions();
   const isPhone = width > 0 && width < 420;
@@ -1394,16 +1109,6 @@ function TournamentLobbyHero({
   const nextMatch = getNextPublicMatch(liveBracket);
   const isComplete = liveBracket?.status === 'complete' || Boolean(result);
   const championName = liveBracket?.winner?.name || result?.winner || '';
-  const primaryAction = getPlayerPrimaryAction({
-    checkInPath,
-    isBracketLive,
-    matchStatusPath,
-    playerStatus,
-    registrationMeta,
-    signInPath,
-    tournamentPath,
-  });
-  const signInAction = getSecondarySignInAction(playerStatus, signInPath);
 
   return (
     <Surface style={styles.lobbyCard}>
@@ -1432,11 +1137,6 @@ function TournamentLobbyHero({
           </Text>
         </View>
         <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
-          <ActionButton href={isComplete ? '/results' : primaryAction.href}>
-            {isComplete ? 'View Results' : primaryAction.label}
-          </ActionButton>
-          {primaryAction.href !== matchStatusPath ? <ActionButton href={matchStatusPath} variant="secondary">Check Match Status</ActionButton> : null}
-          {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
           {streams.length ? <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton> : null}
         </View>
       </View>
@@ -1481,130 +1181,6 @@ function TournamentLobbyHero({
           )}
           {signups.length > 8 ? <Text style={styles.lobbyMore}>+{signups.length - 8} more</Text> : null}
         </View>
-      </View>
-    </Surface>
-  );
-}
-
-function dashboardStatusCopy({ isBracketLive, playerStatus, registrationMeta }) {
-  const data = playerStatus.data;
-
-  if (playerStatus.loading) {
-    return 'Checking your player account and current match...';
-  }
-
-  if (data?.currentMatch) {
-    return 'Your match is ready. Open it from this page, then return here for bracket and result status.';
-  }
-
-  if (isBracketLive) {
-    return data?.signup
-      ? 'You are in the tournament. Watch this page for your assigned table.'
-      : 'The bracket is live. Sign in with the account used for signup to find your match.';
-  }
-
-  if (registrationMeta.value === 'open') {
-    return data?.signup
-      ? 'You are already on the roster. The host will publish match links when the bracket is ready.'
-      : 'Create or sign in to an account, then join the roster before the bracket is seeded.';
-  }
-
-  return registrationMeta.actionCopy;
-}
-
-function dashboardTitleCopy({ currentMatch, isBracketLive, playerStatus }) {
-  const { account, signup } = getPlayerAccountState(playerStatus);
-
-  if (currentMatch) return 'Your table is ready.';
-  if (signup) return 'You are on the roster.';
-  if (!account) return 'Sign in to reserve your seat.';
-  if (isBracketLive) return 'Find your assigned match.';
-  return 'Join before the bracket is seeded.';
-}
-
-function TournamentDashboard({
-  advertisedRosterCap,
-  checkInPath,
-  isBracketLive,
-  liveBracket,
-  matchStatusPath,
-  minimumPlayers,
-  playerStatus,
-  registrationMeta,
-  signInPath,
-  signupSummary,
-  streams,
-  tournament,
-}) {
-  const data = playerStatus.data;
-  const currentMatch = data?.currentMatch || null;
-  const tournamentPath = getTournamentPath(tournament.slug);
-  const registeredLabel = seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading);
-  const bracketLabel = liveBracket
-    ? `${liveBracket.participantCount || 0} seeded`
-    : actualBracketPreviewLabel(signupSummary.count, minimumPlayers, signupSummary.loading);
-  const primaryAction = getPlayerPrimaryAction({
-    checkInPath,
-    isBracketLive,
-    matchStatusPath,
-    playerStatus,
-    registrationMeta,
-    signInPath,
-    tournamentPath,
-  });
-  const signInAction = getSecondarySignInAction(playerStatus, signInPath);
-
-  return (
-    <Surface style={styles.dashboardCard}>
-      <View style={styles.dashboardTopRow}>
-        <View style={styles.dashboardCopy}>
-          <Badge tone={currentMatch ? 'green' : isBracketLive ? 'accent' : registrationMeta.tone}>
-            {currentMatch ? 'Match ready' : isBracketLive ? 'Bracket live' : registrationMeta.label}
-          </Badge>
-          <Text style={styles.dashboardTitle}>
-            {dashboardTitleCopy({ currentMatch, isBracketLive, playerStatus })}
-          </Text>
-          <Text style={styles.dashboardText}>
-            {dashboardStatusCopy({ isBracketLive, playerStatus, registrationMeta })}
-          </Text>
-        </View>
-
-        <View style={styles.dashboardActions}>
-          <ActionButton href={primaryAction.href}>{primaryAction.label}</ActionButton>
-          {signInAction ? <ActionButton href={signInAction.href} variant="secondary">{signInAction.label}</ActionButton> : null}
-          <ActionButton href={`${tournamentPath}${isBracketLive ? '#live-bracket' : '#registered-players'}`} variant="secondary">
-            {isBracketLive ? 'View Bracket' : 'View Roster'}
-          </ActionButton>
-          {streams.length ? (
-            <ActionButton href="/stream" variant="secondary">
-              Watch
-            </ActionButton>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={styles.dashboardGrid}>
-        <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Players</Text>
-          <Text style={styles.dashboardTileValue}>{registeredLabel}</Text>
-          <Text style={styles.dashboardTileMeta}>advertised seats</Text>
-        </View>
-        <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Bracket Status</Text>
-          <Text style={styles.dashboardTileValue}>{bracketLabel}</Text>
-          <Text style={styles.dashboardTileMeta}>{liveBracket ? 'live bracket' : 'actual if seeded now'}</Text>
-        </View>
-        <View style={styles.dashboardTile}>
-          <Text style={styles.dashboardTileLabel}>Minimum Players</Text>
-          <Text style={styles.dashboardTileValue}>{minimumPlayers}</Text>
-          <Text style={styles.dashboardTileMeta}>players to run</Text>
-        </View>
-      </View>
-
-      <View style={styles.dashboardPolicy}>
-        <Text style={styles.dashboardPolicyText}>
-          {rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}
-        </Text>
       </View>
     </Surface>
   );
@@ -1706,108 +1282,90 @@ function statusTone(nextStep) {
   return 'blue';
 }
 
-function statusBadgeLabel(nextStep) {
-  switch (nextStep) {
-    case 'sign-in':
-      return 'Sign in needed';
-    case 'sign-up':
-      return 'Not registered';
-    case 'ready-match':
-      return 'Match ready';
-    case 'wait-opponent':
-      return 'Waiting';
-    case 'eliminated':
-      return 'Finished';
-    case 'champion':
-      return 'Champion';
-    case 'complete':
-      return 'Complete';
-    default:
-      return 'Checking';
-  }
-}
-
-function playerSpotlightTitle(playerStatus, result) {
-  const data = playerStatus.data;
-
-  if (playerStatus.loading) return 'Checking your tournament status...';
-  if (data?.currentMatch) return 'Your match is ready.';
-  if (data?.nextStep === 'champion') return 'You are the champion.';
-  if (result || data?.nextStep === 'complete') return 'Tournament results are posted.';
-  if (data?.signup) return 'You are signed up.';
-  if (data?.account) return 'Join the roster to play.';
-  return 'Create an account to join.';
-}
-
-function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, gameName) {
-  const data = playerStatus.data;
-  const accountName = data?.account?.playerName || '';
-  const signupName = data?.signup?.playerName || '';
-
-  if (playerStatus.loading) return 'One moment while we check this browser for a player account and roster seat.';
-  if (data?.currentMatch) return `Open your assigned ${gameName} match from My Match, then return here after the game.`;
-  if (data?.nextStep === 'champion') return 'Nice. The bracket has you marked as tournament winner.';
-  if (data?.nextStep === 'complete') return 'This event is complete. You can review the final bracket and results.';
-  if (signupName) return `${signupName} is on the roster. The host will publish match links when the bracket is ready.`;
-  if (accountName && registrationMeta.value === 'open') return `${accountName} is signed in. Join this tournament to reserve a roster seat.`;
-  if (accountName && isBracketLive) return `${accountName} is signed in, but this bracket is already live. Check with the host if you expected a seat.`;
-  if (registrationMeta.value === 'open') return 'Sign in or create an account, then reserve your spot on the tournament roster.';
-  return registrationMeta.actionCopy || 'Registration is not open right now.';
-}
-
 function PlayerStatusSpotlight({
-  gameName,
-  isBracketLive,
+  bracketPath,
+  checkInWindow,
   liveBracket,
+  matchPath,
   playerStatus,
-  primaryAction,
   registrationMeta,
   result,
+  signInPath,
   slug,
+  signupPath,
+  tournamentStatus,
 }) {
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState('');
   const data = playerStatus.data || {};
   const currentMatch = data.currentMatch || null;
+  const waitingMatch = data.waitingMatch || null;
   const accountName = data.account?.playerName || '';
   const signupName = data.signup?.playerName || '';
-  const steps = [
+  const statusUnavailable = Boolean(playerStatus.error && !playerStatus.loading);
+  const resolvedPresentation = getTournamentPlayerPresentation({
+    bracketPath,
+    hasBracket: Boolean(liveBracket),
+    matchPath,
+    playerStatus,
+    registrationStatus: registrationMeta.value,
+    signInPath,
+    signupPath,
+    tournamentStatus: result ? 'complete' : tournamentStatus,
+  });
+  const presentation = playerStatus.loading
+    ? {
+        state: TOURNAMENT_PLAYER_PRESENTATION_STATES.WAITING,
+        label: 'CHECKING',
+        title: 'Checking your tournament status…',
+        description: 'Looking for your player account, registration, and assigned match.',
+        primaryAction: null,
+      }
+    : statusUnavailable
+      ? {
+          state: TOURNAMENT_PLAYER_PRESENTATION_STATES.WAITING,
+          label: 'STATUS UNAVAILABLE',
+          title: 'WE COULDN’T LOAD YOUR STATUS',
+          description: 'Your account and registration were not changed. We’ll retry automatically.',
+          primaryAction: null,
+        }
+      : resolvedPresentation;
+  const playableMatch = presentation.state === TOURNAMENT_PLAYER_PRESENTATION_STATES.READY_MATCH
+    ? currentMatch
+    : null;
+  const visibleWaitingMatch = presentation.state === TOURNAMENT_PLAYER_PRESENTATION_STATES.PENDING_MATCH
+    ? waitingMatch
+    : null;
+  const finished = [
+    TOURNAMENT_PLAYER_PRESENTATION_STATES.ELIMINATED,
+    TOURNAMENT_PLAYER_PRESENTATION_STATES.CHAMPION,
+    TOURNAMENT_PLAYER_PRESENTATION_STATES.COMPLETE,
+  ].includes(presentation.state);
+  const steps = statusUnavailable ? [] : [
     {
-      label: 'Account',
-      value: accountName || 'Needed',
-      tone: accountName ? 'green' : 'accent',
-      done: Boolean(accountName),
-    },
-    {
-      label: 'Roster',
-      value: signupName ? 'Signed up' : 'Not joined',
-      tone: signupName ? 'green' : accountName ? 'accent' : 'blue',
+      label: 'SIGN UP',
+      value: signupName ? 'Registered' : accountName ? 'Ready to register' : 'Account needed',
       done: Boolean(signupName),
     },
     {
-      label: 'Bracket',
-      value: liveBracket ? 'Live' : 'Waiting',
-      tone: liveBracket ? 'green' : signupName ? 'accent' : 'blue',
+      label: 'CHECK IN',
+      value: liveBracket
+        ? 'Bracket ready'
+        : signupName
+          ? checkInWindow || 'Waiting for bracket'
+          : 'After signup',
       done: Boolean(liveBracket),
     },
     {
-      label: 'Match',
-      value: currentMatch ? 'Ready' : 'Waiting',
-      tone: currentMatch ? 'green' : liveBracket ? 'accent' : 'blue',
-      done: Boolean(currentMatch),
-    },
-    {
-      label: 'Results',
-      value: result ? 'Posted' : 'After final',
-      tone: result ? 'green' : 'blue',
-      done: Boolean(result),
+      label: 'PLAY',
+      value: finished ? 'Complete' : playableMatch ? 'Ready' : visibleWaitingMatch ? 'Preparing' : 'Waiting',
+      done: Boolean(playableMatch || finished),
     },
   ];
-  const actionLabel = currentMatch ? 'Open My Match' : primaryAction?.label || 'Next Step';
-  const matchPlayers = currentMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
+  const matchPlayers = playableMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
 
   async function handlePlayMyMatch() {
-    if (!currentMatch || opening) return;
+    if (!playableMatch || opening) return;
 
     setOpenError('');
     setOpening(true);
@@ -1815,7 +1373,7 @@ function PlayerStatusSpotlight({
     try {
       const result = await issueTournamentMatchTicket({
         slug,
-        matchId: currentMatch.id,
+        matchId: playableMatch.id,
       });
 
       if (result.roomUrl && globalThis.location?.assign) {
@@ -1829,169 +1387,74 @@ function PlayerStatusSpotlight({
   }
 
   return (
-    <Surface style={[styles.statusSpotlight, currentMatch && styles.statusSpotlightReady]}>
+    <Surface nativeID="my-match" style={[styles.statusSpotlight, playableMatch && styles.statusSpotlightReady]}>
       <View style={styles.statusSpotlightTopRow}>
         <View style={styles.statusSpotlightCopy}>
-          <Badge tone={statusTone(data.nextStep)}>{statusBadgeLabel(data.nextStep)}</Badge>
-          <Text style={styles.statusSpotlightTitle}>{playerSpotlightTitle(playerStatus, result)}</Text>
-          <Text style={styles.statusSpotlightBody}>
-            {playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, gameName)}
-          </Text>
+          <Badge tone={statusTone(data.nextStep)}>{presentation.label}</Badge>
+          <Text style={styles.statusSpotlightTitle}>{presentation.title}</Text>
+          <Text style={styles.statusSpotlightBody}>{presentation.description}</Text>
         </View>
         <View style={styles.statusSpotlightAction}>
-          {!currentMatch && primaryAction?.href ? <ActionButton href={primaryAction.href}>{actionLabel}</ActionButton> : null}
-          <ActionButton href="/rules" variant="secondary">Rules</ActionButton>
+          {!playableMatch && presentation.primaryAction ? (
+            <ActionButton href={presentation.primaryAction.href}>
+              {presentation.primaryAction.label}
+            </ActionButton>
+          ) : null}
         </View>
       </View>
-      {currentMatch && primaryAction?.href ? (
+      {playableMatch ? (
         <View style={styles.statusSpotlightMatchCallout}>
           <View style={styles.statusSpotlightMatchCopy}>
             <Text style={styles.statusSpotlightMatchLabel}>Ready now</Text>
             <Text style={styles.statusSpotlightMatchTitle}>
-              {currentMatch.round.title} • {currentMatch.label}
+              {playableMatch.round.title} • {playableMatch.label}
             </Text>
             <Text style={styles.statusSpotlightMatchPlayers}>{matchPlayers}</Text>
           </View>
-          <ActionButton onPress={handlePlayMyMatch} style={styles.statusSpotlightPlayButton}>
-            {opening ? 'Opening...' : 'Open My Match'}
+          <ActionButton
+            onPress={handlePlayMyMatch}
+            style={styles.statusSpotlightPlayButton}
+            variant="success">
+            {opening ? 'OPENING…' : 'PLAY MATCH'}
           </ActionButton>
         </View>
       ) : null}
-      {openError ? <Text style={styles.playerStatusWarning}>{openError}</Text> : null}
-      <View style={styles.statusSpotlightSteps}>
-        {steps.map((step, index) => (
-          <View
-            key={step.label}
-            style={[
-              styles.statusSpotlightStep,
-              step.done && styles.statusSpotlightStepDone,
-              currentMatch && step.label === 'Match' && styles.statusSpotlightStepReady,
-            ]}>
-            <Text style={[styles.statusSpotlightStepNumber, step.done && styles.statusSpotlightStepNumberDone]}>
-              {index + 1}
+      {visibleWaitingMatch ? (
+        <View style={styles.statusSpotlightMatchCallout}>
+          <View style={styles.statusSpotlightMatchCopy}>
+            <Text style={styles.statusSpotlightMatchLabel}>Preparing match…</Text>
+            <Text style={styles.statusSpotlightMatchTitle}>
+              {visibleWaitingMatch.round.title} • {visibleWaitingMatch.label}
             </Text>
-            <View style={styles.statusSpotlightStepCopy}>
-              <Text style={styles.statusSpotlightStepLabel}>{step.label}</Text>
-              <Text numberOfLines={1} style={styles.statusSpotlightStepValue}>{step.value}</Text>
-            </View>
+            <Text style={styles.statusSpotlightMatchPlayers}>
+              {visibleWaitingMatch.players?.map(playerLabel).join(' vs ') || 'Waiting for opponent'}
+            </Text>
           </View>
-        ))}
-      </View>
-    </Surface>
-  );
-}
-
-function playerStatusActionLabel(data, currentMatch) {
-  if (currentMatch) return 'Open My Match';
-  if (!data?.account) return 'Sign In to Join';
-  if (!data?.signup) return 'Join Tournament';
-  return 'Check Match Status';
-}
-
-function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug }) {
-  const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState('');
-  const data = playerStatus.data;
-  const currentMatch = data?.currentMatch || null;
-  const signedInName = data?.account?.playerName || '';
-  const signupName = data?.signup?.playerName || '';
-
-  async function handlePlayMyMatch() {
-    if (!currentMatch) return;
-    setOpenError('');
-    setOpening(true);
-
-    try {
-      const result = await issueTournamentMatchTicket({
-        slug,
-        matchId: currentMatch.id,
-      });
-
-      if (result.roomUrl && globalThis.location?.assign) {
-        globalThis.location.assign(result.roomUrl);
-      }
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : 'Match access could not be opened.');
-    } finally {
-      setOpening(false);
-    }
-  }
-
-  return (
-    <Surface style={[styles.playerStatusCard, currentMatch && styles.playerStatusCardReady]}>
-      <View style={styles.playerStatusTopRow}>
-        <Badge tone={statusTone(data?.nextStep)}>{statusBadgeLabel(data?.nextStep)}</Badge>
-        <Text style={styles.playerStatusMeta}>
-          {playerStatus.loading
-            ? 'Checking account'
-            : signedInName
-              ? `Signed in as ${signedInName}`
-              : 'No player account signed in'}
-        </Text>
-      </View>
-
-      <Text style={styles.playerStatusTitle}>
-        {playerStatus.loading ? 'Checking your tournament status...' : data?.statusLabel || 'Status unavailable'}
-      </Text>
-
+        </View>
+      ) : null}
       {playerStatus.error ? <Text style={styles.playerStatusWarning}>{playerStatus.error}</Text> : null}
       {openError ? <Text style={styles.playerStatusWarning}>{openError}</Text> : null}
-
-      {data?.signup ? (
-        <Text style={styles.playerStatusCopy}>
-          Tournament seat confirmed for {playerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
-        </Text>
-      ) : signedInName ? (
-        <Text style={styles.playerStatusCopy}>
-          {signedInName} is signed in, but not on this tournament roster yet.
-        </Text>
-      ) : null}
-
-      <View style={styles.playerStatusSteps}>
-        <View style={[styles.playerStatusStep, signedInName && styles.playerStatusStepDone]}>
-          <Text style={[styles.playerStatusStepLabel, signedInName && styles.playerStatusStepLabelDone]}>Account</Text>
-          <Text style={styles.playerStatusStepValue}>{signedInName || 'Needed'}</Text>
-        </View>
-        <View style={[styles.playerStatusStep, signupName && styles.playerStatusStepDone]}>
-          <Text style={[styles.playerStatusStepLabel, signupName && styles.playerStatusStepLabelDone]}>Roster</Text>
-          <Text style={styles.playerStatusStepValue}>{signupName ? 'Registered' : 'Not yet'}</Text>
-        </View>
-        <View style={[styles.playerStatusStep, currentMatch && styles.playerStatusStepReady]}>
-          <Text style={[styles.playerStatusStepLabel, currentMatch && styles.playerStatusStepLabelReady]}>Match</Text>
-          <Text style={styles.playerStatusStepValue}>{currentMatch ? 'Ready' : 'Waiting'}</Text>
-        </View>
-      </View>
-
-      {currentMatch ? (
-        <View style={styles.playerMatchBox}>
-          <Text style={styles.playerMatchLabel}>
-            {currentMatch.round.title} • {currentMatch.label}
-          </Text>
-          <Text style={styles.playerMatchPlayers}>{currentMatch.players.map(playerLabel).join(' vs ')}</Text>
+      {steps.length ? (
+        <View style={styles.statusSpotlightSteps}>
+          {steps.map((step, index) => (
+            <View
+              key={step.label}
+              style={[
+                styles.statusSpotlightStep,
+                step.done && styles.statusSpotlightStepDone,
+                playableMatch && step.label === 'PLAY' && styles.statusSpotlightStepReady,
+              ]}>
+              <Text style={[styles.statusSpotlightStepNumber, step.done && styles.statusSpotlightStepNumberDone]}>
+                {index + 1}
+              </Text>
+              <View style={styles.statusSpotlightStepCopy}>
+                <Text style={styles.statusSpotlightStepLabel}>{step.label}</Text>
+                <Text numberOfLines={1} style={styles.statusSpotlightStepValue}>{step.value}</Text>
+              </View>
+            </View>
+          ))}
         </View>
       ) : null}
-
-      {data?.waitingMatch ? (
-        <View style={styles.playerMatchBox}>
-          <Text style={styles.playerMatchLabel}>
-            {data.waitingMatch.round.title} • {data.waitingMatch.label}
-          </Text>
-          <Text style={styles.playerMatchPlayers}>{data.waitingMatch.players.map(playerLabel).join(' vs ')}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.playerStatusActions}>
-        {currentMatch ? (
-          <ActionButton onPress={handlePlayMyMatch}>{opening ? 'Opening...' : 'Open My Match'}</ActionButton>
-        ) : !data?.account ? (
-          <ActionButton href={signInPath}>Sign in</ActionButton>
-        ) : (
-          <ActionButton href={checkInPath}>{playerStatusActionLabel(data, currentMatch)}</ActionButton>
-        )}
-        <ActionButton href="/rules" variant="secondary">
-          Rules
-        </ActionButton>
-      </View>
     </Surface>
   );
 }
@@ -2098,32 +1561,10 @@ function RegisteredPlayersPanel({
 }
 
 function LiveBracketBoard({ bracket }) {
-  const [openingMatchId, setOpeningMatchId] = useState('');
-  const [accessError, setAccessError] = useState('');
   const matches = getBracketMatches(bracket);
   const completedCount = matches.filter((match) => match.status === 'final').length;
   const readyCount = matches.filter((match) => match.status === 'ready' || match.status === 'active').length;
   const nextMatch = getNextPublicMatch(bracket);
-
-  async function handleOpenMatch(match) {
-    setAccessError('');
-    setOpeningMatchId(match.id);
-
-    try {
-      const result = await issueTournamentMatchTicket({
-        slug: bracket.tournamentSlug,
-        matchId: match.id,
-      });
-
-      if (result.roomUrl && globalThis.location?.assign) {
-        globalThis.location.assign(result.roomUrl);
-      }
-    } catch (error) {
-      setAccessError(error instanceof Error ? error.message : 'Match access could not be opened.');
-    } finally {
-      setOpeningMatchId('');
-    }
-  }
 
   return (
     <Surface style={styles.liveBracketCard}>
@@ -2155,8 +1596,6 @@ function LiveBracketBoard({ bracket }) {
           </Text>
         </View>
       ) : null}
-      {accessError ? <Text style={styles.liveBracketError}>{accessError}</Text> : null}
-
       {nextMatch ? (
         <View style={styles.upNextCard}>
           <View style={styles.upNextTopRow}>
@@ -2164,13 +1603,9 @@ function LiveBracketBoard({ bracket }) {
             <Text style={styles.upNextRound}>{nextMatch.label}</Text>
           </View>
           <Text style={styles.upNextPlayers}>{matchPlayersLabel(nextMatch)}</Text>
-          {nextMatch.status === 'ready' ? (
-            <View style={styles.upNextActions}>
-              <ActionButton onPress={() => handleOpenMatch(nextMatch)}>
-                {openingMatchId === nextMatch.id ? 'Opening...' : 'Play match'}
-              </ActionButton>
-            </View>
-          ) : null}
+          <Text style={styles.liveMatchLocked}>
+            {nextMatch.status === 'ready' ? 'Ready for assigned players' : 'Waiting for the bracket to advance'}
+          </Text>
         </View>
       ) : null}
 
@@ -2202,15 +1637,13 @@ function LiveBracketBoard({ bracket }) {
                   </View>
                   {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {match.winnerName}</Text> : null}
                   <View style={styles.liveMatchActions}>
-                    {match.status === 'ready' ? (
-                      <ActionButton onPress={() => handleOpenMatch(match)} variant="secondary">
-                        {openingMatchId === match.id ? 'Opening...' : 'Play match'}
-                      </ActionButton>
-                    ) : (
-                      <Text style={styles.liveMatchLocked}>
-                        {match.status === 'final' ? 'Match complete' : 'Opens when both players are set'}
-                      </Text>
-                    )}
+                    <Text style={styles.liveMatchLocked}>
+                      {match.status === 'final'
+                        ? 'Match complete'
+                        : match.status === 'ready'
+                          ? 'Ready for assigned players'
+                          : 'Opens when both players are set'}
+                    </Text>
                   </View>
                 </View>
               );

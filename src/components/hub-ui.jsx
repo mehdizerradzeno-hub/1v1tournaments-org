@@ -59,7 +59,7 @@ function getNextNavTournamentSlug(hostedTournaments = []) {
     || null;
 }
 
-function getNavItems(paths) {
+function getNavItems(paths, hasActiveMatch = false) {
   return [
     { label: 'Compete', href: '/games' },
     { label: 'Tournaments', href: '/tournaments' },
@@ -67,24 +67,24 @@ function getNavItems(paths) {
     { label: 'Rankings', href: '/leaderboard' },
     { label: 'Results', href: '/results' },
     { label: 'Profile', href: '/account' },
-    { label: 'My Match', href: paths.matchPath, activePath: paths.matchActivePath },
+    { label: hasActiveMatch ? 'Return to Match' : 'My Match', href: paths.matchPath, activePath: paths.matchActivePath },
   ];
 }
 
-function getMobileNavItems(paths) {
+function getMobileNavItems(paths, hasActiveMatch = false) {
   return [
     { label: 'Compete', href: '/games' },
-    { label: 'Match', href: paths.matchPath, activePath: paths.matchActivePath },
+    { label: hasActiveMatch ? 'Return' : 'Match', href: paths.matchPath, activePath: paths.matchActivePath },
     { label: 'Events', href: '/tournaments' },
     { label: 'Leagues', href: '/leagues' },
     { label: 'Profile', href: '/account' },
   ];
 }
 
-function getStickyActionItems(paths) {
+function getStickyActionItems(paths, hasActiveMatch = false) {
   return [
-    { label: 'Join', href: paths.checkInPath, tone: 'primary' },
-    { label: 'My Match', href: paths.matchPath, tone: 'secondary', activePath: paths.matchActivePath },
+    { label: 'Sign Up', href: paths.checkInPath, tone: 'primary' },
+    { label: hasActiveMatch ? 'Return to Match' : 'My Match', href: paths.matchPath, tone: 'secondary', activePath: paths.matchActivePath },
     { label: 'Watch', href: '/stream', tone: 'secondary' },
   ];
 }
@@ -209,8 +209,8 @@ function CardLink({ href, children, style, accent = theme.colors.accent, externa
   );
 }
 
-export function Surface({ children, style }) {
-  return <View style={[styles.surface, style]}>{children}</View>;
+export function Surface({ children, style, ...viewProps }) {
+  return <View {...viewProps} style={[styles.surface, style]}>{children}</View>;
 }
 
 export function PlayerRouteStrip({ title = 'Player path', body = 'Join first, then use My Match after the bracket is live.' }) {
@@ -253,6 +253,7 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
       <View
         style={[
           styles.actionButtonInner,
+          variant === 'success' && styles.actionButtonInnerSuccess,
           variant === 'secondary' && styles.actionButtonInnerSecondary,
           variant === 'ghost' && styles.actionButtonInnerGhost,
           variant === 'danger' && styles.actionButtonInnerDanger,
@@ -261,6 +262,7 @@ export function ActionButton({ href, onPress, children, variant = 'primary', ext
         <Text
           style={[
             styles.actionButtonText,
+            variant === 'success' && styles.actionButtonTextSuccess,
             variant === 'secondary' && styles.actionButtonTextSecondary,
             variant === 'ghost' && styles.actionButtonTextSecondary,
             variant === 'danger' && styles.actionButtonTextDanger,
@@ -736,6 +738,7 @@ export function HubScreen({
   showNavigation = true,
   heroVariant = 'default',
   stickyActions = true,
+  pageDataSet,
 }) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
@@ -771,9 +774,10 @@ export function HubScreen({
       : `${primaryPaths.checkInPath}?mode=signin#account-access`
     : '/next';
   const accountPath = accountHref || fallbackAccountPath;
-  const navItems = getNavItems(primaryPaths);
-  const mobileNavItems = getMobileNavItems(primaryPaths);
-  const stickyActionItems = getStickyActionItems(primaryPaths);
+  const hasActiveMatch = Boolean(navActiveMatch);
+  const navItems = getNavItems(primaryPaths, hasActiveMatch);
+  const mobileNavItems = getMobileNavItems(primaryPaths, hasActiveMatch);
+  const stickyActionItems = getStickyActionItems(primaryPaths, hasActiveMatch);
   const hasHydratedViewport = isHydrated && width > 0;
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && hasHydratedViewport && width < 720;
   const showTopNav = showNavigation && (forceTopNav || !showMobileNav);
@@ -997,7 +1001,7 @@ export function HubScreen({
           ]}
           style={styles.mainScroll}
           showsVerticalScrollIndicator={false}>
-          <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
+          <View dataSet={pageDataSet} style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
             {showHeader ? (
               <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
                 <Link href="/" asChild>
@@ -1669,6 +1673,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLift,
     borderColor: theme.colors.lineStrong,
   },
+  actionButtonInnerSuccess: {
+    backgroundColor: theme.colors.green,
+    borderColor: theme.colors.green,
+  },
   actionButtonInnerGhost: {
     backgroundColor: 'transparent',
     borderColor: theme.colors.lineStrong,
@@ -1690,6 +1698,9 @@ const styles = StyleSheet.create({
   },
   actionButtonTextSecondary: {
     color: theme.colors.text,
+  },
+  actionButtonTextSuccess: {
+    color: '#08100C',
   },
   actionButtonTextDanger: {
     color: '#FFE5E0',

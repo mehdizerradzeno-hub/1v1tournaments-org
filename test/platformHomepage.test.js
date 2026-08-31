@@ -19,19 +19,23 @@ const hubUi = await readFile(
   new URL("../src/components/hub-ui.jsx", import.meta.url),
   "utf8",
 );
+const tournamentMasterUi = await readFile(
+  new URL("../src/components/tournament-master-ui.jsx", import.meta.url),
+  "utf8",
+);
 
 test("root route renders the multi-game platform hub", () => {
   assert.match(rootRoute, /HomeScreen/);
-  assert.match(homeScreen, /COMPETE IN 1V1/);
-  assert.match(homeScreen, /Spades and Euchre/);
-  assert.match(homeScreen, /No partner\. No excuses\./);
+  assert.match(homeScreen, /TournamentJourney/);
+  assert.match(tournamentMasterUi, /1V1 TOURNAMENTS/);
+  assert.match(tournamentMasterUi, /Sign up\. Check in\. Play\./);
+  assert.match(tournamentMasterUi, /Spades, Euchre/);
   assert.match(homeScreen, /PLATFORM_GAME_PRESENTATION/);
   assert.doesNotMatch(homeScreen, /TwitchTournamentBoard/);
   assert.doesNotMatch(homeScreen, /StreamCard/);
   assert.match(homeScreen, /homeUpcoming\.length/);
   assert.match(homeScreen, /laterTournaments\.slice\(0, 2\)/);
-  assert.match(homeScreen, /aria-level=\{1\}/);
-  assert.match(homeScreen, /aria-level=\{2\}/);
+  assert.match(tournamentMasterUi, /accessibilityRole="header"/);
 });
 
 test("platform navigation keeps competition, account, and My Match visible", () => {
@@ -42,10 +46,10 @@ test("platform navigation keeps competition, account, and My Match visible", () 
     "Rankings",
     "Results",
     "Profile",
-    "My Match",
   ]) {
     assert.match(hubUi, new RegExp(`label: '${label}'`));
   }
+  assert.match(hubUi, /hasActiveMatch \? 'Return to Match' : 'My Match'/);
   assert.match(hubUi, /resolvedPlayerAccount\?\.hostApproved/);
 });
 

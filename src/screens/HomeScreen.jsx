@@ -6,7 +6,6 @@ import {
   Text,
   View,
   StyleSheet,
-  useWindowDimensions,
 } from "react-native";
 
 import {
@@ -19,7 +18,9 @@ import {
   Surface,
   EmptyState,
 } from "../components/hub-ui.jsx";
-import { formatDateLine, formatShortDate } from "../lib/format.js";
+import { TournamentJourney } from "../components/tournament-master-ui.jsx";
+import { getTournamentDiscoveryPresentation } from "../lib/tournamentJourneyPresentation.js";
+import { formatDateLine } from "../lib/format.js";
 import { APP_STORE_BADGE_URL, downloadLinks } from "../lib/downloadLinks.js";
 import { openSharedAccountGame } from "../lib/sharedAccountLaunch.js";
 import {
@@ -39,7 +40,6 @@ import {
 } from "../lib/tournamentCatalog.js";
 import {
   getAppleReleaseLabel,
-  getFeaturedCompetitionAction,
   getCompetitionLifecycleLabel,
   PLATFORM_GAME_PRESENTATION,
   PLATFORM_APP_STORE_STATEMENT,
@@ -192,7 +192,7 @@ export default function HomeScreen() {
       getPublicTournamentCatalog(
         getUpcomingTournaments(),
         hostedTournaments,
-      ).filter((tournament) => tournament.status === "upcoming"),
+      ).filter((tournament) => ["upcoming", "live"].includes(tournament.status)),
     [hostedTournaments],
   );
   const gameLookup = new Map(games.map((game) => [game.slug, game]));
@@ -228,9 +228,6 @@ export default function HomeScreen() {
   const featuredSignupPath = featuredTournament
     ? getCheckInPath(featuredTournament.slug)
     : "/";
-  const featuredMatchStatusPath = featuredTournament
-    ? `${featuredTournamentPath}#my-match`
-    : featuredTournamentPath;
   const featuredRegistrationMeta = featuredTournament
     ? getEffectiveRegistrationStatus(featuredTournament, {
         hasLiveBracket: Boolean(featuredBracket),
@@ -340,26 +337,23 @@ export default function HomeScreen() {
       eyebrow="Official website"
       footerNote={siteData.site.adminNote}
       lead="One account for competitive Spades and Euchre, tournament assignments, leagues, rankings, and results."
+      pageDataSet={{ tournamentPage: "true" }}
       showHero={false}
+      stickyActions={false}
       subtitle="One account. Ranked competition. Tournaments."
       title={siteData.site.name}
     >
-      <PlatformIntroHero />
+      <TournamentJourney />
 
-      <PremiumCountdownHero
+      <MasterFeaturedTournament
         bracket={featuredBracket}
         countdown={featuredCountdown}
-        eventCount={visibleUpcoming.length}
-        gameCount={games.length}
-        matchStatusPath={featuredMatchStatusPath}
         registrationMeta={featuredRegistrationMeta}
         signupPath={featuredSignupPath}
         signupSummary={featuredSignupSummary}
         tournament={featuredTournament}
         tournamentPath={featuredTournamentPath}
       />
-
-      <PremiumDownloadSection />
 
       {homeUpcoming.length ? (
         <Section
@@ -381,6 +375,8 @@ export default function HomeScreen() {
           />
         </Section>
       ) : null}
+
+      <PremiumDownloadSection />
 
       <Section
         action={
@@ -407,278 +403,87 @@ export default function HomeScreen() {
   );
 }
 
-function PlatformIntroHero() {
-  const { width } = useWindowDimensions();
-  const compact = width > 0 && width < 700;
-  const tight = width > 0 && width < 440;
-
-  return (
-    <Surface
-      style={[styles.platformHero, compact && styles.platformHeroCompact]}
-    >
-      <View style={styles.platformHeroBackdrop}>
-        <Text style={styles.platformHeroSuit}>♠</Text>
-        <Text style={[styles.platformHeroSuit, styles.platformHeroSuitRight]}>
-          ♦
-        </Text>
-      </View>
-      <View style={styles.platformHeroCopy}>
-        <Badge tone="accent">SEASON 1 · LIVE</Badge>
-        <Text
-          aria-level={1}
-          accessibilityRole="header"
-          style={[
-            styles.platformHeroTitle,
-            compact && styles.platformHeroTitleCompact,
-            tight && styles.platformHeroTitleTight,
-          ]}
-        >
-          COMPETE IN 1V1
-        </Text>
-        <Text style={styles.platformHeroLead}>Spades and Euchre</Text>
-        <Text style={styles.platformHeroCallout}>No partner. No excuses.</Text>
-      </View>
-      <View style={styles.platformHeroActions}>
-        <ActionButton href="/games">Compete</ActionButton>
-        <ActionButton href="/tournaments" variant="secondary">
-          Tournaments
-        </ActionButton>
-        <ActionButton href="/leagues" variant="secondary">
-          Leagues
-        </ActionButton>
-      </View>
-    </Surface>
-  );
-}
-
-function PremiumCountdownHero({
+function MasterFeaturedTournament({
   bracket,
   countdown,
-  eventCount,
-  gameCount,
-  matchStatusPath,
   registrationMeta,
   signupPath,
   signupSummary,
   tournament,
   tournamentPath,
 }) {
-  const isBracketLive = Boolean(bracket);
-  const gameSlug = tournament?.gameSlug || tournament?.game || "spades";
-  const gamePresentation =
-    PLATFORM_GAME_PRESENTATION[gameSlug] || PLATFORM_GAME_PRESENTATION.spades;
-  const primaryAction = getFeaturedCompetitionAction({
-    status: tournament?.status,
-    registrationStatus: registrationMeta?.value,
-    hasBracket: isBracketLive,
-    tournamentPath,
-    signupPath,
-    matchPath: matchStatusPath,
-  });
-  const gameWebUrl =
-    gameSlug === "euchre" ? downloadLinks.webEuchre : downloadLinks.webSpades;
-  const { width } = useWindowDimensions();
-  const isCompact = width > 0 && width < 760;
-  const isTight = width > 0 && width < 440;
-  const competitionStatus = getCompetitionLifecycleLabel({
-    status: tournament?.status,
-    hasBracket: isBracketLive,
-  });
-  const heroStats = tournament
-    ? [
-        {
-          label: "Next event",
-          value: countdown.hasDate
-            ? formatShortDate(tournament.date, tournament.timeZone)
-            : "TBD",
-          tone: "accent",
-        },
-        {
-          label: "Registered",
-          value: registeredCountLabel(signupSummary, tournament),
-          tone: signupSummary.count ? "green" : "blue",
-        },
-        {
-          label: "Bracket",
-          value: bracket
-            ? `${bracket.participantCount || 0} seeded`
-            : bracketTargetLabel(tournament),
-          tone: bracket ? "green" : "accent",
-        },
-        { label: "Games", value: String(gameCount || 0), tone: "blue" },
-        { label: "Events", value: String(eventCount || 0), tone: "green" },
-      ]
-    : [];
-
   if (!tournament) {
     return (
       <EmptyState
-        body="The next public event has not been posted yet."
-        title="No tournament scheduled"
+        action={<ActionButton href="/tournaments">View tournaments</ActionButton>}
+        body="The next public tournament will appear here as soon as it is published."
+        title="Next tournament coming soon"
       />
     );
   }
 
-  return (
-    <Surface style={[styles.premiumHero, isTight && styles.premiumHeroTight]}>
-      <View style={styles.premiumHeroBackdrop}>
-        <Text style={[styles.heroSpade, styles.heroSpadeLeft]}>♠</Text>
-        <Text style={[styles.heroSpade, styles.heroSpadeRight]}>♠</Text>
-        <View style={styles.heroGoldGlow} />
-        <View style={styles.heroGreenGlow} />
-      </View>
-      <View style={styles.premiumHeroTopRow}>
-        <Badge
-          tone={
-            competitionStatus === "LIVE"
-              ? "green"
-              : competitionStatus === "COMPLETE"
-                ? "rose"
-                : "blue"
-          }
-        >
-          {competitionStatus}
-        </Badge>
-        <Badge tone="accent">SEASON 1 · LIVE</Badge>
-        <Text style={styles.premiumHeroDomain}>Tournament hub</Text>
-      </View>
+  const gameSlug = tournament.gameSlug || tournament.game || "spades";
+  const gamePresentation = PLATFORM_GAME_PRESENTATION[gameSlug] || PLATFORM_GAME_PRESENTATION.spades;
+  const competitionStatus = getCompetitionLifecycleLabel({
+    status: tournament.status,
+    hasBracket: Boolean(bracket),
+  });
+  const discovery = getTournamentDiscoveryPresentation({
+    hasBracket: Boolean(bracket),
+    registrationStatus: registrationMeta?.value,
+    signupPath,
+    signupSummary,
+    tournamentPath,
+  });
+  const checkInWindow = tournament.checkIn?.window || "Return near start time for match assignment.";
 
-      <View style={styles.premiumHeroCopy}>
-        <Text
-          aria-level={2}
-          accessibilityRole="header"
-          style={[
-            styles.premiumHeroTitle,
-            isCompact && styles.premiumHeroTitleCompact,
-          ]}
-        >
-          {tournament.title}
-        </Text>
-        <Text style={styles.premiumHeroSubtitle}>
-          Free-entry. Account-based. Head-to-head {gamePresentation.name}.
-        </Text>
-        <Text style={styles.premiumHeroDate}>
+  return (
+    <Surface dataSet={{ masterFeaturedTournament: "true" }} style={styles.masterFeatured}>
+      <View style={styles.masterFeaturedHeader}>
+        <View style={styles.masterFeaturedBadges}>
+          <Badge tone={competitionStatus === "LIVE" ? "green" : "blue"}>{competitionStatus}</Badge>
+          <Badge tone="accent">{gamePresentation.name}</Badge>
+          {discovery.registered ? <Badge tone="green">REGISTERED</Badge> : null}
+        </View>
+        <Text style={styles.masterFeaturedDate}>
           {countdown.hasDate
-            ? formatDateLine(
-                tournament.date,
-                tournament.timeZone,
-                tournament.timeZoneLabel,
-              )
+            ? formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)
             : "Date pending"}
         </Text>
       </View>
 
-      <View
-        style={[styles.countdownFrame, isTight && styles.countdownFrameTight]}
-      >
-        <View style={styles.countdownRailRow}>
-          <View style={styles.countdownRail} />
-          <Text style={styles.countdownFrameLabel}>Tournament starts in</Text>
-          <View style={styles.countdownRail} />
-        </View>
-        <View
-          style={[
-            styles.countdownGrid,
-            isCompact && styles.countdownGridCompact,
-          ]}
-        >
-          {countdown.parts.map((part) => (
-            <View
-              key={part.label}
-              style={[
-                styles.countdownUnit,
-                isTight && styles.countdownUnitTight,
-              ]}
-            >
-              <Text
-                adjustsFontSizeToFit
-                numberOfLines={1}
-                style={[
-                  styles.countdownValue,
-                  isCompact && styles.countdownValueCompact,
-                  isTight && styles.countdownValueTight,
-                ]}
-              >
-                {part.value}
-              </Text>
-              <Text style={styles.countdownLabel}>{part.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.heroPrimaryActions}>
-        <ActionButton href={primaryAction.href} style={styles.heroActionButton}>
-          {primaryAction.label}
-        </ActionButton>
-        <ActionButton
-          href={matchStatusPath}
-          style={styles.heroActionButton}
-          variant="secondary"
-        >
-          Check Match Status
-        </ActionButton>
-        <ActionButton
-          href={`${tournamentPath}#live-bracket`}
-          style={styles.heroActionButton}
-          variant="secondary"
-        >
-          Bracket
-        </ActionButton>
-      </View>
-
-      <View style={styles.heroActionRowSecondary}>
-        <ActionButton
-          href="/stream"
-          style={styles.heroSecondaryButton}
-          variant="secondary"
-        >
-          Watch live
-        </ActionButton>
-        <ActionButton
-          href="/results"
-          style={styles.heroSecondaryButton}
-          variant="ghost"
-        >
-          Results
-        </ActionButton>
-      </View>
-
-      <View style={styles.rosterPolicyBar}>
-        <Text style={styles.rosterPolicyText}>
-          {flexibleBracketCopy(tournament)}
-        </Text>
-      </View>
-
-      <View style={styles.heroInfoGrid}>
-        {heroStats.map((stat) => (
-          <View
-            key={stat.label}
-            style={[
-              styles.heroInfoTile,
-              styles[
-                `heroInfo${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`
-              ],
-            ]}
-          >
-            <Text style={styles.heroInfoLabel}>{stat.label}</Text>
-            <Text numberOfLines={1} style={styles.heroInfoValue}>
-              {stat.value}
-            </Text>
+      <View style={styles.masterFeaturedBody}>
+        <View style={styles.masterFeaturedCopy}>
+          <Text accessibilityRole="header" style={styles.masterFeaturedTitle}>{tournament.title}</Text>
+          <Text style={styles.masterFeaturedSummary}>
+            {tournament.summary || `Head-to-head ${gamePresentation.name} competition.`}
+          </Text>
+          <View style={styles.masterFeaturedStats}>
+            <StatPill
+              label="Registered"
+              value={registeredCountLabel(signupSummary, tournament)}
+              tone={signupSummary.count ? "green" : "blue"}
+            />
+            <StatPill
+              label="Status"
+              value={bracket ? "Bracket live" : registrationMeta.label}
+              tone={bracket ? "green" : registrationMeta.tone}
+            />
+            <StatPill label="Entry" value="Free" tone="green" />
           </View>
-        ))}
+        </View>
+        <View style={styles.masterFeaturedActions}>
+          <ActionButton href={discovery.primaryAction.href}>{discovery.primaryAction.label}</ActionButton>
+          {discovery.secondaryAction ? (
+            <ActionButton href={discovery.secondaryAction.href} variant="secondary">
+              {discovery.secondaryAction.label}
+            </ActionButton>
+          ) : null}
+        </View>
       </View>
-
-      <View style={styles.heroActionRow}>
-        <PremiumLinkButton
-          gameAudience={gameSlug}
-          href={gameWebUrl}
-          label={`Play ${gamePresentation.name} on the Web`}
-        />
-        <PremiumLinkButton href={downloadLinks.twitch} label="Twitch" />
-        <PremiumLinkButton href={downloadLinks.discord} label="Discord" />
-        <PremiumLinkButton href={downloadLinks.youtube} label="YouTube" />
-      </View>
+      <Text style={styles.masterFeaturedHint}>
+        {discovery.registered ? "You're registered. " : ""}{checkInWindow}
+      </Text>
     </Surface>
   );
 }
@@ -873,7 +678,6 @@ function UpcomingTournamentList({
         const signups = signupSummary.signups || [];
         const tournamentPath = getTournamentPath(tournament.slug);
         const signupPath = getCheckInPath(tournament.slug);
-        const matchPath = `${tournamentPath}#my-match`;
         const gameName =
           gameLookup.get(tournament.gameSlug)?.name || tournament.gameSlug;
         const competitionStatus = getCompetitionLifecycleLabel({
@@ -886,14 +690,12 @@ function UpcomingTournamentList({
             : competitionStatus === "COMPLETE"
               ? "rose"
               : "blue";
-        const action = getFeaturedCompetitionAction({
-          status: tournament.status,
-          registrationStatus: registrationMeta.value,
+        const discovery = getTournamentDiscoveryPresentation({
           hasBracket: Boolean(bracket),
-          tournamentPath,
+          registrationStatus: registrationMeta.value,
           signupPath,
-          matchPath,
-          resultsPath: "/results",
+          signupSummary,
+          tournamentPath,
         });
         const isToday = isTournamentToday(tournament, nowMs);
 
@@ -911,6 +713,7 @@ function UpcomingTournamentList({
                   {isNext ? "Next tournament" : competitionStatus}
                 </Badge>
                 {isToday ? <Badge tone="accent">Tonight</Badge> : null}
+                {discovery.registered ? <Badge tone="green">Registered</Badge> : null}
                 <Text style={styles.upcomingGame}>{gameName}</Text>
               </View>
               <Text style={styles.upcomingTitle}>{tournament.title}</Text>
@@ -952,10 +755,14 @@ function UpcomingTournamentList({
               />
             </View>
             <View style={styles.upcomingActions}>
-              <ActionButton href={action.href}>{action.label}</ActionButton>
-              <ActionButton href={matchPath} variant="secondary">
-                Check Match Status
+              <ActionButton href={discovery.primaryAction.href}>
+                {discovery.primaryAction.label}
               </ActionButton>
+              {discovery.secondaryAction ? (
+                <ActionButton href={discovery.secondaryAction.href} variant="secondary">
+                  {discovery.secondaryAction.label}
+                </ActionButton>
+              ) : null}
             </View>
           </Surface>
         );
@@ -1006,6 +813,73 @@ function UpcomingRosterPreview({ loading, signups }) {
 const styles = StyleSheet.create({
   block: {
     marginBottom: 14,
+  },
+  masterFeatured: {
+    backgroundColor: "rgba(12, 17, 15, 0.94)",
+    borderColor: "rgba(94, 205, 158, 0.26)",
+    gap: 18,
+    marginBottom: 28,
+    minWidth: 0,
+  },
+  masterFeaturedActions: {
+    flexBasis: 210,
+    gap: 9,
+    minWidth: 190,
+  },
+  masterFeaturedBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  masterFeaturedBody: {
+    alignItems: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 20,
+  },
+  masterFeaturedCopy: {
+    flex: 1,
+    gap: 10,
+    minWidth: 250,
+  },
+  masterFeaturedDate: {
+    color: "#D6A24E",
+    fontSize: 13,
+    fontWeight: "900",
+    lineHeight: 19,
+  },
+  masterFeaturedHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  masterFeaturedHint: {
+    color: '#A7A29A',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 14,
+  },
+  masterFeaturedStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 3,
+  },
+  masterFeaturedSummary: {
+    color: "#B7B0A7",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  masterFeaturedTitle: {
+    color: "#F4EFE6",
+    fontSize: 32,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    lineHeight: 38,
   },
   frontDoorShell: {
     backgroundColor: "#07110F",

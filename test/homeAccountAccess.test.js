@@ -25,7 +25,8 @@ test('loading, empty, and live next-event states retain account access', () => {
   assert.equal(nextSource.match(/accountHref="\/account"/g)?.length, 3);
   assert.doesNotMatch(nextSource, /showHeader=\{false\}/);
   assert.match(nextSource, /No upcoming tournament is published yet/);
-  assert.match(nextSource, /NextLobbyHero/);
+  assert.match(nextSource, /TournamentJourney/);
+  assert.match(nextSource, /MasterTournamentCard/);
 });
 
 test('Tournament Hub account route reuses the existing authoritative account flow', () => {

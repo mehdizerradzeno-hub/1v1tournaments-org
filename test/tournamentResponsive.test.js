@@ -7,6 +7,14 @@ const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScr
 const tournamentScreenSource = readFileSync(tournamentScreenFile, 'utf8');
 const hubUiFile = fileURLToPath(new URL('../src/components/hub-ui.jsx', import.meta.url));
 const hubUiSource = readFileSync(hubUiFile, 'utf8');
+const masterUiSource = readFileSync(
+  fileURLToPath(new URL('../src/components/tournament-master-ui.jsx', import.meta.url)),
+  'utf8',
+);
+const responsiveCssSource = readFileSync(
+  fileURLToPath(new URL('../src/styles/tournamentResponsive.css', import.meta.url)),
+  'utf8',
+);
 
 function hubViewportMarkup({ hydrated, width }) {
   const hasHydratedViewport = hydrated && width > 0;
@@ -23,22 +31,27 @@ function hubViewportMarkup({ hydrated, width }) {
   };
 }
 
-test('the Twitch arrival actions take the available row at phone widths', () => {
-  assert.match(tournamentScreenSource, /const usePhoneActionLayout = width > 0 && width <= 430;/);
-  assert.match(
-    tournamentScreenSource,
-    /style=\{\[styles\.arrivalActions, usePhoneActionLayout && styles\.arrivalActionsPhone\]\}/,
-  );
-  assert.match(
-    tournamentScreenSource,
-    /arrivalActionsPhone:\s*\{\s*flexBasis: '100%',\s*width: '100%',\s*\}/,
-  );
-  assert.match(tournamentScreenSource, /arrivalActions:\s*\{[\s\S]*?flexWrap: 'wrap'/);
+test('master journey stays usable at phone and 914x335-style short-landscape viewports', () => {
+  assert.match(masterUiSource, /width > 0 && width <= 520/);
+  assert.match(masterUiSource, /width > height && height > 0 && height <= 360/);
+  assert.match(masterUiSource, /stepsPhone:\s*\{\s*flexDirection: 'column'/);
+  assert.match(masterUiSource, /tournamentJourneySteps: 'true'/);
+  assert.match(masterUiSource, /tournamentJourneyStep: 'true'/);
+  assert.match(responsiveCssSource, /orientation: landscape/);
+  assert.match(responsiveCssSource, /max-height: 360px/);
+  assert.match(responsiveCssSource, /max-width: 100%/);
+  assert.match(responsiveCssSource, /data-tournament-journey-steps="true"/);
+  assert.match(responsiveCssSource, /data-tournament-journey-step="true"/);
+  assert.doesNotMatch(responsiveCssSource, /overflow-x:\s*(hidden|clip)/);
 });
 
-test('every Twitch arrival action preserves a 44px minimum touch target', () => {
-  assert.equal((tournamentScreenSource.match(/style=\{styles\.arrivalAction\}/g) || []).length, 3);
-  assert.match(tournamentScreenSource, /arrivalAction:\s*\{\s*minHeight: 44,\s*\}/);
+test('the player owns one match launcher and public bracket cards stay view-only', () => {
+  assert.equal((tournamentScreenSource.match(/issueTournamentMatchTicket/g) || []).length, 2);
+  assert.match(tournamentScreenSource, /PLAY MATCH/);
+  assert.doesNotMatch(tournamentScreenSource, /Open My Match/);
+  assert.doesNotMatch(tournamentScreenSource, />Play match</);
+  assert.match(tournamentScreenSource, /Ready for assigned players/);
+  assert.match(responsiveCssSource, /min-height: 44px/);
 });
 
 test('the longest tournament tab uses a compact phone label', () => {

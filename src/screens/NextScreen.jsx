@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import {
   ActionButton,
@@ -15,6 +8,8 @@ import {
   HubScreen,
   Surface,
 } from "../components/hub-ui.jsx";
+import { TournamentJourney } from "../components/tournament-master-ui.jsx";
+import { getTournamentDiscoveryPresentation } from "../lib/tournamentJourneyPresentation.js";
 import { formatDateLine } from "../lib/format.js";
 import { downloadLinks } from "../lib/downloadLinks.js";
 import {
@@ -29,11 +24,7 @@ import {
   mergeTournamentLists,
 } from "../lib/tournamentCatalog.js";
 import {
-  findRedditSundayCommunityCup,
-  getCommunityCupPrimaryAction,
-  getTournamentBroadcastPath,
   getCompetitionLifecycleLabel,
-  getFeaturedCompetitionAction,
 } from "../lib/platformPresentation.js";
 import {
   getEffectiveRegistrationStatus,
@@ -43,146 +34,12 @@ import {
   fetchSignupSummary,
   fetchTournamentBracket,
   fetchTournamentEvents,
-  fetchTournamentPlayerStatus,
   fetchTournamentSettings,
 } from "../lib/tournamentHostingClient.js";
 import { startVisibilityAwarePolling } from "../lib/visibilityPoller.js";
 import { useVisibleNow } from "../lib/useVisibleNow.js";
 
 const DEFAULT_ROSTER_CAP = 8;
-const NEXT_CHAT_COMMANDS = [
-  { command: "!join", label: "Signup" },
-  { command: "!match", label: "Match" },
-  { command: "!rules", label: "Rules" },
-  { command: "!discord", label: "Discord" },
-];
-const NEXT_MOTION_CSS = `
-@keyframes nextCountdownTick {
-  0% { opacity: .78; filter: blur(.35px) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
-  42% { opacity: 1; filter: blur(0) drop-shadow(0 0 14px rgba(214, 162, 78, .22)); }
-  100% { opacity: 1; filter: blur(0) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
-}
-
-@keyframes nextTitleBreath {
-  0%, 100% {
-    text-shadow: 0 0 0 rgba(214, 162, 78, 0);
-    transform: scale(1);
-  }
-  50% {
-    text-shadow: 0 0 18px rgba(214, 162, 78, .20), 0 0 34px rgba(214, 162, 78, .08);
-    transform: scale(1.024);
-  }
-}
-
-@keyframes nextProgressSheen {
-  0% { opacity: 0; transform: translateX(-120%); }
-  16% { opacity: .46; }
-  56% { opacity: .20; }
-  100% { opacity: 0; transform: translateX(220%); }
-}
-
-@keyframes nextCtaBreath {
-  0%, 100% { box-shadow: 0 12px 28px rgba(214, 162, 78, .14); transform: translateY(0); }
-  45% { box-shadow: 0 18px 44px rgba(214, 162, 78, .24); transform: translateY(-1px); }
-}
-
-@keyframes nextCtaSweep {
-  0% { opacity: 0; transform: translateX(-140%) skewX(-18deg); }
-  18% { opacity: .44; }
-  42% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
-  100% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
-}
-
-[data-next-motion="countdown"] {
-  animation: nextCountdownTick 440ms cubic-bezier(.2, .86, .22, 1) both;
-  will-change: opacity, filter;
-}
-
-[data-countdown-clock="true"] {
-  display: block;
-  font-feature-settings: "tnum" 1;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  word-break: normal;
-}
-
-[data-next-motion="title"] {
-  animation: nextTitleBreath 3.1s ease-in-out infinite;
-  display: inline-block;
-  transform-origin: left center;
-  will-change: transform, text-shadow;
-}
-
-[data-next-motion="progress"] {
-  position: relative;
-}
-
-[data-next-motion="progress"]::after {
-  animation: nextProgressSheen 3.8s cubic-bezier(.2, .8, .2, 1) infinite;
-  background: linear-gradient(90deg, transparent, rgba(255, 239, 184, .64), transparent);
-  border-radius: 999px;
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 42%;
-}
-
-[data-next-motion="progress-fill"] {
-  transition: width 780ms cubic-bezier(.2, .8, .2, 1);
-  will-change: width;
-}
-
-[data-next-motion="cta"] {
-  animation: nextCtaBreath 4.8s ease-in-out infinite;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  transition: filter 180ms ease, transform 180ms ease;
-}
-
-[data-next-motion="cta"]::after {
-  animation: nextCtaSweep 5.6s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, rgba(255, 247, 214, .38), transparent);
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 52%;
-  z-index: 2;
-}
-
-[data-next-motion="cta"] a > div,
-[data-next-motion="cta"] [role="link"] > div,
-[data-next-motion="cta"] [role="button"] > div {
-  background: linear-gradient(135deg, #F0C86A 0%, #D6A24E 46%, #9F6B24 100%);
-  border-color: rgba(255, 236, 181, .56);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
-}
-
-[data-next-motion="cta"]:hover {
-  filter: saturate(1.05);
-  transform: translateY(-2px);
-}
-
-[data-next-motion="cta"]:active {
-  filter: saturate(.98);
-  transform: translateY(1px);
-}
-
-[data-next-motion="panel"],
-[data-next-motion="card"] {
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
-}
-
-[data-next-motion="panel"]:hover,
-[data-next-motion="card"]:hover {
-  border-color: rgba(214, 162, 78, .24);
-  box-shadow: 0 24px 62px rgba(0, 0, 0, .30), 0 0 34px rgba(214, 162, 78, .07);
-  transform: translateY(-1px);
-}
-`;
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -197,31 +54,6 @@ function sortTournamentsByDate(tournaments) {
   );
 }
 
-function getCountdownParts(tournament, nowMs) {
-  const startMs = new Date(tournament?.date).getTime();
-
-  if (!Number.isFinite(startMs)) {
-    return {
-      clockLabel: "Date TBA",
-      dayLabel: "",
-    };
-  }
-
-  const totalSeconds = Math.max(Math.ceil((startMs - nowMs) / 1000), 0);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const hourLabel = String(hours).padStart(2, "0");
-  const minuteLabel = String(minutes).padStart(2, "0");
-  const secondLabel = String(seconds).padStart(2, "0");
-
-  return {
-    clockLabel: `${hourLabel}:${minuteLabel}:${secondLabel}`,
-    dayLabel: days > 0 ? `${days}d` : "",
-  };
-}
-
 function getSignupCount(signupSummary) {
   return signupSummary?.count || signupSummary?.signups?.length || 0;
 }
@@ -230,104 +62,12 @@ function getRosterCap(tournament) {
   return parsePositiveInt(tournament?.rosterCap, DEFAULT_ROSTER_CAP);
 }
 
-function getRegistrationPercent(signupCount, rosterCap) {
-  if (!rosterCap) {
-    return 0;
-  }
-
-  return Math.min(Math.round((signupCount / rosterCap) * 100), 100);
-}
-
-function getSeatsMessage(openSeats, signupCount, rosterCap) {
-  if (rosterCap && signupCount >= rosterCap) {
-    return "Tournament is full";
-  }
-
-  if (openSeats === 1) {
-    return "Only 1 seat left";
-  }
-
-  return `Only ${openSeats} seats left`;
-}
-
-function getDurationLabel(tournament) {
-  return tournament?.duration || tournament?.durationLabel || "45-60 min";
-}
-
-function getTournamentSponsor(tournament) {
-  const sponsor = tournament?.sponsor || tournament?.presentingSponsor || null;
-
-  if (!sponsor?.name) {
-    return null;
-  }
-
-  return {
-    logoUrl: sponsor.logoUrl || sponsor.logo || "",
-    name: sponsor.name,
-  };
-}
-
-function getMotionDataSet(value) {
-  return Platform.OS === "web" ? { nextMotion: value } : undefined;
-}
-
-function NextMotionStyles() {
-  if (Platform.OS !== "web") {
-    return null;
-  }
-
-  return <style dangerouslySetInnerHTML={{ __html: NEXT_MOTION_CSS }} />;
-}
-
-function absoluteTournamentUrl(path) {
-  const origin = downloadLinks.tournaments || "https://1v1tournaments.org";
-
-  return `${origin.replace(/\/$/, "")}${path}`;
-}
-
-function getQrUrl(value) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(value)}`;
-}
-
-function getNextMatchLabel(bracket) {
-  const matches =
-    bracket?.rounds?.flatMap((round) => round.matches || []) || [];
-  const match =
-    matches.find(
-      (item) => item.status === "ready" || item.status === "active",
-    ) ||
-    matches.find((item) => item.status !== "final" && !item.winnerName) ||
-    null;
-
-  if (!match) {
-    return "Players appear after seeding";
-  }
-
-  const players = match.players || [];
-
-  if (players.length) {
-    return players
-      .map((player) =>
-        player?.handle ? `${player.name} (${player.handle})` : player?.name,
-      )
-      .filter(Boolean)
-      .join(" vs ");
-  }
-
-  return match.teams?.join(" vs ") || "Players appear after seeding";
-}
-
 export default function NextScreen({ showDiscovery = false }) {
   const [eventDataBySlug, setEventDataBySlug] = useState({});
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [hostedTournamentsLoaded, setHostedTournamentsLoaded] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleRequestId, setScheduleRequestId] = useState(0);
-  const [communityPlayerStatus, setCommunityPlayerStatus] = useState({
-    data: null,
-    error: "",
-    loading: false,
-  });
   const nowMs = useVisibleNow(1000);
   const publicTournaments = useMemo(
     () =>
@@ -357,16 +97,6 @@ export default function NextScreen({ showDiscovery = false }) {
       ),
     ),
   );
-  const communityTournament = findRedditSundayCommunityCup(
-    hydratedPublicTournaments,
-  );
-  const communityEventData =
-    eventDataBySlug[communityTournament?.slug || ""] || {};
-  const communityRegistrationMeta = communityTournament
-    ? getEffectiveRegistrationStatus(communityTournament, {
-        hasLiveBracket: Boolean(communityEventData.bracket),
-      })
-    : null;
   const tournament = getNextPublicTournament(
     hydratedPublicTournaments,
     eventDataBySlug,
@@ -385,35 +115,21 @@ export default function NextScreen({ showDiscovery = false }) {
       })
     : { label: "Coming soon", tone: "neutral", value: "coming-soon" };
   const tournamentPath = tournament ? getTournamentPath(tournament.slug) : "/";
-  const checkInPath = tournament ? getCheckInPath(tournament.slug) : "/";
   const competitionStatus = tournament
     ? getCompetitionLifecycleLabel({
         status: tournament.status,
         hasBracket: Boolean(bracket),
       })
     : "UPCOMING";
-  const primaryAction = tournament
-    ? getFeaturedCompetitionAction({
-        status: tournament.status,
-        registrationStatus: registrationMeta.value,
-        hasBracket: Boolean(bracket),
-        tournamentPath,
-        signupPath: checkInPath,
-        matchPath: `${tournamentPath}#my-match`,
-        resultsPath: "/results",
-      })
-    : { label: "View tournaments", href: "/tournaments" };
   const statusTone =
     competitionStatus === "LIVE"
       ? "green"
       : competitionStatus === "COMPLETE"
         ? "rose"
         : "blue";
-  const joinUrl = absoluteTournamentUrl(checkInPath);
   const signupCount = getSignupCount(signupSummary);
   const rosterCap = getRosterCap(tournament);
   const openSeats = Math.max(rosterCap - signupCount, 0);
-  const hasTwitch = Boolean(downloadLinks.twitch);
 
   useEffect(() => {
     let active = true;
@@ -525,47 +241,6 @@ export default function NextScreen({ showDiscovery = false }) {
     };
   }, [publicTournaments, publicTournamentSlugs]);
 
-  useEffect(() => {
-    if (!showDiscovery || !communityTournament?.slug) {
-      return undefined;
-    }
-
-    let active = true;
-    let refreshing = false;
-
-    async function loadCommunityPlayerStatus() {
-      if (refreshing) return;
-      refreshing = true;
-
-      try {
-        const result = await fetchTournamentPlayerStatus({
-          slug: communityTournament.slug,
-        });
-        if (active)
-          setCommunityPlayerStatus({ data: result, error: "", loading: false });
-      } catch (error) {
-        if (active) {
-          setCommunityPlayerStatus({
-            data: null,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Player status is unavailable.",
-            loading: false,
-          });
-        }
-      } finally {
-        refreshing = false;
-      }
-    }
-
-    const stopPolling = startVisibilityAwarePolling(loadCommunityPlayerStatus, 15000);
-
-    return () => {
-      active = false;
-      stopPolling();
-    };
-  }, [communityTournament?.slug, showDiscovery]);
 
   if (!hostedTournamentsLoaded) {
     return (
@@ -574,6 +249,7 @@ export default function NextScreen({ showDiscovery = false }) {
         actions={[{ label: "Home", href: "/" }]}
         eyebrow={showDiscovery ? "Tournaments" : "Next"}
         lead="Loading the live tournament schedule."
+        pageDataSet={{ tournamentPage: "true" }}
         stickyActions={false}
         subtitle="Checking events"
         title={showDiscovery ? "Tournaments" : "Next tournament"}
@@ -605,12 +281,14 @@ export default function NextScreen({ showDiscovery = false }) {
         lead={scheduleUnavailable
           ? "The live schedule is temporarily unavailable."
           : "The next public event will appear here when it is scheduled."}
+        pageDataSet={{ tournamentPage: "true" }}
         stickyActions={false}
         subtitle={scheduleUnavailable
           ? "The fallback schedule has no upcoming event"
           : "No upcoming tournament is published yet"}
         title={showDiscovery ? "Tournaments" : "Next tournament"}
       >
+        {showDiscovery ? <TournamentJourney compact /> : null}
         <EmptyState
           action={(
             <View style={styles.emptyStateActions}>
@@ -631,7 +309,6 @@ export default function NextScreen({ showDiscovery = false }) {
             : "No public event is open right now. Explore league play or review completed events while the next bracket is prepared."}
           title={scheduleUnavailable ? "Schedule temporarily unavailable" : "Next bracket coming soon"}
         />
-        {showDiscovery ? <CommunityCupsSection tournament={null} /> : null}
       </HubScreen>
     );
   }
@@ -639,22 +316,11 @@ export default function NextScreen({ showDiscovery = false }) {
   return (
     <HubScreen
       accountHref="/account"
-      actions={[
-        { label: primaryAction.label, href: primaryAction.href },
-        {
-          label: "Check Match Status",
-          href: `${tournamentPath}#my-match`,
-          variant: "secondary",
-        },
-        hasTwitch
-          ? { label: "Watch", href: "/stream", variant: "secondary" }
-          : null,
-        { label: "Rules", href: "/rules", variant: "ghost" },
-      ].filter(Boolean)}
       eyebrow={showDiscovery ? "Tournaments" : "Next event"}
       footerNote={siteData.site.adminNote}
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
+      pageDataSet={{ tournamentPage: "true" }}
       showHero={false}
       subtitle={formatDateLine(
         tournament.date,
@@ -664,6 +330,7 @@ export default function NextScreen({ showDiscovery = false }) {
       stickyActions={false}
       title={showDiscovery ? "Tournaments" : tournament.title}
     >
+      {showDiscovery ? <TournamentJourney /> : null}
       {scheduleError ? (
         <Surface style={styles.scheduleNotice}>
           <View style={styles.scheduleNoticeCopy}>
@@ -682,564 +349,357 @@ export default function NextScreen({ showDiscovery = false }) {
           </ActionButton>
         </Surface>
       ) : null}
-      <NextLobbyHero
+      <MasterTournamentCard
         bracket={bracket}
-        countdownParts={getCountdownParts(tournament, nowMs)}
-        joinUrl={joinUrl}
         openSeats={openSeats}
         registrationMeta={registrationMeta}
         competitionStatus={competitionStatus}
         rosterCap={rosterCap}
         signupCount={signupCount}
         signupSummary={signupSummary}
-        primaryAction={primaryAction}
         tournament={tournament}
         tournamentPath={tournamentPath}
         statusTone={statusTone}
       />
       {showDiscovery ? (
-        <CommunityCupsSection
-          bracket={communityEventData.bracket || null}
-          playerStatus={communityPlayerStatus}
-          registrationMeta={communityRegistrationMeta}
-          tournament={communityTournament}
+        <TournamentDiscoveryList
+          eventDataBySlug={eventDataBySlug}
+          featuredSlug={tournament.slug}
+          tournaments={hydratedPublicTournaments}
         />
       ) : null}
     </HubScreen>
   );
 }
 
-function NextLobbyHero({
+function TournamentDiscoveryList({ eventDataBySlug, featuredSlug, tournaments }) {
+  const remaining = tournaments.filter((tournament) => tournament.slug !== featuredSlug);
+
+  if (!remaining.length) return null;
+
+  return (
+    <Surface style={styles.discoverySection}>
+      <View style={styles.discoveryHeader}>
+        <View style={styles.discoveryHeaderCopy}>
+          <Text style={styles.discoveryEyebrow}>TOURNAMENT DISCOVERY</Text>
+          <Text style={styles.discoveryTitle}>More tournaments</Text>
+        </View>
+        <Text style={styles.discoveryMeta}>{remaining.length} available</Text>
+      </View>
+      <View style={styles.discoveryGrid}>
+        {remaining.map((tournament) => {
+          const eventData = eventDataBySlug[tournament.slug] || {};
+          const bracket = eventData.bracket || null;
+          const signupSummary = eventData.signupSummary || { count: 0, loading: true };
+          const registrationMeta = getEffectiveRegistrationStatus(tournament, {
+            hasLiveBracket: Boolean(bracket),
+          });
+          const tournamentPath = getTournamentPath(tournament.slug);
+          const discovery = getTournamentDiscoveryPresentation({
+            hasBracket: Boolean(bracket),
+            registrationStatus: registrationMeta.value,
+            signupPath: getCheckInPath(tournament.slug),
+            signupSummary,
+            tournamentPath,
+          });
+          const gameName = String(tournament.gameSlug || tournament.game || "Spades")
+            .replace(/(^|[-_ ])\w/g, (value) => value.toUpperCase())
+            .replace(/[-_]/g, " ");
+
+          return (
+            <View key={tournament.slug} style={styles.discoveryCard}>
+              <View style={styles.discoveryCardTop}>
+                <Badge tone={discovery.registered || bracket ? "green" : registrationMeta.tone}>
+                  {discovery.statusLabel}
+                </Badge>
+                <Text style={styles.discoveryGame}>{gameName}</Text>
+              </View>
+              <Text style={styles.discoveryCardTitle}>{tournament.title}</Text>
+              <Text style={styles.discoveryCardDate}>
+                {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+              </Text>
+              <Text style={styles.discoveryCardMeta}>
+                {signupSummary.loading ? "Checking players" : `${signupSummary.count} registered`}
+              </Text>
+              <View style={styles.discoveryActions}>
+                <ActionButton href={discovery.primaryAction.href}>
+                  {discovery.primaryAction.label}
+                </ActionButton>
+                {discovery.secondaryAction ? (
+                  <ActionButton href={discovery.secondaryAction.href} variant="secondary">
+                    {discovery.secondaryAction.label}
+                  </ActionButton>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Surface>
+  );
+}
+
+function MasterTournamentCard({
   bracket,
-  countdownParts,
-  joinUrl,
-  openSeats,
   competitionStatus,
+  openSeats,
   registrationMeta,
   rosterCap,
-  primaryAction,
   signupCount,
   signupSummary,
   tournament,
   tournamentPath,
   statusTone,
 }) {
-  const { width } = useWindowDimensions();
-  const isPhone = width > 0 && width < 420;
-  const signups = signupSummary.signups || [];
-  const signedUpValue = signupSummary.loading
-    ? "--"
-    : `${signupCount}/${rosterCap}`;
-  const openSeatsValue = signupSummary.loading ? "--" : openSeats;
-  const registrationPercent = signupSummary.loading
-    ? 0
-    : getRegistrationPercent(signupCount, rosterCap);
-  const urgencyCopy = signupSummary.loading
-    ? "Checking available seats"
-    : getSeatsMessage(openSeats, signupCount, rosterCap);
-  const primaryHref = primaryAction.href;
-  const primaryLabel = primaryAction.label;
-  const appStoreUrl = downloadLinks.appStoreSpades;
-  const sponsor = getTournamentSponsor(tournament);
-  const countdownKey = `${countdownParts.dayLabel}-${countdownParts.clockLabel}`;
+  const gameName = String(tournament.gameSlug || tournament.game || "Spades")
+    .replace(/(^|[-_ ])\w/g, (value) => value.toUpperCase())
+    .replace(/[-_]/g, " ");
+  const discovery = getTournamentDiscoveryPresentation({
+    hasBracket: Boolean(bracket),
+    registrationStatus: registrationMeta.value,
+    signupPath: getCheckInPath(tournament.slug),
+    signupSummary,
+    tournamentPath,
+  });
+  const playerCount = signupSummary.loading ? "—" : `${signupCount}/${rosterCap}`;
+  const spotsLabel = signupSummary.loading
+    ? "Checking spots"
+    : openSeats > 0
+      ? `${openSeats} spot${openSeats === 1 ? "" : "s"} remaining`
+      : "Registration full";
 
   return (
-    <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
-      <NextMotionStyles />
-      <View
-        dataSet={getMotionDataSet("panel")}
-        style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}
-      >
-        <View
-          style={[styles.countdownCopy, isPhone && styles.countdownCopyPhone]}
-        >
-          <Text style={styles.countdownLabel}>Starts in</Text>
-          <View
-            dataSet={getMotionDataSet("countdown")}
-            key={countdownKey}
-            style={styles.countdownStack}
-          >
-            {countdownParts.dayLabel ? (
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.countdownDays,
-                  isPhone && styles.countdownDaysPhone,
-                ]}
-              >
-                {countdownParts.dayLabel}
-              </Text>
-            ) : null}
-            <Text
-              dataSet={{ countdownClock: "true" }}
-              numberOfLines={1}
-              style={[
-                styles.countdownClock,
-                isPhone && styles.countdownClockPhone,
-                !countdownParts.dayLabel && styles.countdownClockSolo,
-                isPhone &&
-                  !countdownParts.dayLabel &&
-                  styles.countdownClockSoloPhone,
-              ]}
-            >
-              {countdownParts.clockLabel}
-            </Text>
-          </View>
-          <Text
-            accessibilityRole="heading"
-            aria-level={1}
-            dataSet={getMotionDataSet("title")}
-            style={[styles.heroTitle, isPhone && styles.heroTitlePhone]}
-          >
-            {tournament.title}
-          </Text>
-          <PresentedBy sponsor={sponsor} />
-          <View style={styles.heroFacts}>
-            <Text style={styles.heroFact}>Free Entry</Text>
-            <Text style={styles.heroFactDivider}>/</Text>
-            <Text style={styles.heroFact}>{tournament.format}</Text>
-            <Text style={styles.heroFactDivider}>/</Text>
-            <Text style={styles.heroFact}>{getDurationLabel(tournament)}</Text>
-          </View>
+    <Surface dataSet={{ tournamentDiscovery: "true" }} style={styles.masterEventCard}>
+      <View style={styles.masterEventHeader}>
+        <View style={styles.masterEventBadges}>
+          <Badge tone={statusTone}>{competitionStatus}</Badge>
+          <Badge tone="blue">{gameName}</Badge>
+          <Badge tone="accent">SEASON 1</Badge>
+          {discovery.registered ? <Badge tone="green">REGISTERED</Badge> : null}
+        </View>
+        <Text style={styles.masterEventDate}>
+          {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+        </Text>
+      </View>
 
-          <View
-            style={[styles.heroExitGrid, isPhone && styles.heroExitGridPhone]}
-          >
-            <ActionButton href={primaryHref} style={styles.heroExitButton}>
-              {primaryLabel}
-            </ActionButton>
-            <ActionButton
-              href={`${tournamentPath}#my-match`}
-              style={styles.heroExitButton}
-              variant="secondary"
-            >
-              Check Match Status
-            </ActionButton>
-            <ActionButton
-              href="/stream"
-              style={styles.heroExitButton}
-              variant="secondary"
-            >
-              Watch Tournament
-            </ActionButton>
-          </View>
-
-          {isPhone ? null : (
-            <Text style={styles.heroText}>{tournament.summary}</Text>
-          )}
-
-          <View style={styles.heroUrgencyCard}>
-            <View
-              style={[
-                styles.urgencyTopRow,
-                isPhone && styles.urgencyTopRowPhone,
-              ]}
-            >
-              <Text style={styles.urgencyLabel}>{registrationMeta.label}</Text>
-              <Text
-                style={[
-                  styles.urgencyValue,
-                  isPhone && styles.urgencyValuePhone,
-                ]}
-              >
-                {urgencyCopy}
-              </Text>
+      <View style={styles.masterEventBody}>
+        <View style={styles.masterEventCopy}>
+          <Text accessibilityRole="header" style={styles.masterEventTitle}>{tournament.title}</Text>
+          <Text style={styles.masterEventSummary}>{tournament.summary}</Text>
+          <View style={styles.masterEventFacts}>
+            <View style={styles.masterEventFact}>
+              <Text style={styles.masterEventFactLabel}>PLAYERS</Text>
+              <Text style={styles.masterEventFactValue}>{playerCount}</Text>
             </View>
-            <View
-              accessibilityLabel={`${signupCount} of ${rosterCap} players registered`}
-              accessibilityRole="progressbar"
-              dataSet={getMotionDataSet("progress")}
-              style={styles.progressTrack}
-            >
-              <View
-                dataSet={getMotionDataSet("progress-fill")}
-                style={[
-                  styles.progressFill,
-                  { width: `${registrationPercent}%` },
-                ]}
-              />
+            <View style={styles.masterEventFact}>
+              <Text style={styles.masterEventFactLabel}>REGISTRATION</Text>
+              <Text style={styles.masterEventFactValue}>{registrationMeta.label}</Text>
             </View>
-            <Text style={styles.progressText}>
-              {signupSummary.loading
-                ? "Loading registration"
-                : `${signedUpValue} players registered / ${registrationPercent}% filled`}
-            </Text>
+            <View style={styles.masterEventFact}>
+              <Text style={styles.masterEventFactLabel}>AVAILABILITY</Text>
+              <Text style={styles.masterEventFactValue}>{spotsLabel}</Text>
+            </View>
           </View>
+        </View>
 
-          {isPhone ? (
-            <Text style={[styles.heroText, styles.heroTextPhone]}>
-              {tournament.summary}
-            </Text>
+        <View style={styles.masterEventActions}>
+          <ActionButton href={discovery.primaryAction.href}>{discovery.primaryAction.label}</ActionButton>
+          {discovery.secondaryAction ? (
+            <ActionButton href={discovery.secondaryAction.href} variant="secondary">
+              {discovery.secondaryAction.label}
+            </ActionButton>
           ) : null}
         </View>
-
-        <View
-          dataSet={getMotionDataSet("card")}
-          style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}
-        >
-          {isPhone ? null : (
-            <StreamQrGrid
-              appStoreUrl={appStoreUrl}
-              isPhone={false}
-              joinUrl={joinUrl}
-            />
-          )}
-
-          <View style={styles.eventPanelHeader}>
-            <Text style={styles.eventPanelLabel}>Tournament status</Text>
-            <Text style={styles.eventPanelMeta}>{tournament.location}</Text>
-          </View>
-
-          <View style={styles.statusRows}>
-            <StatusRow label="Competition" value={competitionStatus} />
-            <StatusRow
-              label="Status"
-              value={bracket ? "Bracket live" : "Online"}
-            />
-            <StatusRow label="Players registered" value={signedUpValue} />
-            <StatusRow
-              label="Seats Open"
-              value={String(openSeatsValue)}
-              emphasis
-            />
-            <StatusRow
-              label="Estimated start"
-              value={formatDateLine(
-                tournament.date,
-                tournament.timeZone,
-                tournament.timeZoneLabel,
-              )}
-            />
-            <StatusRow label="Bracket type" value={tournament.format} />
-          </View>
-
-          <View style={styles.matchFocus}>
-            <Text style={styles.metricLabel}>Next match</Text>
-            <Text numberOfLines={2} style={styles.matchFocusText}>
-              {getNextMatchLabel(bracket)}
-            </Text>
-          </View>
-
-          <View
-            style={[styles.heroActions, isPhone && styles.heroActionsPhone]}
-          >
-            {isPhone ? null : (
-              <View
-                dataSet={getMotionDataSet("cta")}
-                style={styles.primaryCtaMotion}
-              >
-                <ActionButton
-                  href={primaryHref}
-                  style={styles.primaryCtaButton}
-                >
-                  {primaryLabel}
-                </ActionButton>
-              </View>
-            )}
-            <View style={styles.secondaryActionRow}>
-              <ActionButton
-                href={`${tournamentPath}#my-match`}
-                style={styles.secondaryCtaButton}
-                variant="ghost"
-              >
-                Check Match Status
-              </ActionButton>
-              <ActionButton
-                href={tournamentPath}
-                style={styles.secondaryCtaButton}
-                variant="ghost"
-              >
-                Event
-              </ActionButton>
-            </View>
-          </View>
-        </View>
       </View>
 
-      <View style={styles.heroBadgeRow}>
-        <Badge tone={statusTone}>{competitionStatus}</Badge>
-        <Badge tone="accent">SEASON 1 · LIVE</Badge>
-        <Text style={styles.heroDate}>
-          {formatDateLine(
-            tournament.date,
-            tournament.timeZone,
-            tournament.timeZoneLabel,
-          )}
-        </Text>
-      </View>
-
-      <View style={styles.lobbyBottom}>
-        <View dataSet={getMotionDataSet("card")} style={styles.rosterPreview}>
-          <View style={styles.rosterPreviewHead}>
-            <Text style={styles.rosterPreviewTitle}>Competitors</Text>
-            <Text style={styles.rosterPreviewMeta}>
-              {signupSummary.loading ? "Loading" : `${signups.length} visible`}
-            </Text>
-          </View>
-          <View style={styles.playerChips}>
-            {signupSummary.loading ? (
-              <Text style={styles.playerEmpty}>Loading roster...</Text>
-            ) : signups.length ? (
-              signups.slice(0, 10).map((signup, index) => (
-                <View
-                  key={signup.id || `${signup.playerName}-${index}`}
-                  style={styles.playerChip}
-                >
-                  <Text numberOfLines={1} style={styles.playerChipText}>
-                    {signup.playerName || "Player"}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.playerEmpty}>No public signups yet.</Text>
-            )}
-            {signups.length > 10 ? (
-              <Text style={styles.playerMore}>+{signups.length - 10} more</Text>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.lobbySideRail}>
-          <View dataSet={getMotionDataSet("card")} style={styles.shortcutStrip}>
-            <View style={styles.shortcutCopy}>
-              <Text style={styles.shortcutLabel}>Twitch commands</Text>
-              <Text style={styles.shortcutTitle}>
-                Say it once on stream. Chat can handle the rest.
-              </Text>
-            </View>
-            <View style={styles.shortcutCommands}>
-              {NEXT_CHAT_COMMANDS.map((item) => (
-                <View key={item.command} style={styles.shortcutCommand}>
-                  <Text selectable style={styles.shortcutCommandText}>
-                    {item.command}
-                  </Text>
-                  <Text style={styles.shortcutCommandLabel}>{item.label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-      </View>
-    </Surface>
-  );
-}
-
-function CommunityCupsSection({
-  bracket = null,
-  playerStatus = null,
-  registrationMeta = null,
-  tournament,
-}) {
-  const tournamentPath = tournament
-    ? getTournamentPath(tournament.slug)
-    : "/tournaments";
-  const signupPath = tournament
-    ? getCheckInPath(tournament.slug)
-    : "/tournaments";
-  const bracketPath = tournament
-    ? `${tournamentPath}#live-bracket`
-    : "/tournaments";
-  const broadcastPath = tournament
-    ? getTournamentBroadcastPath(tournament.slug)
-    : "/overlay/bracket";
-  const primaryAction = tournament
-    ? getCommunityCupPrimaryAction({
-        playerStatus,
-        status: tournament.status,
-        registrationStatus: registrationMeta?.value,
-        hasBracket: Boolean(bracket),
-        tournamentPath,
-        signupPath,
-        matchPath: `${tournamentPath}#my-match`,
-        bracketPath,
-      })
-    : null;
-
-  return (
-    <Surface nativeID="community-cups" style={styles.communitySection}>
-      <View style={styles.communityHeader}>
-        <View style={styles.communityHeaderCopy}>
-          <Text style={styles.communityEyebrow}>1V1 Community Cups</Text>
-          <Text style={styles.communityTitle}>
-            A clear path from open cups to championships.
-          </Text>
-          <Text style={styles.communityBody}>
-            Community competitions live under the 1V1 platform, alongside league
-            seasons and the permanent results archive.
-          </Text>
-        </View>
-        <Badge tone="accent">Community-run competition</Badge>
-      </View>
-
-      <View style={styles.competitionHierarchy}>
-        <View style={styles.hierarchyCard}>
-          <Text style={styles.hierarchyLabel}>Official Championships</Text>
-          <Text style={styles.hierarchyValue}>Season championships</Text>
-          <Text style={styles.hierarchyMeta}>Top-level 1V1 events.</Text>
-        </View>
-        <View style={[styles.hierarchyCard, styles.hierarchyCardActive]}>
-          <Text style={styles.hierarchyLabel}>Community Cups</Text>
-          <Text style={styles.hierarchyValue}>Reddit Cups</Text>
-          <Text style={styles.hierarchyMeta}>
-            Discord and venue cups can follow.
-          </Text>
-        </View>
-        <View style={styles.hierarchyCard}>
-          <Text style={styles.hierarchyLabel}>League Seasons</Text>
-          <Text style={styles.hierarchyValue}>Recurring competition</Text>
-          <Text style={styles.hierarchyMeta}>Weekly schedules and standings.</Text>
-          <ActionButton href="/leagues" variant="ghost">
-            Open leagues
-          </ActionButton>
-        </View>
-        <View style={styles.hierarchyCard}>
-          <Text style={styles.hierarchyLabel}>Results & Champions</Text>
-          <Text style={styles.hierarchyValue}>Permanent archive</Text>
-          <ActionButton href="/results" variant="ghost">
-            Open results
-          </ActionButton>
-        </View>
-      </View>
-
-      {tournament ? (
-        <View style={styles.communityEventCard}>
-          <View style={styles.communityEventCopy}>
-            <View style={styles.communityBadges}>
-              <Badge tone="accent">Reddit Cup</Badge>
-              <Badge tone="blue">Spades</Badge>
-              <Badge tone="green">Free entry</Badge>
-              <Badge tone={registrationMeta?.tone || "neutral"}>
-                {registrationMeta?.label || "Event posted"}
-              </Badge>
-            </View>
-            <Text style={styles.communityEventTitle}>{tournament.title}</Text>
-            <Text style={styles.communityEventDate}>
-              {formatDateLine(
-                tournament.date,
-                tournament.timeZone,
-                tournament.timeZoneLabel,
-              )}{" "}
-              • {getRosterCap(tournament)} player cap • Single elimination
-            </Text>
-            <Text style={styles.communityEventInstructions}>
-              Register now. Check-in opens 30 minutes before the event. The
-              public bracket is generated after check-in.
-            </Text>
-            {playerStatus?.error ? (
-              <Text style={styles.communityStatusWarning}>
-                {playerStatus.error}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.communityActions}>
-            <ActionButton href={primaryAction.href}>
-              {playerStatus?.loading
-                ? "Checking your status..."
-                : primaryAction.label}
-            </ActionButton>
-            <ActionButton href={broadcastPath} variant="secondary">
-              Open stream bracket
-            </ActionButton>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.communityEmpty}>
-          <Text style={styles.communityEventTitle}>
-            No Community Cup is published yet.
-          </Text>
-          <Text style={styles.communityBody}>
-            The next Reddit Cup will appear here from the authoritative
-            tournament schedule.
-          </Text>
-        </View>
-      )}
-    </Surface>
-  );
-}
-
-function StreamQrGrid({ appStoreUrl, isPhone, joinUrl }) {
-  return (
-    <View style={[styles.heroQrSection, isPhone && styles.heroQrSectionPhone]}>
-      <View style={styles.heroQrHeader}>
-        <Text style={styles.eventPanelLabel}>Scan from your phone</Text>
-        <Text style={styles.eventPanelMeta}>
-          Join the event or get the game
-        </Text>
-      </View>
-
-      <View style={styles.heroQrGrid}>
-        <View style={styles.heroQrCard}>
-          <View style={styles.heroQrWrap}>
-            <Image
-              accessibilityLabel="QR code for the next tournament signup"
-              resizeMode="contain"
-              source={{ uri: getQrUrl(joinUrl) }}
-              style={[styles.heroQr, isPhone && styles.heroQrPhone]}
-            />
-          </View>
-          <Text style={styles.heroQrLabel}>Scan to join</Text>
-          <Text style={styles.heroQrMeta}>Registration and bracket</Text>
-        </View>
-
-        {appStoreUrl ? (
-          <View style={[styles.heroQrCard, styles.heroQrCardApp]}>
-            <View style={styles.heroQrWrap}>
-              <Image
-                accessibilityLabel="QR code for 1v1 Spades on the App Store"
-                resizeMode="contain"
-                source={{ uri: getQrUrl(appStoreUrl) }}
-                style={[styles.heroQr, isPhone && styles.heroQrPhone]}
-              />
-            </View>
-            <Text style={styles.heroQrLabel}>Get 1v1 Spades</Text>
-            <Text style={styles.heroQrMeta}>Apple App Store</Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-function PresentedBy({ sponsor }) {
-  if (!sponsor) {
-    return null;
-  }
-
-  return (
-    <View style={styles.presentedBy}>
-      {sponsor.logoUrl ? (
-        <Image
-          accessibilityLabel={`${sponsor.name} sponsor logo`}
-          resizeMode="contain"
-          source={{ uri: sponsor.logoUrl }}
-          style={styles.presentedByLogo}
-        />
-      ) : null}
-      <View style={styles.presentedByCopy}>
-        <Text style={styles.presentedByLabel}>Presented by</Text>
-        <Text numberOfLines={1} style={styles.presentedByName}>
-          {sponsor.name}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function StatusRow({ label, value, emphasis = false }) {
-  return (
-    <View style={styles.statusRow}>
-      <Text style={styles.statusLabel}>{label}</Text>
-      <Text
-        numberOfLines={2}
-        style={[styles.statusValue, emphasis && styles.statusValueEmphasis]}
-      >
-        {value}
+      <Text style={styles.masterEventHint}>
+        {discovery.registered
+          ? `You're registered. ${tournament.checkIn?.window || "Return near start time for match assignment."}`
+          : bracket
+          ? "The bracket is live. Your assigned match appears on the tournament page."
+          : registrationMeta.value === "open"
+            ? "Sign up now. Return near start time and we’ll show your match when the bracket is ready."
+            : "Registration is not open. Event status will update here."}
       </Text>
-    </View>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
+  discoveryActions: {
+    gap: 8,
+    marginTop: 4,
+  },
+  discoveryCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.035)",
+    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 8,
+    minWidth: 230,
+    padding: 15,
+  },
+  discoveryCardDate: {
+    color: "#D6A24E",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 19,
+  },
+  discoveryCardMeta: {
+    color: "#A7A29A",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  discoveryCardTitle: {
+    color: "#F4EFE6",
+    fontSize: 19,
+    fontWeight: "900",
+    lineHeight: 25,
+  },
+  discoveryCardTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  discoveryEyebrow: {
+    color: "#D6A24E",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  discoveryGame: {
+    color: "#A7A29A",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  discoveryGrid: {
+    alignItems: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  discoveryHeader: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  discoveryHeaderCopy: {
+    gap: 4,
+  },
+  discoveryMeta: {
+    color: "#A7A29A",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  discoverySection: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  discoveryTitle: {
+    color: "#F4EFE6",
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 30,
+  },
+  masterEventActions: {
+    flexBasis: 210,
+    flexGrow: 0,
+    gap: 9,
+    minWidth: 190,
+  },
+  masterEventBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  masterEventBody: {
+    alignItems: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 20,
+  },
+  masterEventCard: {
+    backgroundColor: "rgba(12, 17, 15, 0.94)",
+    borderColor: "rgba(94, 205, 158, 0.24)",
+    gap: 18,
+    marginBottom: 24,
+    minWidth: 0,
+  },
+  masterEventCopy: {
+    flex: 1,
+    gap: 10,
+    minWidth: 250,
+  },
+  masterEventDate: {
+    color: "#D6A24E",
+    fontSize: 13,
+    fontWeight: "900",
+    lineHeight: 19,
+  },
+  masterEventFact: {
+    backgroundColor: "rgba(255, 255, 255, 0.035)",
+    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    minWidth: 118,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  masterEventFactLabel: {
+    color: "#8F8A82",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  masterEventFacts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 3,
+  },
+  masterEventFactValue: {
+    color: "#F4EFE6",
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 19,
+  },
+  masterEventHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  masterEventHint: {
+    borderTopColor: "rgba(244, 239, 230, 0.10)",
+    borderTopWidth: 1,
+    color: "#B7B0A7",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 20,
+    paddingTop: 14,
+  },
+  masterEventSummary: {
+    color: "#B7B0A7",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 21,
+  },
+  masterEventTitle: {
+    color: "#F4EFE6",
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+    lineHeight: 36,
+  },
   scheduleNotice: {
     alignItems: "center",
     borderColor: "rgba(214, 162, 78, 0.35)",

@@ -13,9 +13,11 @@ test('Tournaments keeps platform navigation and routes empty-state players to ac
   assert.match(nextScreenSource, /Join league play/);
   assert.match(nextScreenSource, /View past results/);
   assert.match(nextScreenSource, /Get event alerts/);
-  assert.match(nextScreenSource, /League Seasons/);
+  assert.match(nextScreenSource, /TournamentJourney/);
+  assert.match(nextScreenSource, /MasterTournamentCard/);
+  assert.match(nextScreenSource, /TournamentDiscoveryList/);
   assert.match(hubUiSource, /Spades • Euchre • Competitive Play/);
-  assert.match(nextScreenSource, /aria-level=\{1\}/);
+  assert.match(nextScreenSource, /accountHref="\/account"/);
 });
 
 test('public Leagues stays player-focused while host controls remain on the admin route', () => {

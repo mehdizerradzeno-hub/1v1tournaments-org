@@ -9,6 +9,21 @@
   max-width: 100%;
 }
 
+@media (orientation: landscape) and (max-height: 360px) {
+  [data-tournament-page="true"] {
+    padding-bottom: 12px !important;
+  }
+
+  [data-tournament-page="true"] [data-tournament-journey="true"] {
+    margin-bottom: 12px !important;
+  }
+
+  [data-tournament-page="true"] [role="button"],
+  [data-tournament-page="true"] a {
+    min-height: 44px;
+  }
+}
+
 /*
  * Keep flex containers shrinkable, but DO NOT globally force every child
  * to min-width: 0. Doing that destroys intentional card minimum widths.
@@ -44,5 +59,21 @@
   [data-tournament-page="true"] a {
     min-height: 44px;
     white-space: normal;
+  }
+
+  /*
+   * Static web rendering may initially hydrate with a wider native window
+   * measurement. Keep the player journey responsive from CSS as well so the
+   * three steps can never be clipped inside the overflow-hidden surface.
+   */
+  [data-tournament-page="true"] [data-tournament-journey-steps="true"] {
+    flex-direction: column !important;
+  }
+
+  [data-tournament-page="true"] [data-tournament-journey-step="true"] {
+    flex-basis: auto !important;
+    min-height: 86px !important;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 }
