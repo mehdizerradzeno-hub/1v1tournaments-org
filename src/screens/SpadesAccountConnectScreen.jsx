@@ -126,10 +126,10 @@ export function GameAccountConnectScreen({
   const telemetryAttemptId = firstQueryValue(searchParams.qaTelemetryAttempt);
   const [returnStatus, setReturnStatus] = useState(() => {
     const saved = loadDevReturnStatus(globalThis.localStorage, telemetryAttemptId);
-    return saved || {
+    const currentAttempt = {
       ...DEFAULT_RETURN_STATUS,
       telemetryAttemptActive: Boolean(telemetryAttemptId),
-      hubTelemetryAttemptMatched: false,
+      hubTelemetryAttemptMatched: Boolean(telemetryAttemptId),
       staleHubTelemetryIgnored: false,
       hubInitialQueryCaptured: true,
       hubInitialStatePresent: initialQuery.statePresent,
@@ -144,6 +144,7 @@ export function GameAccountConnectScreen({
       nativeContextPresent,
       statePresent: initialQuery.statePresent,
     };
+    return saved ? { ...currentAttempt, ...saved } : currentAttempt;
   });
   const [nativeStateDiagnostic, setNativeStateDiagnostic] = useState(null);
 
