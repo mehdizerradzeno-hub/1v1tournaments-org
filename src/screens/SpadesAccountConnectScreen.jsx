@@ -190,7 +190,6 @@ export function GameAccountConnectScreen({
           authorizationIssueAttempted: true,
           safeFailureClass: '',
         });
-        setNativeStateDiagnostic(launch.qaNativeStateDiagnostic || null);
         const launch = isNativeSpadesHandoff
           ? await prepareReturn({
             redirectUri: firstQueryValue(searchParams.redirectUri),
@@ -198,6 +197,7 @@ export function GameAccountConnectScreen({
             state: firstQueryValue(searchParams.state),
           })
           : await prepareReturn();
+        setNativeStateDiagnostic(launch.qaNativeStateDiagnostic || null);
         updateReturnStatus({
           authorizationIssueSucceeded: true,
           authorizationCodePresent: Boolean(new URL(launch.url).searchParams.get('sharedAccountCode')),
