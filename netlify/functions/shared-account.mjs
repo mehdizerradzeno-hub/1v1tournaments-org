@@ -56,7 +56,11 @@ export async function handleSharedAccountRequest(event, dependencies = {}) {
     const account = await resolveAccount(event);
     if (!account) return json(401, { error: 'Sign in before authorizing a game.' });
     const identity = await resolveIdentity(account);
-    const authorization = await issueAuthorization(identity, payload.audience);
+    const authorization = await issueAuthorization(identity, payload.audience, {
+      redirectUri: payload.redirectUri,
+      source: payload.source,
+      state: payload.state,
+    });
     return json(201, { ok: true, authorization });
   }
 

@@ -19,6 +19,22 @@ const GAME_SECRET_ENVIRONMENT_KEYS = Object.freeze({
   euchre: 'SHARED_ACCOUNT_EUCHRE_SECRET',
   gin: 'SHARED_ACCOUNT_GIN_SECRET',
 });
+export const SPADES_NATIVE_CALLBACK_URI = 'spades-freeplay://shared-account-callback';
+
+export function validateNativeGameCallback({ audience, source, redirectUri, state }) {
+  if (!source && !redirectUri && !state) return null;
+  if (source !== 'spades-native' || audience !== 'spades') {
+    throw new SharedAccountContractError('The native callback belongs to a different game.', 400, 'invalid_native_callback');
+  }
+  if (redirectUri !== SPADES_NATIVE_CALLBACK_URI) {
+    throw new SharedAccountContractError('The native callback is not allowlisted.', 400, 'invalid_native_callback');
+  }
+  const normalizedState = cleanText(state);
+  if (!normalizedState || normalizedState.length < 32 || normalizedState.length > 128 || /\s/.test(normalizedState)) {
+    throw new SharedAccountContractError('The native callback state is invalid.', 400, 'invalid_native_callback_state');
+  }
+  return { redirectUri: SPADES_NATIVE_CALLBACK_URI, state: normalizedState };
+}
 
 export class SharedAccountContractError extends Error {
   constructor(message, statusCode = 400, code = 'shared_account_error') {
@@ -270,6 +286,12 @@ export async function createGameAuthorization(identity, audienceValue, options =
   }
 
   const store = resolveStore(options.store, AUTHORIZATION_STORE_NAME);
+  const nativeCallback = validateNativeGameCallback({
+    audience,
+    redirectUri: options.redirectUri,
+    source: options.source,
+    state: options.state,
+  });
   const authorizationCode = (options.codeFactory || (() => randomBytes(32).toString('base64url')))();
   const now = Number(options.now ?? Date.now());
   const ttlMs = Math.min(Number(options.ttlMs || GAME_AUTHORIZATION_TTL_MS), GAME_AUTHORIZATION_TTL_MS);
@@ -279,6 +301,7 @@ export async function createGameAuthorization(identity, audienceValue, options =
     identity,
     issuedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ttlMs).toISOString(),
+    ...(nativeCallback ? { nativeCallback } : {}),
   };
 
   await store.setJSON(authorizationKey(authorizationCode), record, {
@@ -295,6 +318,7 @@ export async function createGameAuthorization(identity, audienceValue, options =
     authorizationCode,
     audience,
     expiresAt: record.expiresAt,
+    ...(nativeCallback ? nativeCallback : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 import { createElement, useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
@@ -54,6 +55,10 @@ function inputProps(setValue, {
   };
 }
 
+function firstQueryValue(value) {
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
 function AccountForm({ children, onSubmit }) {
   if (Platform.OS === 'web') {
     return createElement('form', {
@@ -85,6 +90,7 @@ export function GameAccountConnectScreen({
   signedOutManageFallback = false,
   useHubShell = false,
 }) {
+  const searchParams = useLocalSearchParams();
   const [mode, setMode] = useState(initialMode);
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +166,14 @@ export function GameAccountConnectScreen({
     setError('');
     try {
       await runAccountHandoffOnce(handoffStartedRef, async () => {
-        const launch = await prepareReturn();
+        const isNativeSpadesHandoff = gameName === 'Spades' && searchParams.source === 'spades-native';
+        const launch = isNativeSpadesHandoff
+          ? await prepareReturn({
+            redirectUri: firstQueryValue(searchParams.redirectUri),
+            source: firstQueryValue(searchParams.source),
+            state: firstQueryValue(searchParams.state),
+          })
+          : await prepareReturn();
         if (!launch.authorized || typeof globalThis.location?.assign !== 'function') {
           throw new Error(`${gameName} authorization could not be opened.`);
         }

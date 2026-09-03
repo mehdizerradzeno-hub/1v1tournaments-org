@@ -1,6 +1,7 @@
 export const SHARED_ACCOUNT_CODE_QUERY_PARAMETER = 'sharedAccountCode';
 export const SHARED_ACCOUNT_LAUNCH_PROTOCOL_VERSION = '2026-08-04';
 export const SHARED_ACCOUNT_ENDPOINT = '/.netlify/functions/shared-account';
+export const SPADES_NATIVE_CALLBACK_URI = 'spades-freeplay://shared-account-callback';
 
 const SUPPORTED_GAME_AUDIENCES = new Set(['spades', 'euchre', 'gin']);
 
@@ -47,7 +48,13 @@ async function readJsonResponse(response) {
   }
 }
 
-export async function issueSharedAccountAuthorization({ audience: audienceValue, fetchImpl = globalThis.fetch }) {
+export async function issueSharedAccountAuthorization({
+  audience: audienceValue,
+  fetchImpl = globalThis.fetch,
+  redirectUri = '',
+  source = '',
+  state = '',
+}) {
   const audience = normalizeAudience(audienceValue);
   if (!audience) {
     throw new SharedAccountLaunchError('Shared account launch supports only configured games.', {
@@ -61,16 +68,15 @@ export async function issueSharedAccountAuthorization({ audience: audienceValue,
     });
   }
 
+  const body = { action: 'issue-game-authorization', audience };
+  if (source || redirectUri || state) Object.assign(body, { redirectUri, source, state });
   const response = await fetchImpl(SHARED_ACCOUNT_ENDPOINT, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 'issue-game-authorization',
-      audience,
-    }),
+    body: JSON.stringify(body),
   });
   const result = await readJsonResponse(response);
 
@@ -103,8 +109,15 @@ export async function issueSharedAccountAuthorization({ audience: audienceValue,
   return authorization;
 }
 
-export function attachSharedAccountCode(destinationUrl, authorizationCode) {
-  const url = parseLaunchUrl(destinationUrl);
+export function attachSharedAccountCode(destinationUrl, authorizationCode, nativeCallback = null) {
+  if (nativeCallback && nativeCallback.redirectUri !== SPADES_NATIVE_CALLBACK_URI) {
+    throw new SharedAccountLaunchError('The native callback is not allowlisted.', {
+      code: 'callback_not_allowlisted',
+    });
+  }
+  const url = nativeCallback?.redirectUri
+    ? new URL(nativeCallback.redirectUri)
+    : parseLaunchUrl(destinationUrl);
   const code = String(authorizationCode || '').trim();
   if (!code) {
     throw new SharedAccountLaunchError('The Account Hub did not provide a launch code. Try again.', {
@@ -114,6 +127,14 @@ export function attachSharedAccountCode(destinationUrl, authorizationCode) {
   }
 
   url.searchParams.set(SHARED_ACCOUNT_CODE_QUERY_PARAMETER, code);
+  if (nativeCallback?.state) {
+    if (nativeCallback.state.length < 32 || nativeCallback.state.length > 128 || /\s/.test(nativeCallback.state)) {
+      throw new SharedAccountLaunchError('The native callback state is invalid.', {
+        code: 'callback_state_invalid',
+      });
+    }
+    url.searchParams.set('state', nativeCallback.state);
+  }
   return url.toString();
 }
 
@@ -122,6 +143,9 @@ export async function prepareSharedAccountLaunch({
   destinationUrl,
   fetchImpl = globalThis.fetch,
   requireAccount = false,
+  redirectUri = '',
+  source = '',
+  state = '',
 }) {
   const audience = normalizeAudience(audienceValue);
   const destination = parseLaunchUrl(destinationUrl);
@@ -133,7 +157,7 @@ export async function prepareSharedAccountLaunch({
 
   let authorization;
   try {
-    authorization = await issueSharedAccountAuthorization({ audience, fetchImpl });
+    authorization = await issueSharedAccountAuthorization({ audience, fetchImpl, redirectUri, source, state });
   } catch (error) {
     if (error instanceof SharedAccountLaunchError && error.code === 'unauthenticated' && !requireAccount) {
       return {
@@ -146,12 +170,24 @@ export async function prepareSharedAccountLaunch({
     throw error;
   }
 
+  const nativeCallback = authorization.redirectUri === SPADES_NATIVE_CALLBACK_URI
+    && authorization.state === state
+    ? { redirectUri: authorization.redirectUri, state: authorization.state }
+    : null;
+  if ((source || redirectUri || state) && !nativeCallback) {
+    throw new SharedAccountLaunchError('The Account Hub returned an incompatible native callback.', {
+      code: 'callback_contract_mismatch',
+      retryable: true,
+    });
+  }
+
   return {
     audience,
     authorized: true,
     expiresAt: authorization.expiresAt,
     protocolVersion: authorization.protocolVersion,
-    url: attachSharedAccountCode(destination.toString(), authorization.authorizationCode),
+    url: attachSharedAccountCode(destination.toString(), authorization.authorizationCode, nativeCallback),
+    ...(nativeCallback || {}),
   };
 }
 

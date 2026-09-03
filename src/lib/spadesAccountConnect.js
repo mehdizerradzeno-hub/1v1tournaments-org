@@ -13,11 +13,16 @@ export function normalizeSpadesAccountMode(value) {
   return mode === 'create' || mode === 'reset' || mode === 'manage' ? mode : 'signin';
 }
 
-export function prepareSpadesAccountReturn(fetchImpl = globalThis.fetch) {
+export function prepareSpadesAccountReturn(optionsOrFetch = globalThis.fetch) {
+  const isFetch = typeof optionsOrFetch === 'function';
+  const options = isFetch ? {} : optionsOrFetch || {};
   return prepareSharedAccountLaunch({
     audience: 'spades',
     destinationUrl: SPADES_ACCOUNT_DESTINATION,
-    fetchImpl,
+    fetchImpl: isFetch ? optionsOrFetch : globalThis.fetch,
     requireAccount: true,
+    redirectUri: options.redirectUri,
+    source: options.source,
+    state: options.state,
   });
 }
