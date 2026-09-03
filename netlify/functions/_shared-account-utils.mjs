@@ -21,6 +21,29 @@ const GAME_SECRET_ENVIRONMENT_KEYS = Object.freeze({
 });
 export const SPADES_NATIVE_CALLBACK_URI = 'spades-freeplay://shared-account-callback';
 
+export const QA_NATIVE_STATE_DIAGNOSTIC_VERSION = 'qa-native-state-v1';
+
+export function isQaNativeStateDiagnosticEnvironment() {
+  return process.env.APP_ENV === 'qa-native-auth';
+}
+
+export function nativeStateShapeDiagnostic(state) {
+  const statePresent = state !== undefined && state !== null && state !== '';
+  const stateTypeClass = typeof state === 'string' ? 'string' : statePresent ? 'other' : 'missing';
+  const stateLength = stateTypeClass === 'string' ? state.length : 0;
+  const stateLengthInRange = stateTypeClass === 'string' && stateLength >= 32 && stateLength <= 128;
+  const stateHasWhitespace = stateTypeClass === 'string' && /\s/.test(state);
+  return {
+    stateValidatorDiagnosticVersion: QA_NATIVE_STATE_DIAGNOSTIC_VERSION,
+    statePresent,
+    stateTypeClass,
+    stateLength,
+    stateLengthInRange,
+    stateHasWhitespace,
+    stateValidationPassed: stateLengthInRange && !stateHasWhitespace,
+  };
+}
+
 export function validateNativeGameCallback({ audience, source, redirectUri, state }) {
   if (!source && !redirectUri && !state) return null;
   if (source !== 'spades-native' || audience !== 'spades') {
@@ -30,10 +53,17 @@ export function validateNativeGameCallback({ audience, source, redirectUri, stat
     throw new SharedAccountContractError('The native callback is not allowlisted.', 400, 'invalid_native_callback');
   }
   const normalizedState = cleanText(state);
-  if (!normalizedState || normalizedState.length < 32 || normalizedState.length > 128 || /\s/.test(normalizedState)) {
-    throw new SharedAccountContractError('The native callback state is invalid.', 400, 'invalid_native_callback_state');
+  const stateDiagnostic = nativeStateShapeDiagnostic(state);
+  if (!stateDiagnostic.stateValidationPassed) {
+    const error = new SharedAccountContractError('The native callback state is invalid.', 400, 'invalid_native_callback_state');
+    if (isQaNativeStateDiagnosticEnvironment()) error.qaNativeStateDiagnostic = stateDiagnostic;
+    throw error;
   }
-  return { redirectUri: SPADES_NATIVE_CALLBACK_URI, state: normalizedState };
+  return {
+    redirectUri: SPADES_NATIVE_CALLBACK_URI,
+    state: normalizedState,
+    ...(isQaNativeStateDiagnosticEnvironment() ? { qaNativeStateDiagnostic: stateDiagnostic } : {}),
+  };
 }
 
 export class SharedAccountContractError extends Error {

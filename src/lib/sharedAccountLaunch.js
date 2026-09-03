@@ -12,6 +12,7 @@ export class SharedAccountLaunchError extends Error {
     this.code = options.code || 'shared_account_launch_error';
     this.retryable = Boolean(options.retryable);
     this.statusCode = Number(options.statusCode || 0);
+    this.qaNativeStateDiagnostic = options.qaNativeStateDiagnostic || null;
   }
 }
 
@@ -89,6 +90,7 @@ export async function issueSharedAccountAuthorization({
         code: result?.code || (response.status === 401 ? 'unauthenticated' : 'authorization_issue_failed'),
         retryable: response.status === 429 || response.status >= 500,
         statusCode: response.status,
+        qaNativeStateDiagnostic: result?.qaNativeStateDiagnostic,
       },
     );
   }
@@ -172,7 +174,7 @@ export async function prepareSharedAccountLaunch({
 
   const nativeCallback = authorization.redirectUri === SPADES_NATIVE_CALLBACK_URI
     && authorization.state === state
-    ? { redirectUri: authorization.redirectUri, state: authorization.state }
+    ? { redirectUri: authorization.redirectUri, state: authorization.state, qaNativeStateDiagnostic: authorization.qaNativeStateDiagnostic }
     : null;
   if ((source || redirectUri || state) && !nativeCallback) {
     throw new SharedAccountLaunchError('The Account Hub returned an incompatible native callback.', {

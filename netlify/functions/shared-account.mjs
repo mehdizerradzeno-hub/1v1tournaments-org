@@ -6,6 +6,7 @@ import {
   SharedAccountContractError,
   createGameAuthorization,
   exchangeGameAuthorization,
+  isQaNativeStateDiagnosticEnvironment,
   resolveGameAccountIdentities,
   sharedIdentityForAccount,
   validateGameAuthorizationCaller,
@@ -136,7 +137,13 @@ export async function handler(event) {
     return await handleSharedAccountRequest(event);
   } catch (error) {
     if (error instanceof SharedAccountContractError) {
-      return json(error.statusCode, { error: error.message, code: error.code });
+      return json(error.statusCode, {
+        error: error.message,
+        code: error.code,
+        ...(isQaNativeStateDiagnosticEnvironment() && error.qaNativeStateDiagnostic
+          ? { qaNativeStateDiagnostic: error.qaNativeStateDiagnostic }
+          : {}),
+      });
     }
     console.error('Shared account authorization failed', error);
     return json(500, { error: 'Shared account authorization is not available yet.' });

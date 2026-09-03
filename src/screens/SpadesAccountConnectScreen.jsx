@@ -117,6 +117,7 @@ export function GameAccountConnectScreen({
     nativeContextPresent,
     statePresent: Boolean(searchParams.state),
   });
+  const [nativeStateDiagnostic, setNativeStateDiagnostic] = useState(null);
 
   const updateReturnStatus = (patch) => setReturnStatus((current) => {
     const next = { ...current, ...patch };
@@ -189,6 +190,7 @@ export function GameAccountConnectScreen({
           authorizationIssueAttempted: true,
           safeFailureClass: '',
         });
+        setNativeStateDiagnostic(launch.qaNativeStateDiagnostic || null);
         const launch = isNativeSpadesHandoff
           ? await prepareReturn({
             redirectUri: firstQueryValue(searchParams.redirectUri),
@@ -211,6 +213,7 @@ export function GameAccountConnectScreen({
     } catch (handoffError) {
       setSubmitting(false);
       updateReturnStatus({ safeFailureClass: safeReturnFailureClass(handoffError) });
+      setNativeStateDiagnostic(handoffError?.qaNativeStateDiagnostic || null);
       setError(handoffError instanceof Error ? handoffError.message : `${gameName} authorization could not be opened.`);
     }
   };
@@ -639,6 +642,8 @@ export function GameAccountConnectScreen({
           <View style={styles.devStatusPanel}>
             <Text style={styles.devStatusTitle}>DEV RETURN STATUS</Text>
             <Text style={styles.devStatusText}>{JSON.stringify(returnStatus, null, 2)}</Text>
+            <Text style={styles.devStatusTitle}>DEV NATIVE STATE VALIDATION</Text>
+            <Text style={styles.devStatusText}>{JSON.stringify(nativeStateDiagnostic, null, 2)}</Text>
             <ActionButton onPress={() => { clearDevReturnStatus(); setReturnStatus({ ...DEFAULT_RETURN_STATUS }); }} variant="ghost">Reset return telemetry</ActionButton>
           </View>
         ) : null}
