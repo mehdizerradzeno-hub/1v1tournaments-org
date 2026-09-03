@@ -34,7 +34,7 @@ import {
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
-import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
+import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
 
 function inputProps(setValue, {
   autoComplete = 'off',
@@ -117,6 +117,7 @@ export function GameAccountConnectScreen({
     nativeContextPresent,
     statePresent: Boolean(searchParams.state),
   });
+  const [bridgeStatus] = useState(() => emitQaWebViewBridgePing());
 
   const updateReturnStatus = (patch) => setReturnStatus((current) => {
     const next = { ...current, ...patch };
@@ -636,9 +637,15 @@ export function GameAccountConnectScreen({
 
         {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
         {error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        {isQaReturnTelemetryEnvironment() ? (
-          <View style={styles.devStatusPanel}>
-            <Text style={styles.devStatusTitle}>DEV RETURN STATUS</Text>
+          {isQaReturnTelemetryEnvironment() ? (
+            <View style={styles.devStatusPanel}>
+              <Text style={styles.devStatusTitle}>DEV WEBVIEW BRIDGE</Text>
+              <Text style={styles.devStatusText}>{JSON.stringify(bridgeStatus, null, 2)}</Text>
+            </View>
+          ) : null}
+          {isQaReturnTelemetryEnvironment() ? (
+            <View style={styles.devStatusPanel}>
+              <Text style={styles.devStatusTitle}>DEV RETURN STATUS</Text>
             <Text style={styles.devStatusText}>{JSON.stringify(returnStatus, null, 2)}</Text>
             <ActionButton onPress={() => { clearDevReturnStatus(); setReturnStatus({ ...DEFAULT_RETURN_STATUS }); }} variant="ghost">Reset return telemetry</ActionButton>
           </View>

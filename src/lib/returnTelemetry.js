@@ -20,6 +20,12 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
 
 const RETURN_TELEMETRY_FIELDS = Object.freeze(Object.keys(DEFAULT_RETURN_STATUS));
 
+export const DEFAULT_WEBVIEW_BRIDGE_STATUS = Object.freeze({
+  pageMounted: false,
+  reactNativeWebViewPresent: false,
+  pingAttempted: false,
+});
+
 export function emitQaReturnTelemetry(status, windowRef = globalThis) {
   if (!isQaReturnTelemetryEnvironment() || !windowRef?.ReactNativeWebView?.postMessage) return false;
   const payload = Object.fromEntries(RETURN_TELEMETRY_FIELDS.map((field) => [field, status[field] ?? DEFAULT_RETURN_STATUS[field]]));
@@ -29,6 +35,25 @@ export function emitQaReturnTelemetry(status, windowRef = globalThis) {
   } catch {
     return false;
   }
+}
+
+export function emitQaWebViewBridgePing(windowRef = globalThis) {
+  const status = {
+    pageMounted: true,
+    reactNativeWebViewPresent: typeof windowRef?.ReactNativeWebView?.postMessage === 'function',
+    pingAttempted: false,
+  };
+  if (!isQaReturnTelemetryEnvironment() || !status.reactNativeWebViewPresent) return status;
+  try {
+    status.pingAttempted = true;
+    windowRef.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'qa-spades-webview-bridge-ping',
+      payload: status,
+    }));
+  } catch {
+    status.pingAttempted = false;
+  }
+  return status;
 }
 
 export function isQaReturnTelemetryEnvironment() {

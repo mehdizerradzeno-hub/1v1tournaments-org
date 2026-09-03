@@ -16,7 +16,7 @@ import {
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
 import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
-import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
+import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
 import { classifyReturnTarget, safeReturnFailureClass } from '../src/lib/returnTelemetry.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
@@ -115,6 +115,22 @@ test('QA WebView bridge emits only the allowlisted return telemetry payload', ()
   assert.equal(Object.hasOwn(messages[0].payload, 'state'), false);
   assert.equal(Object.hasOwn(messages[0].payload, 'authorizationCode'), false);
   if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
+});
+
+test('QA WebView bridge ping emits exactly once with only safe fields', () => {
+  const messages = [];
+  const previous = process.env.APP_ENV;
+  process.env.APP_ENV = 'qa-native-auth';
+  const status = emitQaWebViewBridgePing({ ReactNativeWebView: { postMessage: (value) => messages.push(JSON.parse(value)) } });
+  assert.deepEqual(status, { pageMounted: true, reactNativeWebViewPresent: true, pingAttempted: true });
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0], { type: 'qa-spades-webview-bridge-ping', payload: status });
+  process.env.APP_ENV = previous;
+});
+
+test('QA WebView bridge ping does not call absent browser bridge', () => {
+  const status = emitQaWebViewBridgePing({});
+  assert.deepEqual(status, { pageMounted: true, reactNativeWebViewPresent: false, pingAttempted: false });
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {
