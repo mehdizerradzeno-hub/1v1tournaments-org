@@ -10,6 +10,22 @@ const SAFE_FAILURE_CLASSES = new Set([
   'unauthenticated',
 ]);
 
+export const QA_RETURN_TELEMETRY_KEY = 'qa-spades-native-return-telemetry-v1';
+export const DEFAULT_RETURN_STATUS = Object.freeze({
+  returnClicked: false, sourceClass: 'none', nativeContextPresent: false, statePresent: false,
+  authorizationIssueAttempted: false, authorizationIssueSucceeded: false, authorizationCodePresent: false,
+  returnedStatePresent: false, finalTargetClass: 'none', navigationAttempted: false,
+  navigationMethod: 'none', safeFailureClass: '',
+});
+
+export function loadDevReturnStatus(storage = globalThis.localStorage) {
+  if (process.env.APP_ENV !== 'qa-native-auth') return null;
+  try {
+    const value = JSON.parse(storage?.getItem(QA_RETURN_TELEMETRY_KEY) || 'null');
+    return value && typeof value === 'object' ? { ...DEFAULT_RETURN_STATUS, ...value } : null;
+  } catch { return null; }
+}
+
 export function classifyReturnTarget(value) {
   try {
     const url = new URL(String(value || ''));
@@ -28,11 +44,16 @@ export function safeReturnFailureClass(error) {
   return SAFE_FAILURE_CLASSES.has(error?.code) ? error.code : 'unknown';
 }
 
-export function persistDevReturnStatus(status, storage = globalThis.sessionStorage) {
+export function persistDevReturnStatus(status, storage = globalThis.localStorage) {
   if (process.env.APP_ENV !== 'qa-native-auth') return;
   try {
-    storage?.setItem('qa-native-return-status', JSON.stringify(status));
+    storage?.setItem(QA_RETURN_TELEMETRY_KEY, JSON.stringify({ ...DEFAULT_RETURN_STATUS, ...status }));
   } catch {
     // Diagnostics must never affect the handoff.
   }
+}
+
+export function clearDevReturnStatus(storage = globalThis.localStorage) {
+  if (process.env.APP_ENV !== 'qa-native-auth') return;
+  try { storage?.removeItem(QA_RETURN_TELEMETRY_KEY); } catch { /* Diagnostics must never affect the handoff. */ }
 }

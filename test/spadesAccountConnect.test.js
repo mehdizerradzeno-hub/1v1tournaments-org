@@ -16,6 +16,7 @@ import {
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
 import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
+import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
 import { classifyReturnTarget, safeReturnFailureClass } from '../src/lib/returnTelemetry.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
@@ -77,6 +78,20 @@ test('return telemetry classifies native and safe failure targets without sensit
   assert.equal(classifyReturnTarget('https://1v1spades.com/'), 'production-spades');
   assert.equal(safeReturnFailureClass({ code: 'authorization_issue_failed', message: 'do not expose' }), 'authorization_issue_failed');
   assert.equal(safeReturnFailureClass({ code: 'unexpected', message: 'do not expose' }), 'unknown');
+});
+
+test('QA return telemetry persists across remount and resets only its key', () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  const previous = process.env.APP_ENV;
+  process.env.APP_ENV = 'qa-native-auth';
+  persistDevReturnStatus({ returnClicked: true, statePresent: true }, storage);
+  assert.equal(loadDevReturnStatus(storage).returnClicked, true);
+  assert.equal(JSON.parse(values.get(QA_RETURN_TELEMETRY_KEY)).statePresent, true);
+  clearDevReturnStatus(storage);
+  assert.equal(values.has(QA_RETURN_TELEMETRY_KEY), false);
+  assert.equal(DEFAULT_RETURN_STATUS.returnClicked, false);
+  if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {
