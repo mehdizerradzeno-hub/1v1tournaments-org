@@ -20,6 +20,7 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   hubInitialSourceClass: 'none', hubInitialRedirectUriPresent: false,
   hubCurrentStatePresent: false, hubCurrentStateLength: 0,
   hubCurrentSourceClass: 'none', hubCurrentRedirectUriPresent: false,
+  telemetryAttemptActive: false, hubTelemetryAttemptMatched: false, staleHubTelemetryIgnored: false,
 });
 
 export function isQaReturnTelemetryEnvironment() {
@@ -27,11 +28,14 @@ export function isQaReturnTelemetryEnvironment() {
     || globalThis.location?.hostname === '1v1tournaments-native-auth-qa-20260903.netlify.app';
 }
 
-export function loadDevReturnStatus(storage = globalThis.localStorage) {
+export function loadDevReturnStatus(storage = globalThis.localStorage, telemetryAttemptId = '') {
   if (!isQaReturnTelemetryEnvironment()) return null;
   try {
     const value = JSON.parse(storage?.getItem(QA_RETURN_TELEMETRY_KEY) || 'null');
-    return value && typeof value === 'object' ? { ...DEFAULT_RETURN_STATUS, ...value } : null;
+    if (!value || typeof value !== 'object' || value.telemetryAttemptId !== telemetryAttemptId) {
+      return value?.telemetryAttemptId ? { ...DEFAULT_RETURN_STATUS, telemetryAttemptActive: Boolean(telemetryAttemptId), staleHubTelemetryIgnored: true } : null;
+    }
+    return { ...DEFAULT_RETURN_STATUS, ...value.data, telemetryAttemptActive: true, hubTelemetryAttemptMatched: true };
   } catch { return null; }
 }
 
@@ -53,10 +57,11 @@ export function safeReturnFailureClass(error) {
   return SAFE_FAILURE_CLASSES.has(error?.code) ? error.code : 'unknown';
 }
 
-export function persistDevReturnStatus(status, storage = globalThis.localStorage) {
+export function persistDevReturnStatus(status, storage = globalThis.localStorage, telemetryAttemptId = '') {
   if (!isQaReturnTelemetryEnvironment()) return;
+  if (!telemetryAttemptId) return;
   try {
-    storage?.setItem(QA_RETURN_TELEMETRY_KEY, JSON.stringify({ ...DEFAULT_RETURN_STATUS, ...status }));
+    storage?.setItem(QA_RETURN_TELEMETRY_KEY, JSON.stringify({ telemetryAttemptId, data: { ...DEFAULT_RETURN_STATUS, ...status } }));
   } catch {
     // Diagnostics must never affect the handoff.
   }

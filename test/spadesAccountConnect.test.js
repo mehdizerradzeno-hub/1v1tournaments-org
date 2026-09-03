@@ -85,9 +85,10 @@ test('QA return telemetry persists across remount and resets only its key', () =
   const storage = { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
   const previous = process.env.APP_ENV;
   process.env.APP_ENV = 'qa-native-auth';
-  persistDevReturnStatus({ returnClicked: true, statePresent: true }, storage);
-  assert.equal(loadDevReturnStatus(storage).returnClicked, true);
-  assert.equal(JSON.parse(values.get(QA_RETURN_TELEMETRY_KEY)).statePresent, true);
+  persistDevReturnStatus({ returnClicked: true, statePresent: true }, storage, 'attempt-a');
+  assert.equal(loadDevReturnStatus(storage, 'attempt-a').returnClicked, true);
+  assert.equal(JSON.parse(values.get(QA_RETURN_TELEMETRY_KEY)).data.statePresent, true);
+  assert.equal(loadDevReturnStatus(storage, 'attempt-b').staleHubTelemetryIgnored, true);
   clearDevReturnStatus(storage);
   assert.equal(values.has(QA_RETURN_TELEMETRY_KEY), false);
   assert.equal(DEFAULT_RETURN_STATUS.returnClicked, false);
