@@ -130,6 +130,7 @@ export function GameAccountConnectScreen({
       ...DEFAULT_RETURN_STATUS,
       telemetryAttemptActive: Boolean(telemetryAttemptId),
       hubTelemetryAttemptMatched: Boolean(telemetryAttemptId),
+      hubTelemetryAttemptParamPresent: Boolean(telemetryAttemptId),
       staleHubTelemetryIgnored: false,
       hubInitialQueryCaptured: true,
       hubInitialStatePresent: initialQuery.statePresent,

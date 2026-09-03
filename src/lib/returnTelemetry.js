@@ -21,6 +21,7 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   hubCurrentStatePresent: false, hubCurrentStateLength: 0,
   hubCurrentSourceClass: 'none', hubCurrentRedirectUriPresent: false,
   telemetryAttemptActive: false, hubTelemetryAttemptMatched: false, staleHubTelemetryIgnored: false,
+  hubTelemetryAttemptParamPresent: false,
 });
 
 export function isQaReturnTelemetryEnvironment() {
@@ -33,9 +34,9 @@ export function loadDevReturnStatus(storage = globalThis.localStorage, telemetry
   try {
     const value = JSON.parse(storage?.getItem(QA_RETURN_TELEMETRY_KEY) || 'null');
     if (!value || typeof value !== 'object' || value.telemetryAttemptId !== telemetryAttemptId) {
-      return value?.telemetryAttemptId ? { ...DEFAULT_RETURN_STATUS, telemetryAttemptActive: Boolean(telemetryAttemptId), staleHubTelemetryIgnored: true } : null;
+      return value ? { ...DEFAULT_RETURN_STATUS, telemetryAttemptActive: Boolean(telemetryAttemptId), staleHubTelemetryIgnored: true } : null;
     }
-    return { ...DEFAULT_RETURN_STATUS, ...value.data, telemetryAttemptActive: true, hubTelemetryAttemptMatched: true };
+    return { ...DEFAULT_RETURN_STATUS, ...value.data, telemetryAttemptActive: true, hubTelemetryAttemptMatched: true, hubTelemetryAttemptParamPresent: true };
   } catch { return null; }
 }
 

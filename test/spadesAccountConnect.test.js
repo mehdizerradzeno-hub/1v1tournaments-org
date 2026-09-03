@@ -89,6 +89,8 @@ test('QA return telemetry persists across remount and resets only its key', () =
   assert.equal(loadDevReturnStatus(storage, 'attempt-a').returnClicked, true);
   assert.equal(JSON.parse(values.get(QA_RETURN_TELEMETRY_KEY)).data.statePresent, true);
   assert.equal(loadDevReturnStatus(storage, 'attempt-b').staleHubTelemetryIgnored, true);
+  values.set(QA_RETURN_TELEMETRY_KEY, JSON.stringify({ returnClicked: true }));
+  assert.equal(loadDevReturnStatus(storage, 'attempt-c').staleHubTelemetryIgnored, true);
   clearDevReturnStatus(storage);
   assert.equal(values.has(QA_RETURN_TELEMETRY_KEY), false);
   assert.equal(DEFAULT_RETURN_STATUS.returnClicked, false);
