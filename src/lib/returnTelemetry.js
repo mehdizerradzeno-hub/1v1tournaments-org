@@ -56,6 +56,19 @@ export function emitQaWebViewBridgePing(windowRef = globalThis) {
   return status;
 }
 
+export function sendNativeSpadesAuthCallback(callbackUrl, windowRef = globalThis) {
+  if (typeof windowRef?.ReactNativeWebView?.postMessage !== 'function') return false;
+  try {
+    windowRef.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'spades-native-auth-callback',
+      callbackUrl,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isQaReturnTelemetryEnvironment() {
   return process.env.APP_ENV === 'qa-native-auth'
     || globalThis.location?.hostname === '1v1tournaments-native-auth-qa-20260903.netlify.app';

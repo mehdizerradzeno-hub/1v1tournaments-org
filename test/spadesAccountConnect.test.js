@@ -16,7 +16,7 @@ import {
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
 import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
-import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
+import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY, sendNativeSpadesAuthCallback } from '../src/lib/returnTelemetry.js';
 import { classifyReturnTarget, safeReturnFailureClass } from '../src/lib/returnTelemetry.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
@@ -131,6 +131,17 @@ test('QA WebView bridge ping emits exactly once with only safe fields', () => {
 test('QA WebView bridge ping does not call absent browser bridge', () => {
   const status = emitQaWebViewBridgePing({});
   assert.deepEqual(status, { pageMounted: true, reactNativeWebViewPresent: false, pingAttempted: false });
+});
+
+test('native Spades handoff sends the existing callback URL through the WebView bridge', () => {
+  const messages = [];
+  const callbackUrl = 'spades-freeplay://shared-account-callback?sharedAccountCode=opaque&state=opaque';
+  assert.equal(sendNativeSpadesAuthCallback(callbackUrl, { ReactNativeWebView: { postMessage: (value) => messages.push(JSON.parse(value)) } }), true);
+  assert.deepEqual(messages, [{ type: 'spades-native-auth-callback', callbackUrl }]);
+});
+
+test('ordinary browser handoff has no native callback bridge side effect', () => {
+  assert.equal(sendNativeSpadesAuthCallback('spades-freeplay://shared-account-callback?sharedAccountCode=opaque&state=opaque', {}), false);
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {

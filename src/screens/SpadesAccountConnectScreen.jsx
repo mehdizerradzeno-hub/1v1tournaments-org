@@ -34,7 +34,7 @@ import {
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
-import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, DEFAULT_WEBVIEW_BRIDGE_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
+import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, DEFAULT_WEBVIEW_BRIDGE_STATUS, emitQaReturnTelemetry, emitQaWebViewBridgePing, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass, sendNativeSpadesAuthCallback } from '../lib/returnTelemetry.js';
 
 function inputProps(setValue, {
   autoComplete = 'off',
@@ -211,7 +211,9 @@ export function GameAccountConnectScreen({
         if (!launch.authorized || typeof globalThis.location?.assign !== 'function') {
           throw new Error(`${gameName} authorization could not be opened.`);
         }
-        updateReturnStatus({ navigationAttempted: true, navigationMethod: 'location.assign' });
+        const sentToNative = isNativeSpadesHandoff && sendNativeSpadesAuthCallback(launch.url);
+        updateReturnStatus({ navigationAttempted: true, navigationMethod: sentToNative ? 'ReactNativeWebView.postMessage' : 'location.assign' });
+        if (sentToNative) return;
         globalThis.location.assign(launch.url);
       });
     } catch (handoffError) {
