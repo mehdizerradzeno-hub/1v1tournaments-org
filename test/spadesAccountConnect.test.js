@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -106,6 +107,15 @@ test('return telemetry is disabled outside the QA environment', () => {
   assert.equal(values.size, 0);
   assert.equal(loadDevReturnStatus(storage), null);
   if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
+});
+
+test('native context prefers the document query and keeps telemetry values redacted', () => {
+  const source = readFileSync(new URL('../src/screens/SpadesAccountConnectScreen.jsx', import.meta.url), 'utf8');
+  assert.match(source, /readNativeSpadesHandoffContext/);
+  assert.match(source, /new URLSearchParams\(locationRef\?\.search \|\| ''\)/);
+  assert.match(source, /documentContext\.source === 'spades-native'/);
+  assert.match(source, /nativeContext\.state/);
+  assert.doesNotMatch(source, /console\.(log|warn|error).*nativeContext/);
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {

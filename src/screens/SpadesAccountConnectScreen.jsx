@@ -71,6 +71,28 @@ function firstQueryValue(value) {
   return Array.isArray(value) ? value[0] || '' : value || '';
 }
 
+export function readNativeSpadesHandoffContext(routerParams, locationRef = globalThis.location) {
+  const routerContext = {
+    source: firstQueryValue(routerParams.source),
+    redirectUri: firstQueryValue(routerParams.redirectUri),
+    state: firstQueryValue(routerParams.state),
+    qaTelemetryAttempt: firstQueryValue(routerParams.qaTelemetryAttempt),
+  };
+  if (Platform.OS !== 'web') return { ...routerContext, stateSource: routerContext.state ? 'router' : 'missing' };
+
+  const documentParams = new URLSearchParams(locationRef?.search || '');
+  const documentContext = {
+    source: documentParams.get('source') || '',
+    redirectUri: documentParams.get('redirectUri') || '',
+    state: documentParams.get('state') || '',
+    qaTelemetryAttempt: documentParams.get('qaTelemetryAttempt') || '',
+  };
+  if (documentContext.source === 'spades-native') {
+    return { ...documentContext, stateSource: documentContext.state ? 'document' : 'missing' };
+  }
+  return { ...routerContext, stateSource: routerContext.state ? 'router' : 'missing' };
+}
+
 function AccountForm({ children, onSubmit }) {
   if (Platform.OS === 'web') {
     return createElement('form', {
@@ -121,9 +143,10 @@ export function GameAccountConnectScreen({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteExpanded, setDeleteExpanded] = useState(false);
   const handoffStartedRef = useRef(false);
-  const nativeContextPresent = Boolean(searchParams.source && searchParams.redirectUri && searchParams.state);
-  const initialQuery = nativeQuerySnapshot(searchParams);
-  const telemetryAttemptId = firstQueryValue(searchParams.qaTelemetryAttempt);
+  const [nativeContext] = useState(() => readNativeSpadesHandoffContext(searchParams));
+  const nativeContextPresent = Boolean(nativeContext.source && nativeContext.redirectUri && nativeContext.state);
+  const initialQuery = nativeQuerySnapshot(nativeContext);
+  const telemetryAttemptId = nativeContext.qaTelemetryAttempt;
   const [returnStatus, setReturnStatus] = useState(() => {
     const saved = loadDevReturnStatus(globalThis.localStorage, telemetryAttemptId);
     const currentAttempt = {
@@ -132,6 +155,10 @@ export function GameAccountConnectScreen({
       hubTelemetryAttemptMatched: Boolean(telemetryAttemptId),
       hubTelemetryAttemptParamPresent: Boolean(telemetryAttemptId),
       staleHubTelemetryIgnored: false,
+      routerStatePresent: Boolean(firstQueryValue(searchParams.state)),
+      documentStatePresent: Platform.OS === 'web' ? Boolean(new URLSearchParams(globalThis.location?.search || '').get('state')) : false,
+      nativeContextStateSource: nativeContext.stateSource,
+      nativeContextStateLength: nativeContext.state.length,
       hubInitialQueryCaptured: true,
       hubInitialStatePresent: initialQuery.statePresent,
       hubInitialStateLength: initialQuery.stateLength,
@@ -141,11 +168,30 @@ export function GameAccountConnectScreen({
       hubCurrentStateLength: initialQuery.stateLength,
       hubCurrentSourceClass: initialQuery.sourceClass,
       hubCurrentRedirectUriPresent: initialQuery.redirectUriPresent,
-      sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
+      sourceClass: nativeContext.source === 'spades-native' ? 'spades-native' : nativeContext.source ? 'other' : 'none',
       nativeContextPresent,
       statePresent: initialQuery.statePresent,
     };
-    return saved ? { ...currentAttempt, ...saved } : currentAttempt;
+    const acceptedSaved = saved && !saved.staleHubTelemetryIgnored ? saved : null;
+    return {
+      ...currentAttempt,
+      ...(acceptedSaved || {}),
+      sourceClass: currentAttempt.sourceClass,
+      nativeContextPresent: currentAttempt.nativeContextPresent,
+      statePresent: currentAttempt.statePresent,
+      hubCurrentStatePresent: currentAttempt.hubCurrentStatePresent,
+      hubCurrentStateLength: currentAttempt.hubCurrentStateLength,
+      hubCurrentSourceClass: currentAttempt.hubCurrentSourceClass,
+      hubCurrentRedirectUriPresent: currentAttempt.hubCurrentRedirectUriPresent,
+      telemetryAttemptActive: currentAttempt.telemetryAttemptActive,
+      hubTelemetryAttemptMatched: currentAttempt.hubTelemetryAttemptMatched,
+      hubTelemetryAttemptParamPresent: currentAttempt.hubTelemetryAttemptParamPresent,
+      routerStatePresent: currentAttempt.routerStatePresent,
+      documentStatePresent: currentAttempt.documentStatePresent,
+      nativeContextStateSource: currentAttempt.nativeContextStateSource,
+      nativeContextStateLength: currentAttempt.nativeContextStateLength,
+      staleHubTelemetryIgnored: saved?.staleHubTelemetryIgnored === true,
+    };
   });
   const [nativeStateDiagnostic, setNativeStateDiagnostic] = useState(null);
 
@@ -211,20 +257,20 @@ export function GameAccountConnectScreen({
     setError('');
     try {
       await runAccountHandoffOnce(handoffStartedRef, async () => {
-        const isNativeSpadesHandoff = gameName === 'Spades' && searchParams.source === 'spades-native';
+        const isNativeSpadesHandoff = gameName === 'Spades' && nativeContext.source === 'spades-native';
         updateReturnStatus({ returnClicked: true });
         updateReturnStatus({
-          sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
+          sourceClass: nativeContext.source === 'spades-native' ? 'spades-native' : nativeContext.source ? 'other' : 'none',
           nativeContextPresent: isNativeSpadesHandoff && nativeContextPresent,
-          statePresent: Boolean(searchParams.state),
+          statePresent: Boolean(nativeContext.state),
           authorizationIssueAttempted: true,
           safeFailureClass: '',
         });
         const launch = isNativeSpadesHandoff
           ? await prepareReturn({
-            redirectUri: firstQueryValue(searchParams.redirectUri),
-            source: firstQueryValue(searchParams.source),
-            state: firstQueryValue(searchParams.state),
+            redirectUri: nativeContext.redirectUri,
+            source: nativeContext.source,
+            state: nativeContext.state,
           })
           : await prepareReturn();
         setNativeStateDiagnostic(launch.qaNativeStateDiagnostic || null);

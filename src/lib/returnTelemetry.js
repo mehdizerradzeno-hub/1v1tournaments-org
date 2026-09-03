@@ -22,6 +22,8 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   hubCurrentSourceClass: 'none', hubCurrentRedirectUriPresent: false,
   telemetryAttemptActive: false, hubTelemetryAttemptMatched: false, staleHubTelemetryIgnored: false,
   hubTelemetryAttemptParamPresent: false,
+  routerStatePresent: false, documentStatePresent: false,
+  nativeContextStateSource: 'missing', nativeContextStateLength: 0,
 });
 
 export function isQaReturnTelemetryEnvironment() {
