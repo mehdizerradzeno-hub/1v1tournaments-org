@@ -56,6 +56,17 @@ function inputProps(setValue, {
   };
 }
 
+function nativeQuerySnapshot(params) {
+  const state = firstQueryValue(params.state);
+  const source = firstQueryValue(params.source);
+  return {
+    statePresent: Boolean(state),
+    stateLength: state.length,
+    sourceClass: source === 'spades-native' ? 'spades-native' : source ? 'other' : 'none',
+    redirectUriPresent: Boolean(firstQueryValue(params.redirectUri)),
+  };
+}
+
 function firstQueryValue(value) {
   return Array.isArray(value) ? value[0] || '' : value || '';
 }
@@ -111,11 +122,24 @@ export function GameAccountConnectScreen({
   const [deleteExpanded, setDeleteExpanded] = useState(false);
   const handoffStartedRef = useRef(false);
   const nativeContextPresent = Boolean(searchParams.source && searchParams.redirectUri && searchParams.state);
-  const [returnStatus, setReturnStatus] = useState(() => loadDevReturnStatus() || {
-    ...DEFAULT_RETURN_STATUS,
-    sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
-    nativeContextPresent,
-    statePresent: Boolean(searchParams.state),
+  const initialQuery = nativeQuerySnapshot(searchParams);
+  const [returnStatus, setReturnStatus] = useState(() => {
+    const saved = loadDevReturnStatus();
+    return saved || {
+      ...DEFAULT_RETURN_STATUS,
+      hubInitialQueryCaptured: true,
+      hubInitialStatePresent: initialQuery.statePresent,
+      hubInitialStateLength: initialQuery.stateLength,
+      hubInitialSourceClass: initialQuery.sourceClass,
+      hubInitialRedirectUriPresent: initialQuery.redirectUriPresent,
+      hubCurrentStatePresent: initialQuery.statePresent,
+      hubCurrentStateLength: initialQuery.stateLength,
+      hubCurrentSourceClass: initialQuery.sourceClass,
+      hubCurrentRedirectUriPresent: initialQuery.redirectUriPresent,
+      sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
+      nativeContextPresent,
+      statePresent: initialQuery.statePresent,
+    };
   });
   const [nativeStateDiagnostic, setNativeStateDiagnostic] = useState(null);
 

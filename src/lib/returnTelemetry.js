@@ -16,6 +16,10 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   authorizationIssueAttempted: false, authorizationIssueSucceeded: false, authorizationCodePresent: false,
   returnedStatePresent: false, finalTargetClass: 'none', navigationAttempted: false,
   navigationMethod: 'none', safeFailureClass: '',
+  hubInitialQueryCaptured: false, hubInitialStatePresent: false, hubInitialStateLength: 0,
+  hubInitialSourceClass: 'none', hubInitialRedirectUriPresent: false,
+  hubCurrentStatePresent: false, hubCurrentStateLength: 0,
+  hubCurrentSourceClass: 'none', hubCurrentRedirectUriPresent: false,
 });
 
 export function isQaReturnTelemetryEnvironment() {
