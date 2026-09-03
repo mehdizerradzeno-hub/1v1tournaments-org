@@ -34,7 +34,7 @@ import {
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
-import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
+import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
 
 function inputProps(setValue, {
   autoComplete = 'off',
@@ -635,7 +635,7 @@ export function GameAccountConnectScreen({
 
         {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
         {error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        {process.env.APP_ENV === 'qa-native-auth' ? (
+        {isQaReturnTelemetryEnvironment() ? (
           <View style={styles.devStatusPanel}>
             <Text style={styles.devStatusTitle}>DEV RETURN STATUS</Text>
             <Text style={styles.devStatusText}>{JSON.stringify(returnStatus, null, 2)}</Text>

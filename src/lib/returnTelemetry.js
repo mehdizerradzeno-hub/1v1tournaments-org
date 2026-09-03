@@ -18,8 +18,13 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   navigationMethod: 'none', safeFailureClass: '',
 });
 
+export function isQaReturnTelemetryEnvironment() {
+  return process.env.APP_ENV === 'qa-native-auth'
+    || globalThis.location?.hostname === '1v1tournaments-native-auth-qa-20260903.netlify.app';
+}
+
 export function loadDevReturnStatus(storage = globalThis.localStorage) {
-  if (process.env.APP_ENV !== 'qa-native-auth') return null;
+  if (!isQaReturnTelemetryEnvironment()) return null;
   try {
     const value = JSON.parse(storage?.getItem(QA_RETURN_TELEMETRY_KEY) || 'null');
     return value && typeof value === 'object' ? { ...DEFAULT_RETURN_STATUS, ...value } : null;
@@ -45,7 +50,7 @@ export function safeReturnFailureClass(error) {
 }
 
 export function persistDevReturnStatus(status, storage = globalThis.localStorage) {
-  if (process.env.APP_ENV !== 'qa-native-auth') return;
+  if (!isQaReturnTelemetryEnvironment()) return;
   try {
     storage?.setItem(QA_RETURN_TELEMETRY_KEY, JSON.stringify({ ...DEFAULT_RETURN_STATUS, ...status }));
   } catch {
@@ -54,6 +59,6 @@ export function persistDevReturnStatus(status, storage = globalThis.localStorage
 }
 
 export function clearDevReturnStatus(storage = globalThis.localStorage) {
-  if (process.env.APP_ENV !== 'qa-native-auth') return;
+  if (!isQaReturnTelemetryEnvironment()) return;
   try { storage?.removeItem(QA_RETURN_TELEMETRY_KEY); } catch { /* Diagnostics must never affect the handoff. */ }
 }

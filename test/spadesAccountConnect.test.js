@@ -94,6 +94,17 @@ test('QA return telemetry persists across remount and resets only its key', () =
   if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
 });
 
+test('return telemetry is disabled outside the QA environment', () => {
+  const values = new Map();
+  const storage = { getItem: () => null, setItem: (key, value) => values.set(key, value), removeItem: () => values.clear() };
+  const previous = process.env.APP_ENV;
+  process.env.APP_ENV = 'production';
+  persistDevReturnStatus({ returnClicked: true }, storage);
+  assert.equal(values.size, 0);
+  assert.equal(loadDevReturnStatus(storage), null);
+  if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
+});
+
 test('Sign In uses the existing shared player-account login action', async () => {
   const body = await captureAccountAction(() => loginPlayerAccount({
     contactEmail: 'player@example.com',
