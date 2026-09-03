@@ -16,6 +16,7 @@ import {
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
 import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
+import { classifyReturnTarget, safeReturnFailureClass } from '../src/lib/returnTelemetry.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
   const originalFetch = globalThis.fetch;
@@ -68,6 +69,14 @@ test('successful account auth issues the established one-time Spades handoff', a
   assert.equal(launch.authorized, true);
   assert.equal(new URL(launch.url).origin, 'https://1v1spades.com');
   assert.equal(new URL(launch.url).searchParams.get('sharedAccountCode'), 'opaque-one-time-code');
+});
+
+test('return telemetry classifies native and safe failure targets without sensitive data', () => {
+  assert.equal(classifyReturnTarget('spades-freeplay://shared-account-callback?sharedAccountCode=opaque'), 'custom-scheme-callback');
+  assert.equal(classifyReturnTarget('https://onev1-spades-native-auth-qa-20260903.onrender.com/'), 'qa-spades');
+  assert.equal(classifyReturnTarget('https://1v1spades.com/'), 'production-spades');
+  assert.equal(safeReturnFailureClass({ code: 'authorization_issue_failed', message: 'do not expose' }), 'authorization_issue_failed');
+  assert.equal(safeReturnFailureClass({ code: 'unexpected', message: 'do not expose' }), 'unknown');
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {

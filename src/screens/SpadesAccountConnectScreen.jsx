@@ -34,6 +34,7 @@ import {
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
+import { classifyReturnTarget, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
 
 function inputProps(setValue, {
   autoComplete = 'off',
@@ -109,6 +110,25 @@ export function GameAccountConnectScreen({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteExpanded, setDeleteExpanded] = useState(false);
   const handoffStartedRef = useRef(false);
+  const nativeContextPresent = Boolean(searchParams.source && searchParams.redirectUri && searchParams.state);
+  const [returnStatus, setReturnStatus] = useState({
+    sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
+    nativeContextPresent,
+    statePresent: Boolean(searchParams.state),
+    authorizationIssueAttempted: false,
+    authorizationIssueSucceeded: false,
+    authorizationCodePresent: false,
+    finalTargetClass: 'none',
+    navigationAttempted: false,
+    navigationMethod: 'none',
+    safeFailureClass: '',
+  });
+
+  const updateReturnStatus = (patch) => setReturnStatus((current) => {
+    const next = { ...current, ...patch };
+    persistDevReturnStatus(next);
+    return next;
+  });
 
   useEffect(() => {
     let active = true;
@@ -167,6 +187,13 @@ export function GameAccountConnectScreen({
     try {
       await runAccountHandoffOnce(handoffStartedRef, async () => {
         const isNativeSpadesHandoff = gameName === 'Spades' && searchParams.source === 'spades-native';
+        updateReturnStatus({
+          sourceClass: searchParams.source === 'spades-native' ? 'spades-native' : searchParams.source ? 'other' : 'none',
+          nativeContextPresent: isNativeSpadesHandoff && nativeContextPresent,
+          statePresent: Boolean(searchParams.state),
+          authorizationIssueAttempted: true,
+          safeFailureClass: '',
+        });
         const launch = isNativeSpadesHandoff
           ? await prepareReturn({
             redirectUri: firstQueryValue(searchParams.redirectUri),
@@ -174,13 +201,20 @@ export function GameAccountConnectScreen({
             state: firstQueryValue(searchParams.state),
           })
           : await prepareReturn();
+        updateReturnStatus({
+          authorizationIssueSucceeded: true,
+          authorizationCodePresent: Boolean(new URL(launch.url).searchParams.get('sharedAccountCode')),
+          finalTargetClass: classifyReturnTarget(launch.url),
+        });
         if (!launch.authorized || typeof globalThis.location?.assign !== 'function') {
           throw new Error(`${gameName} authorization could not be opened.`);
         }
+        updateReturnStatus({ navigationAttempted: true, navigationMethod: 'location.assign' });
         globalThis.location.assign(launch.url);
       });
     } catch (handoffError) {
       setSubmitting(false);
+      updateReturnStatus({ safeFailureClass: safeReturnFailureClass(handoffError) });
       setError(handoffError instanceof Error ? handoffError.message : `${gameName} authorization could not be opened.`);
     }
   };
@@ -605,6 +639,7 @@ export function GameAccountConnectScreen({
 
         {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
         {error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        {process.env.APP_ENV === 'qa-native-auth' ? <Text style={styles.message}>DEV RETURN STATUS {JSON.stringify(returnStatus)}</Text> : null}
         <ActionButton
           disabled={submitting}
           onPress={() => returnToGameWithoutAccountChange(destination)}
