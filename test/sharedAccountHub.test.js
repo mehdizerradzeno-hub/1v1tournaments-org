@@ -312,6 +312,95 @@ test('game identity lookup endpoint is server-authenticated and returns only pub
   assert.equal(JSON.stringify(body).includes(account.email), false);
 });
 
+test('QA exchange rejection diagnostic captures safe Hub rejection classes without changing responses', async () => {
+  const cases = [
+    ['game_not_authorized', 401],
+    ['authorization_not_found', 401],
+    ['authorization_expired', 401],
+  ];
+
+  for (const [code, statusCode] of cases) {
+    const logs = [];
+    const response = await handleSharedAccountRequest({
+      httpMethod: 'POST',
+      body: JSON.stringify({ action: 'exchange-game-authorization', audience: 'spades' }),
+    }, {
+      appEnv: 'qa-native-auth',
+      qaExchangeRejectionLogger: (entry) => logs.push(JSON.parse(entry)),
+      validateGameAuthorizationCaller: () => {
+        if (code === 'game_not_authorized') throw new SharedAccountContractError('rejected', statusCode, code);
+        return 'spades';
+      },
+      exchangeGameAuthorization: async () => {
+        throw new SharedAccountContractError('rejected', statusCode, code);
+      },
+    }).catch((error) => ({ statusCode: error.statusCode, body: JSON.stringify({ error: error.message, code: error.code }) }));
+
+    assert.equal(response.statusCode, statusCode);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].event, 'qa_shared_account_exchange_rejection');
+    assert.equal(logs[0].operation, 'exchange-game-authorization');
+    assert.equal(logs[0].audience, 'spades');
+    assert.equal(logs[0].hubStatus, statusCode);
+    assert.equal(logs[0].hubErrorCode, code);
+    assert.equal(Number.isInteger(logs[0].elapsedMs), true);
+    assert.match(logs[0].correlationId, /^qa-hub:[0-9a-f-]{36}$/);
+    assert.equal(JSON.stringify(logs[0]).includes('authorizationCode'), false);
+    assert.equal(JSON.stringify(logs[0]).includes('rejected'), false);
+  }
+});
+
+test('QA exchange diagnostic normalizes unknown errors and is suppressed outside QA', async () => {
+  const unknownLogs = [];
+  await assert.rejects(
+    handleSharedAccountRequest({
+      httpMethod: 'POST',
+      body: JSON.stringify({ action: 'exchange-game-authorization', audience: 'spades' }),
+    }, {
+      appEnv: 'qa-native-auth',
+      qaExchangeRejectionLogger: (entry) => unknownLogs.push(JSON.parse(entry)),
+      validateGameAuthorizationCaller: () => 'spades',
+      exchangeGameAuthorization: async () => {
+        throw new SharedAccountContractError('internal detail', 500, 'private_internal_code');
+      },
+    }),
+  );
+  assert.equal(unknownLogs[0].hubStatus, 500);
+  assert.equal(unknownLogs[0].hubErrorCode, 'unknown_hub_error');
+
+  const productionLogs = [];
+  await assert.rejects(
+    handleSharedAccountRequest({
+      httpMethod: 'POST',
+      body: JSON.stringify({ action: 'exchange-game-authorization', audience: 'spades' }),
+    }, {
+      appEnv: 'production',
+      qaExchangeRejectionLogger: (entry) => productionLogs.push(entry),
+      validateGameAuthorizationCaller: () => {
+        throw new SharedAccountContractError('rejected', 401, 'game_not_authorized');
+      },
+    }),
+  );
+  assert.deepEqual(productionLogs, []);
+});
+
+test('successful QA exchange does not emit a rejection diagnostic', async () => {
+  const logs = [];
+  const response = await handleSharedAccountRequest({
+    httpMethod: 'POST',
+    body: JSON.stringify({ action: 'exchange-game-authorization', audience: 'spades' }),
+  }, {
+    appEnv: 'qa-native-auth',
+    qaExchangeRejectionLogger: (entry) => logs.push(entry),
+    validateGameAuthorizationCaller: () => 'spades',
+    exchangeGameAuthorization: async () => ({ canonicalAccountId: 'safe-id' }),
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body), { ok: true, identity: { canonicalAccountId: 'safe-id' } });
+  assert.deepEqual(logs, []);
+});
+
 test('tournament signup and match access payloads expose canonical identity with legacy IDs', () => {
   const signup = publicSignup({
     id: 'signup-1',

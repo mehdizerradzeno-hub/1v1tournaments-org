@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { connectLambda } from '@netlify/blobs';
 
 import { getAccountFromEvent } from './_account-utils.mjs';
@@ -27,6 +28,49 @@ function parseBody(event) {
   } catch {
     return null;
   }
+}
+
+const QA_EXCHANGE_REJECTION_CODES = new Set([
+  'game_not_authorized',
+  'authorization_not_found',
+  'authorization_expired',
+  'authorization_replayed',
+  'authorization_unconfigured',
+  'wrong_audience',
+  'invalid_request',
+  'invalid_operation',
+  'invalid_audience',
+  'unauthorized',
+  'forbidden',
+  'rate_limited',
+  'server_error',
+]);
+
+function qaExchangeRejectionDiagnostic(error, startedAt, dependencies) {
+  if ((dependencies.appEnv ?? process.env.APP_ENV) !== 'qa-native-auth') return null;
+
+  const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : null;
+  const errorCode = typeof error?.code === 'string' && QA_EXCHANGE_REJECTION_CODES.has(error.code)
+    ? error.code
+    : 'unknown_hub_error';
+
+  return {
+    event: 'qa_shared_account_exchange_rejection',
+    correlationId: `qa-hub:${randomUUID()}`,
+    operation: 'exchange-game-authorization',
+    audience: 'spades',
+    hubStatus: statusCode,
+    hubErrorCode: errorCode,
+    elapsedMs: Math.max(0, Date.now() - startedAt),
+  };
+}
+
+function emitQaExchangeRejection(error, startedAt, dependencies) {
+  const diagnostic = qaExchangeRejectionDiagnostic(error, startedAt, dependencies);
+  if (!diagnostic) return;
+
+  const logger = dependencies.qaExchangeRejectionLogger || console.warn;
+  logger(JSON.stringify(diagnostic));
 }
 
 export async function handleSharedAccountRequest(event, dependencies = {}) {
@@ -65,9 +109,15 @@ export async function handleSharedAccountRequest(event, dependencies = {}) {
   }
 
   if (payload.action === 'exchange-game-authorization') {
-    const audience = authorizeGame(event, payload.audience);
-    const identity = await exchangeAuthorization(payload.authorizationCode, audience);
-    return json(200, { ok: true, identity });
+    const startedAt = Date.now();
+    try {
+      const audience = authorizeGame(event, payload.audience);
+      const identity = await exchangeAuthorization(payload.authorizationCode, audience);
+      return json(200, { ok: true, identity });
+    } catch (error) {
+      emitQaExchangeRejection(error, startedAt, dependencies);
+      throw error;
+    }
   }
 
   if (payload.action === 'resolve-game-identities') {
