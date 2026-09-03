@@ -34,7 +34,7 @@ import {
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
-import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
+import { clearDevReturnStatus, classifyReturnTarget, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, isQaReturnTelemetryEnvironment, loadDevReturnStatus, persistDevReturnStatus, safeReturnFailureClass } from '../lib/returnTelemetry.js';
 
 function inputProps(setValue, {
   autoComplete = 'off',
@@ -121,6 +121,7 @@ export function GameAccountConnectScreen({
   const updateReturnStatus = (patch) => setReturnStatus((current) => {
     const next = { ...current, ...patch };
     persistDevReturnStatus(next);
+    emitQaReturnTelemetry(next);
     return next;
   });
 

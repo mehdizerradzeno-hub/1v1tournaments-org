@@ -16,7 +16,7 @@ import {
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
 import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
-import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
+import { clearDevReturnStatus, DEFAULT_RETURN_STATUS, emitQaReturnTelemetry, loadDevReturnStatus, persistDevReturnStatus, QA_RETURN_TELEMETRY_KEY } from '../src/lib/returnTelemetry.js';
 import { classifyReturnTarget, safeReturnFailureClass } from '../src/lib/returnTelemetry.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
@@ -102,6 +102,18 @@ test('return telemetry is disabled outside the QA environment', () => {
   persistDevReturnStatus({ returnClicked: true }, storage);
   assert.equal(values.size, 0);
   assert.equal(loadDevReturnStatus(storage), null);
+  if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
+});
+
+test('QA WebView bridge emits only the allowlisted return telemetry payload', () => {
+  const messages = [];
+  const previous = process.env.APP_ENV;
+  process.env.APP_ENV = 'qa-native-auth';
+  assert.equal(emitQaReturnTelemetry({ returnClicked: true, authorizationCodePresent: true, state: 'secret' }, { ReactNativeWebView: { postMessage: (value) => messages.push(JSON.parse(value)) } }), true);
+  assert.deepEqual(messages[0].type, 'qa-spades-native-return-telemetry');
+  assert.equal(messages[0].payload.returnClicked, true);
+  assert.equal(Object.hasOwn(messages[0].payload, 'state'), false);
+  assert.equal(Object.hasOwn(messages[0].payload, 'authorizationCode'), false);
   if (previous === undefined) delete process.env.APP_ENV; else process.env.APP_ENV = previous;
 });
 

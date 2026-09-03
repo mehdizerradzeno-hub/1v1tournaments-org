@@ -18,6 +18,19 @@ export const DEFAULT_RETURN_STATUS = Object.freeze({
   navigationMethod: 'none', safeFailureClass: '',
 });
 
+const RETURN_TELEMETRY_FIELDS = Object.freeze(Object.keys(DEFAULT_RETURN_STATUS));
+
+export function emitQaReturnTelemetry(status, windowRef = globalThis) {
+  if (!isQaReturnTelemetryEnvironment() || !windowRef?.ReactNativeWebView?.postMessage) return false;
+  const payload = Object.fromEntries(RETURN_TELEMETRY_FIELDS.map((field) => [field, status[field] ?? DEFAULT_RETURN_STATUS[field]]));
+  try {
+    windowRef.ReactNativeWebView.postMessage(JSON.stringify({ type: 'qa-spades-native-return-telemetry', payload }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isQaReturnTelemetryEnvironment() {
   return process.env.APP_ENV === 'qa-native-auth'
     || globalThis.location?.hostname === '1v1tournaments-native-auth-qa-20260903.netlify.app';
