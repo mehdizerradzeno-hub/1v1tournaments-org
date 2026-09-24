@@ -4,7 +4,10 @@ import test from 'node:test';
 import {
   normalizeSpadesAccountMode,
   prepareSpadesAccountReturn,
+  resolveSpadesAccountDestination,
   SPADES_ACCOUNT_ENTRY_ROUTE,
+  SPADES_ACCOUNT_DESTINATION,
+  SPADES_ACCOUNT_QA_DESTINATION,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../src/lib/spadesAccountConnect.js';
 import {
@@ -43,6 +46,57 @@ test('Spades account entry exposes the three required signed-out actions', () =>
   assert.equal(normalizeSpadesAccountMode('create'), 'create');
   assert.equal(normalizeSpadesAccountMode('reset'), 'reset');
   assert.equal(normalizeSpadesAccountMode('unknown'), 'signin');
+});
+
+test('Spades account return allows only production and the explicit QA origin', () => {
+  assert.equal(
+    resolveSpadesAccountDestination('https://1v1spades.com/anything'),
+    SPADES_ACCOUNT_DESTINATION,
+  );
+  assert.equal(
+    resolveSpadesAccountDestination(
+      'https://onev1-spades-phase1-qa-20260923.onrender.com/anything?x=1',
+    ),
+    SPADES_ACCOUNT_QA_DESTINATION,
+  );
+  assert.equal(
+    resolveSpadesAccountDestination('https://evil.example/phish'),
+    SPADES_ACCOUNT_DESTINATION,
+  );
+  assert.equal(
+    resolveSpadesAccountDestination(
+      'https://onev1-spades-phase1-qa-20260923.onrender.com.evil.example/',
+    ),
+    SPADES_ACCOUNT_DESTINATION,
+  );
+  assert.equal(
+    resolveSpadesAccountDestination('javascript:alert(1)'),
+    SPADES_ACCOUNT_DESTINATION,
+  );
+});
+
+test('Spades QA account auth returns the authorization code to the QA origin', async () => {
+  const launch = await prepareSpadesAccountReturn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          authorization: {
+            authorizationCode: 'opaque-qa-code',
+            audience: 'spades',
+            protocolVersion: '2026-08-04',
+            expiresAt: '2026-09-25T15:00:00.000Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    SPADES_ACCOUNT_QA_DESTINATION,
+  );
+
+  const url = new URL(launch.url);
+
+  assert.equal(url.origin, new URL(SPADES_ACCOUNT_QA_DESTINATION).origin);
+  assert.equal(url.pathname, '/');
+  assert.equal(url.searchParams.get('sharedAccountCode'), 'opaque-qa-code');
 });
 
 test('successful account auth issues the established one-time Spades handoff', async () => {
