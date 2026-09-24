@@ -21,6 +21,7 @@ import {
 } from '../lib/tournamentHostingClient.js';
 import {
   prepareSpadesAccountReturn,
+  resolveSpadesAccountDestination,
   SPADES_ACCOUNT_DESTINATION,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../lib/spadesAccountConnect.js';
@@ -631,7 +632,27 @@ export function GameAccountConnectScreen({
 }
 
 export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
-  return <GameAccountConnectScreen initialMode={initialMode} />;
+  let requestedDestination = null;
+
+  try {
+    requestedDestination = new URLSearchParams(
+      globalThis.location?.search || '',
+    ).get('returnTo');
+  } catch {
+    requestedDestination = null;
+  }
+
+  const destination = resolveSpadesAccountDestination(requestedDestination);
+
+  return (
+    <GameAccountConnectScreen
+      initialMode={initialMode}
+      destination={destination}
+      prepareReturn={() =>
+        prepareSpadesAccountReturn(globalThis.fetch, destination)
+      }
+    />
+  );
 }
 
 const styles = StyleSheet.create({
