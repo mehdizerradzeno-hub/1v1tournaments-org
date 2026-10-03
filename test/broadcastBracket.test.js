@@ -21,8 +21,8 @@ function player(id, seed, name) {
   return { id, seed, name, canonicalAccountId: `private-${id}`, email: `${id}@example.test` };
 }
 
-function broadcastWrapper({ hydrated, width, height }) {
-  return !hydrated || width < 680 || height < 760 ? 'ScrollView' : 'View';
+function broadcastWrapper({ hydrated, width, height, hasTallBracket = false }) {
+  return !hydrated || width < 680 || height < 760 || hasTallBracket ? 'ScrollView' : 'View';
 }
 
 function eightPlayerBracket() {
@@ -55,6 +55,33 @@ test('broadcast model presents an authentic populated eight-player bracket witho
   assert.equal(model.featured.kind, 'featured-match');
   assert.equal(model.featured.title, 'Player 1 vs Player 3');
   assert.equal(model.featured.detail, 'Winner advances to the next round');
+  assert.equal(model.status, 'live');
+  assert.equal(model.statusLabel, 'Live');
+});
+
+test('published rounds do not imply a live tournament before authoritative play starts', () => {
+  const bracket = { ...eightPlayerBracket(), status: 'published' };
+  const futureEvent = { ...event, date: '2030-05-02T18:00:00.000Z' };
+  for (const candidate of [bracket, { ...bracket, status: 'ready' }, { ...bracket, status: '' }]) {
+    const model = buildBroadcastBracketModel({ event: futureEvent, bracket: candidate, now: Date.parse('2026-10-03T12:00:00.000Z') });
+    assert.equal(model.status, 'published');
+    assert.equal(model.statusLabel, 'Published');
+    assert.equal(model.rounds.length, 3);
+    assert.equal(model.featured.kind, 'featured-match');
+    assert.equal(model.featured.title, 'Player 1 vs Player 3');
+  }
+
+  assert.equal(buildBroadcastBracketModel({ event: { ...futureEvent, status: 'live' }, bracket }).status, 'live');
+  for (const status of ['live', 'active', 'in-progress']) {
+    assert.equal(buildBroadcastBracketModel({ event: futureEvent, bracket: { ...bracket, status } }).status, 'live');
+  }
+});
+
+test('authoritative completion takes priority over a live event or bracket', () => {
+  const bracket = eightPlayerBracket();
+  assert.equal(buildBroadcastBracketModel({ event: { ...event, status: 'complete' }, bracket }).status, 'complete');
+  assert.equal(buildBroadcastBracketModel({ event: { ...event, status: 'live' }, bracket: { ...bracket, status: 'complete' } }).status, 'complete');
+  assert.equal(buildBroadcastBracketModel({ event: { ...event, status: 'live' }, bracket: { ...bracket, winner: player('p1', 1, 'Player 1') } }).status, 'complete');
 });
 
 test('broadcast model preserves byes, TBD slots, winners, and completed champion state', () => {
@@ -107,6 +134,14 @@ test('pre-bracket model is explicit rather than inventing an empty bracket', () 
   assert.equal(model.featured.kind, 'pre-bracket');
   assert.equal(model.featured.title, 'Reddit Sunday Spades Tournament');
   assert.equal(model.featured.detail, 'Bracket generates after check-in');
+  assert.equal(model.status, 'upcoming');
+  assert.equal(model.featured.eyebrow, 'Registration open');
+  const closed = buildBroadcastBracketModel({ event: { ...event, registrationStatus: 'closed' }, bracket: null });
+  assert.equal(closed.featured.eyebrow, 'Tournament upcoming');
+  const live = buildBroadcastBracketModel({ event: { ...event, status: 'live' }, bracket: null });
+  assert.equal(live.rounds.length, 0);
+  assert.equal(live.featured.eyebrow, 'Tournament live');
+  assert.equal(live.featured.detail, 'Bracket not published yet');
 });
 
 test('broadcast route is public, read-only, mobile-aware, and contains no host controls', async () => {
@@ -119,7 +154,10 @@ test('broadcast route is public, read-only, mobile-aware, and contains no host c
   assert.match(routeSource, /useGlobalSearchParams/);
   assert.match(screenSource, /mobileRoundTabs/);
   assert.match(screenSource, /accessibilityRole="tab"/);
-  assert.match(screenSource, /LIVE DATA \/ 15S REFRESH/);
+  assert.match(screenSource, /PUBLIC DATA \/ 15S REFRESH/);
+  assert.match(screenSource, /broadcastMatchId: match\.key/);
+  assert.match(screenSource, /broadcastBracketState: model\.status/);
+  assert.match(screenSource, /broadcastChampion: 'true'/);
   assert.match(screenSource, /eventsResult\?\.events\?\.find/);
   assert.doesNotMatch(screenSource, /Admin|Host control|canonicalAccountId|email|ticket|token/);
   assert.match(responsiveSource, /max-width: 430px/);
@@ -127,19 +165,33 @@ test('broadcast route is public, read-only, mobile-aware, and contains no host c
   assert.doesNotMatch(responsiveSource, /overflow-x:\s*(hidden|clip)/);
 });
 
-test('stacked broadcast brackets expand around every match before the footer', async () => {
+test('stacked and tall broadcast brackets expand around every match before the footer', async () => {
   const screenSource = await readFile(new URL('../src/screens/BroadcastBracketScreen.jsx', import.meta.url), 'utf8');
 
   assert.match(screenSource, /styles\.bracketPanel, stacked && styles\.bracketPanelStacked/);
-  assert.match(screenSource, /styles\.rounds, stacked && styles\.roundsStacked/);
-  assert.match(screenSource, /styles\.matchStack, stacked && styles\.matchStackStacked/);
+  assert.match(screenSource, /styles\.rounds, \(stacked \|\| tall\) && styles\.roundsStacked/);
+  assert.match(screenSource, /styles\.matchStack, stacked && styles\.matchStackStacked, tall && !stacked && styles\.matchStackTall/);
   assert.match(screenSource, /mainStageStacked:\s*\{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto'/);
+  assert.match(screenSource, /mainStageTall:\s*\{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto', alignItems: 'flex-start' \}/);
+  assert.match(screenSource, /tall && !stacked && styles\.mainStageTall/);
   assert.match(screenSource, /bracketPanelStacked:\s*\{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto' \}/);
   assert.match(screenSource, /roundsStacked:\s*\{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto' \}/);
   assert.match(screenSource, /matchStackStacked:\s*\{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto' \}/);
-  assert.match(screenSource, /<\/View>\s*<View style=\{styles\.footer\}>/);
+  assert.match(screenSource, /matchStackTall:\s*\{ flexGrow: 1, flexShrink: 0, flexBasis: 'auto' \}/);
+  assert.match(screenSource, /broadcastRoundHeader: round\.key/);
+  assert.match(screenSource, /<\/View>\s*<View dataSet=\{\{ broadcastFooter: 'true' \}\} style=\{styles\.footer\}>/);
   assert.doesNotMatch(screenSource, /(bracketPanel|rounds|matchStack)Stacked:\s*\{[^}]*\bheight\s*:/);
   assert.doesNotMatch(screenSource, /(bracketPanel|rounds|matchStack)Stacked:\s*\{[^}]*overflow:\s*'hidden'/);
+});
+
+test('compact broadcast headers and round tabs keep readable independent space', async () => {
+  const source = await readFile(new URL('../src/screens/BroadcastBracketScreen.jsx', import.meta.url), 'utf8');
+  assert.match(source, /topBarCompact:\s*\{ flexDirection: 'column', alignItems: 'stretch'/);
+  assert.match(source, /brandLockupCompact:\s*\{ width: '100%', flexGrow: 0, flexShrink: 0, flexBasis: 'auto'/);
+  assert.match(source, /liveLockupCompact:\s*\{ width: '100%', maxWidth: '100%', alignItems: 'flex-start'/);
+  assert.match(source, /mobileRoundTabs:\s*\{[^}]*flexWrap: 'wrap'/);
+  assert.match(source, /roundTab:\s*\{[^}]*flexShrink: 0[^}]*minWidth: 104/);
+  assert.match(source, /broadcastTitle: 'true'/);
 });
 
 test('public broadcast direct loads keep the server wrapper through first hydration', async () => {
@@ -151,7 +203,8 @@ test('public broadcast direct loads keep the server wrapper through first hydrat
   assert.match(routeSource, /BroadcastBracketScreen/);
   assert.match(screenSource, /import \{ useHydrated \} from '\.\.\/lib\/useHydrated';/);
   assert.match(screenSource, /const isHydrated = useHydrated\(\);/);
-  assert.match(screenSource, /const shouldScroll = !isHydrated \|\| compact \|\| height < 760;/);
+  assert.match(screenSource, /const hasTallBracket = Boolean\(model\?\.rounds\.some\(\(round\) => round\.matches\.length > 4\)\);/);
+  assert.match(screenSource, /const shouldScroll = !isHydrated \|\| compact \|\| height < 760 \|\| hasTallBracket;/);
   assert.match(screenSource, /if \(shouldScroll\) \{\s*return <ScrollView/);
 
   for (const viewport of [{ width: 390, height: 844 }, { width: 1920, height: 1080 }]) {
@@ -162,4 +215,5 @@ test('public broadcast direct loads keep the server wrapper through first hydrat
 
   assert.equal(broadcastWrapper({ hydrated: true, width: 390, height: 844 }), 'ScrollView');
   assert.equal(broadcastWrapper({ hydrated: true, width: 1920, height: 1080 }), 'View');
+  assert.equal(broadcastWrapper({ hydrated: true, width: 1440, height: 900, hasTallBracket: true }), 'ScrollView');
 });

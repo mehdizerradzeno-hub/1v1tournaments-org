@@ -21,7 +21,6 @@ import {
   getCheckInPath,
   getTournamentPath,
   getUpcomingTournaments,
-  siteData,
 } from "../lib/siteData.js";
 import {
   getNextPublicTournament,
@@ -222,6 +221,15 @@ function getCountdownParts(tournament, nowMs) {
   };
 }
 
+function isConfirmedLiveBracket(tournament, bracket) {
+  const bracketStatus = String(bracket?.status || '').trim().toLowerCase();
+
+  return Boolean(bracket)
+    && bracketStatus !== 'complete'
+    && (String(tournament?.status || '').trim().toLowerCase() === 'live'
+      || ['live', 'active', 'in-progress'].includes(bracketStatus));
+}
+
 function getSignupCount(signupSummary) {
   return signupSummary?.count || signupSummary?.signups?.length || 0;
 }
@@ -379,9 +387,10 @@ export default function NextScreen({ showDiscovery = false }) {
     loading: Boolean(tournament),
   };
   const bracket = eventData.bracket || null;
+  const isBracketLive = isConfirmedLiveBracket(tournament, bracket);
   const registrationMeta = tournament
     ? getEffectiveRegistrationStatus(tournament, {
-        hasLiveBracket: Boolean(bracket),
+        hasLiveBracket: isBracketLive,
       })
     : { label: "Coming soon", tone: "neutral", value: "coming-soon" };
   const tournamentPath = tournament ? getTournamentPath(tournament.slug) : "/";
@@ -389,14 +398,14 @@ export default function NextScreen({ showDiscovery = false }) {
   const competitionStatus = tournament
     ? getCompetitionLifecycleLabel({
         status: tournament.status,
-        hasBracket: Boolean(bracket),
+        hasBracket: isBracketLive,
       })
     : "UPCOMING";
   const primaryAction = tournament
     ? getFeaturedCompetitionAction({
         status: tournament.status,
         registrationStatus: registrationMeta.value,
-        hasBracket: Boolean(bracket),
+        hasBracket: isBracketLive,
         tournamentPath,
         signupPath: checkInPath,
         matchPath: `${tournamentPath}#my-match`,
@@ -574,6 +583,7 @@ export default function NextScreen({ showDiscovery = false }) {
         actions={[{ label: "Home", href: "/" }]}
         eyebrow={showDiscovery ? "Tournaments" : "Next"}
         lead="Loading the live tournament schedule."
+        publicShell
         stickyActions={false}
         subtitle="Checking events"
         title={showDiscovery ? "Tournaments" : "Next tournament"}
@@ -605,6 +615,7 @@ export default function NextScreen({ showDiscovery = false }) {
         lead={scheduleUnavailable
           ? "The live schedule is temporarily unavailable."
           : "The next public event will appear here when it is scheduled."}
+        publicShell
         stickyActions={false}
         subtitle={scheduleUnavailable
           ? "The fallback schedule has no upcoming event"
@@ -652,9 +663,10 @@ export default function NextScreen({ showDiscovery = false }) {
         { label: "Rules", href: "/rules", variant: "ghost" },
       ].filter(Boolean)}
       eyebrow={showDiscovery ? "Tournaments" : "Next event"}
-      footerNote={siteData.site.adminNote}
+      footerNote="Creating the competitive 1v1 spades category."
       heroVariant="compact"
       lead="The public lobby for guests: signup count, join link, live link, roster preview, and bracket status."
+      publicShell
       showHero={false}
       subtitle={formatDateLine(
         tournament.date,
@@ -684,6 +696,7 @@ export default function NextScreen({ showDiscovery = false }) {
       ) : null}
       <NextLobbyHero
         bracket={bracket}
+        isBracketLive={isBracketLive}
         countdownParts={getCountdownParts(tournament, nowMs)}
         joinUrl={joinUrl}
         openSeats={openSeats}
@@ -711,6 +724,7 @@ export default function NextScreen({ showDiscovery = false }) {
 
 function NextLobbyHero({
   bracket,
+  isBracketLive,
   countdownParts,
   joinUrl,
   openSeats,
@@ -894,7 +908,7 @@ function NextLobbyHero({
             <StatusRow label="Competition" value={competitionStatus} />
             <StatusRow
               label="Status"
-              value={bracket ? "Bracket live" : "Online"}
+              value={isBracketLive ? "Bracket live" : bracket?.status === "complete" ? "Bracket complete" : bracket ? "Bracket published" : "Online"}
             />
             <StatusRow label="Players registered" value={signedUpValue} />
             <StatusRow

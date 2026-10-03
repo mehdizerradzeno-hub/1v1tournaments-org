@@ -333,9 +333,10 @@ export default function LiveScreen() {
         { label: 'Results', href: '/results', variant: 'ghost' },
       ].filter(Boolean)}
       eyebrow="Watch"
-      footerNote={siteData.site.adminNote}
+      footerNote="Creating the competitive 1v1 spades category."
       heroVariant="compact"
       lead="Twitch, next event, overlays, and announcement tools in one place."
+      publicShell
       subtitle="Broadcast command center"
       stickyActions={false}
       title="Live coverage">

@@ -370,7 +370,8 @@ test('overlay routes stay wired to OBS browser sources', () => {
   assert.match(overlayScreenSource, /startVisibilityAwarePolling\(loadHostedTournaments, 15000\)/);
   assert.match(overlayScreenSource, /startVisibilityAwarePolling\(loadEventData, 15000\)/);
   assert.match(overlayScreenSource, /getOverlayStatusLabel/);
-  assert.match(broadcastBracketScreenSource, /LIVE DATA \/ 15S REFRESH/);
+  assert.match(broadcastBracketScreenSource, /PUBLIC DATA \/ 15S REFRESH/);
+  assert.doesNotMatch(broadcastBracketScreenSource, /LIVE DATA \/ 15S REFRESH/);
   assert.match(broadcastBracketScreenSource, /mobileRoundTabs/);
   assert.doesNotMatch(broadcastBracketScreenSource, /canonicalAccountId|participantId|accountId/);
 });

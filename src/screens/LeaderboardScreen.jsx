@@ -14,9 +14,11 @@ import {
 } from '../components/hub-ui.jsx';
 import { formatPlacement, formatResultDate } from '../lib/format.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
-import { getGames, getGamePath, getResults } from '../lib/siteData.js';
+import { getResults } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
 import { buildTournamentLeaderboard, summarizeTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
+import { getPublicGamePath, getPublicGames } from '../lib/publicPresentationCatalog.js';
+import { usePublicGameFilter } from '../lib/usePublicGameFilter.js';
 
 const RANKING_PRIORITIES = [
   { number: '01', title: 'Championships', body: 'Tournament wins carry the most weight.' },
@@ -37,9 +39,9 @@ function normalizeSearch(value) {
 }
 
 export default function LeaderboardScreen() {
-  const games = useMemo(() => getGames(), []);
+  const games = useMemo(() => getPublicGames(), []);
   const results = useMergedLiveResults(getResults());
-  const [activeGame, setActiveGame] = useState('all');
+  const [activeGame, setActiveGame] = usePublicGameFilter();
   const [playerSearch, setPlayerSearch] = useState('');
   const filteredResults = useMemo(
     () => activeGame === 'all'
@@ -92,6 +94,7 @@ export default function LeaderboardScreen() {
       footerNote="Tournament rankings are separate from the Spades in-game leaderboard and any future Euchre in-game leaderboard. This page tracks posted hosted-event performance only."
       heroVariant="compact"
       lead="See the circuit leaders, search the full field, and understand exactly how posted tournament performance is ordered."
+      publicShell
       subtitle="Championships • finals • bracket record"
       stickyActions={false}
       title="Rankings">
@@ -233,7 +236,13 @@ export default function LeaderboardScreen() {
                         : 'No completed hosted-event standings yet.'}
                     </Text>
                   </View>
-                  <Badge tone={gameEntries.length ? 'green' : 'blue'}>{game.badge}</Badge>
+                  <Badge tone={gameEntries.length ? 'green' : 'blue'}>
+                    {gameEntries.length
+                      ? 'Event records'
+                      : game.tournamentReady
+                        ? 'Tournament lane'
+                        : 'Information lane'}
+                  </Badge>
                 </View>
                 <View style={styles.gameLeaderBox}>
                   <Text style={styles.gameLeaderLabel}>Circuit leader</Text>
@@ -243,7 +252,7 @@ export default function LeaderboardScreen() {
                   </Text>
                 </View>
                 <View style={styles.gameActions}>
-                  <ActionButton href={getGamePath(game.slug)} variant={gameEntries.length ? 'primary' : 'secondary'}>
+                  <ActionButton href={getPublicGamePath(game.slug)} variant={gameEntries.length ? 'primary' : 'secondary'}>
                     Open {game.name}
                   </ActionButton>
                 </View>

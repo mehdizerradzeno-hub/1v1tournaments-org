@@ -1,307 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  ActionButton,
-  BulletList,
-  EmptyState,
-  HubScreen,
-  ResultCard,
-  RuleBlock,
-  Section,
-  StreamCard,
-  Surface,
-  TournamentCard,
-} from '../components/hub-ui.jsx';
-import {
-  getGameBySlug,
-  getResultsForGame,
-  getCheckInPath,
-  getStreamBySlug,
-  getTournamentPath,
-  getTournamentsForGame,
-  mergeResults,
-  siteData,
-} from '../lib/siteData.js';
-import { useLiveTournamentResult } from '../lib/liveResults.js';
-import { getActiveOrFutureTournaments, getPublicTournamentCatalog } from '../lib/tournamentCatalog.js';
+import { ActionButton, EmptyState, HubScreen, ResultCard, Section, Surface } from '../components/hub-ui.jsx';
+import { formatDateLine } from '../lib/format.js';
+import { getResults, siteData } from '../lib/siteData.js';
 import { fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
+import { filterPublicEventsByGame, getPublicGamePresentation, getPublicPresentationEvents } from '../lib/publicPresentationCatalog.js';
+import { useVisibleNow } from '../lib/useVisibleNow.js';
 
 export default function GameScreen({ gameSlug }) {
-  const [hostedTournaments, setHostedTournaments] = useState([]);
-  const game = getGameBySlug(gameSlug);
-  const tournaments = useMemo(() => {
-    if (!game) {
-      return [];
-    }
-
-    return getActiveOrFutureTournaments(
-      getPublicTournamentCatalog(getTournamentsForGame(game.slug), hostedTournaments)
-        .filter((tournament) => tournament.gameSlug === game.slug),
-    );
-  }, [game, hostedTournaments]);
-  const featuredTournament = game?.featuredTournamentSlug
-    ? tournaments.find((tournament) => tournament.slug === game.featuredTournamentSlug) || null
-    : null;
-  const currentTournament = featuredTournament || tournaments[0] || null;
-  const liveResult = useLiveTournamentResult(currentTournament?.slug || '');
+  const [hostedEvents, setHostedEvents] = useState([]);
+  const game = getPublicGamePresentation(gameSlug);
+  const nowMs = useVisibleNow(60000);
+  const events = useMemo(() => filterPublicEventsByGame(getPublicPresentationEvents(siteData.tournaments, hostedEvents), game?.slug).filter((event) => event.status === 'live' || new Date(event.date).getTime() > nowMs), [game?.slug, hostedEvents, nowMs]);
+  const results = useMemo(() => getResults().filter((result) => result.gameSlug === game?.slug), [game?.slug]);
 
   useEffect(() => {
     let active = true;
-
-    fetchTournamentEvents()
-      .then((result) => {
-        if (active) setHostedTournaments(result.tournaments || []);
-      })
-      .catch(() => {
-        if (active) setHostedTournaments([]);
-      });
-
-    return () => {
-      active = false;
-    };
+    fetchTournamentEvents().then((result) => { if (active) setHostedEvents(Array.isArray(result.tournaments) ? result.tournaments : []); }).catch(() => { if (active) setHostedEvents([]); });
+    return () => { active = false; };
   }, []);
 
-  if (!game) {
-    return (
-      <HubScreen
-        actions={[{ label: 'Home', href: '/' }]}
-        eyebrow="Game not found"
-        lead="That game page is not available."
-        subtitle="Check the game link and try again."
-        title="Unknown game">
-        <EmptyState
-          action={<ActionButton href="/">Back home</ActionButton>}
-          body="Use the home page to return to the active game and tournament paths."
-          title="Nothing to show here"
-        />
-      </HubScreen>
-    );
-  }
+  if (!game) return <HubScreen accountHref="/account" heroVariant="compact" lead="That game page is not available." publicShell stickyActions={false} subtitle="Check the game link and try again." title="Unknown game"><EmptyState action={<ActionButton href="/games">Browse games</ActionButton>} body="Only published game information routes are available here." title="Nothing to show here" /></HubScreen>;
 
-  const results = mergeResults(
-    getResultsForGame(game.slug),
-    liveResult?.gameSlug === game.slug ? liveResult : null,
-  );
-  const featuredStreams = currentTournament?.streamSlugs
-    ? currentTournament.streamSlugs
-        .map((streamSlug) => getStreamBySlug(streamSlug))
-        .filter(Boolean)
-    : [];
-  const upcomingTournaments = tournaments.filter((tournament) => tournament.status === 'upcoming');
-  const visibleUpcomingTournaments = currentTournament
-    ? upcomingTournaments.filter((tournament) => tournament.slug !== currentTournament.slug)
-    : upcomingTournaments;
-  const isPrimaryGame = game.slug === siteData.site.primaryGameSlug;
-
-  const stats = [
-    { label: 'Status', value: game.status === 'active' ? 'Active' : 'Coming soon', tone: game.status === 'active' ? 'green' : 'blue' },
-    { label: 'Upcoming', value: String(upcomingTournaments.length), tone: 'accent' },
-    { label: 'Entry', value: 'Free', tone: 'green' },
-  ];
-
-  const actions = [];
-  if (currentTournament) {
-    actions.push({ label: 'Event', href: getTournamentPath(currentTournament.slug) });
-    actions.push({ label: 'Join', href: getCheckInPath(currentTournament.slug), variant: 'secondary' });
-  }
-  actions.push({ label: 'Rules', href: '/rules', variant: 'secondary' });
-  actions.push({ label: 'Results', href: '/results', variant: 'ghost' });
-
-  return (
-    <HubScreen
-      actions={actions}
-      eyebrow={game.badge}
-      footerNote={siteData.site.adminNote}
-      lead={game.heroCopy}
-      stats={stats}
-      subtitle={
-        isPrimaryGame
-          ? 'Launch game'
-          : game.status === 'active'
-            ? 'Currently featured'
-            : currentTournament
-              ? 'Featured event available'
-              : 'Coming soon'
-      }
-      title={game.name}>
-      <Section description="Where this game fits in the tournament hub." title="Game snapshot">
-        <Surface style={styles.snapshotCard}>
-          <Text style={styles.snapshotLabel}>{game.summary}</Text>
-          <BulletList items={game.highlights} />
-        </Surface>
-      </Section>
-
-      {currentTournament ? (
-        <Section
-          description={
-            isPrimaryGame
-              ? 'Spades is the launch game, with the featured event and live coverage pinned at the top.'
-              : 'The featured event is pinned first so the main tournament stays easy to find.'
-          }
-          title={isPrimaryGame ? 'Launch coverage' : 'Featured event'}>
-          <Surface style={styles.featuredCard}>
-            <View style={styles.featuredHeader}>
-              <Text style={styles.featuredBadge}>{currentTournament.badge}</Text>
-              <Text style={styles.featuredMeta}>{currentTournament.format}</Text>
-            </View>
-            <Text style={styles.featuredTitle}>{currentTournament.title}</Text>
-            {game.shortPath ? <Text style={styles.featuredPath}>{game.shortPath}</Text> : null}
-            <Text style={styles.featuredLead}>{currentTournament.detail}</Text>
-            <Text style={styles.featuredEntry}>{currentTournament.entryLine}</Text>
-            {currentTournament.callout ? <Text style={styles.featuredCallout}>{currentTournament.callout}</Text> : null}
-            <BulletList items={currentTournament.highlights} tone="accent" />
-            <View style={styles.featuredActions}>
-              <ActionButton href={getTournamentPath(currentTournament.slug)}>Event</ActionButton>
-              <ActionButton href={getCheckInPath(currentTournament.slug)} variant="secondary">
-                Join
-              </ActionButton>
-              <ActionButton href="/stream" variant="secondary">
-                Watch
-              </ActionButton>
-            </View>
-          </Surface>
-        </Section>
-      ) : null}
-
-      {isPrimaryGame && featuredStreams.length ? (
-        <Section
-          description="These links stay pinned to the Spades launch mode so the live table and replays are one tap away."
-          title="Launch streams">
-          {featuredStreams.map((stream) => (
-            <View key={stream.slug} style={styles.block}>
-              <StreamCard stream={stream} />
-            </View>
-          ))}
-        </Section>
-      ) : null}
-
-      <Section
-        description="Future public events for this game."
-        title="Upcoming tournaments">
-        {visibleUpcomingTournaments.map((tournament) => (
-          <View key={tournament.slug} style={styles.block}>
-            <TournamentCard
-              gameName={game.name}
-              href={getTournamentPath(tournament.slug)}
-              tournament={tournament}
-            />
-          </View>
-        ))}
-        {!visibleUpcomingTournaments.length ? (
-          <EmptyState
-            body={
-              game.status === 'active'
-                ? 'Future events will appear here when they are scheduled.'
-                : 'This game is coming soon. Add the first public event once the format is ready.'
-            }
-            title={game.status === 'active' ? 'No upcoming events for this game' : 'No public events posted yet'}
-          />
-        ) : null}
-      </Section>
-
-      <Section
-        description="Current public notes for this game."
-        title="Rule blocks">
-        {game.ruleSections.map((section) => (
-          <View key={section.title} style={styles.block}>
-            <RuleBlock section={section} />
-          </View>
-        ))}
-      </Section>
-
-      <Section
-        description="Recent final tables for this game."
-        title="Latest results">
-        {results.map((result) => (
-          <View key={result.slug} style={styles.block}>
-            <ResultCard result={result} />
-          </View>
-        ))}
-        {!results.length ? (
-          <EmptyState
-            action={<ActionButton href="/results">Open results page</ActionButton>}
-            body="Posted results will appear here after an event is complete."
-            title="No results recorded yet"
-          />
-        ) : null}
-      </Section>
-    </HubScreen>
-  );
+  return <HubScreen accountHref="/account" footerNote="Creating the competitive 1v1 spades category." heroVariant="compact" lead={game.summary} publicShell stickyActions={false} subtitle="Public game information" title={game.name}><Section description="This lane remains descriptive until a verified public event or play destination is available." title="Availability"><Surface style={[styles.availability, { borderColor: game.accent }]}><Text style={styles.availabilityLabel}>PUBLIC STATUS</Text><Text style={styles.availabilityText}>{game.availability}</Text><View style={styles.factRow}>{game.facts.map((fact) => <Text key={fact} style={styles.fact}>{fact}</Text>)}</View>{game.playPath && game.webReady ? <ActionButton href={game.playPath} variant="secondary">Open {game.shortName}</ActionButton> : <ActionButton href="/tournaments" variant="secondary">Browse tournaments</ActionButton>}</Surface></Section><Section description="Only published, eligible public events for this game appear here." title="Live and upcoming tournaments">{events.length ? <View style={styles.eventList}>{events.map((event) => <Surface key={event.slug} style={[styles.event, { borderColor: game.accent }]}>{event.status === 'live' ? <Text style={styles.eventLive}>Live now</Text> : null}<Text style={styles.eventTitle}>{event.title}</Text><Text style={styles.eventMeta}>{formatDateLine(event.date, event.timeZone, event.timeZoneLabel)}</Text>{event.format ? <Text style={styles.eventMeta}>{event.format}</Text> : null}<ActionButton href={`/tournaments/${event.slug}`} variant="secondary">View event</ActionButton></Surface>)}</View> : <EmptyState action={<ActionButton href="/tournaments" variant="secondary">Browse tournaments</ActionButton>} body={`No public ${game.name} tournaments are live or scheduled.`} title="No public events posted" />}</Section><Section description="Only completed public records appear here." title="Results">{results.length ? results.map((result) => <View key={result.slug} style={styles.result}><ResultCard href={result.tournamentSlug ? `/tournaments/${result.tournamentSlug}` : undefined} result={result} /></View>) : <EmptyState action={<ActionButton href="/results" variant="secondary">Open results</ActionButton>} body={`No ${game.name} results have been posted.`} title="No posted results yet" />}</Section></HubScreen>;
 }
 
 const styles = StyleSheet.create({
-  block: {
-    marginBottom: 14,
-  },
-  featuredActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 16,
-  },
-  featuredBadge: {
-    color: '#D6A24E',
-    fontSize: 12,
-    letterSpacing: 0.8,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  featuredCallout: {
-    color: '#D6A24E',
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 10,
-    fontWeight: '700',
-  },
-  featuredCard: {
-    borderColor: 'rgba(214, 162, 78, 0.3)',
-  },
-  featuredEntry: {
-    color: '#F4EFE6',
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 10,
-    fontWeight: '700',
-  },
-  featuredHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  featuredLead: {
-    color: '#A7A29A',
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-  },
-  featuredMeta: {
-    color: '#A7A29A',
-    fontSize: 11,
-    letterSpacing: 0.8,
-    fontWeight: '800',
-  },
-  featuredPath: {
-    color: '#D6A24E',
-    fontSize: 12,
-    letterSpacing: 0.8,
-    fontWeight: '800',
-    marginTop: 8,
-    fontFamily: 'monospace',
-  },
-  featuredTitle: {
-    color: '#F4EFE6',
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '800',
-  },
-  snapshotCard: {
-    borderColor: 'rgba(214, 162, 78, 0.24)',
-  },
-  snapshotLabel: {
-    color: '#F4EFE6',
-    fontSize: 15,
-    lineHeight: 23,
-    marginBottom: 10,
-  },
+  availability: { padding: 18 },
+  availabilityLabel: { color: '#E3AD4F', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  availabilityText: { color: '#F4EFE6', fontSize: 17, fontWeight: '800', lineHeight: 24, marginTop: 7 },
+  factRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15, marginTop: 12 },
+  fact: { backgroundColor: '#151c25', borderColor: 'rgba(255,255,255,.13)', borderRadius: 999, borderWidth: 1, color: '#C7D0D9', fontSize: 12, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 6 },
+  eventList: { gap: 12 }, event: { padding: 17 }, eventLive: { color: '#8DCAA9', fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' }, eventTitle: { color: '#F4EFE6', fontSize: 19, fontWeight: '900' }, eventMeta: { color: '#B8C2CC', fontSize: 13, lineHeight: 19, marginTop: 4 }, result: { marginBottom: 12 },
 });

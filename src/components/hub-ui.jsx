@@ -55,6 +55,28 @@ function getNavItems(paths) {
   ];
 }
 
+function getPublicNavItems(paths) {
+  return [
+    { label: 'Games', href: '/games' },
+    { label: 'Tournaments', href: '/tournaments' },
+    { label: 'Watch', href: '/stream' },
+    { label: 'Rankings', href: '/leaderboard' },
+    { label: 'Results', href: '/results' },
+    { label: 'Profile', href: '/account' },
+    { label: 'My Match', href: paths.matchPath, activePath: paths.tournamentPath },
+  ];
+}
+
+function getPublicMobileNavItems(paths) {
+  return [
+    { label: 'Games', href: '/games' },
+    { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Events', href: '/tournaments' },
+    { label: 'Results', href: '/results' },
+    { label: 'Profile', href: '/account' },
+  ];
+}
+
 function getMobileNavItems(paths) {
   return [
     { label: 'Compete', href: '/games' },
@@ -719,6 +741,7 @@ export function HubScreen({
   showHeader = true,
   showNavigation = true,
   heroVariant = 'default',
+  publicShell = false,
   stickyActions = true,
 }) {
   const pathname = usePathname();
@@ -736,8 +759,10 @@ export function HubScreen({
       : `${primaryPaths.checkInPath}?mode=signin#account-access`
     : '/next';
   const accountPath = accountHref || fallbackAccountPath;
-  const navItems = getNavItems(primaryPaths);
-  const mobileNavItems = getMobileNavItems(primaryPaths);
+  const navItems = publicShell ? getPublicNavItems(primaryPaths) : getNavItems(primaryPaths);
+  const mobileNavItems = publicShell
+    ? getPublicMobileNavItems(primaryPaths)
+    : getMobileNavItems(primaryPaths);
   const stickyActionItems = getStickyActionItems(primaryPaths);
   const hasHydratedViewport = isHydrated && width > 0;
   const showMobileNav = !forceTopNav && Platform.OS === 'web' && hasHydratedViewport && width < 720;
@@ -887,7 +912,7 @@ export function HubScreen({
           showsVerticalScrollIndicator={false}>
           <View style={[styles.page, showLaptopLayout && styles.pageLaptop]}>
             {showHeader ? (
-              <View style={[styles.brandRow, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
+              <View style={[styles.brandRow, publicShell && styles.brandRowPublic, showLaptopLayout && styles.brandRowLaptop, showTinyHeader && styles.brandRowTiny]}>
                 <Link href="/" asChild>
                   <Pressable accessibilityRole="link" style={showTinyHeader ? styles.brandLinkTiny : styles.brandLink}>
                     <View style={styles.brandMark}>
@@ -895,7 +920,7 @@ export function HubScreen({
                     </View>
                     <View style={[styles.brandCopy, showTinyHeader && styles.brandCopyTiny]}>
                       <Text style={styles.brandTitle}>1v1 Tournaments</Text>
-                      <Text style={styles.brandDomain}>Spades • Euchre • Competitive Play</Text>
+                      <Text style={styles.brandDomain}>{publicShell ? 'No partner. No excuses.' : 'Spades • Euchre • Competitive Play'}</Text>
                     </View>
                   </Pressable>
                 </Link>
@@ -1141,6 +1166,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(9, 19, 17, 0.82)',
     borderWidth: 1,
     borderColor: theme.colors.line,
+  },
+  brandRowPublic: {
+    backgroundColor: 'rgba(9, 13, 18, 0.92)',
+    borderColor: 'rgba(214, 162, 78, 0.34)',
   },
   brandRowLaptop: {
     marginBottom: 10,

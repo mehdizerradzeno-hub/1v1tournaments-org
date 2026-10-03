@@ -155,12 +155,20 @@ function getBracketMatchSummary(bracket) {
   };
 }
 
-function getViewerNextSteps(registrationMeta, featuredBracket) {
-  if (featuredBracket) {
+function getViewerNextSteps(registrationMeta, isBracketLive, hasPublishedBracket) {
+  if (isBracketLive) {
     return [
       { label: 'Playing', title: 'Check match status', body: 'Open Match Status or use !match in Twitch chat.' },
       { label: 'Watching', title: 'Follow the bracket', body: 'Use the tournament page for the live bracket and roster.' },
       { label: 'Chat', title: 'Ask for links', body: 'Type !live, !rules, or !discord in Twitch chat.' },
+    ];
+  }
+
+  if (hasPublishedBracket) {
+    return [
+      { label: 'Bracket', title: 'Review the published bracket', body: 'Use the tournament page for the current bracket and roster.' },
+      { label: 'Playing', title: 'Check match status', body: 'Open Match Status when a host confirms the next match.' },
+      { label: 'Chat', title: 'Ask for links', body: 'Type !next, !rules, or !discord in Twitch chat.' },
     ];
   }
 
@@ -200,8 +208,21 @@ export default function StreamModeScreen() {
   const featuredEventData = eventDataBySlug[featuredSlug] || {};
   const featuredSignupSummary = featuredEventData.signupSummary || { count: 0, signups: [], loading: Boolean(featuredTournament) };
   const featuredBracket = featuredEventData.bracket || null;
+  const bracketStatus = String(featuredBracket?.status || '').trim().toLowerCase();
+  const isBracketComplete = bracketStatus === 'complete';
+  const isBracketLive = Boolean(featuredBracket) && !isBracketComplete && (
+    String(featuredTournament?.status || '').trim().toLowerCase() === 'live'
+    || ['live', 'active', 'in-progress'].includes(bracketStatus)
+  );
+  const bracketLabel = isBracketComplete
+    ? 'Bracket complete'
+    : isBracketLive
+      ? 'Bracket live'
+      : featuredBracket
+        ? 'Bracket published'
+        : null;
   const registrationMeta = featuredTournament
-    ? getEffectiveRegistrationStatus(featuredTournament, { hasLiveBracket: Boolean(featuredBracket) })
+    ? getEffectiveRegistrationStatus(featuredTournament, { hasLiveBracket: isBracketLive })
     : { label: 'Coming soon', tone: 'neutral', value: 'coming-soon' };
   const tournamentPath = featuredTournament ? getTournamentPath(featuredTournament.slug) : '/';
   const signupPath = featuredTournament ? getCheckInPath(featuredTournament.slug) : '/';
@@ -212,7 +233,7 @@ export default function StreamModeScreen() {
   const openSeats = Math.max(cap - getSignupCount(featuredSignupSummary), 0);
   const bracketMatchSummary = getBracketMatchSummary(featuredBracket);
   const countdownParts = getCountdownParts(featuredTournament, nowMs);
-  const viewerNextSteps = getViewerNextSteps(registrationMeta, featuredBracket);
+  const viewerNextSteps = getViewerNextSteps(registrationMeta, isBracketLive, Boolean(featuredBracket));
   const isWide = Platform.OS === 'web' && width >= 920;
   const feedStatus = getPublicTournamentFeedStatus({
     error: hostedTournamentState.error,
@@ -350,9 +371,10 @@ export default function StreamModeScreen() {
         { label: 'Live links', href: '/live', variant: 'ghost' },
       ]}
       eyebrow="Twitch mode"
-      footerNote="Stream mode is public and read-only. Admin tools stay separate."
+      footerNote="Creating the competitive 1v1 spades category."
       forceTopNav
       lead="A clean guest-facing board for Twitch viewers, OBS browser sources, and tournament-day sharing."
+      publicShell
       subtitle="Next tournament, signup count, public roster, and match links in one place."
       title="Stream board">
       {feedStatus === 'loading' ? (
@@ -376,8 +398,8 @@ export default function StreamModeScreen() {
             <Surface style={styles.nextCard}>
               <View style={styles.glow} />
               <View style={styles.eventTopRow}>
-                <Badge tone={featuredBracket ? 'green' : registrationMeta.tone}>
-                  {featuredBracket ? 'Bracket live' : registrationMeta.label}
+                <Badge tone={isBracketLive ? 'green' : registrationMeta.tone}>
+                  {bracketLabel || registrationMeta.label}
                 </Badge>
                 <Text style={styles.eventMeta}>Next tournament</Text>
               </View>
@@ -431,7 +453,7 @@ export default function StreamModeScreen() {
             <Surface style={styles.nextStepCard}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>What to do next</Text>
-                <Text style={styles.cardMeta}>{featuredBracket ? 'Bracket live' : registrationMeta.label}</Text>
+                <Text style={styles.cardMeta}>{bracketLabel || registrationMeta.label}</Text>
               </View>
               <View style={styles.nextStepGrid}>
                 {viewerNextSteps.map((item) => (
@@ -447,7 +469,7 @@ export default function StreamModeScreen() {
             <Surface style={styles.chatCard}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Twitch chat commands</Text>
-                <Text style={styles.cardMeta}>Bot live</Text>
+                <Text style={styles.cardMeta}>Chat commands</Text>
               </View>
               <View style={styles.viewerCommandGrid}>
                 {VIEWER_COMMANDS.map((item) => (
@@ -496,7 +518,7 @@ export default function StreamModeScreen() {
             <Surface style={styles.matchCard}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Match focus</Text>
-                <Text style={styles.cardMeta}>{featuredBracket ? 'Live bracket' : 'Waiting for seeding'}</Text>
+                <Text style={styles.cardMeta}>{isBracketComplete ? 'Bracket complete' : isBracketLive ? 'Live bracket' : featuredBracket ? 'Bracket published' : 'Waiting for seeding'}</Text>
               </View>
               {bracketMatchSummary ? (
                 <View style={styles.matchFocus}>

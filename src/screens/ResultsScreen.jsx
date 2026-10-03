@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -14,13 +14,15 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatResultDate } from '../lib/format.js';
-import { getGames, getGamePath, getResults, getTournamentPath, siteData } from '../lib/siteData.js';
+import { getResults, getTournamentPath } from '../lib/siteData.js';
 import { useMergedLiveResults } from '../lib/liveResults.js';
+import { getPublicGamePath, getPublicGames } from '../lib/publicPresentationCatalog.js';
+import { usePublicGameFilter } from '../lib/usePublicGameFilter.js';
 
 export default function ResultsScreen() {
-  const games = getGames();
+  const games = getPublicGames();
   const results = useMergedLiveResults(getResults());
-  const [activeGame, setActiveGame] = useState('all');
+  const [activeGame, setActiveGame] = usePublicGameFilter();
   const filteredResults = useMemo(
     () => activeGame === 'all'
       ? results
@@ -50,9 +52,10 @@ export default function ResultsScreen() {
         { label: 'Rules', href: '/rules', variant: 'secondary' },
       ]}
       eyebrow="Results"
-      footerNote={siteData.site.adminNote}
+      footerNote="Creating the competitive 1v1 spades category."
       heroVariant="compact"
       lead="Archived scoreboards and final tables live here after events are complete."
+      publicShell
       subtitle="Posted scoreboards and final tables"
       stickyActions={false}
       title="Results archive">
@@ -134,8 +137,8 @@ function GameArchiveCard({ game, latestResult, resultCount }) {
       <View style={styles.archiveTopRow}>
         <View style={styles.archiveTitleGroup}>
           <Text style={styles.archiveTitle}>{game.name}</Text>
-          <Badge tone={game.status === 'active' ? 'green' : 'blue'}>
-            {game.badge}
+          <Badge tone={game.tournamentReady ? 'green' : 'blue'}>
+            {game.tournamentReady ? 'Event records' : 'Information lane'}
           </Badge>
         </View>
         <Text style={styles.archiveCount}>{resultCount} posted</Text>
@@ -156,16 +159,14 @@ function GameArchiveCard({ game, latestResult, resultCount }) {
           <>
             <Text style={styles.archiveMeta}>No posted results yet</Text>
             <Text style={styles.archiveDetail}>
-              {game.status === 'active'
-                ? 'Completed event results will land here after the bracket closes.'
-                : 'Coming soon. No public events are active for this game yet.'}
+              Completed public event results will appear here when they are posted.
             </Text>
           </>
         )}
       </View>
 
       <View style={styles.archiveActions}>
-        <ActionButton href={getGamePath(game.slug)}>
+        <ActionButton href={getPublicGamePath(game.slug)}>
           Open game
         </ActionButton>
         <ActionButton href="/results#recent-results" variant="secondary">
