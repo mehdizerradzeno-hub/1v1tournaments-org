@@ -18,10 +18,12 @@ function roundTitle(round, index, count) {
 }
 
 function eventStatus(event, bracket, now) {
-  if (bracket?.winner || bracket?.status === 'complete' || event?.status === 'complete') return 'complete';
-  if (Array.isArray(bracket?.rounds) && bracket.rounds.length) return 'live';
-
+  const bracketStatus = cleanText(bracket?.status).toLowerCase();
   const requested = cleanText(event?.status || event?.registrationStatus).toLowerCase();
+  if (bracket?.winner || bracketStatus === 'complete' || requested === 'complete') return 'complete';
+  if (requested === 'live' || ['live', 'active', 'in-progress'].includes(bracketStatus)) return 'live';
+  if (Array.isArray(bracket?.rounds) && bracket.rounds.length) return 'published';
+
   if (requested === 'registration' || requested === 'open') return 'registration';
   if (requested === 'check-in' || requested === 'checkin') return 'check-in';
   if (SAFE_STATUS.has(requested)) return requested;
@@ -107,7 +109,7 @@ function featuredPanel(status, event, bracket, rounds) {
       || candidates.at(-1);
     return {
       kind: 'featured-match',
-      eyebrow: cleanText(match?.roundTitle, 'Live bracket'),
+      eyebrow: cleanText(match?.roundTitle, status === 'live' ? 'Live bracket' : 'Published bracket'),
       title: match?.players?.map((player) => player.name).join(' vs ') || 'Match pending',
       detail: match?.hasNextMatch ? 'Winner advances to the next round' : 'Championship match',
       match: match || null,
@@ -116,11 +118,14 @@ function featuredPanel(status, event, bracket, rounds) {
 
   const registered = safeNumber(bracket?.participantCount || event?.participantCount || event?.registeredCount) ?? 0;
   const cap = safeNumber(event?.rosterCap);
+  const registrationOpen = status === 'registration' || cleanText(event?.registrationStatus).toLowerCase() === 'open';
   return {
     kind: 'pre-bracket',
-    eyebrow: status === 'check-in' ? 'Check-in open' : 'Registration open',
+    eyebrow: status === 'live' ? 'Tournament live'
+      : status === 'check-in' ? 'Check-in open'
+        : registrationOpen ? 'Registration open' : 'Tournament upcoming',
     title: cleanText(event?.title, 'Tournament bracket'),
-    detail: 'Bracket generates after check-in',
+    detail: status === 'live' ? 'Bracket not published yet' : 'Bracket generates after check-in',
     registered,
     cap,
   };

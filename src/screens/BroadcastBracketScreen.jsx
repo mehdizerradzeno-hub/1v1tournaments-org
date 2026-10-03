@@ -40,7 +40,7 @@ function PlayerRow({ player }) {
 
 function MatchCard({ match }) {
   return (
-    <View style={[styles.matchCard, match.winnerName && styles.finalMatchCard]}>
+    <View dataSet={{ broadcastMatchId: match.key }} style={[styles.matchCard, match.winnerName && styles.finalMatchCard]}>
       <View style={styles.matchMeta}>
         <Text style={styles.matchLabel}>{match.label}</Text>
         <Text style={styles.matchStatus}>{match.isBye ? 'BYE' : match.status.toUpperCase()}</Text>
@@ -50,14 +50,14 @@ function MatchCard({ match }) {
   );
 }
 
-function RoundColumn({ round, compact, stacked }) {
+function RoundColumn({ round, compact, stacked, tall }) {
   return (
     <View style={[styles.roundColumn, compact && styles.roundColumnCompact]}>
-      <View style={styles.roundHeader}>
+      <View dataSet={{ broadcastRoundHeader: round.key }} style={styles.roundHeader}>
         <Text style={styles.roundKicker}>ROUND {round.key}</Text>
         <Text style={styles.roundTitle}>{round.title}</Text>
       </View>
-      <View style={[styles.matchStack, stacked && styles.matchStackStacked]}>
+      <View style={[styles.matchStack, stacked && styles.matchStackStacked, tall && !stacked && styles.matchStackTall]}>
         {round.matches.length
           ? round.matches.map((match) => <MatchCard key={match.key} match={match} />)
           : <Text style={styles.emptyRound}>Matchups pending</Text>}
@@ -70,7 +70,7 @@ function FeaturedPanel({ model }) {
   const featured = model.featured;
   const isChampion = featured.kind === 'champion';
   return (
-    <View style={[styles.featurePanel, isChampion && styles.championPanel]}>
+    <View dataSet={isChampion ? { broadcastChampion: 'true' } : undefined} style={[styles.featurePanel, isChampion && styles.championPanel]}>
       <View style={styles.featureIcon}>
         <Text style={styles.featureSuit}>{isChampion ? '1V1' : model.gameSlug === 'euchre' ? 'D' : 'S'}</Text>
       </View>
@@ -80,7 +80,7 @@ function FeaturedPanel({ model }) {
       {featured.kind === 'pre-bracket' ? (
         <View style={styles.registrationMetric}>
           <Text style={styles.metricValue}>{featured.registered}{featured.cap ? ` / ${featured.cap}` : ''}</Text>
-          <Text style={styles.metricLabel}>REGISTERED / CHECKED IN</Text>
+          <Text style={styles.metricLabel}>REGISTERED</Text>
         </View>
       ) : null}
       {featured.match ? (
@@ -94,7 +94,7 @@ function FeaturedPanel({ model }) {
   );
 }
 
-function BroadcastContent({ model, width }) {
+function BroadcastContent({ model, width, tall }) {
   const compact = width < 680;
   const stacked = width < 980;
   const [selectedRound, setSelectedRound] = useState(Math.max(0, model.rounds.length - 1));
@@ -103,19 +103,19 @@ function BroadcastContent({ model, width }) {
   const eventDate = formatBroadcastDate(model.date, model.timeZoneLabel);
 
   return (
-    <View style={styles.broadcastCanvas}>
-      <View style={[styles.topBar, compact && styles.topBarCompact]}>
-        <View style={styles.brandLockup}>
-          <View style={styles.brandMark}><Text style={styles.brandMarkText}>1V1</Text></View>
+    <View dataSet={{ broadcastBracketState: model.status }} style={styles.broadcastCanvas}>
+      <View dataSet={{ broadcastHeader: 'true' }} style={[styles.topBar, compact && styles.topBarCompact]}>
+        <View style={[styles.brandLockup, compact && styles.brandLockupCompact]}>
+          <View style={[styles.brandMark, compact && styles.brandMarkCompact]}><Text style={styles.brandMarkText}>1V1</Text></View>
           <View style={styles.brandCopy}>
             <View style={styles.badgeRow}>
               <Text style={styles.gameBadge}>{model.gameName}</Text>
               {model.series ? <Text style={styles.seriesBadge}>{model.series}</Text> : null}
             </View>
-            <Text numberOfLines={compact ? 3 : 2} style={[styles.eventTitle, compact && styles.eventTitleCompact]}>{model.title}</Text>
+            <Text dataSet={{ broadcastTitle: 'true' }} numberOfLines={compact ? 3 : 2} style={[styles.eventTitle, compact && styles.eventTitleCompact]}>{model.title}</Text>
           </View>
         </View>
-        <View style={styles.liveLockup}>
+        <View dataSet={{ broadcastStatus: 'true' }} style={[styles.liveLockup, compact && styles.liveLockupCompact]}>
           <Text style={[styles.statusBadge, model.status === 'complete' && styles.completeBadge]}>{model.statusLabel}</Text>
           <Text style={styles.currentRound}>{model.currentRound}</Text>
           {eventDate ? <Text style={styles.eventDate}>{eventDate}</Text> : null}
@@ -138,16 +138,16 @@ function BroadcastContent({ model, width }) {
         </View>
       ) : null}
 
-      <View style={[styles.mainStage, stacked && styles.mainStageStacked]}>
+      <View style={[styles.mainStage, stacked && styles.mainStageStacked, tall && !stacked && styles.mainStageTall]}>
         {stacked ? <FeaturedPanel model={model} /> : null}
-        <View style={[styles.bracketPanel, stacked && styles.bracketPanelStacked]}>
+        <View dataSet={{ broadcastBracketPanel: 'true' }} style={[styles.bracketPanel, stacked && styles.bracketPanelStacked]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionKicker}>AUTHORITATIVE BRACKET</Text>
-            <Text style={styles.refreshLabel}>LIVE DATA / 15S REFRESH</Text>
+            <Text style={styles.refreshLabel}>PUBLIC DATA / 15S REFRESH</Text>
           </View>
           {visibleRounds.length ? (
-            <View style={[styles.rounds, stacked && styles.roundsStacked, compact && styles.roundsCompact]}>
-              {visibleRounds.map((round) => <RoundColumn compact={compact} key={round.key} round={round} stacked={stacked} />)}
+            <View style={[styles.rounds, (stacked || tall) && styles.roundsStacked, compact && styles.roundsCompact]}>
+              {visibleRounds.map((round) => <RoundColumn compact={compact} key={round.key} round={round} stacked={stacked} tall={tall} />)}
             </View>
           ) : (
             <View style={styles.emptyBracket}>
@@ -159,7 +159,7 @@ function BroadcastContent({ model, width }) {
         {!stacked ? <FeaturedPanel model={model} /> : null}
       </View>
 
-      <View style={styles.footer}>
+      <View dataSet={{ broadcastFooter: 'true' }} style={styles.footer}>
         <Text style={styles.footerUrl}>1v1tournaments.org</Text>
         <Text style={styles.footerStatement}>{model.freeEntry ? 'FREE ENTRY / ' : ''}POWERED BY 1V1</Text>
       </View>
@@ -202,12 +202,13 @@ export default function BroadcastBracketScreen({ tournamentSlug = '' }) {
 
   const model = useMemo(() => buildBroadcastBracketModel(state), [state]);
   const compact = width < 680;
-  const shouldScroll = !isHydrated || compact || height < 760;
+  const hasTallBracket = Boolean(model?.rounds.some((round) => round.matches.length > 4));
+  const shouldScroll = !isHydrated || compact || height < 760 || hasTallBracket;
   const frame = state.loading ? (
-    <View style={styles.statePanel}><Text style={styles.stateEyebrow}>1V1 LIVE</Text><Text style={styles.stateTitle}>Loading broadcast bracket</Text></View>
+    <View style={styles.statePanel}><Text style={styles.stateEyebrow}>1V1 BROADCAST</Text><Text style={styles.stateTitle}>Loading broadcast bracket</Text></View>
   ) : state.error || !model ? (
     <View style={[styles.statePanel, styles.errorPanel]}><Text style={styles.stateEyebrow}>BROADCAST UNAVAILABLE</Text><Text style={styles.stateTitle}>{state.error || 'Tournament not found.'}</Text><Text style={styles.stateCopy}>No bracket state has been invented. Try this public link again shortly.</Text></View>
-  ) : <BroadcastContent model={model} width={width} />;
+  ) : <BroadcastContent model={model} tall={hasTallBracket} width={width} />;
 
   if (shouldScroll) {
     return <ScrollView contentContainerStyle={styles.scrollContent} style={styles.page}>{frame}</ScrollView>;
@@ -220,9 +221,11 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, backgroundColor: COLORS.black },
   broadcastCanvas: { flex: 1, width: '100%', minWidth: 0, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 14, backgroundColor: COLORS.black },
   topBar: { minHeight: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 24, paddingHorizontal: 24, paddingVertical: 16, borderWidth: 1, borderColor: '#3B3020', backgroundColor: '#080B09' },
-  topBarCompact: { alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 16, gap: 14 },
+  topBarCompact: { flexDirection: 'column', alignItems: 'stretch', paddingHorizontal: 16, paddingVertical: 16, gap: 14 },
   brandLockup: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 18 },
+  brandLockupCompact: { width: '100%', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', gap: 12 },
   brandMark: { width: 68, height: 68, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold, backgroundColor: '#14110C', transform: [{ rotate: '-4deg' }] },
+  brandMarkCompact: { width: 48, height: 48 },
   brandMarkText: { color: COLORS.gold, fontSize: 20, fontWeight: '900', fontFamily: 'monospace' },
   brandCopy: { flex: 1, minWidth: 0, gap: 7 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -231,12 +234,14 @@ const styles = StyleSheet.create({
   eventTitle: { color: COLORS.ivory, fontSize: 34, lineHeight: 38, fontWeight: '900', fontFamily: 'Georgia' },
   eventTitleCompact: { fontSize: 24, lineHeight: 28 },
   liveLockup: { flexShrink: 0, maxWidth: 300, alignItems: 'flex-end', gap: 6 },
+  liveLockupCompact: { width: '100%', maxWidth: '100%', alignItems: 'flex-start' },
   statusBadge: { color: COLORS.black, backgroundColor: COLORS.green, paddingHorizontal: 12, paddingVertical: 6, fontSize: 12, fontWeight: '900', fontFamily: 'monospace', textTransform: 'uppercase' },
   completeBadge: { backgroundColor: COLORS.gold },
   currentRound: { color: COLORS.ivory, fontSize: 17, fontWeight: '800' },
   eventDate: { color: COLORS.muted, fontSize: 12, fontFamily: 'monospace' },
   mainStage: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 22, paddingVertical: 22 },
   mainStageStacked: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', flexDirection: 'column' },
+  mainStageTall: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', alignItems: 'flex-start' },
   bracketPanel: { flex: 2, minWidth: 0, padding: 20, borderWidth: 1, borderColor: '#302A20', backgroundColor: COLORS.raised },
   bracketPanelStacked: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: COLORS.line },
@@ -252,6 +257,7 @@ const styles = StyleSheet.create({
   roundTitle: { color: COLORS.ivory, fontSize: 18, fontWeight: '900' },
   matchStack: { flex: 1, justifyContent: 'space-around', gap: 10 },
   matchStackStacked: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
+  matchStackTall: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
   matchCard: { minWidth: 0, padding: 10, borderLeftWidth: 3, borderLeftColor: COLORS.blue, borderWidth: 1, borderColor: COLORS.line, backgroundColor: '#101210' },
   finalMatchCard: { borderLeftColor: COLORS.gold, backgroundColor: '#15130E' },
   matchMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
@@ -286,8 +292,8 @@ const styles = StyleSheet.create({
   footer: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: '#302A20' },
   footerUrl: { color: COLORS.ivory, fontSize: 13, fontWeight: '800' },
   footerStatement: { color: COLORS.gold, fontSize: 11, fontWeight: '900', fontFamily: 'monospace' },
-  mobileRoundTabs: { minWidth: 0, flexDirection: 'row', gap: 8, paddingTop: 14 },
-  roundTab: { minHeight: 44, flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderWidth: 1, borderColor: COLORS.line, backgroundColor: COLORS.raised },
+  mobileRoundTabs: { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 14 },
+  roundTab: { minHeight: 44, flexGrow: 1, flexShrink: 0, flexBasis: 'auto', minWidth: 104, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: COLORS.line, backgroundColor: COLORS.raised },
   roundTabActive: { borderColor: COLORS.gold, backgroundColor: '#241C0E' },
   roundTabText: { color: COLORS.muted, fontSize: 11, fontWeight: '800' },
   roundTabTextActive: { color: COLORS.ivory },

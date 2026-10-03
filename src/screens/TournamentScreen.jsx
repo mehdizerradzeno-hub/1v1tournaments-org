@@ -32,6 +32,7 @@ import {
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getPublicGamePresentation } from '../lib/publicPresentationCatalog.js';
+import { getPublicBracketPresentation } from '../lib/publicBracketPresentation.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   fetchTournamentPlayerStatus,
@@ -544,7 +545,7 @@ export default function TournamentScreen({ slug }) {
           setLiveBracket(null);
           setBracketState({
             loading: false,
-            error: error instanceof Error ? error.message : 'Could not load the live bracket.',
+            error: error instanceof Error ? error.message : 'Could not load the tournament bracket.',
           });
         }
       }
@@ -701,11 +702,12 @@ export default function TournamentScreen({ slug }) {
   );
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: isBracketLive });
   const showSignupSection = !isBracketLive;
-  const bracketSectionTitle = liveBracket
-    ? liveBracket.status === 'complete'
-      ? 'Final bracket'
-      : 'Live bracket'
-    : 'Bracket preview';
+  const bracketPresentation = getPublicBracketPresentation({
+    hasBracket: Boolean(liveBracket),
+    isLive: isBracketLive,
+    isComplete: isBracketComplete,
+  });
+  const bracketSectionTitle = bracketPresentation.label;
 
   const primaryPlayerAction = getPlayerPrimaryAction({
     checkInPath,
@@ -839,7 +841,7 @@ export default function TournamentScreen({ slug }) {
           />
 
           <Section
-            description="Your tournament status, match access, field size, and live bracket in one competitive dashboard."
+            description="Your tournament status, match access, field size, and bracket in one competitive dashboard."
             nativeID="my-match"
             title="Player command center">
             <View style={styles.playerCommandGrid}>
@@ -854,6 +856,7 @@ export default function TournamentScreen({ slug }) {
               <View style={styles.playerCommandDashboard}>
                 <TournamentDashboard
                   advertisedRosterCap={advertisedRosterCap}
+                  bracketPresentation={bracketPresentation}
                   checkInPath={checkInPath}
                   isBracketLive={isBracketLive}
                   liveBracket={liveBracket}
@@ -875,6 +878,7 @@ export default function TournamentScreen({ slug }) {
             title="Tournament format">
             <TournamentFormatCard
               advertisedRosterCap={advertisedRosterCap}
+              bracketPresentation={bracketPresentation}
               formatDetails={formatDetails}
               isBracketLive={isBracketLive}
               liveBracket={liveBracket}
@@ -893,8 +897,8 @@ export default function TournamentScreen({ slug }) {
           nativeID="tournament-panel-roster">
           <TournamentTabCommandCard
             body={
-              isBracketLive
-                ? 'Confirm who made the published bracket, then jump to your match or the live view.'
+              liveBracket
+                ? 'Confirm who made the published bracket and review your tournament status.'
                 : 'Use this roster to confirm signups before the host seeds the bracket.'
             }
             primary={primaryPlayerAction}
@@ -902,21 +906,22 @@ export default function TournamentScreen({ slug }) {
             stats={[
               { label: 'Registered', value: seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Bracket', value: liveBracket ? `${liveBracket.participantCount || 0} seeded` : bracketSizeLabel(rosterBracketSize) },
-              { label: 'Status', value: liveBracket ? 'Published' : registrationMeta.label },
+              { label: 'Status', value: liveBracket ? bracketPresentation.statusLabel : registrationMeta.label },
             ]}
             title="Roster control"
           />
 
           <Section
             description={
-              isBracketLive
-                ? 'Players can confirm they are in the published bracket before opening the table.'
+              liveBracket
+                ? 'Players can confirm they are in the published bracket and review their assigned matches.'
                 : 'Players can confirm their name is on the signup roster before the host seeds the bracket.'
             }
             nativeID="registered-players"
             title="Current roster">
             <RegisteredPlayersPanel
               advertisedRosterCap={advertisedRosterCap}
+              bracketPresentation={bracketPresentation}
               liveBracket={liveBracket}
               liveBracketSize={liveBracketSize}
               minimumPlayers={minimumPlayers}
@@ -951,9 +956,13 @@ export default function TournamentScreen({ slug }) {
           nativeID="tournament-panel-bracket">
           <TournamentTabCommandCard
             body={
-              isBracketLive
-                ? 'Follow the active match flow, table links, winners, and bracket status.'
-                : 'Bracket preview is ready. Live table links appear after the host publishes the bracket.'
+              isBracketComplete
+                ? 'Review the final match results and tournament champion.'
+                : isBracketLive
+                  ? 'Follow the active match flow, table links, winners, and bracket status.'
+                  : liveBracket
+                    ? 'Review the published match assignments. Live status appears only after play is confirmed.'
+                    : 'Bracket preview is ready. Assigned match cards appear after the host publishes the bracket.'
             }
             primary={primaryPlayerAction.href === matchStatusPath ? primaryPlayerAction : { label: 'My Match', href: matchStatusPath }}
             secondary={streams.length ? { label: 'Watch', href: '/stream' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
@@ -970,7 +979,7 @@ export default function TournamentScreen({ slug }) {
               description={`Match cards show assigned players, winners, and ${gameName} match links.`}
               nativeID="live-bracket"
               title={bracketSectionTitle}>
-              <LiveBracketBoard bracket={liveBracket} />
+              <LiveBracketBoard bracket={liveBracket} bracketPresentation={bracketPresentation} />
             </Section>
           ) : null}
 
@@ -982,7 +991,7 @@ export default function TournamentScreen({ slug }) {
               <BracketBoard bracket={visibleTournament.bracket} />
               {bracketState.error ? <Text style={styles.bracketLoadNote}>{bracketState.error}</Text> : null}
               {!bracketState.loading && !bracketState.error ? (
-                <Text style={styles.bracketLoadNote}>No live bracket has been published yet.</Text>
+                <Text style={styles.bracketLoadNote}>No tournament bracket has been published yet.</Text>
               ) : null}
             </Section>
           ) : null}
@@ -1043,6 +1052,7 @@ export default function TournamentScreen({ slug }) {
           <Section description="How this event will be seeded and played." title="Tournament format">
             <TournamentFormatCard
               advertisedRosterCap={advertisedRosterCap}
+              bracketPresentation={bracketPresentation}
               formatDetails={formatDetails}
               isBracketLive={isBracketLive}
               liveBracket={liveBracket}
@@ -1534,6 +1544,7 @@ function dashboardTitleCopy({ currentMatch, isBracketLive, playerStatus }) {
 
 function TournamentDashboard({
   advertisedRosterCap,
+  bracketPresentation,
   checkInPath,
   isBracketLive,
   liveBracket,
@@ -1602,7 +1613,7 @@ function TournamentDashboard({
         <View style={styles.dashboardTile}>
           <Text style={styles.dashboardTileLabel}>Bracket Status</Text>
           <Text style={styles.dashboardTileValue}>{bracketLabel}</Text>
-          <Text style={styles.dashboardTileMeta}>{liveBracket ? 'live bracket' : 'actual if seeded now'}</Text>
+          <Text style={styles.dashboardTileMeta}>{liveBracket ? bracketPresentation.label.toLowerCase() : 'actual if seeded now'}</Text>
         </View>
         <View style={styles.dashboardTile}>
           <Text style={styles.dashboardTileLabel}>Minimum Players</Text>
@@ -1622,6 +1633,7 @@ function TournamentDashboard({
 
 function TournamentFormatCard({
   advertisedRosterCap,
+  bracketPresentation,
   formatDetails,
   isBracketLive,
   liveBracket,
@@ -1633,7 +1645,7 @@ function TournamentFormatCard({
   const bracketValue = liveBracket
     ? `${liveBracket.participantCount || 0} seeded`
     : actualBracketPreviewLabel(signupSummary.count, minimumPlayers, signupSummary.loading);
-  const statusLabel = isBracketLive ? 'Bracket live' : 'Before seeding';
+  const statusLabel = liveBracket ? bracketPresentation.label : 'Before seeding';
 
   return (
     <Surface style={styles.formatCard}>
@@ -2008,6 +2020,7 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug })
 
 function RegisteredPlayersPanel({
   advertisedRosterCap,
+  bracketPresentation,
   liveBracket,
   liveBracketSize,
   minimumPlayers,
@@ -2019,10 +2032,10 @@ function RegisteredPlayersPanel({
   const seededCount = liveBracket?.participantCount || 0;
   const extraSignupCount = liveBracket ? Math.max(signupSummary.count - seededCount, 0) : 0;
   const rosterCapacityCopy = liveBracket
-    ? `${seededCount}/${liveBracketSize} seeded in the live bracket • advertised ${advertisedRosterCap} seats`
+    ? `${seededCount}/${liveBracketSize} seeded in the ${bracketPresentation.label.toLowerCase()} • advertised ${advertisedRosterCap} seats`
     : `${playerCapacityLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading)} advertised seats • ${openSlotLabel(signupSummary.count, advertisedRosterCap, minimumPlayers, signupSummary.loading)}`;
   const bracketCopy = liveBracket
-    ? `Live bracket: ${bracketSizeLabel(liveBracketSize)} with ${seededCount} seeded player${seededCount === 1 ? '' : 's'}.`
+    ? `${bracketPresentation.label}: ${bracketSizeLabel(liveBracketSize)} with ${seededCount} seeded player${seededCount === 1 ? '' : 's'}.`
     : `Actual bracket if seeded now: ${bracketSizeLabel(rosterBracketSize)}. ${rosterPolicyCopy(tournament, advertisedRosterCap, minimumPlayers)}`;
   const rosterCountValue = signupSummary.loading ? '--' : String(signupSummary.count);
   const bracketValue = liveBracket ? `${seededCount} seeded` : bracketSizeLabel(rosterBracketSize);
@@ -2061,7 +2074,7 @@ function RegisteredPlayersPanel({
       <Text style={styles.rosterNote}>{bracketCopy}</Text>
       {extraSignupCount ? (
         <Text style={styles.rosterWarning}>
-          {extraSignupCount} registered player{extraSignupCount === 1 ? '' : 's'} are not in the live bracket. The host should reset/reseed or clear signups before running a new bracket.
+          {extraSignupCount} registered player{extraSignupCount === 1 ? '' : 's'} are not in the published bracket. The host should reset/reseed or clear signups before running a new bracket.
         </Text>
       ) : null}
 
@@ -2078,6 +2091,7 @@ function RegisteredPlayersPanel({
               <View style={styles.rosterList}>
                 {group.players.map((signup, index) => (
                   <View
+                    dataSet={{ tournamentRosterId: signup.id || `${group.key}-${index}` }}
                     key={signup.id || `${group.key}-${signup.playerName}-${index}`}
                     style={[styles.rosterRow, signup.currentPlayer && styles.rosterRowCurrent]}>
                     <View style={[styles.rosterRank, signup.currentPlayer && styles.rosterRankCurrent]}>
@@ -2107,7 +2121,7 @@ function RegisteredPlayersPanel({
   );
 }
 
-function LiveBracketBoard({ bracket }) {
+function LiveBracketBoard({ bracket, bracketPresentation }) {
   const [openingMatchId, setOpeningMatchId] = useState('');
   const [accessError, setAccessError] = useState('');
   const matches = getBracketMatches(bracket);
@@ -2139,7 +2153,7 @@ function LiveBracketBoard({ bracket }) {
     <Surface style={styles.liveBracketCard}>
       <View style={styles.liveBracketHeader}>
         <View style={styles.liveBracketHeaderCopy}>
-          <Badge tone={bracket.status === 'complete' ? 'green' : 'accent'}>{bracket.status}</Badge>
+          <Badge tone={bracketPresentation.state === 'complete' ? 'green' : 'accent'}>{bracketPresentation.statusLabel}</Badge>
           <Text style={styles.liveBracketTitle}>Public bracket</Text>
           <Text style={styles.liveBracketMeta}>
             {bracket.participantCount} players • {completedCount}/{matches.length} matches final • {readyCount} ready
@@ -2184,7 +2198,7 @@ function LiveBracketBoard({ bracket }) {
         </View>
       ) : null}
 
-      <View style={styles.liveRounds}>
+      <View dataSet={{ tournamentBracketState: bracketPresentation.state }} style={styles.liveRounds}>
         {bracket.rounds.map((round) => (
           <View key={round.index} style={styles.liveRound}>
             <Text style={styles.liveRoundTitle}>{round.title}</Text>
@@ -2192,7 +2206,7 @@ function LiveBracketBoard({ bracket }) {
               const playerRows = getMatchPlayerRows(match);
 
               return (
-                <View key={match.id} style={[styles.liveMatch, match.status === 'ready' && styles.liveMatchReady, match.status === 'final' && styles.liveMatchFinal]}>
+                <View dataSet={{ tournamentMatchId: match.id }} key={match.id} style={[styles.liveMatch, match.status === 'ready' && styles.liveMatchReady, match.status === 'final' && styles.liveMatchFinal]}>
                   <View style={styles.liveMatchTopRow}>
                     <Badge tone={getMatchTone(match)}>{getMatchStatusLabel(match)}</Badge>
                     <Text style={styles.liveMatchLabel}>{match.label}</Text>
