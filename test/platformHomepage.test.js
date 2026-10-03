@@ -2,11 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  APP_STORE_EUCHRE_URL,
-  APP_STORE_SPADES_URL,
-} from "../src/lib/downloadLinks.js";
-
 const rootRoute = await readFile(
   new URL("../app/index.jsx", import.meta.url),
   "utf8",
@@ -22,16 +17,22 @@ const hubUi = await readFile(
 
 test("root route renders the multi-game platform hub", () => {
   assert.match(rootRoute, /HomeScreen/);
-  assert.match(homeScreen, /COMPETE IN 1V1/);
-  assert.match(homeScreen, /Spades and Euchre/);
+  assert.match(homeScreen, /YOUR GAME\. YOUR BRACKET\./);
   assert.match(homeScreen, /No partner\. No excuses\./);
-  assert.match(homeScreen, /PLATFORM_GAME_PRESENTATION/);
+  assert.match(homeScreen, /getPublicGames/);
+  assert.match(homeScreen, /physical-card-rotor/);
+  assert.match(homeScreen, /CardArtwork/);
+  assert.match(homeScreen, /crownShape/);
+  assert.match(homeScreen, /euchreCrest/);
+  assert.match(homeScreen, /ginHand/);
+  assert.match(homeScreen, /cribbageBoard/);
+  assert.match(homeScreen, /prefers-reduced-motion/);
+  assert.match(homeScreen, /getNextEligiblePublicEvent/);
+  assert.match(homeScreen, /usePublicSchedule/);
   assert.doesNotMatch(homeScreen, /TwitchTournamentBoard/);
   assert.doesNotMatch(homeScreen, /StreamCard/);
-  assert.match(homeScreen, /homeUpcoming\.length/);
-  assert.match(homeScreen, /laterTournaments\.slice\(0, 2\)/);
+  assert.doesNotMatch(homeScreen, /PremiumDownloadSection/);
   assert.match(homeScreen, /aria-level=\{1\}/);
-  assert.match(homeScreen, /aria-level=\{2\}/);
 });
 
 test("platform navigation keeps competition, account, and My Match visible", () => {
@@ -49,18 +50,11 @@ test("platform navigation keeps competition, account, and My Match visible", () 
   assert.match(hubUi, /resolvedPlayerAccount\?\.hostApproved/);
 });
 
-test("homepage keeps Euchre invitation-only and gives both games App Store buttons", () => {
-  assert.doesNotMatch(homeScreen, /Euchre.*Public tournaments/s);
-  assert.equal(
-    APP_STORE_SPADES_URL,
-    "https://apps.apple.com/us/app/1v1-spades/id6776721716?uo=4",
-  );
-  assert.equal(
-    APP_STORE_EUCHRE_URL,
-    "https://apps.apple.com/us/app/euchre-1v1/id6788707299",
-  );
-  assert.match(homeScreen, /appStoreSpades/);
-  assert.match(homeScreen, /appStoreEuchre/);
-  assert.match(homeScreen, /PLATFORM_APP_STORE_STATEMENT/);
-  assert.match(homeScreen, /Download \$\{game\.title\} on the App Store/);
+test("homepage keeps selection and schedule reads within the public presentation contract", () => {
+  assert.match(homeScreen, /getPublicEventAction/);
+  assert.match(homeScreen, /SCHEDULE_REFRESH_MS/);
+  assert.match(homeScreen, /No public ' \+ activeGameName \+ ' tournaments are scheduled/);
+  assert.match(homeScreen, /Explore \{game\.shortName\}/);
+  assert.doesNotMatch(homeScreen, /Gin Rummy.*Register/s);
+  assert.doesNotMatch(homeScreen, /No results have been invented/);
 });

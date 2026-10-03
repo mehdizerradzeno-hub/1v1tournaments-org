@@ -1,14 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import GameScreen from '../../src/screens/GameScreen.jsx';
-import { siteData } from '../../src/lib/siteData.js';
+import { getPublicGames } from '../../src/lib/publicPresentationCatalog.js';
 
 export function generateStaticParams() {
-  return siteData.games
-    .filter((game) => !game.shortPath)
-    .map((game) => ({
-      gameSlug: game.slug,
-    }));
+  return getPublicGames().map((game) => ({ gameSlug: game.slug }));
 }
 
 function normalizeParam(value) {

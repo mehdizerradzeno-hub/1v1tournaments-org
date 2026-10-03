@@ -31,7 +31,7 @@ import {
   siteData,
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
-import { getTournamentGameName } from '../lib/tournamentCatalog.js';
+import { getPublicGamePresentation } from '../lib/publicPresentationCatalog.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   fetchTournamentPlayerStatus,
@@ -366,20 +366,20 @@ function buildTournamentTimeline({ isBracketLive, liveBracket, registrationMeta,
     {
       key: 'check-in',
       label: 'Check-in',
-      value: isBracketLive || liveBracket ? 'Locked' : 'Roster building',
-      state: isBracketLive || liveBracket ? 'done' : 'active',
+      value: isBracketLive ? 'Locked' : 'Roster building',
+      state: isBracketLive ? 'done' : 'active',
     },
     {
       key: 'bracket',
       label: 'Bracket',
-      value: liveBracket ? 'Live' : 'Pending',
-      state: liveBracket ? 'active' : 'waiting',
+      value: isBracketLive ? 'Live' : liveBracket ? 'Published' : 'Pending',
+      state: isBracketLive ? 'active' : liveBracket ? 'done' : 'waiting',
     },
     {
       key: 'match',
       label: 'Match links',
-      value: playerHasReadyMatch ? 'Ready' : liveBracket ? 'Watch page' : 'After seed',
-      state: playerHasReadyMatch ? 'active' : liveBracket ? 'done' : 'waiting',
+      value: playerHasReadyMatch ? 'Ready' : isBracketLive ? 'Watch page' : 'After seed',
+      state: playerHasReadyMatch ? 'active' : isBracketLive ? 'done' : 'waiting',
     },
     {
       key: 'results',
@@ -648,6 +648,7 @@ export default function TournamentScreen({ slug }) {
           actions={[{ label: 'Home', href: '/' }]}
           eyebrow="Loading tournament"
           lead="Looking up this hosted tournament."
+          publicShell
           subtitle="Host-posted events load from the tournament catalog."
           title="Loading event">
           <EmptyState
@@ -663,6 +664,7 @@ export default function TournamentScreen({ slug }) {
         actions={[{ label: 'Home', href: '/' }]}
         eyebrow="Tournament not found"
         lead="That tournament page is not available."
+        publicShell
         subtitle="Add the event record or check the route."
         title="Unknown tournament">
         <EmptyState
@@ -676,7 +678,8 @@ export default function TournamentScreen({ slug }) {
 
   const visibleTournament = liveTournament || tournament;
   const game = getGameBySlug(visibleTournament.gameSlug);
-  const gameName = getTournamentGameName(visibleTournament.gameSlug);
+  const presentationGame = getPublicGamePresentation(visibleTournament.gameSlug);
+  const gameName = presentationGame?.name || game?.name || 'Tournament';
   const isPrimaryGame = game?.slug === siteData.site.primaryGameSlug;
   const gamePath = game ? getGamePath(game.slug) : null;
   const streams = (visibleTournament.streamSlugs || [])
@@ -685,14 +688,18 @@ export default function TournamentScreen({ slug }) {
   const checkInPath = getCheckInPath(visibleTournament.slug);
   const signInPath = getSignInPath(checkInPath);
   const tournamentPath = getTournamentPath(visibleTournament.slug);
-  const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const matchStatusPath = `${tournamentPath}#my-match`;
   const result = getResultByTournamentSlug(visibleTournament.slug)
     || buildResultFromTournamentBracket(visibleTournament, liveBracket)
     || (visibleTournament.status === 'complete' ? getResultsForGame(visibleTournament.gameSlug)[0] || null : null);
   const playerHasReadyMatch = Boolean(playerStatus.data?.currentMatch);
-  const isBracketLive = registrationMeta.reason === 'bracket-live' || Boolean(liveBracket);
   const isBracketComplete = liveBracket?.status === 'complete' || Boolean(result);
+  const bracketStatus = String(liveBracket?.status || '').trim().toLowerCase();
+  const isBracketLive = !isBracketComplete && (
+    visibleTournament.status === 'live'
+    || ['live', 'active', 'in-progress'].includes(bracketStatus)
+  );
+  const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: isBracketLive });
   const showSignupSection = !isBracketLive;
   const bracketSectionTitle = liveBracket
     ? liveBracket.status === 'complete'
@@ -750,9 +757,10 @@ export default function TournamentScreen({ slug }) {
     <HubScreen
       actions={heroActions}
       eyebrow={game?.badge || 'Tournament'}
-      footerNote={siteData.site.adminNote}
+      footerNote="Creating the competitive 1v1 spades category."
       heroVariant="compact"
       lead={visibleTournament.detail}
+      publicShell
       subtitle={`${gameName} tournament • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
       stickyActions
       showHero={false}
@@ -950,7 +958,7 @@ export default function TournamentScreen({ slug }) {
             primary={primaryPlayerAction.href === matchStatusPath ? primaryPlayerAction : { label: 'My Match', href: matchStatusPath }}
             secondary={streams.length ? { label: 'Watch', href: '/stream' } : { label: 'Roster', href: `${tournamentPath}#registered-players` }}
             stats={[
-              { label: 'Bracket', value: isBracketComplete ? 'Complete' : liveBracket ? 'Live' : 'Preview' },
+              { label: 'Bracket', value: isBracketComplete ? 'Complete' : isBracketLive ? 'Live' : liveBracket ? 'Published' : 'Preview' },
               { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
               { label: 'Next', value: getNextPublicMatch(liveBracket)?.label || 'After seed' },
             ]}
@@ -1407,9 +1415,11 @@ function TournamentLobbyHero({
 
   return (
     <Surface style={styles.lobbyCard}>
-      <View style={styles.lobbyBadgeRow}>
-        <Badge tone={isComplete ? 'green' : liveBracket ? 'green' : registrationMeta.tone}>
-          {isComplete ? 'Completed' : liveBracket ? 'Tournament Live' : registrationMeta.label}
+      <View
+        dataSet={{ tournamentLifecycle: isComplete ? 'complete' : isBracketLive ? 'live' : 'registration' }}
+        style={styles.lobbyBadgeRow}>
+        <Badge tone={isComplete ? 'green' : isBracketLive ? 'green' : registrationMeta.tone}>
+          {isComplete ? 'Completed' : isBracketLive ? 'Tournament Live' : registrationMeta.label}
         </Badge>
         <Text style={styles.lobbyDate}>
           {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
@@ -1786,8 +1796,8 @@ function PlayerStatusSpotlight({
     },
     {
       label: 'Bracket',
-      value: liveBracket ? 'Live' : 'Waiting',
-      tone: liveBracket ? 'green' : signupName ? 'accent' : 'blue',
+      value: result ? 'Complete' : isBracketLive ? 'Live' : liveBracket ? 'Published' : 'Waiting',
+      tone: result || isBracketLive ? 'green' : signupName ? 'accent' : 'blue',
       done: Boolean(liveBracket),
     },
     {
