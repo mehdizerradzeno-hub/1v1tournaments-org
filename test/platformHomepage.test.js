@@ -98,8 +98,11 @@ test("platform navigation keeps competition, account, and My Match visible", () 
 test("homepage keeps selection and schedule reads within the public presentation contract", () => {
   assert.match(homeScreen, /getPublicEventAction/);
   assert.match(homeScreen, /SCHEDULE_REFRESH_MS/);
+  assert.match(homeScreen, /const isDirectSpadesLaunch = game\.slug === 'spades' && game\.webReady && Boolean\(game\.playPath\)/);
+  assert.match(homeScreen, /const isComingSoon = !game\.webReady/);
+  assert.match(homeScreen, /disabled=\{isComingSoon\} href=\{isDirectSpadesLaunch \? game\.playPath : isComingSoon \? undefined : game\.infoPath\}/);
+  assert.match(homeScreen, /isDirectSpadesLaunch \? 'Play Spades' : isComingSoon \? 'Coming soon' : 'Explore ' \+ game\.shortName/);
   assert.match(homeScreen, /No public ' \+ activeGameName \+ ' tournaments are scheduled/);
-  assert.match(homeScreen, /Explore \{game\.shortName\}/);
   assert.doesNotMatch(homeScreen, /Gin Rummy.*Register/s);
   assert.doesNotMatch(homeScreen, /No results have been invented/);
 });
