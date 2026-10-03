@@ -87,24 +87,17 @@ function CardArtwork({ art }) {
 
 function PhysicalGameCard({ game, pageVisible, selected, onSelect }) {
   const [hovered, setHovered] = useState(false);
-  const [returning, setReturning] = useState(false);
   const [turn, setTurn] = useState(0);
   const hoveringRef = useRef(false);
-  const returnTimerRef = useRef(null);
   const motionAllowed = pageVisible && Platform.OS === 'web' && globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
   const pip = game.art === 'spade' ? '♠' : game.art === 'euchre' ? '♣' : game.art === 'gin' ? '♦' : '●';
   const backLabel = { spade: 'CROWNED SPADES', euchre: 'BOWER COURT', gin: 'MELD TABLE', cribbage: 'PEG TRACK' }[game.art];
   const isDirectSpadesLaunch = game.slug === 'spades' && game.webReady && Boolean(game.playPath);
   const isComingSoon = !game.webReady;
   const cardTurning = pageVisible && hovered;
-  useEffect(() => () => {
-    if (returnTimerRef.current) globalThis.clearTimeout(returnTimerRef.current);
-  }, []);
   function startTurn() {
     if (!motionAllowed) return;
-    if (returnTimerRef.current) globalThis.clearTimeout(returnTimerRef.current);
     hoveringRef.current = true;
-    setReturning(false);
     setHovered(true);
     setTurn((current) => current + 1);
   }
@@ -112,19 +105,11 @@ function PhysicalGameCard({ game, pageVisible, selected, onSelect }) {
     if (!motionAllowed) return;
     hoveringRef.current = false;
     setHovered(false);
-    setReturning(true);
-    setTurn(0);
-    if (returnTimerRef.current) globalThis.clearTimeout(returnTimerRef.current);
-    returnTimerRef.current = globalThis.setTimeout(() => {
-      if (!hoveringRef.current) setReturning(false);
-    }, 480);
   }
   function continueTurn(event) {
     if (event.target !== event.currentTarget) return;
     if (hoveringRef.current && motionAllowed) {
       setTurn((current) => current + 1);
-    } else {
-      setReturning(false);
     }
   }
   function openDirectGame() {
@@ -144,7 +129,7 @@ function PhysicalGameCard({ game, pageVisible, selected, onSelect }) {
     }
   }
   const cardIsDirectLaunch = isDirectSpadesLaunch;
-  return <View style={[styles.physicalGameCard, selected && styles.physicalGameCardSelected]}><Pressable accessibilityHint={cardIsDirectLaunch ? 'Opens the 1V1 Spades website.' : 'Selects this game and updates the public schedule below.'} accessibilityLabel={cardIsDirectLaunch ? 'Open ' + game.name : 'Select ' + game.name} accessibilityRole={cardIsDirectLaunch ? 'link' : 'radio'} accessibilityState={cardIsDirectLaunch ? undefined : { selected }} dataSet={{ physicalCardHit: 'true', directLaunch: cardIsDirectLaunch ? 'true' : 'false', hovered: cardTurning ? 'true' : 'false' }} onHoverIn={startTurn} onHoverOut={stopTurn} onKeyDown={handleCardKeyDown} onPress={handleCardPress}><View dataSet={{ physicalCardScene: 'true' }}><View dataSet={{ physicalCardRotor: 'true', pageVisible: pageVisible ? 'true' : 'false', returning: returning ? 'true' : 'false', turning: cardTurning ? 'true' : 'false' }} onTransitionEnd={continueTurn} style={{ transform: [{ rotateY: (turn * 360) + 'deg' }] }}><View dataSet={{ physicalCardFace: 'true', physicalCardFront: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><Text dataSet={{ cardCorner: 'true' }}>A{pip}</Text><Text dataSet={{ cardCorner: 'true', cardCornerBottom: 'true' }}>A{pip}</Text><View dataSet={{ cardCenter: 'true' }}><View><CardArtwork art={game.art} /><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardTitle: 'true' }}>{game.cardName}</Text><Text dataSet={{ cardKicker: 'true' }}>No partner. No excuses.</Text></View></View></View><View dataSet={{ physicalCardFace: 'true', physicalCardBack: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><View dataSet={{ cardCenter: 'true' }}><View><View dataSet={{ cardBackSeal: 'true' }}><Text dataSet={{ cardBackWord: 'true' }}>{backLabel}</Text></View><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardKicker: 'true' }}>Tournaments</Text></View></View></View></View></View></Pressable><View style={styles.cardInfo}><View style={styles.cardLabelRow}><Text style={styles.cardName}>{game.name}</Text>{selected ? <Text accessibilityLiveRegion="polite" style={styles.selectedMark}>SELECTED</Text> : null}</View><Text style={styles.cardSummary}>{game.summary}</Text><ActionButton disabled={isComingSoon} href={isDirectSpadesLaunch ? game.playPath : isComingSoon ? undefined : game.infoPath} variant={selected ? 'primary' : 'secondary'}>{isDirectSpadesLaunch ? 'Play Spades' : isComingSoon ? 'Coming soon' : 'Explore ' + game.shortName}</ActionButton></View></View>;
+  return <View style={[styles.physicalGameCard, selected && styles.physicalGameCardSelected]}><Pressable accessibilityHint={cardIsDirectLaunch ? 'Opens the 1V1 Spades website.' : 'Selects this game and updates the public schedule below.'} accessibilityLabel={cardIsDirectLaunch ? 'Open ' + game.name : 'Select ' + game.name} accessibilityRole={cardIsDirectLaunch ? 'link' : 'radio'} accessibilityState={cardIsDirectLaunch ? undefined : { selected }} dataSet={{ physicalCardHit: 'true', directLaunch: cardIsDirectLaunch ? 'true' : 'false', hovered: cardTurning ? 'true' : 'false' }} onHoverIn={startTurn} onHoverOut={stopTurn} onKeyDown={handleCardKeyDown} onPress={handleCardPress}><View dataSet={{ physicalCardScene: 'true' }}><View dataSet={{ physicalCardRotor: 'true', pageVisible: pageVisible ? 'true' : 'false', turning: cardTurning ? 'true' : 'false' }} onTransitionEnd={continueTurn} style={{ transform: [{ rotateY: (turn * 360) + 'deg' }] }}><View dataSet={{ physicalCardFace: 'true', physicalCardFront: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><Text dataSet={{ cardCorner: 'true' }}>A{pip}</Text><Text dataSet={{ cardCorner: 'true', cardCornerBottom: 'true' }}>A{pip}</Text><View dataSet={{ cardCenter: 'true' }}><View><CardArtwork art={game.art} /><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardTitle: 'true' }}>{game.cardName}</Text><Text dataSet={{ cardKicker: 'true' }}>No partner. No excuses.</Text></View></View></View><View dataSet={{ physicalCardFace: 'true', physicalCardBack: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><View dataSet={{ cardCenter: 'true' }}><View><View dataSet={{ cardBackSeal: 'true' }}><Text dataSet={{ cardBackWord: 'true' }}>{backLabel}</Text></View><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardKicker: 'true' }}>Tournaments</Text></View></View></View></View></View></Pressable><View style={styles.cardInfo}><View style={styles.cardLabelRow}><Text style={styles.cardName}>{game.name}</Text>{selected ? <Text accessibilityLiveRegion="polite" style={styles.selectedMark}>SELECTED</Text> : null}</View><Text style={styles.cardSummary}>{game.summary}</Text><ActionButton disabled={isComingSoon} href={isDirectSpadesLaunch ? game.playPath : isComingSoon ? undefined : game.infoPath} variant={selected ? 'primary' : 'secondary'}>{isDirectSpadesLaunch ? 'Play Spades' : isComingSoon ? 'Coming soon' : 'Explore ' + game.shortName}</ActionButton></View></View>;
 }
 
 function PublicEventCard({ event }) {
