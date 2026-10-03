@@ -67,6 +67,16 @@ function getPublicNavItems(paths) {
   ];
 }
 
+function getPublicMobileNavItems(paths) {
+  return [
+    { label: 'Games', href: '/games' },
+    { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
+    { label: 'Events', href: '/tournaments' },
+    { label: 'Results', href: '/results' },
+    { label: 'Profile', href: '/account' },
+  ];
+}
+
 function getMobileNavItems(paths) {
   return [
     { label: 'Compete', href: '/games' },
@@ -751,7 +761,7 @@ export function HubScreen({
   const accountPath = accountHref || fallbackAccountPath;
   const navItems = publicShell ? getPublicNavItems(primaryPaths) : getNavItems(primaryPaths);
   const mobileNavItems = publicShell
-    ? getPublicNavItems(primaryPaths).slice(0, 5)
+    ? getPublicMobileNavItems(primaryPaths)
     : getMobileNavItems(primaryPaths);
   const stickyActionItems = getStickyActionItems(primaryPaths);
   const hasHydratedViewport = isHydrated && width > 0;

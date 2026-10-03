@@ -236,7 +236,13 @@ export default function LeaderboardScreen() {
                         : 'No completed hosted-event standings yet.'}
                     </Text>
                   </View>
-                  <Badge tone={gameEntries.length ? 'green' : 'blue'}>{game.badge}</Badge>
+                  <Badge tone={gameEntries.length ? 'green' : 'blue'}>
+                    {gameEntries.length
+                      ? 'Event records'
+                      : game.tournamentReady
+                        ? 'Tournament lane'
+                        : 'Information lane'}
+                  </Badge>
                 </View>
                 <View style={styles.gameLeaderBox}>
                   <Text style={styles.gameLeaderLabel}>Circuit leader</Text>

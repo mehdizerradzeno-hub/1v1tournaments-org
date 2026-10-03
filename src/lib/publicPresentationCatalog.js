@@ -1,3 +1,5 @@
+import { downloadLinks } from './downloadLinks.js';
+
 /**
  * Read-only public presentation data.
  *
@@ -19,7 +21,7 @@ export const PUBLIC_GAME_PRESENTATIONS = Object.freeze([
     tournamentReady: true,
     webReady: true,
     infoPath: '/games/spades',
-    playPath: '/spades',
+    playPath: downloadLinks.webSpades,
     summary: 'Head-to-head trick taking for players who want every hand to matter.',
     facts: Object.freeze(['Ranked head-to-head', 'Public events when posted']),
   }),
@@ -36,7 +38,7 @@ export const PUBLIC_GAME_PRESENTATIONS = Object.freeze([
     tournamentReady: false,
     webReady: true,
     infoPath: '/games/euchre',
-    playPath: '/euchre',
+    playPath: downloadLinks.webEuchre,
     summary: 'A compact trump game with a court-card focus and one opponent across the table.',
     facts: Object.freeze(['Head-to-head game', 'Tournament status announced per event']),
   }),
@@ -119,7 +121,10 @@ function publicVisibility(tournament, seeded = false) {
   const visibility = String(tournament?.visibility || '').trim().toLowerCase();
 
   if (seeded) return true;
-  return visibility === 'public' || visibility === 'published';
+  // The hosted-event endpoint has always treated its legacy/default blank
+  // visibility as public. Keep that contract here while retaining explicit
+  // rejections for private, unlisted, and draft records below.
+  return visibility === '' || visibility === 'public' || visibility === 'published';
 }
 
 export function isPublicPresentationEvent(tournament, { seeded = false } = {}) {
@@ -162,7 +167,8 @@ function adaptPublicEvent(tournament) {
 
 /**
  * Merges presentation data without writer normalizers that coerce game IDs or
- * clamp capacity. Hosted records require an explicit public/published state.
+ * clamp capacity. Hosted records follow the established public-visibility
+ * contract while preserving explicit privacy and draft exclusions.
  */
 export function getPublicPresentationEvents(seededEvents = [], hostedEvents = []) {
   const bySlug = new Map();
@@ -189,7 +195,16 @@ export function getPublicPresentationEvents(seededEvents = [], hostedEvents = []
 }
 
 export function getNextEligiblePublicEvent(events = [], nowMs = Date.now()) {
-  return events.find((event) => new Date(event.date).getTime() > nowMs) || null;
+  return events.find((event) => event.status !== 'live' && new Date(event.date).getTime() > nowMs) || null;
+}
+
+export function getLivePublicEvent(events = []) {
+  return [...events]
+    .filter((event) => event?.status === 'live')
+    .sort((left, right) => {
+      const dateDifference = new Date(right.date).getTime() - new Date(left.date).getTime();
+      return dateDifference || right.slug.localeCompare(left.slug);
+    })[0] || null;
 }
 
 /**

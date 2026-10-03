@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 
+import '../src/styles/publicCards.css';
+
 import { theme } from '../src/lib/theme.js';
 
 export default function RootLayout() {
