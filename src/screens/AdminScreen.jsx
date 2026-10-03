@@ -61,6 +61,8 @@ import {
   saveTournamentEvent,
   saveStreamCommands,
   saveTournamentSettings,
+  createTournamentGuestKey,
+  revokeTournamentGuestKey,
 } from '../lib/tournamentHostingClient.js';
 import { TOURNAMENT_REPEAT_OPTIONS, TOURNAMENT_WEEKDAYS } from '../lib/tournamentRecurrence.js';
 import { hasActiveTournamentMatches } from '../lib/tournamentLifecycle.js';
@@ -347,6 +349,11 @@ export default function AdminScreen() {
   const [rosterMessage, setRosterMessage] = useState('');
   const [rosterError, setRosterError] = useState('');
   const [rosterLastRefreshedAt, setRosterLastRefreshedAt] = useState('');
+  const [guestKey, setGuestKey] = useState('');
+  const [guestKeyExpiresAt, setGuestKeyExpiresAt] = useState('');
+  const [guestKeyLoading, setGuestKeyLoading] = useState(false);
+  const [guestKeyMessage, setGuestKeyMessage] = useState('');
+  const [guestKeyError, setGuestKeyError] = useState('');
   const [bracket, setBracket] = useState(null);
   const [bracketLoading, setBracketLoading] = useState(false);
   const [bracketMessage, setBracketMessage] = useState('');
@@ -1832,6 +1839,50 @@ export default function AdminScreen() {
     }
   }
 
+  async function handleCreateGuestKey(rotate = false) {
+    if (!hasHostCredential || !rosterSlug) {
+      setGuestKeyError('Sign in with a host-approved account or enter the fallback token first.');
+      return;
+    }
+
+    setGuestKeyLoading(true);
+    setGuestKeyError('');
+    setGuestKeyMessage('');
+    try {
+      const result = await createTournamentGuestKey({ token: rosterToken.trim(), slug: rosterSlug, rotate });
+      setGuestKey(result.guestKey || '');
+      setGuestKeyExpiresAt(result.expiresAt || '');
+      setGuestKeyMessage('Copy this guest key now. The server will not show it again.');
+    } catch (error) {
+      setGuestKeyError(error instanceof Error ? error.message : 'Guest key could not be created.');
+    } finally {
+      setGuestKeyLoading(false);
+    }
+  }
+
+  async function handleRevokeGuestKey() {
+    if (!hasHostCredential || !rosterSlug) return;
+    setGuestKeyLoading(true);
+    setGuestKeyError('');
+    setGuestKeyMessage('');
+    try {
+      await revokeTournamentGuestKey({ token: rosterToken.trim(), slug: rosterSlug });
+      setGuestKey('');
+      setGuestKeyExpiresAt('');
+      setGuestKeyMessage('Guest access revoked for this event.');
+    } catch (error) {
+      setGuestKeyError(error instanceof Error ? error.message : 'Guest key could not be revoked.');
+    } finally {
+      setGuestKeyLoading(false);
+    }
+  }
+
+  async function handleCopyGuestKey() {
+    if (!guestKey || !globalThis.navigator?.clipboard?.writeText) return;
+    await globalThis.navigator.clipboard.writeText(guestKey);
+    setGuestKeyMessage('Guest key copied to the clipboard.');
+  }
+
   useEffect(() => {
     if (!isHostApproved) {
       return undefined;
@@ -2795,6 +2846,30 @@ export default function AdminScreen() {
             </Text>
           </View>
 
+          <View style={styles.guestKeyPanel}>
+            <View style={styles.metaRow}>
+              <Badge tone="blue">Guest view key</Badge>
+              <Text style={styles.metaText}>View-only access for invited guests. It never unlocks roster controls or match play.</Text>
+            </View>
+            {guestKey ? (
+              <Text selectable style={styles.guestKeyValue}>{guestKey}</Text>
+            ) : null}
+            {guestKeyExpiresAt ? <Text style={styles.refreshText}>Expires {new Date(guestKeyExpiresAt).toLocaleString()}</Text> : null}
+            {guestKeyError ? <Text style={styles.errorText}>{guestKeyError}</Text> : null}
+            {guestKeyMessage ? <Text style={styles.successText}>{guestKeyMessage}</Text> : null}
+            <View style={styles.buttonRow}>
+              <ActionButton disabled={!hasHostCredential || guestKeyLoading} onPress={() => handleCreateGuestKey(Boolean(guestKey))} variant="secondary">
+                {guestKeyLoading ? 'Working...' : guestKey ? 'Rotate guest key' : 'Create guest key'}
+              </ActionButton>
+              <ActionButton disabled={!guestKey || guestKeyLoading} onPress={handleCopyGuestKey} variant="ghost">
+                Copy key
+              </ActionButton>
+              <ActionButton disabled={!hasHostCredential || guestKeyLoading} onPress={handleRevokeGuestKey} variant="ghost">
+                Revoke guest access
+              </ActionButton>
+            </View>
+          </View>
+
           <View style={styles.buttonRow}>
             <ActionButton onPress={handleLoadRoster}>{rosterLoading ? 'Refreshing...' : 'Refresh roster'}</ActionButton>
             <ActionButton onPress={handleCopyRoster} variant="secondary">
@@ -3493,6 +3568,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 12,
     fontWeight: '700',
+  },
+  guestKeyPanel: {
+    backgroundColor: 'rgba(94, 127, 163, 0.08)',
+    borderColor: 'rgba(94, 127, 163, 0.28)',
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 14,
+    padding: 14,
+  },
+  guestKeyValue: {
+    backgroundColor: '#101614',
+    borderRadius: 8,
+    color: '#F4EFE6',
+    fontFamily: CODE_FONT,
+    fontSize: 13,
+    padding: 10,
   },
   fieldGroup: {
     marginTop: 14,

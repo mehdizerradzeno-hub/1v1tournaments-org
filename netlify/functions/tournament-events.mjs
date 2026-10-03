@@ -2,6 +2,7 @@ import { connectLambda } from '@netlify/blobs';
 
 import { accountCanonicalId, cleanText } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { requireTournamentEventAccess } from './_tournament-guest-auth.mjs';
 import {
   deleteHostedTournament,
   listHostedTournaments,
@@ -46,8 +47,17 @@ export async function handler(event) {
           return json(404, { error: 'That hosted tournament was not found.' });
         }
 
+        const access = await requireTournamentEventAccess(event, tournament);
+        if (access.error) {
+          return json(access.error.statusCode, {
+            error: access.error.message,
+            code: access.error.code,
+          });
+        }
+
         return json(200, {
           ok: true,
+          access: access.method,
           tournament,
           tournaments: [tournament],
         });

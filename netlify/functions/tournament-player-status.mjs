@@ -8,6 +8,8 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import { requireTournamentEventAccess } from './_tournament-guest-auth.mjs';
+import { loadHostedTournament } from './_tournament-events-utils.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -287,6 +289,31 @@ export async function handler(event) {
   }
 
   try {
+    const tournament = await loadHostedTournament(tournamentSlug);
+    const access = tournament ? await requireTournamentEventAccess(event, tournament) : { ok: true, method: 'public' };
+    if (access.error) {
+      return json(access.error.statusCode, { error: access.error.message, code: access.error.code });
+    }
+
+    // A guest key is intentionally view-only. It must never turn a private
+    // event status response into an account/identity lookup.
+    if (access.method === 'guest') {
+      return json(200, {
+        ok: true,
+        tournamentSlug,
+        access: 'guest',
+        account: null,
+        signup: null,
+        bracketStatus: null,
+        participantCount: 0,
+        currentMatch: null,
+        waitingMatch: null,
+        finalMatch: null,
+        nextStep: 'sign-in',
+        statusLabel: statusLabel('sign-in'),
+      });
+    }
+
     const account = await getAccountFromEvent(event);
 
     if (!account) {

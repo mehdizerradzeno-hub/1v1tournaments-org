@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -39,6 +39,7 @@ import {
   fetchSignupSummary,
   fetchTournamentBracket,
   fetchTournamentEvent,
+  exchangeTournamentGuestKey,
   issueTournamentMatchTicket,
 } from '../lib/tournamentHostingClient.js';
 import { downloadLinks } from '../lib/downloadLinks.js';
@@ -61,6 +62,50 @@ const TOURNAMENT_TABS = [
   { id: 'results', label: 'Results', body: 'Final placement and the permanent event record.' },
 ];
 const TWITCH_VIEWER_COMMANDS = ['!join', '!next', '!match', '!bracket', '!rules', '!discord'];
+
+function GuestAccessPanel({ slug, onUnlocked }) {
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit() {
+    const trimmed = key.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError('');
+
+    try {
+      await exchangeTournamentGuestKey({ slug, key: trimmed });
+      onUnlocked?.();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'That guest key could not be accepted.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Surface style={styles.guestAccessPanel}>
+      <Text style={styles.sectionTitle}>Guest key required</Text>
+      <Text style={styles.bodyCopy}>This event is shared by invitation. Enter the key from the tournament host to view its schedule, players, and bracket.</Text>
+      <TextInput
+        autoCapitalize="none"
+        autoCorrect={false}
+        onChangeText={setKey}
+        onSubmitEditing={handleSubmit}
+        placeholder="Paste guest key"
+        placeholderTextColor="#6B766F"
+        secureTextEntry
+        style={styles.guestAccessInput}
+        value={key}
+      />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <ActionButton disabled={!key.trim() || busy} onPress={handleSubmit}>
+        {busy ? 'Checking key...' : 'Unlock event'}
+      </ActionButton>
+    </Surface>
+  );
+}
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -480,7 +525,7 @@ export default function TournamentScreen({ slug }) {
   const [signupSummary, setSignupSummary] = useState({ count: 0, signups: [], loading: true, error: '' });
   const [tournamentSettings, setTournamentSettings] = useState(null);
   const [hostedTournament, setHostedTournament] = useState(null);
-  const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '' });
+  const [tournamentLookup, setTournamentLookup] = useState({ loading: true, error: '', code: '' });
   const nowMs = useVisibleNow(15000);
   const seededTournament = getTournamentBySlug(slug);
   const tournament = useMemo(
@@ -497,19 +542,19 @@ export default function TournamentScreen({ slug }) {
 
     async function loadTournamentRecord() {
       if (!slug) {
-        setTournamentLookup({ loading: false, error: '' });
+        setTournamentLookup({ loading: false, error: '', code: '' });
         setHostedTournament(null);
         return;
       }
 
-      setTournamentLookup({ loading: !seededTournament, error: '' });
+      setTournamentLookup({ loading: !seededTournament, error: '', code: '' });
 
       try {
         const result = await fetchTournamentEvent({ slug });
 
         if (active) {
           setHostedTournament(result.tournament || null);
-          setTournamentLookup({ loading: false, error: '' });
+          setTournamentLookup({ loading: false, error: '', code: '' });
         }
       } catch (error) {
         if (active) {
@@ -517,6 +562,7 @@ export default function TournamentScreen({ slug }) {
           setTournamentLookup({
             loading: false,
             error: error instanceof Error ? error.message : 'Tournament record could not be loaded.',
+            code: error?.code || '',
           });
         }
       }
@@ -673,6 +719,9 @@ export default function TournamentScreen({ slug }) {
           body={tournamentLookup.error || 'The detail route is ready, but the matching tournament record still needs to be added.'}
           title="Nothing to display"
         />
+        {tournamentLookup.code === 'guest_access_required' ? (
+          <GuestAccessPanel slug={slug} onUnlocked={() => globalThis.location?.reload?.()} />
+        ) : null}
       </HubScreen>
     );
   }
@@ -768,6 +817,9 @@ export default function TournamentScreen({ slug }) {
       showHero={false}
       showNavigation
       title={visibleTournament.title}>
+      {tournamentLookup.code === 'guest_access_required' ? (
+        <GuestAccessPanel slug={slug} onUnlocked={() => globalThis.location?.reload?.()} />
+      ) : null}
       <TournamentLobbyHero
         advertisedRosterCap={advertisedRosterCap}
         checkInPath={checkInPath}
@@ -2247,6 +2299,33 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
 }
 
 const styles = StyleSheet.create({
+  guestAccessPanel: {
+    gap: 12,
+    marginTop: 18,
+    maxWidth: 620,
+    padding: 18,
+  },
+  guestAccessInput: {
+    backgroundColor: '#F4EFE6',
+    borderColor: '#C9BDAA',
+    borderRadius: 10,
+    borderWidth: 1,
+    color: '#1C2421',
+    fontSize: 16,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sectionTitle: {
+    color: '#F4EFE6',
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  bodyCopy: {
+    color: '#B8B8AF',
+    fontSize: 14,
+    lineHeight: 21,
+  },
   arrivalAction: {
     minHeight: 44,
   },

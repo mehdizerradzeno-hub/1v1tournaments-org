@@ -8,6 +8,7 @@ const MATCH_ACCESS_ENDPOINT = '/.netlify/functions/tournament-match-access';
 const PLAYER_STATUS_ENDPOINT = '/.netlify/functions/tournament-player-status';
 const SETTINGS_ENDPOINT = '/.netlify/functions/tournament-settings';
 const EVENTS_ENDPOINT = '/.netlify/functions/tournament-events';
+const GUEST_ACCESS_ENDPOINT = '/.netlify/functions/tournament-guest-access';
 const SERIES_ENDPOINT = '/.netlify/functions/tournament-series';
 const EUCHRE_PILOT_ENDPOINT = '/.netlify/functions/tournament-pilot';
 const DISCORD_ALERT_ENDPOINT = '/.netlify/functions/discord-alert';
@@ -76,6 +77,12 @@ function adminHeaders(token, headers = {}) {
   }
 
   return nextHeaders;
+}
+
+function throwApiError(result, fallback) {
+  const error = new Error(result?.error || fallback);
+  if (result?.code) error.code = result.code;
+  throw error;
 }
 
 export async function submitTournamentSignup(payload) {
@@ -227,7 +234,7 @@ export async function fetchSignupSummary({ slug }) {
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(result?.error || 'Signup count could not be loaded.');
+    throwApiError(result, 'Signup count could not be loaded.');
   }
 
   return result;
@@ -260,7 +267,7 @@ export async function fetchTournamentEvents({ slug, token, includePrivate = fals
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(result?.error || 'Tournament events could not be loaded.');
+    throwApiError(result, 'Tournament events could not be loaded.');
   }
 
   return result;
@@ -359,6 +366,42 @@ export async function fetchTournamentEvent({ slug }) {
     ...result,
     tournament: result.tournament || result.tournaments?.[0] || null,
   };
+}
+
+export async function exchangeTournamentGuestKey({ slug, key }) {
+  const response = await fetch(GUEST_ACCESS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'exchange', tournamentSlug: slug, key }),
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok) throwApiError(result, 'That guest key could not be accepted.');
+  return result;
+}
+
+export async function createTournamentGuestKey({ token, slug, rotate = false }) {
+  const response = await fetch(GUEST_ACCESS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action: rotate ? 'rotate' : 'create', tournamentSlug: slug }),
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok) throwApiError(result, 'Guest key could not be created.');
+  return result;
+}
+
+export async function revokeTournamentGuestKey({ token, slug }) {
+  const response = await fetch(GUEST_ACCESS_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: adminHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action: 'revoke', tournamentSlug: slug }),
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok) throwApiError(result, 'Guest key could not be revoked.');
+  return result;
 }
 
 export async function saveTournamentEvent({ token, tournament }) {
@@ -492,7 +535,7 @@ export async function fetchTournamentBracket({ slug }) {
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(result?.error || 'Bracket could not be loaded.');
+    throwApiError(result, 'Bracket could not be loaded.');
   }
 
   return result;
@@ -529,7 +572,7 @@ export async function fetchTournamentPlayerStatus({ slug }) {
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(result?.error || 'Player tournament status could not be loaded.');
+    throwApiError(result, 'Player tournament status could not be loaded.');
   }
 
   return result;

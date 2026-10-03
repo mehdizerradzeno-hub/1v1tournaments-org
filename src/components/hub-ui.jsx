@@ -177,6 +177,22 @@ function LinkShell({ href, children, style, accessibilityLabel, accessibilitySta
       accessibilityRole={href ? 'link' : 'button'}
       accessibilityState={{ ...accessibilityState, disabled }}
       disabled={disabled}
+      onKeyDown={(event) => {
+        if (disabled || (event?.key !== 'Enter' && event?.key !== ' ')) return;
+        event.preventDefault?.();
+        if (onPress) {
+          onPress();
+          return;
+        }
+        if (href) {
+          trackSiteEvent('link_click', {
+            external: true,
+            from: globalThis.location?.pathname || '/',
+            to: href,
+          });
+          Linking.openURL(href).catch(() => {});
+        }
+      }}
       onPress={() => {
         if (disabled) {
           return;

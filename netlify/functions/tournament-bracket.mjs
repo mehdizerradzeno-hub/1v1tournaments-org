@@ -11,6 +11,7 @@ import {
 } from './_tournament-events-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
+import { requireTournamentEventAccess } from './_tournament-guest-auth.mjs';
 import { normalizeCheckInLeadMinutes } from '../../src/lib/tournamentSettings.js';
 import {
   TOURNAMENT_GAME_PROTOCOL_VERSION,
@@ -619,17 +620,21 @@ async function loadTournamentSignups(tournamentSlug) {
   return signups.filter(Boolean);
 }
 
-function publicBracket(bracket) {
+function publicBracket(bracket, options = {}) {
   if (!bracket) {
     return null;
   }
+
+  const includeAccountIds = options.includeAccountIds !== false;
 
   return {
     ...bracket,
     participants: bracket.participants.map((participant) => ({
       id: participant.id,
-      accountId: participant.accountId || '',
-      canonicalAccountId: participant.canonicalAccountId || participant.accountId || '',
+      ...(includeAccountIds ? {
+        accountId: participant.accountId || '',
+        canonicalAccountId: participant.canonicalAccountId || participant.accountId || '',
+      } : {}),
       seed: participant.seed,
       name: participant.name,
       handle: participant.handle || '',
@@ -642,8 +647,10 @@ function publicBracket(bracket) {
           player
             ? {
                 id: player.id,
-                accountId: player.accountId || '',
-                canonicalAccountId: player.canonicalAccountId || player.accountId || '',
+                ...(includeAccountIds ? {
+                  accountId: player.accountId || '',
+                  canonicalAccountId: player.canonicalAccountId || player.accountId || '',
+                } : {}),
                 seed: player.seed,
                 name: player.name,
                 handle: player.handle || '',
@@ -655,7 +662,7 @@ function publicBracket(bracket) {
   };
 }
 
-function publicMatchDetails(bracket, matchId) {
+function publicMatchDetails(bracket, matchId, options = {}) {
   if (!bracket) {
     return null;
   }
@@ -672,14 +679,16 @@ function publicMatchDetails(bracket, matchId) {
           index: round.index,
           title: round.title,
         },
-        match: {
+          match: {
           ...match,
           players: match.players.map((player) =>
             player
               ? {
                   id: player.id,
-                  accountId: player.accountId || '',
-                  canonicalAccountId: player.canonicalAccountId || player.accountId || '',
+                  ...(options.includeAccountIds !== false ? {
+                    accountId: player.accountId || '',
+                    canonicalAccountId: player.canonicalAccountId || player.accountId || '',
+                  } : {}),
                   seed: player.seed,
                   name: player.name,
                   handle: player.handle || '',
@@ -988,9 +997,14 @@ export async function handler(event) {
 
     try {
       const bracket = await loadBracket(tournamentSlug);
+      const tournament = await loadHostedTournament(tournamentSlug);
+      const access = tournament ? await requireTournamentEventAccess(event, tournament) : { ok: true, method: 'public' };
+      if (access.error) {
+        return json(access.error.statusCode, { error: access.error.message, code: access.error.code });
+      }
 
       if (requestedMatchId) {
-        const matchDetails = publicMatchDetails(bracket, requestedMatchId);
+        const matchDetails = publicMatchDetails(bracket, requestedMatchId, { includeAccountIds: access.method !== 'guest' });
 
         if (!matchDetails) {
           return json(404, { error: 'That match was not found in this bracket.' });
@@ -999,7 +1013,7 @@ export async function handler(event) {
         return json(200, { ok: true, match: matchDetails });
       }
 
-      return json(200, { ok: true, bracket: publicBracket(bracket) });
+      return json(200, { ok: true, access: access.method, bracket: publicBracket(bracket, { includeAccountIds: access.method !== 'guest' }) });
     } catch (error) {
       console.error('Public bracket load failed', error);
       return json(500, { error: 'Bracket storage is not available yet.' });

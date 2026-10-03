@@ -14,6 +14,7 @@ import { loadEuchrePilotPolicy } from './_euchre-pilot-utils.mjs';
 import { loadTournamentSettings, normalizeRegistrationStatus } from './_tournament-settings-utils.mjs';
 import { evaluateEuchrePilotSignupAccess } from '../../src/lib/euchrePilot.js';
 import { siteData } from '../../src/lib/siteData.js';
+import { requireTournamentEventAccess } from './_tournament-guest-auth.mjs';
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -96,11 +97,14 @@ function signupKey(tournamentSlug, contactEmail) {
   return `${tournamentSlug}/${emailKey(contactEmail)}.json`;
 }
 
-export function publicSignup(signup, currentAccount = null) {
+export function publicSignup(signup, currentAccount = null, options = {}) {
+  const includeAccountIds = options.includeAccountIds !== false;
   return {
     id: signup.id,
-    accountId: signup.accountId || '',
-    canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
+    ...(includeAccountIds ? {
+      accountId: signup.accountId || '',
+      canonicalAccountId: signup.canonicalAccountId || signup.accountCanonicalId || signup.accountId || '',
+    } : {}),
     tournamentSlug: signup.tournamentSlug,
     playerName: signup.playerName,
     playerHandle: signup.playerHandle,
@@ -126,14 +130,14 @@ async function loadTournamentSignups(store, tournamentSlug) {
   });
 }
 
-async function publicSignupSummary(store, tournamentSlug, currentAccount = null) {
+async function publicSignupSummary(store, tournamentSlug, currentAccount = null, options = {}) {
   const signups = await loadTournamentSignups(store, tournamentSlug);
   const { settings } = await getTournamentDate(tournamentSlug);
 
   return {
     tournamentSlug,
     signupCount: signups.length,
-    signups: signups.map((signup) => publicSignup(signup, currentAccount)),
+    signups: signups.map((signup) => publicSignup(signup, currentAccount, options)),
     settings,
   };
 }
@@ -193,7 +197,15 @@ export async function handler(event) {
         console.error('Account lookup failed during signup summary', accountError);
       }
 
-      const summary = await publicSignupSummary(store, tournamentSlug, account);
+      const tournament = await loadHostedTournament(tournamentSlug);
+      const access = tournament ? await requireTournamentEventAccess(event, tournament) : { ok: true, method: 'public' };
+      if (access.error) {
+        return json(access.error.statusCode, { error: access.error.message, code: access.error.code });
+      }
+
+      const summary = await publicSignupSummary(store, tournamentSlug, account, {
+        includeAccountIds: access.method !== 'guest',
+      });
 
       return json(200, {
         ok: true,
@@ -218,6 +230,17 @@ export async function handler(event) {
   }
 
   const tournamentSlug = cleanText(payload.tournamentSlug);
+
+  if (!tournamentSlug) {
+    return json(400, { error: 'Choose a tournament before signing up.' });
+  }
+
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const access = hostedTournament ? await requireTournamentEventAccess(event, hostedTournament) : { ok: true, method: 'public' };
+  if (access.error) {
+    return json(access.error.statusCode, { error: access.error.message, code: access.error.code });
+  }
+
   let account;
 
   try {
@@ -239,10 +262,6 @@ export async function handler(event) {
   const contactEmail = cleanEmail(account.email);
   const playerHandle = cleanText(account.playerHandle || payload.playerHandle);
   const notes = cleanText(payload.notes);
-
-  if (!tournamentSlug) {
-    return json(400, { error: 'Choose a tournament before signing up.' });
-  }
 
   if (!playerName) {
     return json(400, { error: 'Enter the player name for this signup.' });
@@ -314,8 +333,8 @@ export async function handler(event) {
 
       return json(200, {
         ok: true,
-        signup: publicSignup(linkedSignup, account),
-        summary: await publicSignupSummary(store, tournamentSlug, account),
+        signup: publicSignup(linkedSignup, account, { includeAccountIds: access.method !== 'guest' }),
+        summary: await publicSignupSummary(store, tournamentSlug, account, { includeAccountIds: access.method !== 'guest' }),
       });
     }
 
@@ -368,8 +387,8 @@ export async function handler(event) {
 
     return json(201, {
       ok: true,
-      signup: publicSignup(signup, account),
-      summary: await publicSignupSummary(store, tournamentSlug, account),
+      signup: publicSignup(signup, account, { includeAccountIds: access.method !== 'guest' }),
+      summary: await publicSignupSummary(store, tournamentSlug, account, { includeAccountIds: access.method !== 'guest' }),
     });
   } catch (error) {
     console.error('Tournament signup failed', error);
