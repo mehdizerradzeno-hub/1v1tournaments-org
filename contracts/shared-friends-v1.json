@@ -1,0 +1,18 @@
+{
+  "contractVersion": "2026-10-07",
+  "resource": "shared-friends",
+  "principal": {
+    "identifier": "canonicalAccountId",
+    "forbiddenIdentifiers": ["displayName", "handle", "email", "gamePlayerId", "roomId", "entrantId", "guestId", "botId"]
+  },
+  "publicProfile": ["canonicalAccountId", "handle", "displayName"],
+  "relationshipStates": ["pending", "accepted"],
+  "operations": ["search", "snapshot", "send", "accept", "decline", "cancel", "remove", "account-delete"],
+  "transport": {
+    "serviceAudiences": ["spades", "euchre"],
+    "idempotencyHeader": "Idempotency-Key",
+    "defaultPageSize": 25,
+    "maximumPageSize": 50
+  },
+  "failureCodes": ["feature_disabled", "friends_storage_unavailable", "service_not_authorized", "wrong_audience", "invalid_principal", "guest_or_bot", "self_action", "account_not_found", "request_not_found", "not_incoming_request", "already_friends", "hub_unavailable", "rate_limited"]
+}

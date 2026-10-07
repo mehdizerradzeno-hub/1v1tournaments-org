@@ -338,6 +338,14 @@ export async function deleteCanonicalAccountFootprint(account, options = {}) {
     options,
   );
 
+  // The live Friends authority remains disabled until a transactional central
+  // store is approved. Keeping this dependency injectable lets the deletion
+  // lifecycle remove every global edge atomically with that future authority
+  // without treating independent Blob records as a friend graph.
+  const friendsCleanup = typeof options.deleteFriendsForAccount === 'function'
+    ? await options.deleteFriendsForAccount({ canonicalAccountId: canonical })
+    : null;
+
   const identity = {
     email,
     ids: new Set([canonical, accountId].filter(Boolean)),
@@ -378,5 +386,6 @@ export async function deleteCanonicalAccountFootprint(account, options = {}) {
     signupsAnonymized,
     tombstoneId,
     spadesCleanup,
+    ...(friendsCleanup ? { friendsCleanup } : {}),
   };
 }

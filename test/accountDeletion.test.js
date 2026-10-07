@@ -422,6 +422,25 @@ test(
   },
 );
 
+test('canonical deletion invokes the injected global Friends cleanup after game cleanup', async () => {
+  const testStores = stores();
+  const order = [];
+  const result = await deleteCanonicalAccountFootprint(account, {
+    stores: testStores,
+    syncSpadesDeletion: async () => {
+      order.push('spades');
+      return { ok: true };
+    },
+    deleteFriendsForAccount: async ({ canonicalAccountId }) => {
+      order.push('friends');
+      assert.equal(canonicalAccountId, 'acct_target');
+      return { relationshipsRemoved: 2 };
+    },
+  });
+  assert.deepEqual(order, ['spades', 'friends']);
+  assert.deepEqual(result.friendsCleanup, { relationshipsRemoved: 2 });
+});
+
 test(
   'canonical deletion fails closed when Spades cleanup fails',
   async () => {
