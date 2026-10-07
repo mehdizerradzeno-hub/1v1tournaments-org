@@ -100,10 +100,22 @@ function storageUnavailable() {
  * admitted a trusted game service request. Missing Database configuration is
  * deliberately converted to a fail-closed Friends error.
  */
-export function createProductionFriendsAuthority({ database, resolveAccount = resolveFriendsAccount } = {}) {
+export function createProductionFriendsAuthority({
+  database,
+  resolveAccount = resolveFriendsAccount,
+  connectionString = process.env.NETLIFY_DB_URL,
+} = {}) {
   let activeDatabase = database;
   try {
-    activeDatabase ||= getDatabase();
+    // The platform-provided default can be a read-only role. Friends is the
+    // sole transactional authority for relationship and presence writes, so
+    // production uses its separately scoped runtime database secret.
+    const configuredConnectionString = typeof connectionString === 'string'
+      ? connectionString.trim()
+      : '';
+    activeDatabase ||= getDatabase(
+      configuredConnectionString ? { connectionString: configuredConnectionString } : undefined,
+    );
   } catch (error) {
     if (error instanceof MissingDatabaseConnectionError) throw storageUnavailable();
     throw error;
