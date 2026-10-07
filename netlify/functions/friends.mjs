@@ -5,7 +5,10 @@ import {
   hubFriendsEnabled,
   validateFriendsServiceCaller,
 } from './_friends-authority.mjs';
-import { createProductionFriendsAuthority } from './_friends-production-authority.mjs';
+import {
+  createProductionFriendsAuthority,
+  syncFriendsPublicProfile,
+} from './_friends-production-authority.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
@@ -41,6 +44,17 @@ export async function handleFriendsRequest(event, dependencies = {}) {
   if (!payload) return json(400, { ok: false, code: 'invalid_request' });
   try {
     const audience = (dependencies.validateCaller || validateFriendsServiceCaller)(event, payload.audience, { env });
+    if (payload.action === 'profile-sync') {
+      return json(200, {
+        ok: true,
+        profile: await (dependencies.syncProfile || syncFriendsPublicProfile)({
+          canonicalAccountId: payload.actorCanonicalAccountId,
+          handle: payload.handle,
+          displayName: payload.displayName,
+          audience,
+        }),
+      });
+    }
     const authority = dependencies.authority
       || await (dependencies.createAuthority || createProductionFriendsAuthority)();
     const actorCanonicalAccountId = payload.actorCanonicalAccountId;

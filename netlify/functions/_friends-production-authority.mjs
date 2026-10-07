@@ -1,6 +1,11 @@
 import { getDatabase, MissingDatabaseConnectionError } from '@netlify/database';
 
-import { accountCanonicalId, cleanText, getStoreWithFallback } from './_account-utils.mjs';
+import {
+  accountCanonicalId,
+  cleanText,
+  getStoreWithFallback,
+  saveAccount,
+} from './_account-utils.mjs';
 import { FriendsAuthority, FriendsAuthorityError } from './_friends-authority.mjs';
 import { PostgresFriendsAuthorityStore } from './_friends-postgres-store.mjs';
 
@@ -26,6 +31,64 @@ export async function resolveFriendsAccount(value) {
   }
   const canonicalAccountId = cleanText(value);
   return accounts.find((account) => accountCanonicalId(account) === canonicalAccountId) || null;
+}
+
+function normalizedPublicHandle(value) {
+  const handle = cleanText(value).replace(/^@/, '').toLowerCase().slice(0, 32);
+  if (!handle || !/^[a-z0-9._-]+$/.test(handle)) {
+    throw new FriendsAuthorityError(
+      'invalid_public_profile',
+      'Friends requires a valid public player handle.',
+      400,
+    );
+  }
+  return handle;
+}
+
+/**
+ * Hydrates an existing Hub account with the public profile that a trusted game
+ * received through the signed shared-account exchange. This deliberately only
+ * fills a missing handle: a later game exchange must never be able to replace
+ * an account's established public identity.
+ */
+export async function syncFriendsPublicProfile(
+  { canonicalAccountId, handle, displayName },
+  options = {},
+) {
+  const canonicalId = cleanText(canonicalAccountId);
+  if (!canonicalId) {
+    throw new FriendsAuthorityError('invalid_principal', 'Friends requires a valid account.', 400);
+  }
+
+  const account = await (options.resolveAccount || resolveFriendsAccount)(canonicalId);
+  if (!account) {
+    throw new FriendsAuthorityError('account_not_found', 'Friends account was not found.', 404);
+  }
+
+  const publicHandle = normalizedPublicHandle(handle);
+  const existingHandle = cleanText(account.playerHandle).replace(/^@/, '').toLowerCase();
+  if (existingHandle && existingHandle !== publicHandle) {
+    throw new FriendsAuthorityError(
+      'public_profile_conflict',
+      'Friends public profile does not match this account.',
+      409,
+    );
+  }
+
+  const publicName = cleanText(displayName).slice(0, 128);
+  const updatedAccount = {
+    ...account,
+    playerHandle: existingHandle || publicHandle,
+    playerName: cleanText(account.playerName).slice(0, 128) || publicName || publicHandle,
+    updatedAt: new Date().toISOString(),
+  };
+  await (options.saveAccount || saveAccount)(updatedAccount);
+
+  return {
+    canonicalAccountId: accountCanonicalId(updatedAccount),
+    handle: updatedAccount.playerHandle,
+    displayName: updatedAccount.playerName,
+  };
 }
 
 function storageUnavailable() {

@@ -12,7 +12,10 @@ import {
 } from '../netlify/functions/_friends-authority.mjs';
 import { handleFriendsRequest } from '../netlify/functions/friends.mjs';
 import { PostgresFriendsAuthorityStore } from '../netlify/functions/_friends-postgres-store.mjs';
-import { createProductionFriendsAuthority } from '../netlify/functions/_friends-production-authority.mjs';
+import {
+  createProductionFriendsAuthority,
+  syncFriendsPublicProfile,
+} from '../netlify/functions/_friends-production-authority.mjs';
 
 const accounts = new Map([
   ['acct-a', { canonicalAccountId: 'acct-a', playerHandle: 'alpha', playerName: 'Alpha' }],
@@ -159,6 +162,64 @@ test('production Friends authority uses the injected Database pool and server-on
   });
   assert.equal(response.relationship, 'outgoing');
   assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_relationships')));
+});
+
+test('trusted game exchanges hydrate a missing Friends public profile without replacing one', async () => {
+  const saved = [];
+  const account = { canonicalAccountId: 'acct-legacy', email: 'legacy@example.com', playerName: '' };
+  const profile = await syncFriendsPublicProfile({
+    canonicalAccountId: 'acct-legacy',
+    handle: '@Legacy_Player',
+    displayName: 'Legacy Player',
+  }, {
+    resolveAccount: async () => account,
+    saveAccount: async (next) => saved.push(next),
+  });
+  assert.deepEqual(profile, {
+    canonicalAccountId: 'acct-legacy',
+    handle: 'legacy_player',
+    displayName: 'Legacy Player',
+  });
+  assert.equal(saved.length, 1);
+  await assert.rejects(
+    syncFriendsPublicProfile({
+      canonicalAccountId: 'acct-legacy',
+      handle: 'other-player',
+      displayName: 'Other Player',
+    }, {
+      resolveAccount: async () => ({ ...saved[0] }),
+      saveAccount: async () => {},
+    }),
+    (error) => error instanceof FriendsAuthorityError && error.code === 'public_profile_conflict',
+  );
+});
+
+test('profile sync is limited to authenticated game services and does not open the friends store', async () => {
+  const calls = [];
+  const response = await handleFriendsRequest({
+    httpMethod: 'POST',
+    headers: { authorization: 'Bearer service-secret' },
+    body: JSON.stringify({
+      audience: 'spades',
+      action: 'profile-sync',
+      actorCanonicalAccountId: 'acct-a',
+      handle: 'alpha',
+      displayName: 'Alpha',
+    }),
+  }, {
+    env: { HUB_FRIENDS_ENABLED: 'true' },
+    validateCaller: () => 'spades',
+    createAuthority: () => { throw new Error('should not create Friends authority'); },
+    syncProfile: async (payload) => {
+      calls.push(payload);
+      return { canonicalAccountId: payload.canonicalAccountId, handle: payload.handle, displayName: payload.displayName };
+    },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(response.body).profile, {
+    canonicalAccountId: 'acct-a', handle: 'alpha', displayName: 'Alpha',
+  });
 });
 
 test('crossed requests are serialized into one accepted relationship', async () => {
