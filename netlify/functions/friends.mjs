@@ -79,6 +79,10 @@ export async function handleFriendsRequest(event, dependencies = {}) {
     if (error instanceof FriendsAuthorityError) {
       return json(error.statusCode, { ok: false, code: error.code, message: error.message });
     }
+    console.error('Friends authority request failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      code: typeof error?.code === 'string' ? error.code : undefined,
+    });
     return json(503, { ok: false, code: 'hub_unavailable' });
   }
 }
