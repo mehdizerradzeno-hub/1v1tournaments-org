@@ -107,9 +107,8 @@ export function createProductionFriendsAuthority({
 } = {}) {
   let activeDatabase = database;
   try {
-    // The platform-provided default can be a read-only role. Friends is the
-    // sole transactional authority for relationship and presence writes, so
-    // production uses its separately scoped runtime database secret.
+    // Friends uses the platform runtime connection. Migration 0003 grants
+    // that role mutation rights only on the Friends authority tables.
     const configuredConnectionString = typeof connectionString === 'string'
       ? connectionString.trim()
       : '';

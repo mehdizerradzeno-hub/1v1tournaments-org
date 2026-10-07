@@ -87,6 +87,16 @@ test('Netlify Database migration preserves normalized relationship and privacy c
   assert.doesNotMatch(migration, /room_code|match_id|last_seen|rating/i);
 });
 
+test('Friends runtime database grants are limited to Friends authority state', () => {
+  const migration = readFileSync(new URL('../netlify/database/migrations/0003_grant_friends_runtime_write.sql', import.meta.url), 'utf8');
+  assert.match(migration, /GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE/);
+  for (const table of ['friends_authority_state', 'friends_relationships', 'friends_idempotency', 'friends_presence', 'friends_audit_events']) {
+    assert.match(migration, new RegExp(`\\b${table}\\b`));
+  }
+  assert.match(migration, /GRANT USAGE ON SEQUENCE friends_audit_events_audit_id_seq/);
+  assert.doesNotMatch(migration, /GRANT ALL|ON ALL TABLES|PUBLIC/i);
+});
+
 test('Postgres Friends store commits normalized state atomically without persisting NUL pair keys', async () => {
   const pool = new RecordingFriendsPool();
   const store = new PostgresFriendsAuthorityStore({ pool });
