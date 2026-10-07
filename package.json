@@ -14,6 +14,7 @@
     "admin:server": "node ./server/adminServer.mjs",
     "lint": "eslint .",
     "test": "node --test",
+    "test:friends-cross-worktrees": "node --experimental-transform-types --experimental-loader ./integration/ts-source-loader.mjs ./integration/friendsCrossAdapters.mts",
     "smoke:prod": "node scripts/production-smoke.mjs",
     "smoke:tournament-integration": "node scripts/tournament-integration-smoke.mjs",
     "capacity": "node scripts/capacity-check.mjs",

@@ -1,9 +1,16 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 
-export const FRIENDS_CONTRACT_VERSION = '2026-10-07';
+export const FRIENDS_CONTRACT_VERSION = '2026-10-07-presence-1';
 export const FRIENDS_ALLOWED_AUDIENCES = new Set(['spades', 'euchre']);
 export const FRIENDS_PAGE_DEFAULT = 25;
 export const FRIENDS_PAGE_MAX = 50;
+export const FRIENDS_PRESENCE_TTL_MS = 90_000;
+export const FRIENDS_PRESENCE = Object.freeze({
+  SPADES: 'online_spades',
+  EUCHRE: 'online_euchre',
+  OFFLINE: 'offline',
+});
 
 export class FriendsAuthorityError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -42,7 +49,10 @@ function publicProfile(account) {
   if (!account || typeof account !== 'object') {
     throw new FriendsAuthorityError('account_not_found', 'That shared account is unavailable.', 404);
   }
-  if (account.deletedAt || account.isGuest === true || account.isBot === true || account.kind === 'guest' || account.kind === 'bot') {
+  if (account.deletedAt || account.blockedAt || account.isBlocked === true || account.status === 'blocked' || account.status === 'deleted') {
+    throw new FriendsAuthorityError('account_not_found', 'That shared account is unavailable.', 404);
+  }
+  if (account.isGuest === true || account.isBot === true || account.kind === 'guest' || account.kind === 'bot') {
     throw new FriendsAuthorityError('guest_or_bot', 'Only active human shared accounts can use Friends.', 403);
   }
   const canonicalAccountId = canonicalId(account.canonicalAccountId || account.id);
@@ -108,14 +118,23 @@ function safeAuditEvent(event, actor, target, pair, at) {
 }
 
 /**
- * This is intentionally a test-only atomic implementation. Its lock lets the
- * state machine prove crossed-request semantics without pretending Netlify
- * Blobs provide a distributed transaction or unique unordered-pair constraint.
+ * Hub Friends transactional-state interface: an authority receives an object
+ * with `atomic(work)`, and the work receives relationship, idempotency,
+ * presence, audit, and version state as one atomic unit. A production adapter
+ * must provide this authority explicitly; Netlify Blobs do not satisfy it.
+ *
+ * This is intentionally a test-only in-memory implementation. Its lock lets
+ * the state machine prove crossed-request and presence semantics without
+ * pretending Netlify Blobs provide a distributed transaction or unique
+ * unordered-pair constraint.
  */
 export class InMemoryFriendsAuthorityStore {
   constructor() {
     this.relationships = new Map();
     this.idempotency = new Map();
+    // This is an intentionally ephemeral, test-only implementation of the
+    // transactional Hub state. It is not a Netlify Blobs substitute.
+    this.presence = new Map();
     this.audits = [];
     this.version = 0;
     this.tail = Promise.resolve();
@@ -153,7 +172,7 @@ export class FixedWindowFriendsRateLimiter {
 }
 
 export class FriendsAuthority {
-  constructor({ store, resolveAccount, now = () => new Date().toISOString(), rateLimiter, auditSink } = {}) {
+  constructor({ store, resolveAccount, now = () => new Date().toISOString(), nowMs = Date.now, rateLimiter, presenceRateLimiter, presenceTtlMs = FRIENDS_PRESENCE_TTL_MS, auditSink } = {}) {
     if (!store || typeof store.atomic !== 'function') {
       throw new Error('FriendsAuthority requires an injected atomic store.');
     }
@@ -163,7 +182,10 @@ export class FriendsAuthority {
     this.store = store;
     this.resolveAccount = resolveAccount;
     this.now = now;
+    this.nowMs = nowMs;
     this.rateLimiter = rateLimiter || new FixedWindowFriendsRateLimiter();
+    this.presenceRateLimiter = presenceRateLimiter || new FixedWindowFriendsRateLimiter({ limit: 12, windowMs: 60_000, now: nowMs });
+    this.presenceTtlMs = presenceTtlMs;
     this.auditSink = auditSink || (() => undefined);
   }
 
@@ -177,9 +199,9 @@ export class FriendsAuthority {
     return profile;
   }
 
-  rateLimit(audience, actor, operation) {
+  rateLimit(audience, actor, operation, limiter = this.rateLimiter) {
     const key = `${audience}:${hash(actor).slice(0, 20)}:${operation}`;
-    if (!this.rateLimiter.allow(key)) {
+    if (!limiter.allow(key)) {
       throw new FriendsAuthorityError('rate_limited', 'Too many Friends requests. Try again shortly.', 429);
     }
   }
@@ -188,6 +210,57 @@ export class FriendsAuthority {
     const audit = safeAuditEvent(event, actor, target, pair, this.now());
     store.audits.push(audit);
     this.auditSink(audit);
+  }
+
+  cleanExpiredPresence(store, currentMs) {
+    let changed = false;
+    for (const [accountId, record] of store.presence) {
+      if (!record || record.expiresAt <= currentMs) {
+        store.presence.delete(accountId);
+        changed = true;
+      }
+    }
+    if (changed) store.version += 1;
+  }
+
+  presenceFor(store, canonicalAccountId, currentMs) {
+    const record = store.presence.get(canonicalAccountId);
+    if (!record || record.expiresAt <= currentMs) return FRIENDS_PRESENCE.OFFLINE;
+    return record.game === 'spades'
+      ? FRIENDS_PRESENCE.SPADES
+      : record.game === 'euchre'
+        ? FRIENDS_PRESENCE.EUCHRE
+        : FRIENDS_PRESENCE.OFFLINE;
+  }
+
+  async heartbeatPresence({ audience, actorCanonicalAccountId }) {
+    const actor = await this.resolvePrincipal(actorCanonicalAccountId);
+    this.rateLimit(audience, actor.canonicalAccountId, 'presence-heartbeat', this.presenceRateLimiter);
+    const currentMs = this.nowMs();
+    return this.store.atomic(async (store) => {
+      this.cleanExpiredPresence(store, currentMs);
+      store.presence.set(actor.canonicalAccountId, {
+        game: audience,
+        expiresAt: currentMs + this.presenceTtlMs,
+      });
+      store.version += 1;
+      // Deliberately omit the expiry and account identity from the response.
+      return { contractVersion: FRIENDS_CONTRACT_VERSION, presence: this.presenceFor(store, actor.canonicalAccountId, currentMs) };
+    });
+  }
+
+  async clearPresence({ audience, actorCanonicalAccountId }) {
+    const actor = await this.resolvePrincipal(actorCanonicalAccountId);
+    this.rateLimit(audience, actor.canonicalAccountId, 'presence-clear', this.presenceRateLimiter);
+    const currentMs = this.nowMs();
+    return this.store.atomic(async (store) => {
+      this.cleanExpiredPresence(store, currentMs);
+      const current = store.presence.get(actor.canonicalAccountId);
+      // A Spades sign-out must not clear a newer Euchre heartbeat, and vice versa.
+      const cleared = Boolean(current && current.game === audience && store.presence.delete(actor.canonicalAccountId));
+      if (cleared) store.version += 1;
+      return { contractVersion: FRIENDS_CONTRACT_VERSION, cleared };
+    });
   }
 
   async search({ audience, actorCanonicalAccountId, query, cursor, limit }) {
@@ -209,7 +282,14 @@ export class FriendsAuthority {
   async snapshot({ audience, actorCanonicalAccountId, cursors = {}, limit }) {
     const actor = await this.resolvePrincipal(actorCanonicalAccountId);
     this.rateLimit(audience, actor.canonicalAccountId, 'snapshot');
-    const rows = await this.store.atomic(async (store) => [...store.relationships.values()]);
+    const currentMs = this.nowMs();
+    const { rows, presence } = await this.store.atomic(async (store) => {
+      this.cleanExpiredPresence(store, currentMs);
+      return {
+        rows: [...store.relationships.values()],
+        presence: new Map(store.presence),
+      };
+    });
     const grouped = { friends: [], incoming: [], outgoing: [] };
     for (const relationship of rows) {
       const [accountA, accountB] = parsePair(relationship.pair);
@@ -217,11 +297,16 @@ export class FriendsAuthority {
       const other = accountA === actor.canonicalAccountId ? accountB : accountA;
       try {
         const profile = await this.resolvePrincipal(other);
-        if (relationship.status === 'accepted') grouped.friends.push(profile);
+        if (relationship.status === 'accepted') {
+          grouped.friends.push({
+            ...profile,
+            presence: this.presenceFor({ presence }, profile.canonicalAccountId, currentMs),
+          });
+        }
         else if (relationship.requestedByAccountId === actor.canonicalAccountId) grouped.outgoing.push(profile);
         else grouped.incoming.push(profile);
       } catch (error) {
-        if (!(error instanceof FriendsAuthorityError) || error.code !== 'account_not_found') throw error;
+        if (!(error instanceof FriendsAuthorityError) || !['account_not_found', 'guest_or_bot'].includes(error.code)) throw error;
       }
     }
     for (const values of Object.values(grouped)) {
@@ -324,14 +409,15 @@ export class FriendsAuthority {
     const account = await this.resolvePrincipal(canonicalAccountId);
     return this.store.atomic(async (store) => {
       let relationshipsRemoved = 0;
-      for (const [key, relationship] of store.relationships) {
+      for (const [key] of store.relationships) {
         if (!key.includes(`${account.canonicalAccountId}\u0000`) && !key.endsWith(`\u0000${account.canonicalAccountId}`)) continue;
         store.relationships.delete(key);
         relationshipsRemoved += 1;
       }
-      if (relationshipsRemoved) store.version += 1;
+      const presenceCleared = store.presence.delete(account.canonicalAccountId);
+      if (relationshipsRemoved || presenceCleared) store.version += 1;
       this.recordAudit(store, 'friend_account_deleted', account.canonicalAccountId, null, null);
-      return { contractVersion: FRIENDS_CONTRACT_VERSION, relationshipsRemoved };
+      return { contractVersion: FRIENDS_CONTRACT_VERSION, relationshipsRemoved, presenceCleared };
     });
   }
 }

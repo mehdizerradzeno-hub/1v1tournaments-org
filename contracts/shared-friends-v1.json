@@ -1,5 +1,5 @@
 {
-  "contractVersion": "2026-10-07",
+  "contractVersion": "2026-10-07-presence-1",
   "resource": "shared-friends",
   "principal": {
     "identifier": "canonicalAccountId",
@@ -7,7 +7,14 @@
   },
   "publicProfile": ["canonicalAccountId", "handle", "displayName"],
   "relationshipStates": ["pending", "accepted"],
-  "operations": ["search", "snapshot", "send", "accept", "decline", "cancel", "remove", "account-delete"],
+  "operations": ["search", "snapshot", "send", "accept", "decline", "cancel", "remove", "presence-heartbeat", "presence-clear", "account-delete"],
+  "presence": {
+    "acceptedFriendField": "presence",
+    "allowedValues": ["online_spades", "online_euchre", "offline"],
+    "heartbeatTtlSeconds": 90,
+    "projection": "accepted-friends-only",
+    "forbiddenFields": ["presenceTimestamp", "lastSeen", "host", "table", "roomCode", "matchId", "joinUrl", "spectateUrl", "inviteUrl", "rating", "navigationUrl"]
+  },
   "transport": {
     "serviceAudiences": ["spades", "euchre"],
     "idempotencyHeader": "Idempotency-Key",

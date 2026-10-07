@@ -50,6 +50,12 @@ export async function handleFriendsRequest(event, dependencies = {}) {
     if (payload.action === 'snapshot') {
       return json(200, { ok: true, ...(await authority.snapshot({ audience, actorCanonicalAccountId, cursors: payload.cursors, limit: payload.limit })) });
     }
+    if (payload.action === 'presence-heartbeat') {
+      return json(200, { ok: true, ...(await authority.heartbeatPresence({ audience, actorCanonicalAccountId })) });
+    }
+    if (payload.action === 'presence-clear') {
+      return json(200, { ok: true, ...(await authority.clearPresence({ audience, actorCanonicalAccountId })) });
+    }
     if (['send', 'accept', 'decline', 'cancel', 'remove'].includes(payload.action)) {
       return json(200, { ok: true, ...(await authority.mutate({ audience, action: payload.action, actorCanonicalAccountId, targetCanonicalAccountId: payload.targetCanonicalAccountId, idempotencyKey })) });
     }

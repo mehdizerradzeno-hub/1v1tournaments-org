@@ -4,11 +4,11 @@ import test from "node:test";
 import {
   SpadesHubFriendsAdapter,
   SpadesHubFriendsClient,
-} from "../../spades/artifacts/api-server/src/lib/hub-friends-client.ts";
+} from "../../1v1-spades-social-tournament-friends-20261006/artifacts/api-server/src/lib/hub-friends-client.ts";
 import {
   EuchreHubFriendsClient,
-} from "../../euchre/artifacts/api-server/src/hub-friends-client.ts";
-import { EuchreFriendsService } from "../../euchre/artifacts/api-server/src/friends-service.ts";
+} from "../../euchre-hub-friends-prep-20261007/artifacts/api-server/src/hub-friends-client.ts";
+import { EuchreFriendsService } from "../../euchre-hub-friends-prep-20261007/artifacts/api-server/src/friends-service.ts";
 import {
   FriendsAuthority,
   InMemoryFriendsAuthorityStore,
@@ -26,7 +26,7 @@ const env = {
   HUB_FRIENDS_EUCHRE_SECRET: secret,
 };
 
-test("a relationship created through Spades is visible and mutable through Euchre", async () => {
+test("a relationship and its coarse online state cross the supplied game worktrees", async () => {
   const authority = new FriendsAuthority({
     store: new InMemoryFriendsAuthorityStore(),
     resolveAccount: async (input: string | { searchHandle: string }) => typeof input === "string"
@@ -68,4 +68,18 @@ test("a relationship created through Spades is visible and mutable through Euchr
     publicIdentity: { canonicalAccountId: "acct-spades" },
   } as any);
   assert.deepEqual(spadesSnapshot.friends.map((profile) => profile.handle), ["euchre-player"]);
+
+  await spades.heartbeat({
+    identity: { canonicalIdentityValidated: true },
+    publicIdentity: { canonicalAccountId: "acct-spades" },
+  } as any);
+  const euchreView = await euchre.snapshot("opaque-euchre-session");
+  assert.deepEqual(euchreView.friends.map((profile) => profile.presence), ["online_spades"]);
+
+  await euchre.heartbeat("opaque-euchre-session");
+  const spadesView = await spades.snapshot({
+    identity: { canonicalIdentityValidated: true },
+    publicIdentity: { canonicalAccountId: "acct-spades" },
+  } as any);
+  assert.deepEqual(spadesView.friends.map((profile) => profile.presence), ["online_euchre"]);
 });
