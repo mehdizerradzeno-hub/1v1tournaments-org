@@ -3,8 +3,9 @@
 The Hub contract is deliberately fail-closed: `HUB_FRIENDS_ENABLED`,
 `SPADES_HUB_FRIENDS_ENABLED`, and `EUCHRE_HUB_FRIENDS_ENABLED` remain off by
 default. Netlify Blobs are not used as a transactional Friends or presence
-authority. Production needs an explicitly injected transactional authority
-before either relationship or presence traffic can activate.
+authority. Production uses the server-only Netlify Database adapter only after
+the Database is configured; it fails closed without that dependency. See
+`docs/shared-friends-database-rollout.md` for the schema and staged rollout.
 
 Presence is an accepted-friends-only projection. A game server derives the
 actor from its validated server session, sends a bounded heartbeat for its own

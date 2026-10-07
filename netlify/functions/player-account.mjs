@@ -24,6 +24,8 @@ import {
 } from './_account-utils.mjs';
 import { isHostAccount } from './_host-auth.mjs';
 import { deleteCanonicalAccountFootprint } from './_account-deletion.mjs';
+import { hubFriendsEnabled } from './_friends-authority.mjs';
+import { deleteFriendsForAccount as deleteDurableFriendsForAccount } from './_friends-production-authority.mjs';
 import {
   consumePlayerEmailCode,
   emailProviderConfigured,
@@ -200,6 +202,8 @@ export async function deleteAccount(event, payload, options = {}) {
     options.deleteSessionsForAccount || deleteSessionsForAccount;
   const removeAccount =
     options.deleteAccountRecord || deleteAccountRecord;
+  const deleteFriends = options.deleteFriendsForAccount
+    || (hubFriendsEnabled(options.env || process.env) ? deleteDurableFriendsForAccount : null);
 
   const account = await resolveAccount(event);
 
@@ -213,7 +217,10 @@ export async function deleteAccount(event, payload, options = {}) {
 
   const canonicalAccountId = account.canonicalAccountId || account.id;
 
-  const cleanup = await cleanupAccount(account);
+  const cleanup = await cleanupAccount(account, {
+    ...options,
+    ...(deleteFriends ? { deleteFriendsForAccount: deleteFriends } : {}),
+  });
 
   // Prevent a recently issued signed session from being accepted through
   // the short propagation-grace fallback after deletion.

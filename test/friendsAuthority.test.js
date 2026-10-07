@@ -11,6 +11,8 @@ import {
   InMemoryFriendsAuthorityStore,
 } from '../netlify/functions/_friends-authority.mjs';
 import { handleFriendsRequest } from '../netlify/functions/friends.mjs';
+import { PostgresFriendsAuthorityStore } from '../netlify/functions/_friends-postgres-store.mjs';
+import { createProductionFriendsAuthority } from '../netlify/functions/_friends-production-authority.mjs';
 
 const accounts = new Map([
   ['acct-a', { canonicalAccountId: 'acct-a', playerHandle: 'alpha', playerName: 'Alpha' }],
@@ -35,9 +37,128 @@ function createAuthority(options = {}) {
   });
 }
 
+class RecordingFriendsClient {
+  constructor({ fail = false, relationshipRows = [] } = {}) {
+    this.fail = fail;
+    this.relationshipRows = relationshipRows;
+    this.queries = [];
+    this.released = false;
+  }
+
+  async query(statement, params = []) {
+    this.queries.push({ statement: String(statement), params });
+    if (this.fail && statement === 'BEGIN') throw new Error('database offline');
+    if (String(statement).includes('FROM friends_relationships')) return { rows: this.relationshipRows };
+    if (String(statement).includes('FROM friends_authority_state')) return { rows: [{ version: 0 }] };
+    return { rows: [] };
+  }
+
+  release() {
+    this.released = true;
+  }
+}
+
+class RecordingFriendsPool {
+  constructor(options) {
+    this.client = new RecordingFriendsClient(options);
+  }
+
+  async connect() {
+    return this.client;
+  }
+}
+
 test('shared Friends contract artifact stays frozen', () => {
   const content = readFileSync(new URL('../contracts/shared-friends-v1.json', import.meta.url));
   assert.equal(createHash('sha256').update(content).digest('hex'), '834c6407123107e2e99519bb0f737b96503fb7fcef3afe8e30f10aa53d14362c');
+});
+
+test('Netlify Database migration preserves normalized relationship and privacy constraints', () => {
+  const migration = readFileSync(new URL('../netlify/database/migrations/0002_shared_friends_authority.sql', import.meta.url), 'utf8');
+  for (const table of ['friends_authority_state', 'friends_relationships', 'friends_idempotency', 'friends_presence', 'friends_audit_events']) {
+    assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
+  }
+  assert.match(migration, /PRIMARY KEY \(left_account_id, right_account_id\)/);
+  assert.match(migration, /CHECK \(left_account_id < right_account_id\)/);
+  assert.match(migration, /CHECK \(game IN \('spades', 'euchre'\)\)/);
+  assert.doesNotMatch(migration, /room_code|match_id|last_seen|rating/i);
+});
+
+test('Postgres Friends store commits normalized state atomically without persisting NUL pair keys', async () => {
+  const pool = new RecordingFriendsPool();
+  const store = new PostgresFriendsAuthorityStore({ pool });
+  const response = await store.atomic(async (state) => {
+    state.relationships.set('acct-a\u0000acct-b', {
+      pair: 'acct-a\u0000acct-b',
+      requestedByAccountId: 'acct-a',
+      status: 'pending',
+      createdAt: '2026-10-07T12:00:00.000Z',
+      updatedAt: '2026-10-07T12:00:00.000Z',
+    });
+    state.idempotency.set('acct-a\u0000send\u0000send-1', { contractVersion: '2026-10-07-presence-1', relationship: 'outgoing' });
+    state.presence.set('acct-b', { game: 'spades', expiresAt: 90_000 });
+    state.audits.push({ event: 'friend_request_sent', at: '2026-10-07T12:00:00.000Z', actorFingerprint: 'actor', targetFingerprint: 'target', pairFingerprint: 'pair' });
+    state.version += 1;
+    return 'committed';
+  });
+  assert.equal(response, 'committed');
+  assert.ok(pool.client.queries.some(({ statement }) => statement === 'BEGIN'));
+  assert.ok(pool.client.queries.some(({ statement }) => statement.includes('pg_advisory_xact_lock')));
+  assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_relationships')));
+  assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_presence')));
+  assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_audit_events')));
+  assert.ok(pool.client.queries.some(({ statement }) => statement === 'COMMIT'));
+  assert.equal(pool.client.queries.some(({ params }) => params.some((value) => String(value).includes('\u0000'))), false);
+  assert.equal(pool.client.released, true);
+});
+
+test('Postgres Friends store rolls back and releases the connection on failure', async () => {
+  const pool = new RecordingFriendsPool();
+  const store = new PostgresFriendsAuthorityStore({ pool });
+  await assert.rejects(store.atomic(async () => { throw new Error('abort'); }), /abort/);
+  assert.ok(pool.client.queries.some(({ statement }) => statement === 'ROLLBACK'));
+  assert.equal(pool.client.released, true);
+});
+
+test('Postgres Friends store persists transitions of records loaded in the transaction', async () => {
+  const pool = new RecordingFriendsPool({
+    relationshipRows: [{
+      left_account_id: 'acct-a',
+      right_account_id: 'acct-b',
+      requested_by_account_id: 'acct-a',
+      status: 'pending',
+      created_at: '2026-10-07T12:00:00.000Z',
+      updated_at: '2026-10-07T12:00:00.000Z',
+      accepted_at: null,
+    }],
+  });
+  const store = new PostgresFriendsAuthorityStore({ pool });
+  await store.atomic(async (state) => {
+    const relationship = state.relationships.get('acct-a\u0000acct-b');
+    relationship.status = 'accepted';
+    relationship.acceptedAt = '2026-10-07T12:01:00.000Z';
+    relationship.updatedAt = relationship.acceptedAt;
+    state.version += 1;
+  });
+  const update = pool.client.queries.find(({ statement }) => statement.includes('INSERT INTO friends_relationships'));
+  assert.ok(update);
+  assert.deepEqual(update.params.slice(0, 4), ['acct-a', 'acct-b', 'acct-a', 'accepted']);
+});
+
+test('production Friends authority uses the injected Database pool and server-only account resolver', async () => {
+  const pool = new RecordingFriendsPool();
+  const authority = createProductionFriendsAuthority({
+    database: { pool },
+    resolveAccount: async (id) => accounts.get(id) || null,
+  });
+  const response = await authority.mutate({
+    audience: 'spades',
+    action: 'send',
+    actorCanonicalAccountId: 'acct-a',
+    targetCanonicalAccountId: 'acct-b',
+  });
+  assert.equal(response.relationship, 'outgoing');
+  assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_relationships')));
 });
 
 test('crossed requests are serialized into one accepted relationship', async () => {

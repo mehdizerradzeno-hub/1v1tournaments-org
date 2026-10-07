@@ -5,6 +5,7 @@ import {
   hubFriendsEnabled,
   validateFriendsServiceCaller,
 } from './_friends-authority.mjs';
+import { createProductionFriendsAuthority } from './_friends-production-authority.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
@@ -27,9 +28,9 @@ function parseBody(event) {
 }
 
 /**
- * A transport seam for a future transactional central store. Production has no
- * authority dependency today, so this function fails closed even if a flag is
- * accidentally enabled. Tests inject an authority backed by the atomic store.
+ * Production resolves the server-only transactional authority only after the
+ * Hub feature gate and game-service authentication pass. Tests may inject an
+ * authority backed by the in-memory atomic store.
  */
 export async function handleFriendsRequest(event, dependencies = {}) {
   const env = dependencies.env || process.env;
@@ -40,8 +41,8 @@ export async function handleFriendsRequest(event, dependencies = {}) {
   if (!payload) return json(400, { ok: false, code: 'invalid_request' });
   try {
     const audience = (dependencies.validateCaller || validateFriendsServiceCaller)(event, payload.audience, { env });
-    const authority = dependencies.authority;
-    if (!authority) return json(503, { ok: false, code: 'friends_storage_unavailable' });
+    const authority = dependencies.authority
+      || await (dependencies.createAuthority || createProductionFriendsAuthority)();
     const actorCanonicalAccountId = payload.actorCanonicalAccountId;
     const idempotencyKey = event.headers?.['idempotency-key'] || event.headers?.['Idempotency-Key'];
     if (payload.action === 'search') {
