@@ -12,6 +12,7 @@ import {
 } from '../../src/lib/leagueCatalog.js';
 
 const STORE_NAME = 'leagues';
+const LEAGUE_RESULT_WRITE_ATTEMPTS = 3;
 
 function cleanText(value, fallback = '') {
   return String(value || '').trim().slice(0, 240);
@@ -52,6 +53,38 @@ function leagueKey(leagueId) {
 
 async function loadLeague(store, leagueId) {
   return store.get(leagueKey(leagueId), { type: 'json' });
+}
+
+async function loadLeagueWithMetadata(store, leagueId) {
+  const key = leagueKey(leagueId);
+  if (typeof store.getWithMetadata === 'function') {
+    const result = await store.getWithMetadata(key, { type: 'json' });
+    return result ? { league: result.data, etag: result.etag } : null;
+  }
+
+  const league = await store.get(key, { type: 'json' });
+  return league ? { league, etag: null } : null;
+}
+
+async function saveLeagueResult(store, league, etag) {
+  const key = leagueKey(league.id);
+  const options = {
+    metadata: {
+      leagueId: league.id,
+      status: league.status,
+      updatedAt: league.updatedAt,
+      gameSlug: league.gameSlug,
+    },
+    ...(etag ? { onlyIfMatch: etag } : {}),
+  };
+
+  if (typeof store.set === 'function') {
+    const result = await store.set(key, JSON.stringify(league), options);
+    return { modified: result?.modified !== false };
+  }
+
+  const result = await store.setJSON(key, league, options);
+  return { modified: result?.modified !== false };
 }
 
 function withStandings(record) {
@@ -250,38 +283,56 @@ export async function promoteLeagueWaitlist(leagueId, accountIdentity = {}) {
 }
 
 export async function upsertLeagueMatchResult(leagueId, matchId, result = {}, options = {}) {
-  const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
-  if (!league) return null;
-
+  const store = options.store || getLeagueStore();
   const resolvedResult = {
     ...normalizeMatchResult(result),
     source: cleanText(result.source, options.source),
     callbackId: cleanText(result.callbackId || options.callbackId),
   };
 
-  const updated = applyLeagueMatchResult(league, matchId, resolvedResult, {
-    force: Boolean(options.force),
-    callbackId: resolvedResult.callbackId,
-    source: cleanText(options.source || result.source),
-    updatedBy: cleanText(options.updatedBy),
-    skipHistory: false,
-  });
+  for (let attempt = 0; attempt < LEAGUE_RESULT_WRITE_ATTEMPTS; attempt += 1) {
+    const loaded = await loadLeagueWithMetadata(store, leagueId);
+    if (!loaded?.league) return null;
 
-  const next = {
-    ...updated.league,
-    id: league.id,
-  };
-  next.updatedAt = nowIso();
-  await store.setJSON(leagueKey(league.id), next);
+    const updated = applyLeagueMatchResult(loaded.league, matchId, resolvedResult, {
+      force: Boolean(options.force),
+      callbackId: resolvedResult.callbackId,
+      source: cleanText(options.source || result.source),
+      updatedBy: cleanText(options.updatedBy),
+      skipHistory: false,
+    });
 
-  return {
-    ...withStandings(next),
-    changed: updated.changed,
-    duplicate: updated.duplicate,
-    completeIgnored: updated.completeIgnored,
-    match: updated.match,
-  };
+    const currentMatch = (loaded.league.matches || []).find((match) => match.id === cleanText(matchId));
+    if (options.rejectConflictingCompleted && currentMatch?.status === 'complete' && !updated.duplicate) {
+      return {
+        ...withStandings(loaded.league),
+        changed: false,
+        duplicate: false,
+        completeIgnored: true,
+        conflict: true,
+        match: currentMatch,
+      };
+    }
+
+    const next = {
+      ...updated.league,
+      id: loaded.league.id,
+      updatedAt: nowIso(),
+    };
+    const saved = await saveLeagueResult(store, next, loaded.etag);
+    if (!saved.modified) continue;
+
+    return {
+      ...withStandings(next),
+      changed: updated.changed,
+      duplicate: updated.duplicate,
+      completeIgnored: updated.completeIgnored,
+      conflict: false,
+      match: updated.match,
+    };
+  }
+
+  throw new Error('League result write conflicted repeatedly; retry the authoritative callback.');
 }
 
 export async function launchLeagueMatch(leagueId, matchId, roomUrl = '', account = null) {

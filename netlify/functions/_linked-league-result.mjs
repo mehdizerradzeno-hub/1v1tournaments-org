@@ -165,10 +165,18 @@ export async function syncLinkedLeagueTournamentResult(
     source: linked.result.source,
     callbackId: linked.result.callbackId,
     updatedBy: 'tournament-authoritative-result',
+    rejectConflictingCompleted: true,
   });
 
   if (!updated) {
     throw new LinkedLeagueResultError(404, 'league_match_not_found', 'The linked league fixture was not found.');
+  }
+  if (updated.conflict) {
+    throw new LinkedLeagueResultError(
+      409,
+      'league_match_already_completed',
+      'The linked league fixture already has a different final result.',
+    );
   }
 
   return {
