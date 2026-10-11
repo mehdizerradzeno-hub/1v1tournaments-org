@@ -138,8 +138,12 @@ export function buildLinkedLeagueTournamentResult({ tournament, tournamentMatch,
     result: {
       winner: cleanText(result.winnerCanonicalAccountId) === linked.homeCanonicalAccountId ? 'home' : 'away',
       winnerId: cleanText(result.winnerCanonicalAccountId),
-      homeScore: Number.isInteger(scores?.north) ? scores.north : 0,
-      awayScore: Number.isInteger(scores?.south) ? scores.south : 0,
+      homeScore: Number.isInteger(scores?.north)
+        ? scores.north
+        : Number.isInteger(scores?.seat0) ? scores.seat0 : 0,
+      awayScore: Number.isInteger(scores?.south)
+        ? scores.south
+        : Number.isInteger(scores?.seat1) ? scores.seat1 : 0,
       forfeit: result.forfeit === true,
       source: 'tournament-authoritative-result',
       callbackId: cleanText(result.completionId),

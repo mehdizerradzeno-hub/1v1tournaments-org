@@ -696,25 +696,21 @@ function publicMatchDetails(bracket, matchId) {
           endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
           method: 'POST',
           tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
-          bodyTemplate: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'
-            ? {
-                action: 'report-result',
-                protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
-                game: 'euchre',
-                tournamentId: bracket.tournamentSlug,
-                matchId,
-                completionId: 'authoritative-euchre-completion-id',
-                winnerParticipantId: 'winner-participant-id-from-this-match',
-                winnerCanonicalAccountId: 'winner-canonical-account-id-from-this-match',
-                scores: { north: 10, south: 0 },
-                forfeit: false,
-                forfeitReason: '',
-              }
-            : {
-                action: 'report-winner',
-                matchId,
-                winnerId: 'winner-player-id-from-this-match',
-              },
+          bodyTemplate: {
+            action: 'report-result',
+            protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
+            game: normalizeTournamentGame(bracket.gameSlug || 'spades'),
+            tournamentId: bracket.tournamentSlug,
+            matchId,
+            completionId: 'authoritative-game-completion-id',
+            winnerParticipantId: 'winner-participant-id-from-this-match',
+            winnerCanonicalAccountId: 'winner-canonical-account-id-from-this-match',
+            scores: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'
+              ? { north: 10, south: 0 }
+              : { seat0: 250, seat1: 0 },
+            forfeit: false,
+            forfeitReason: '',
+          },
         },
       };
     }
@@ -968,7 +964,7 @@ export async function reportAuthoritativeResultWithRetry(tournamentSlug, result,
         return { bracket: savedBracket, duplicate: false, leagueSync };
       } catch (error) {
         // The bracket completion is durable now. Returning a retryable error
-        // makes Euchre's outbox redeliver the same completion; the duplicate
+        // makes the game's outbox redeliver the same completion; the duplicate
         // branch above performs the pending league write idempotently.
         return { error: linkedLeagueError(error) };
       }
