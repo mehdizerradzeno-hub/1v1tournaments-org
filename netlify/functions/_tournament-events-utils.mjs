@@ -16,6 +16,18 @@ import { siteData } from '../../src/lib/siteData.js';
 
 const STORE_NAME = 'tournament-events';
 const SERIES_STORE_NAME = 'tournament-series';
+const TOURNAMENT_READ_BATCH_SIZE = 16;
+
+async function mapInBatches(items, mapper, { settle = false } = {}) {
+  const results = [];
+
+  for (let index = 0; index < items.length; index += TOURNAMENT_READ_BATCH_SIZE) {
+    const batch = items.slice(index, index + TOURNAMENT_READ_BATCH_SIZE).map(mapper);
+    results.push(...await (settle ? Promise.allSettled(batch) : Promise.all(batch)));
+  }
+
+  return results;
+}
 
 function normalizeCompetitionMeta(value = {}) {
   if (!value || typeof value !== 'object') {
@@ -174,21 +186,27 @@ export async function listHostedTournaments(options = {}) {
   const store = options.store || getStoreWithFallback(STORE_NAME);
   const bracketStore = options.bracketStore || getStoreWithFallback('tournament-brackets');
   const seriesStore = options.seriesStore || getStoreWithFallback(SERIES_STORE_NAME);
-  const { blobs } = await store.list();
-  const tournamentReads = await Promise.allSettled(
-    blobs.map((blob) => store.get(blob.key, { type: 'json' })),
-  );
-  const tournaments = tournamentReads
-    .filter((result) => result.status === 'fulfilled')
-    .map((result) => result.value)
-    .filter(Boolean);
-  const visibility = await Promise.all(tournaments.map((tournament) => seriesIsVisible(tournament, seriesStore)));
+  const listedPages = store.list({ paginate: true });
+  const pages = typeof listedPages?.[Symbol.asyncIterator] === 'function'
+    ? listedPages
+    : [await listedPages];
+  const tournaments = [];
+
+  for await (const { blobs = [] } of pages) {
+    const reads = await mapInBatches(blobs, (blob) => store.get(blob.key, { type: 'json' }), { settle: true });
+    tournaments.push(...reads
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value)
+      .filter(Boolean));
+  }
+
+  const visibility = await mapInBatches(tournaments, (tournament) => seriesIsVisible(tournament, seriesStore));
   const visibleTournaments = tournaments.filter((tournament, index) => (
     visibility[index]
     && !tournament.cancelledAt
     && tournament.status !== 'cancelled'
   ));
-  const hydratedReads = await Promise.allSettled(visibleTournaments.map(async (tournament) => {
+  const hydratedReads = await mapInBatches(visibleTournaments, async (tournament) => {
     if (!tournament.slug || tournament.deleted) {
       return deriveTournamentLifecycle(hydrateCompetitionContext(tournament));
     }
@@ -202,7 +220,7 @@ export async function listHostedTournaments(options = {}) {
     }
 
     return deriveTournamentLifecycle(hydrateCompetitionContext(tournament), bracket);
-  }));
+  }, { settle: true });
 
   return hydratedReads
     .filter((result) => result.status === 'fulfilled')

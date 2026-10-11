@@ -5,6 +5,7 @@ import {
   createHostedTournament,
   deleteHostedTournament,
   isHostedTournamentDeleted,
+  listHostedTournaments,
   listPublicHostedTournaments,
   normalizeHostedTournament,
   saveHostedTournament,
@@ -58,6 +59,40 @@ test('public event listing excludes private recurrence records without hiding pu
     tournaments.map((tournament) => tournament.slug),
     ['legacy-public', 'completed-public'],
   );
+});
+
+test('hosted event listing reads every Blob page with bounded record concurrency', async () => {
+  const records = Object.fromEntries(Array.from({ length: 35 }, (_, index) => {
+    const slug = `euchre-event-${index}`;
+    return [`${slug}.json`, { ...baseEvent, slug, gameSlug: 'euchre', status: 'upcoming' }];
+  }));
+  const store = new MemoryStore(records);
+  const keys = [...store.records.keys()];
+  let activeReads = 0;
+  let peakReads = 0;
+  store.list = ({ paginate }) => {
+    assert.equal(paginate, true);
+    return (async function* listPages() {
+      yield { blobs: keys.slice(0, 20).map((key) => ({ key })) };
+      yield { blobs: keys.slice(20).map((key) => ({ key })) };
+    })();
+  };
+  store.get = async (key) => {
+    activeReads += 1;
+    peakReads = Math.max(peakReads, activeReads);
+    await new Promise((resolve) => setImmediate(resolve));
+    activeReads -= 1;
+    return store.records.get(key) || null;
+  };
+
+  const tournaments = await listHostedTournaments({
+    bracketStore: new MemoryStore(),
+    seriesStore: new MemoryStore(),
+    store,
+  });
+
+  assert.equal(tournaments.length, 35);
+  assert.ok(peakReads <= 16);
 });
 
 test('hosted tournament event normalization defaults legacy records to Spades', () => {

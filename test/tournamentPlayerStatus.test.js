@@ -10,6 +10,7 @@ import {
 import {
   findPlayerMatchStatus,
   findReadyEuchreAssignments,
+  loadTournamentSignups,
 } from '../netlify/functions/tournament-player-status.mjs';
 
 function signup(index, name) {
@@ -169,4 +170,61 @@ test('ready-match discovery reveals nothing without an authenticated account', a
   });
 
   assert.deepEqual(matches, []);
+});
+
+test('signup lookup reads every Blob page with bounded record concurrency', async () => {
+  const keys = Array.from({ length: 35 }, (_, index) => `pilot/entry-${index}`);
+  let activeReads = 0;
+  let peakReads = 0;
+  const store = {
+    list: ({ prefix, paginate }) => {
+      assert.equal(prefix, 'pilot/');
+      assert.equal(paginate, true);
+      return (async function* listPages() {
+        yield { blobs: keys.slice(0, 20).map((key) => ({ key })) };
+        yield { blobs: keys.slice(20).map((key) => ({ key })) };
+      })();
+    },
+    get: async (key) => {
+      activeReads += 1;
+      peakReads = Math.max(peakReads, activeReads);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeReads -= 1;
+      return { id: key, createdAt: key };
+    },
+  };
+
+  const signups = await loadTournamentSignups('pilot', { store });
+
+  assert.equal(signups.length, 35);
+  assert.ok(peakReads <= 16);
+});
+
+test('ready-match discovery bounds live Euchre event fan-out', async () => {
+  const events = Array.from({ length: 9 }, (_, index) => ({
+    slug: `pilot-${index}`,
+    title: `Pilot ${index}`,
+    gameSlug: 'euchre',
+    status: 'live',
+  }));
+  let activeEvents = 0;
+  let peakEvents = 0;
+  let loadedEvents = 0;
+
+  const matches = await findReadyEuchreAssignments({ id: 'account-1' }, {
+    events,
+    loadBracket: async () => null,
+    loadSignups: async () => {
+      activeEvents += 1;
+      peakEvents = Math.max(peakEvents, activeEvents);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeEvents -= 1;
+      loadedEvents += 1;
+      return [];
+    },
+  });
+
+  assert.deepEqual(matches, []);
+  assert.equal(loadedEvents, 9);
+  assert.ok(peakEvents <= 4);
 });

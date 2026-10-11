@@ -150,10 +150,20 @@ function isPlayerEliminated(bracket, playerMatches, signup) {
   return playerMatches.some(({ match }) => playerLostMatch(match, signup));
 }
 
-async function loadTournamentSignups(tournamentSlug) {
-  const store = getStoreWithFallback('tournament-signups');
-  const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
-  const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
+export async function loadTournamentSignups(tournamentSlug, options = {}) {
+  const store = options.store || getStoreWithFallback('tournament-signups');
+  const listedPages = store.list({ prefix: `${tournamentSlug}/`, paginate: true });
+  const pages = typeof listedPages?.[Symbol.asyncIterator] === 'function'
+    ? listedPages
+    : [await listedPages];
+  const signups = [];
+
+  for await (const { blobs = [] } of pages) {
+    for (let index = 0; index < blobs.length; index += 16) {
+      const batch = blobs.slice(index, index + 16);
+      signups.push(...await Promise.all(batch.map((blob) => store.get(blob.key, { type: 'json' }))));
+    }
+  }
 
   return signups.filter(Boolean).sort((first, second) => {
     return String(first.createdAt || '').localeCompare(String(second.createdAt || ''));
@@ -198,27 +208,32 @@ export async function findReadyEuchreAssignments(account, options = {}) {
   const candidates = events.filter((event) => (
     event?.gameSlug === 'euchre' && event.status === 'live'
   ));
-  const resolved = await Promise.all(candidates.map(async (event) => {
-    const [signups, bracket] = await Promise.all([
-      loadSignups(event.slug),
-      loadEventBracket(event.slug),
-    ]);
-    const signup = signups.find((item) => signupMatchesAccount(item, account));
+  const resolved = [];
 
-    if (!signup) return null;
+  for (let index = 0; index < candidates.length; index += 4) {
+    const batch = candidates.slice(index, index + 4);
+    resolved.push(...await Promise.all(batch.map(async (event) => {
+      const [signups, bracket] = await Promise.all([
+        loadSignups(event.slug),
+        loadEventBracket(event.slug),
+      ]);
+      const signup = signups.find((item) => signupMatchesAccount(item, account));
 
-    const currentMatch = findPlayerMatchStatus(bracket, signup).currentMatch;
+      if (!signup) return null;
 
-    if (!currentMatch) return null;
+      const currentMatch = findPlayerMatchStatus(bracket, signup).currentMatch;
 
-    return {
-      event: {
-        slug: event.slug,
-        title: event.title,
-      },
-      match: privateReadyMatch(currentMatch),
-    };
-  }));
+      if (!currentMatch) return null;
+
+      return {
+        event: {
+          slug: event.slug,
+          title: event.title,
+        },
+        match: privateReadyMatch(currentMatch),
+      };
+    })));
+  }
 
   return resolved.filter(Boolean);
 }
