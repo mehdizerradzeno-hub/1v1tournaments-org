@@ -660,20 +660,21 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentSettingsClientSource, /zonedDateTimeToIso/);
 });
 
-test('Spades match results can report winners through a narrow callback token', () => {
+test('verified game results use a narrow callback token without exposing it in public bracket reads', () => {
   const tournamentBracketSource = readFileSync(tournamentBracketFunctionFile, 'utf8');
   const readmeSource = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
 
   assert.match(tournamentBracketSource, /TOURNAMENT_MATCH_RESULT_TOKEN/);
-  assert.match(tournamentBracketSource, /requireMatchReporter/);
-  assert.match(tournamentBracketSource, /reportWinnerWithRetry/);
+  assert.match(tournamentBracketSource, /requireAuthoritativeGameReporter/);
+  assert.match(tournamentBracketSource, /reportAuthoritativeResultWithRetry/);
   assert.match(tournamentBracketSource, /publicMatchDetails/);
-  assert.match(tournamentBracketSource, /resultCallback/);
+  assert.match(tournamentBracketSource, /publicMatch/);
+  assert.doesNotMatch(tournamentBracketSource, /resultCallback/);
   assert.match(tournamentBracketSource, /getTournamentSlug/);
   assert.match(tournamentBracketSource, /payload\.action === 'reset'/);
   assert.match(readmeSource, /Spades Match Result Callback/);
-  assert.match(readmeSource, /GET https:\/\/1v1tournaments\.org\/\.netlify\/functions\/tournament-bracket\?matchId=/);
-  assert.match(readmeSource, /"action": "report-winner"/);
+  assert.match(readmeSource, /public bracket endpoint is display-only/);
+  assert.match(readmeSource, /"action": "report-result"/);
 });
 
 test('Twitch chat bot runner reads editable stream commands', () => {
