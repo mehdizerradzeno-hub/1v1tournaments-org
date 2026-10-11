@@ -19,6 +19,13 @@ const SPONSOR_COLLATERAL_ENDPOINT = '/.netlify/functions/sponsor-collateral';
 const SITE_ANALYTICS_ENDPOINT = '/.netlify/functions/site-analytics';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
+const PASSWORD_RESET_REQUEST_TIMEOUT_MS = 45_000;
+
+export function accountActionTimeoutMs(action) {
+  return action === 'reset-password'
+    ? PASSWORD_RESET_REQUEST_TIMEOUT_MS
+    : DEFAULT_REQUEST_TIMEOUT_MS;
+}
 
 function isLocalStaticPreview() {
   const hostname = globalThis.location?.hostname;
@@ -44,10 +51,10 @@ async function readJsonResponse(response) {
   }
 }
 
-async function fetchWithTimeout(input, init = {}) {
+async function fetchWithTimeout(input, init = {}, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timeoutId = controller
-    ? globalThis.setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
+    ? globalThis.setTimeout(() => controller.abort(), timeoutMs)
     : null;
 
   try {
@@ -185,14 +192,14 @@ export function deletePlayerAccount(confirmation = 'DELETE') {
 }
 
 async function postPlayerAccountAction(action, payload = {}) {
-  const response = await fetch(ACCOUNT_ENDPOINT, {
+  const response = await fetchWithTimeout(ACCOUNT_ENDPOINT, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ ...payload, action }),
-  });
+  }, accountActionTimeoutMs(action));
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -206,8 +213,18 @@ export function requestPlayerPasswordReset(payload) {
   return postPlayerAccountAction('request-password-reset', payload);
 }
 
-export function resetPlayerPassword(payload) {
-  return postPlayerAccountAction('reset-password', payload);
+export async function resetPlayerPassword(payload) {
+  try {
+    return await postPlayerAccountAction('reset-password', payload);
+  } catch (error) {
+    if (error?.message === 'The tournament service took too long to respond.') {
+      throw new Error(
+        'The password update may have completed. Try signing in with your new password before requesting another reset link.',
+      );
+    }
+
+    throw error;
+  }
 }
 
 export function requestPlayerEmailVerification(payload) {

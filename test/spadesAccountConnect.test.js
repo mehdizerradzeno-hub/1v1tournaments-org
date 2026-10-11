@@ -11,6 +11,7 @@ import {
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
 } from '../src/lib/spadesAccountConnect.js';
 import {
+  accountActionTimeoutMs,
   createPlayerAccount,
   deletePlayerAccount,
   loginPlayerAccount,
@@ -173,6 +174,12 @@ test('Sign Out uses the authoritative shared player-account logout action', asyn
   assert.equal(verifiedAccountReturnCopy('Spades'), 'Your verified 1v1 account is ready to return to Spades.');
 });
 
+
+test('password reset receives the longer account-action request window', () => {
+  assert.equal(accountActionTimeoutMs('reset-password'), 45_000);
+  assert.equal(accountActionTimeoutMs('request-password-reset'), 8_000);
+  assert.equal(accountActionTimeoutMs('login'), 8_000);
+});
 
 test('Delete Account uses the canonical shared account deletion action', async () => {
   const body = await captureAccountAction(

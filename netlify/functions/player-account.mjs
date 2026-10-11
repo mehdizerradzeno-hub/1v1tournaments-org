@@ -314,6 +314,7 @@ export async function resetAccountPassword(payload, options = {}) {
   const persistAccount = options.saveAccount || saveAccount;
   const removeSessions = options.deleteSessionsForAccount || deleteSessionsForAccount;
   const hashPassword = options.createPasswordRecord || createPasswordRecord;
+  const logError = options.logError || console.error;
   const account = await resolveAccount(email);
   const valid = account && await consumeCode({
     code: payload.code,
@@ -334,7 +335,13 @@ export async function resetAccountPassword(payload, options = {}) {
   };
 
   await persistAccount(updated);
-  await removeSessions(updated.id);
+  try {
+    await removeSessions(updated.id);
+  } catch {
+    // Password changes invalidate older sessions independently. Do not tell a
+    // player their single-use reset failed after the new password was saved.
+    logError('Player session cleanup failed after password reset');
+  }
 
   return withCookie(
     json(200, {
