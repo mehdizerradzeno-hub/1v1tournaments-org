@@ -223,13 +223,11 @@ test('Spades result callbacks use the same signed completion contract with seat 
   assert.equal(match.winnerId, 'signup-2');
   assert.deepEqual(match.completion.scores, { seat0: 120, seat1: 250 });
 
-  assert.throws(
-    () => normalizeTournamentResultCallback(
-      spadesResultPayload({ scores: { seat0: 120, seat1: -1 } }),
-      'spades-season-one',
-    ),
-    (error) => error.code === 'malformed_scores',
+  const penalizedResult = normalizeTournamentResultCallback(
+    spadesResultPayload({ scores: { seat0: 120, seat1: -100 } }),
+    'spades-season-one',
   );
+  assert.deepEqual(penalizedResult.scores, { seat0: 120, seat1: -100 });
   assert.throws(
     () => normalizeTournamentResultCallback(
       spadesResultPayload({ forfeit: true, forfeitReason: '' }),
@@ -336,10 +334,19 @@ test('Euchre result callback rejects missing server authentication and malformed
       body: JSON.stringify(resultPayload({ completionId: '' })),
     });
 
+    delete process.env.TOURNAMENT_MATCH_RESULT_TOKEN;
+    const missingDedicatedToken = await bracketHandler({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer test-only-admin-token' },
+      queryStringParameters: { slug: 'euchre-season-one' },
+      body: JSON.stringify(resultPayload()),
+    });
+
     assert.equal(unauthorized.statusCode, 401);
     assert.equal(adminTokenCannotReportGameResult.statusCode, 401);
     assert.equal(malformed.statusCode, 400);
     assert.equal(JSON.parse(malformed.body).code, 'malformed_result');
+    assert.equal(missingDedicatedToken.statusCode, 503);
   } finally {
     if (previousToken === undefined) {
       delete process.env.TOURNAMENT_MATCH_RESULT_TOKEN;

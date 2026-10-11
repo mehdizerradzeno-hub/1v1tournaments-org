@@ -104,7 +104,9 @@ test('a linked authoritative Spades completion maps bracket seats to home and aw
       completionId: 'spades-completion-001',
       winnerParticipantId: 'signup-away',
       winnerCanonicalAccountId: 'canonical-away',
-      scores: { seat0: 140, seat1: 250 },
+      // Spades penalties can leave one final score below zero. The linked
+      // league projection must retain the signed game-authoritative score.
+      scores: { seat0: -100, seat1: 250 },
       forfeit: false,
     },
     league: league({
@@ -118,7 +120,7 @@ test('a linked authoritative Spades completion maps bracket seats to home and aw
   });
 
   assert.equal(linked.result.winner, 'away');
-  assert.equal(linked.result.homeScore, 140);
+  assert.equal(linked.result.homeScore, -100);
   assert.equal(linked.result.awayScore, 250);
 });
 

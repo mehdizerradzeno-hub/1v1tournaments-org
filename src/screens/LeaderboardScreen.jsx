@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -18,6 +18,7 @@ import { getResults } from '../lib/siteData.js';
 import { theme } from '../lib/theme.js';
 import { buildTournamentLeaderboard, summarizeTournamentLeaderboard } from '../lib/tournamentLeaderboard.js';
 import { getPublicGamePath, getPublicGames } from '../lib/publicPresentationCatalog.js';
+import { fetchPublicGameRankBoards, fetchPublicGameRankings } from '../lib/tournamentHostingClient.js';
 import { usePublicGameFilter } from '../lib/usePublicGameFilter.js';
 
 const RANKING_PRIORITIES = [
@@ -38,11 +39,70 @@ function normalizeSearch(value) {
   return String(value || '').trim().toLocaleLowerCase('en-US');
 }
 
+function gameRankBoardKey(board) {
+  return `${board.game}:${board.leaderboard}:${board.season}`;
+}
+
+function GameRankLeaderboard({ board, entries }) {
+  const gameName = board.game === 'euchre' ? 'Euchre' : 'Spades';
+  return (
+    <Surface style={styles.gameRankBoard}>
+      <View style={styles.gameRankBoardTopRow}>
+        <View>
+          <Text style={styles.gameRankBoardTitle}>{gameName} ladder</Text>
+          <Text style={styles.gameRankBoardMeta}>{board.leaderboard} • {board.season}</Text>
+        </View>
+        <Badge tone="accent">Verified game rank</Badge>
+      </View>
+      {entries?.length ? (
+        <View style={styles.gameRankList}>
+          {entries.map((entry) => (
+            <View key={`${entry.rank}-${entry.player?.handle}`} style={styles.gameRankRow}>
+              <Text style={styles.gameRankPosition}>#{entry.rank}</Text>
+              <View style={styles.gameRankPlayer}>
+                <Text style={styles.gameRankHandle}>@{entry.player?.handle || 'player'}</Text>
+                <Text style={styles.gameRankState}>{entry.provisional ? 'Provisional' : 'Verified placement'}</Text>
+              </View>
+              <ActionButton href={`/players/${encodeURIComponent(entry.player?.handle || '')}`} variant="ghost">Profile</ActionButton>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.gameRankEmpty}>No publicly claimable usernames are ranked on this board yet.</Text>
+      )}
+    </Surface>
+  );
+}
+
 export default function LeaderboardScreen() {
   const games = useMemo(() => getPublicGames(), []);
   const results = useMergedLiveResults(getResults());
   const [activeGame, setActiveGame] = usePublicGameFilter();
   const [playerSearch, setPlayerSearch] = useState('');
+  const [gameRankBoards, setGameRankBoards] = useState([]);
+  const [gameRankEntries, setGameRankEntries] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicGameRankBoards()
+      .then(async (result) => {
+        const boards = Array.isArray(result?.boards) ? result.boards.slice(0, 12) : [];
+        if (cancelled) return;
+        setGameRankBoards(boards);
+        const loaded = await Promise.all(boards.map(async (board) => [
+          gameRankBoardKey(board),
+          (await fetchPublicGameRankings({ ...board, limit: 10 })).entries || [],
+        ]));
+        if (!cancelled) setGameRankEntries(Object.fromEntries(loaded));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGameRankBoards([]);
+          setGameRankEntries({});
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
   const filteredResults = useMemo(
     () => activeGame === 'all'
       ? results
@@ -75,12 +135,14 @@ export default function LeaderboardScreen() {
   const activeGameLabel = activeGame === 'all'
     ? 'All games'
     : games.find((game) => game.slug === activeGame)?.name || 'Game';
+  const visibleGameRankBoards = activeGame === 'all'
+    ? gameRankBoards
+    : gameRankBoards.filter((board) => board.game === activeGame);
   const filterItems = [
-    { id: 'all', label: 'All games', count: allEntries.length },
+    { id: 'all', label: 'All games' },
     ...games.map((game) => ({
       id: game.slug,
       label: game.name,
-      count: gameLeaderboards[game.slug]?.length || 0,
     })),
   ];
 
@@ -90,22 +152,22 @@ export default function LeaderboardScreen() {
         { label: 'Recent results', href: '/results' },
         { label: 'How ranking works', href: '/leaderboard#ranking-method', variant: 'secondary' },
       ]}
-      eyebrow="Tournament rankings"
-      footerNote="Tournament rankings are separate from the Spades in-game leaderboard and any future Euchre in-game leaderboard. This page tracks posted hosted-event performance only."
+      eyebrow="Competition rankings"
+      footerNote="Verified Spades and Euchre game placements appear above. Tournament circuit standings below remain a separate, event-based leaderboard."
       heroVariant="compact"
-      lead="See the circuit leaders, search the full field, and understand exactly how posted tournament performance is ordered."
+      lead="Compare verified game ladders with tournament circuit leaders, then open each player’s permanent cross-game profile."
       publicShell
-      subtitle="Championships • finals • bracket record"
+      subtitle="Game ladders • championships • finals"
       stickyActions={false}
       title="Rankings">
       <PlayerRouteStrip
-        body="Rankings update after results post. During an event, use the tournament page, My Match, or the live bracket."
+        body="Select a game to filter its verified ladder and tournament circuit. During an event, use the tournament page, My Match, or the live bracket."
       />
 
       <CompetitionFilterTabs
         activeId={activeGame}
         items={filterItems}
-        label="Filter tournament rankings by game"
+        label="Filter game ladders and tournament circuit by game"
         onSelect={setActiveGame}
       />
 
@@ -125,6 +187,27 @@ export default function LeaderboardScreen() {
           <StatPill label="Current leader" value={summary.topPlayer} tone="blue" />
         </View>
       </Surface>
+
+      <Section
+        description="Game services publish only a verified placement and permanent username here. Tournament history below remains a separate circuit ranking."
+        title="Verified game leaderboards">
+        {visibleGameRankBoards.length ? (
+          <View style={styles.gameRankBoards}>
+            {visibleGameRankBoards.map((board) => (
+              <GameRankLeaderboard
+                board={board}
+                entries={gameRankEntries[gameRankBoardKey(board)]}
+                key={gameRankBoardKey(board)}
+              />
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            body="Spades and Euchre boards will appear here after each game publishes its first verified placement. Tournament rankings below continue to update from hosted-event results."
+            title="No game leaderboard published yet"
+          />
+        )}
+      </Section>
 
       {entries.length ? (
         <>
@@ -429,6 +512,68 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'space-between',
+  },
+  gameRankBoard: {
+    width: '100%',
+  },
+  gameRankBoards: {
+    gap: 12,
+  },
+  gameRankBoardMeta: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  gameRankBoardTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  gameRankBoardTopRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  gameRankEmpty: {
+    color: theme.colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 16,
+  },
+  gameRankHandle: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  gameRankList: {
+    gap: 8,
+    marginTop: 16,
+  },
+  gameRankPlayer: {
+    flex: 1,
+    gap: 2,
+  },
+  gameRankPosition: {
+    color: theme.colors.accent,
+    fontSize: 16,
+    fontWeight: '900',
+    width: 42,
+  },
+  gameRankRow: {
+    alignItems: 'center',
+    borderTopColor: theme.colors.line,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 10,
+  },
+  gameRankState: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
   },
   methodBody: {
     color: theme.colors.muted,
