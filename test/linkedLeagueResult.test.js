@@ -82,6 +82,46 @@ test('a linked authoritative Euchre completion produces an auditable league fixt
   });
 });
 
+test('a linked authoritative Spades completion maps bracket seats to home and away scores', () => {
+  const linked = buildLinkedLeagueTournamentResult({
+    tournament: {
+      ...tournament,
+      slug: 'spades-league-week-one',
+      gameSlug: 'spades',
+      competitionMeta: {
+        competitionMode: 'league',
+        leagueId: 'spades-league',
+        matchAssignmentId: 'spades-league-w1-1',
+      },
+    },
+    tournamentMatch: {
+      ...tournamentMatch,
+      id: 'spades-league-week-one-r1-m1',
+    },
+    result: {
+      game: 'spades',
+      matchId: 'spades-league-week-one-r1-m1',
+      completionId: 'spades-completion-001',
+      winnerParticipantId: 'signup-away',
+      winnerCanonicalAccountId: 'canonical-away',
+      scores: { seat0: 140, seat1: 250 },
+      forfeit: false,
+    },
+    league: league({
+      id: 'spades-league',
+      gameSlug: 'spades',
+      matches: [{
+        ...league().matches[0],
+        id: 'spades-league-w1-1',
+      }],
+    }),
+  });
+
+  assert.equal(linked.result.winner, 'away');
+  assert.equal(linked.result.homeScore, 140);
+  assert.equal(linked.result.awayScore, 250);
+});
+
 test('linked league sync passes only the authoritative result and stable completion id to the writer', async () => {
   const calls = [];
   const outcome = await syncLinkedLeagueTournamentResult(
