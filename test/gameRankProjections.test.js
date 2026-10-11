@@ -148,4 +148,12 @@ test('HTTP contract is service-authenticated, game-bound, and account-checked', 
   }, { env, projectionStore: store });
   assert.equal(lookup.statusCode, 200);
   assert.equal(JSON.parse(lookup.body).projections[0].ranks[0].rank, 4);
+
+  const browserAttempt = await handleRankProjectionRequest({
+    httpMethod: 'POST',
+    headers: {},
+    body: JSON.stringify({ audience: 'spades', action: 'lookup', canonicalAccountIds: ['canonical-alice'] }),
+  }, { env, projectionStore: store });
+  assert.equal(browserAttempt.statusCode, 401);
+  assert.equal(JSON.parse(browserAttempt.body).code, 'service_not_authorized');
 });
