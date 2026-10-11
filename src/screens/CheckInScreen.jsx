@@ -225,7 +225,7 @@ function getAccountFormStatus({
   const missingFields = [];
 
   if (accountMode === 'create' && !playerHandle.trim()) {
-    missingFields.push('unique username');
+    missingFields.push('username');
   }
 
   if (!contactEmail.trim()) {
@@ -664,8 +664,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
     try {
       const result = await createPlayerAccount({
-        username: playerHandle,
         playerName: playerHandle,
+        username: playerHandle,
         contactEmail,
         password,
         confirmPassword,
@@ -913,7 +913,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
       : isLoginMode
         ? 'Use your account email and password. After sign-in, tap Join Tournament to reserve the roster spot.'
-        : 'Choose a unique username, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
+        : 'Choose a username, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
   const authActionLabel = accountMode === 'create'
     ? 'Create Account'
     : 'Sign In';
@@ -1196,26 +1196,23 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Unique username</Text>
+                  <Text style={styles.fieldLabel}>Username</Text>
                   <TextInput
                     {...formFieldProps({
-                      autoComplete: 'username',
-                      label: 'Unique username',
+                      autoComplete: 'nickname',
+                      label: 'Username',
                       name: 'username',
-                      textContentType: 'username',
+                      textContentType: 'nickname',
                     })}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    onChangeText={(value) => {
-                      setPlayerHandle(value);
-                      setPlayerName(value);
-                    }}
-                    placeholder="3-32 lowercase characters"
+                    onChangeText={setPlayerHandle}
+                    placeholder="3–20 letters, numbers, or underscores"
                     placeholderTextColor="#6B766F"
                     style={styles.input}
                     value={playerHandle}
                   />
-                  <Text style={styles.fieldHint}>This permanent public name appears across games, friends, rosters, brackets, leagues, and results.</Text>
+                  <Text style={styles.fieldHint}>This public name appears in Spades, Euchre, leagues, and tournaments. You can change it later when another username is available.</Text>
                 </View>
               ) : null}
 

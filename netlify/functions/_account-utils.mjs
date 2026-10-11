@@ -17,20 +17,9 @@ const SESSION_TOKEN_PREFIX = 'v1';
 const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
 export const PLAYER_USERNAME_MIN_LENGTH = 3;
-export const PLAYER_USERNAME_MAX_LENGTH = 32;
+export const PLAYER_USERNAME_MAX_LENGTH = 20;
 const SESSION_CLEANUP_BATCH_SIZE = 12;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
-const RESERVED_PLAYER_USERNAMES = new Set([
-  'admin',
-  'administrator',
-  'moderator',
-  'official',
-  'root',
-  'support',
-  'system',
-  '1v1',
-  '1v1tournaments',
-]);
 
 export class PlayerUsernameError extends Error {
   constructor(message, statusCode = 400, code = 'invalid_username') {
@@ -95,12 +84,12 @@ export function isEmailLike(value) {
 }
 
 /**
- * A username is the one public player identity across 1v1. Keep the grammar
- * deliberately small so it is stable in game clients, URLs, and brackets.
- * A leading @ is accepted at input only and is never stored or returned.
+ * The public username is one portable identity for Spades, Euchre, and
+ * Tournaments. A leading @ is accepted only as input convenience; it is never
+ * stored and does not form part of the username.
  */
 export function normalizePlayerUsername(value) {
-  return cleanText(value).replace(/^@+/, '').toLowerCase();
+  return cleanText(value).replace(/^@/, '').toLowerCase();
 }
 
 export function validatePlayerUsername(value) {
@@ -116,15 +105,11 @@ export function validatePlayerUsername(value) {
     };
   }
 
-  if (!/^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/.test(username)) {
+  if (!/^[a-z0-9_]+$/.test(username)) {
     return {
-      error: 'Username can use lowercase letters, numbers, underscores, and hyphens, and must start and end with a letter or number.',
+      error: 'Username can use letters, numbers, and underscores only.',
       username: '',
     };
-  }
-
-  if (RESERVED_PLAYER_USERNAMES.has(username)) {
-    return { error: 'That username is reserved.', username: '' };
   }
 
   return { error: '', username };
@@ -157,8 +142,39 @@ function usernameReservationOwner(record) {
 }
 
 /**
- * Reserve a normalized username before persisting an account. `onlyIfNew`
- * makes competing signups deterministic without exposing emails in the index.
+ * Finds old accounts that were created before the username index existed.
+ * This slow path prevents a new reservation from silently duplicating a
+ * legacy active handle; once a handle is claimed, all later checks use the
+ * atomic reservation key below.
+ */
+export async function findPlayerUsernameOwner(value, options = {}) {
+  const { username } = validatePlayerUsername(value);
+  if (!username) return null;
+
+  const store = options.store || getStoreWithFallback('player-accounts');
+  let cursor;
+  do {
+    const page = await store.list(cursor ? { cursor } : {});
+    const accounts = await Promise.all(
+      (page.blobs || []).map((blob) => store.get(blob.key, { type: 'json' })),
+    );
+    const owner = accounts.find((account) => (
+      account
+      && !account.deletedAt
+      && account.status !== 'deleted'
+      && playerUsernameForAccount(account) === username
+    ));
+    if (owner) return accountCanonicalId(owner);
+    cursor = page.hasMore ? cleanText(page.cursor) : '';
+  } while (cursor);
+
+  return null;
+}
+
+/**
+ * Atomically reserves a normalized username. The index contains only public
+ * account IDs, never emails or credentials. It deliberately permits its
+ * current owner to retry a request without stealing another account's name.
  */
 export async function reservePlayerUsername(value, account, options = {}) {
   const { error, username } = validatePlayerUsername(value);
@@ -169,6 +185,11 @@ export async function reservePlayerUsername(value, account, options = {}) {
     throw new PlayerUsernameError('A valid account is required to reserve a username.', 400, 'invalid_account');
   }
 
+  const findOwner = options.findPlayerUsernameOwner || findPlayerUsernameOwner;
+  const existingAccountOwner = await findOwner(username, options.accountLookupOptions || {});
+  if (existingAccountOwner && existingAccountOwner !== canonicalAccountId) {
+    throw new PlayerUsernameError('That username is already taken.', 409, 'username_taken');
+  }
   const store = options.store || getStoreWithFallback('player-account-usernames');
   const key = playerUsernameKey(username);
   const record = {
@@ -180,9 +201,7 @@ export async function reservePlayerUsername(value, account, options = {}) {
 
   try {
     const result = await store.setJSON(key, record, { onlyIfNew: true });
-    if (result?.modified === false) {
-      throw new Error('Username reservation already exists.');
-    }
+    if (result?.modified === false) throw new Error('Username reservation already exists.');
     return { created: true, username };
   } catch (_errorDuringReservation) {
     const existing = await store.get(key, { type: 'json' }).catch(() => null);
@@ -192,7 +211,6 @@ export async function reservePlayerUsername(value, account, options = {}) {
     if (existing) {
       throw new PlayerUsernameError('That username is already taken.', 409, 'username_taken');
     }
-
     throw new PlayerUsernameError(
       'Username registration is temporarily unavailable. Please try again.',
       503,

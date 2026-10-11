@@ -3,13 +3,12 @@ import test from 'node:test';
 
 import {
   PlayerUsernameError,
-  playerUsernameForAccount,
-  publicAccount,
+  releasePlayerUsernameReservation,
   reservePlayerUsername,
   validatePlayerUsername,
 } from '../netlify/functions/_account-utils.mjs';
 import {
-  claimUsername,
+  changeUsername,
   createAccount,
 } from '../netlify/functions/player-account.mjs';
 
@@ -36,110 +35,145 @@ class MemoryStore {
   }
 }
 
-test('username policy normalizes the input and rejects temporary or ambiguous identifiers', () => {
+function usernameReservation(store) {
+  return (username, account) => reservePlayerUsername(username, account, {
+    store,
+    findPlayerUsernameOwner: async () => null,
+  });
+}
+
+function usernameRelease(store) {
+  return (username, account) => releasePlayerUsernameReservation(username, account, { store });
+}
+
+test('username policy normalizes case and accepts only 3-20 letters, numbers, or underscores', () => {
   assert.deepEqual(validatePlayerUsername('@North_Star'), {
     error: '',
     username: 'north_star',
   });
-  assert.equal(playerUsernameForAccount({ playerHandle: '@North_Star' }), 'north_star');
-  assert.match(validatePlayerUsername('ab').error, /3-32/);
-  assert.match(validatePlayerUsername('north.star').error, /lowercase letters/);
-  assert.match(validatePlayerUsername('admin').error, /reserved/);
-  assert.equal(playerUsernameForAccount({ playerHandle: 'Guest 1234' }), '');
+  assert.match(validatePlayerUsername('ab').error, /3-20/);
+  assert.match(validatePlayerUsername('a'.repeat(21)).error, /3-20/);
+  assert.match(validatePlayerUsername('north-star').error, /letters, numbers, and underscores/);
+  assert.match(validatePlayerUsername('north.star').error, /letters, numbers, and underscores/);
+  assert.match(validatePlayerUsername('north star').error, /letters, numbers, and underscores/);
 });
 
-test('username reservation is atomic, global, and idempotent for its owner', async () => {
+test('username reservation is case-insensitive, global, and idempotent for its owner', async () => {
   const store = new MemoryStore();
+  const reserve = usernameReservation(store);
   const firstAccount = { id: 'acct-first', canonicalAccountId: 'acct-first' };
   const secondAccount = { id: 'acct-second', canonicalAccountId: 'acct-second' };
 
-  assert.deepEqual(
-    await reservePlayerUsername('@North_Star', firstAccount, { store, createdAt: '2026-10-11T00:00:00.000Z' }),
-    { created: true, username: 'north_star' },
-  );
-  assert.deepEqual(
-    await reservePlayerUsername('north_star', firstAccount, { store }),
-    { created: false, username: 'north_star' },
-  );
+  assert.deepEqual(await reserve('@North_Star', firstAccount), {
+    created: true,
+    username: 'north_star',
+  });
+  assert.deepEqual(await reserve('NORTH_STAR', firstAccount), {
+    created: false,
+    username: 'north_star',
+  });
   await assert.rejects(
-    reservePlayerUsername('NORTH_STAR', secondAccount, { store }),
+    reserve('north_star', secondAccount),
     (error) => error instanceof PlayerUsernameError && error.code === 'username_taken',
   );
 });
 
-test('new accounts require and persist the claimed username as their public identity', async () => {
-  const accountStore = new Map();
-  const usernameStore = new MemoryStore();
+test('new Tournament accounts require a unique username', async () => {
+  const usernames = new MemoryStore();
+  const accounts = new Map();
   let saved = null;
 
   const response = await createAccount({
     contactEmail: 'north@example.com',
     password: 'safe-password-1',
     confirmPassword: 'safe-password-1',
-    playerHandle: '@North_Star',
+    username: 'North_Star',
   }, {
-    getAccountByEmail: async (email) => accountStore.get(email) || null,
-    reservePlayerUsername: (username, account) => reservePlayerUsername(username, account, { store: usernameStore }),
+    getAccountByEmail: async (email) => accounts.get(email) || null,
+    reservePlayerUsername: usernameReservation(usernames),
+    releasePlayerUsernameReservation: usernameRelease(usernames),
     saveAccount: async (account) => {
       saved = structuredClone(account);
-      accountStore.set(account.email, saved);
+      accounts.set(account.email, saved);
     },
-    createSession: async () => ({ id: 'session-created', token: 'session-created' }),
+    createSession: async () => ({ id: 'created-session', token: 'created-session' }),
     verifiedEmailsRequired: () => false,
   });
 
-  const body = JSON.parse(response.body);
   assert.equal(response.statusCode, 201);
   assert.equal(saved.playerHandle, 'north_star');
   assert.equal(saved.playerName, 'north_star');
-  assert.equal(body.account.username, 'north_star');
-  assert.equal(body.account.playerName, 'north_star');
-  assert.match(response.headers['Set-Cookie'], /one_v_one_player_session=session-created/);
+  assert.equal(JSON.parse(response.body).account.playerHandle, 'north_star');
 
-  const missingUsername = await createAccount({
-    contactEmail: 'missing@example.com',
+  const invalid = await createAccount({
+    contactEmail: 'invalid@example.com',
     password: 'safe-password-1',
     confirmPassword: 'safe-password-1',
-  }, {
-    getAccountByEmail: async () => null,
-  });
-  assert.equal(missingUsername.statusCode, 400);
-  assert.equal(JSON.parse(missingUsername.body).code, 'invalid_username');
+    username: 'not allowed',
+  }, { getAccountByEmail: async () => null });
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(JSON.parse(invalid.body).code, 'invalid_username');
 });
 
-test('a legacy account can claim one username and receives a refreshed session', async () => {
-  const usernameStore = new MemoryStore();
-  const legacyAccount = {
-    id: 'acct-legacy',
-    canonicalAccountId: 'acct-legacy',
-    email: 'legacy@example.com',
-    emailVerified: true,
-    playerHandle: 'old_handle',
-    playerName: 'Old display name',
+test('a rename keeps the canonical account and releases the previous username', async () => {
+  const usernames = new MemoryStore();
+  const reserve = usernameReservation(usernames);
+  const release = usernameRelease(usernames);
+  const account = {
+    id: 'acct-player',
+    canonicalAccountId: 'acct-player',
+    email: 'player@example.com',
+    playerName: 'old_name',
+    playerHandle: 'old_name',
   };
+  await reserve(account.playerHandle, account);
   let saved = null;
 
-  const response = await claimUsername({ headers: {} }, { username: 'Legacy_Player' }, {
-    getAccountFromEvent: async () => legacyAccount,
-    reservePlayerUsername: (username, account) => reservePlayerUsername(username, account, { store: usernameStore }),
-    saveAccount: async (account) => {
-      saved = structuredClone(account);
-    },
-    createSession: async () => ({ id: 'refreshed-session', token: 'refreshed-session' }),
+  const response = await changeUsername({ headers: {} }, { username: 'New_Name' }, {
+    getAccountFromEvent: async () => account,
+    reservePlayerUsername: reserve,
+    releasePlayerUsernameReservation: release,
+    saveAccount: async (updated) => { saved = structuredClone(updated); },
+    createSession: async () => ({ id: 'renamed-session', token: 'renamed-session' }),
   });
 
   assert.equal(response.statusCode, 200);
-  assert.equal(saved.playerHandle, 'legacy_player');
-  assert.equal(saved.playerName, 'legacy_player');
-  assert.equal(JSON.parse(response.body).account.username, 'legacy_player');
-  assert.match(response.headers['Set-Cookie'], /refreshed-session/);
+  assert.equal(saved.canonicalAccountId, 'acct-player');
+  assert.equal(saved.playerHandle, 'new_name');
+  assert.equal(JSON.parse(response.body).account.playerName, 'new_name');
+  assert.match(response.headers['Set-Cookie'], /renamed-session/);
 
-  assert.equal(publicAccount(legacyAccount).usernameRequired, true);
-  assert.equal(publicAccount(legacyAccount).username, '');
-
-  const repeat = await claimUsername({ headers: {} }, { username: 'different_name' }, {
-    getAccountFromEvent: async () => saved,
+  const nextAccount = { id: 'acct-next', canonicalAccountId: 'acct-next' };
+  assert.deepEqual(await reserve('OLD_NAME', nextAccount), {
+    created: true,
+    username: 'old_name',
   });
-  assert.equal(repeat.statusCode, 409);
-  assert.equal(JSON.parse(repeat.body).code, 'username_already_claimed');
+});
+
+test('a rename rejects a username held by another account without changing the signed-in account', async () => {
+  const usernames = new MemoryStore();
+  const reserve = usernameReservation(usernames);
+  const release = usernameRelease(usernames);
+  const account = {
+    id: 'acct-player',
+    canonicalAccountId: 'acct-player',
+    email: 'player@example.com',
+    playerName: 'player_one',
+    playerHandle: 'player_one',
+  };
+  const other = { id: 'acct-other', canonicalAccountId: 'acct-other' };
+  await reserve(account.playerHandle, account);
+  await reserve('claimed_name', other);
+  let saved = false;
+
+  const response = await changeUsername({ headers: {} }, { username: 'CLAIMED_NAME' }, {
+    getAccountFromEvent: async () => account,
+    reservePlayerUsername: reserve,
+    releasePlayerUsernameReservation: release,
+    saveAccount: async () => { saved = true; },
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(JSON.parse(response.body).code, 'username_taken');
+  assert.equal(saved, false);
 });

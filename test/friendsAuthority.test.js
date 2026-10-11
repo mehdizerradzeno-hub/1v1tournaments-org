@@ -200,7 +200,7 @@ test('trusted game profile sync validates the already-claimed Hub username witho
   await assert.rejects(
     syncFriendsPublicProfile({
       canonicalAccountId: 'acct-legacy',
-      handle: 'other-player',
+      handle: 'other_player',
       displayName: 'Other Player',
     }, {
       resolveAccount: async () => account,

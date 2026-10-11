@@ -11,7 +11,7 @@ import {
 
 import { ActionButton, Badge, HubScreen, Surface } from '../components/hub-ui.jsx';
 import {
-  claimPlayerUsername,
+  changePlayerUsername,
   createPlayerAccount,
   deletePlayerAccount,
   fetchPlayerAccount,
@@ -96,7 +96,7 @@ export function GameAccountConnectScreen({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
-  const [username, setUsername] = useState('');
+  const [usernameDraft, setUsernameDraft] = useState('');
   const [contactEmail, setContactEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -114,6 +114,7 @@ export function GameAccountConnectScreen({
       .then((result) => {
         if (!active) return;
         setAccount(result.account || null);
+        setUsernameDraft(result.account?.playerHandle || '');
         if (
           result.account
           || initialRecoveryToken
@@ -135,7 +136,7 @@ export function GameAccountConnectScreen({
     return () => {
       active = false;
     };
-  }, [initialMode, signedOutManageFallback]);
+  }, [initialMode, initialRecoveryToken, signedOutManageFallback]);
 
   const selectMode = (nextMode) => {
     setMode(nextMode);
@@ -187,6 +188,7 @@ export function GameAccountConnectScreen({
     try {
       const result = await loginPlayerAccount({ contactEmail, password });
       setAccount(result.account || null);
+      setUsernameDraft(result.account?.playerHandle || '');
       await returnToGame();
     } catch (signInError) {
       setSubmitting(false);
@@ -195,6 +197,10 @@ export function GameAccountConnectScreen({
   };
 
   const createAccount = async () => {
+    if (!playerHandle.trim()) {
+      setError('Choose a username with 3-20 letters, numbers, or underscores.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords must match.');
       return;
@@ -209,24 +215,11 @@ export function GameAccountConnectScreen({
         confirmPassword,
       });
       setAccount(result.account || null);
+      setUsernameDraft(result.account?.playerHandle || playerHandle);
       await returnToGame();
     } catch (createError) {
       setSubmitting(false);
       setError(createError instanceof Error ? createError.message : 'Account creation could not be completed.');
-    }
-  };
-
-  const claimUsername = async () => {
-    setSubmitting(true);
-    setError('');
-    try {
-      const result = await claimPlayerUsername(username);
-      setAccount(result.account || null);
-      setUsername('');
-    } catch (claimError) {
-      setError(claimError instanceof Error ? claimError.message : 'Username could not be claimed.');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -304,7 +297,7 @@ export function GameAccountConnectScreen({
       setAccount(null);
       setMode('signin');
       setPlayerHandle('');
-      setUsername('');
+      setUsernameDraft('');
       setContactEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -328,6 +321,29 @@ export function GameAccountConnectScreen({
     }
   };
 
+  const saveUsername = async () => {
+    if (!usernameDraft.trim()) {
+      setError('Choose a username with 3-20 letters, numbers, or underscores.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await changePlayerUsername(usernameDraft);
+      const updated = result.account || null;
+      setAccount(updated);
+      setPlayerHandle(updated?.playerHandle || usernameDraft);
+      setUsernameDraft(updated?.playerHandle || usernameDraft);
+      setMessage('Username updated across your 1v1 account.');
+    } catch (usernameError) {
+      setError(usernameError instanceof Error ? usernameError.message : 'Username could not be updated.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const signOut = async () => {
     setSubmitting(true);
     setError('');
@@ -339,7 +355,7 @@ export function GameAccountConnectScreen({
       setAccount(nextState.account);
       setMode(nextState.mode);
       setPlayerHandle('');
-      setUsername('');
+      setUsernameDraft('');
       setContactEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -404,34 +420,28 @@ export function GameAccountConnectScreen({
       <Surface style={styles.card}>
         {shouldShowConnectedAccount(account, mode) ? (
           <>
-            <Text style={styles.sectionTitle}>{account.username || account.playerName || 'Shared 1v1 account'}</Text>
-            {account.playerHandle ? <Text style={styles.muted}>@{account.playerHandle}</Text> : null}
+            <Text style={styles.sectionTitle}>{account.playerName || 'Shared 1v1 account'}</Text>
             <Text style={styles.muted}>{account.email || 'Account identity verified'}</Text>
-            {account.usernameRequired ? (
-              <>
-                <Text style={styles.fieldLabel}>Choose your unique username</Text>
-                <TextInput
-                  {...inputProps(setUsername, {
-                    autoComplete: 'username',
-                    label: 'Unique username',
-                    name: 'username',
-                    textContentType: 'username',
-                  })}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="3-32 lowercase characters"
-                  value={username}
-                />
-                <Text style={styles.muted}>Use letters, numbers, underscores, or hyphens. Usernames cannot be changed.</Text>
-                <ActionButton disabled={submitting || !username.trim()} onPress={claimUsername}>
-                  {submitting ? 'Saving...' : 'Claim Username'}
-                </ActionButton>
-              </>
-            ) : (
-              <ActionButton disabled={submitting} onPress={returnToGame}>
-                {submitting ? 'Connecting...' : `Continue to ${gameName}`}
-              </ActionButton>
-            )}
+            <Text style={styles.fieldLabel}>Username</Text>
+            <TextInput
+              {...inputProps(setUsernameDraft, {
+                autoComplete: 'nickname',
+                label: 'Username',
+                name: 'username',
+                textContentType: 'nickname',
+              })}
+              onSubmitEditing={saveUsername}
+              placeholder="3–20 letters, numbers, or underscores"
+              returnKeyType="done"
+              value={usernameDraft}
+            />
+            <Text style={styles.muted}>Available usernames can be changed. Your Spades, Euchre, league, and tournament records stay with your account.</Text>
+            <ActionButton disabled={submitting || usernameDraft.trim() === account.playerHandle} onPress={saveUsername} variant="secondary">
+              {submitting ? 'Saving...' : 'Save Username'}
+            </ActionButton>
+            <ActionButton disabled={submitting} onPress={returnToGame}>
+              {submitting ? 'Connecting...' : `Continue to ${gameName}`}
+            </ActionButton>
             <Text style={styles.muted}>Sign out here only to switch the shared 1v1 account used by this browser.</Text>
             <ActionButton disabled={submitting} onPress={signOut} variant="danger">
               {submitting ? 'Signing out...' : 'Sign Out'}
@@ -504,20 +514,18 @@ export function GameAccountConnectScreen({
 
             {mode === 'create' ? (
               <>
-                <Text style={styles.fieldLabel}>Unique username</Text>
+                <Text style={styles.fieldLabel}>Username</Text>
                 <TextInput
                   {...inputProps(setPlayerHandle, {
-                    autoComplete: 'username',
-                    label: 'Unique username',
+                    autoComplete: 'nickname',
+                    label: 'Username',
                     name: 'username',
-                    textContentType: 'username',
+                    textContentType: 'nickname',
                   })}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="3-32 lowercase characters"
+                  placeholder="3–20 letters, numbers, or underscores"
                   value={playerHandle}
                 />
-                <Text style={styles.muted}>This is your permanent public name across 1v1 games, tournaments, leagues, and friends.</Text>
+                <Text style={styles.muted}>This public name appears across 1v1 games, tournaments, leagues, and friends. You can change it later if another username is available.</Text>
               </>
             ) : null}
 

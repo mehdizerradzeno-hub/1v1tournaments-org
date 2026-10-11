@@ -6,6 +6,7 @@ import {
   getStoreWithFallback,
   hasClaimedPlayerUsername,
   playerUsernameForAccount,
+  validatePlayerUsername,
 } from './_account-utils.mjs';
 import { FriendsAuthority, FriendsAuthorityError } from './_friends-authority.mjs';
 import { PostgresFriendsAuthorityStore } from './_friends-postgres-store.mjs';
@@ -27,8 +28,10 @@ async function allAccounts() {
 export async function resolveFriendsAccount(value) {
   const accounts = await allAccounts();
   if (value && typeof value === 'object' && 'searchHandle' in value) {
-    const handle = cleanText(value.searchHandle).replace(/^@/, '').toLowerCase();
-    return accounts.filter((account) => cleanText(account.playerHandle).replace(/^@/, '').toLowerCase() === handle);
+    const handle = validatePlayerUsername(value.searchHandle).username;
+    return handle
+      ? accounts.filter((account) => validatePlayerUsername(account.playerHandle).username === handle)
+      : [];
   }
   const canonicalAccountId = cleanText(value);
   return accounts.find((account) => accountCanonicalId(account) === canonicalAccountId) || null;
@@ -48,8 +51,8 @@ function normalizedPublicHandle(value) {
 
 /**
  * Validates that the public profile returned to a trusted game still matches
- * the Hub account. Games cannot create or backfill an identity: usernames are
- * claimed exactly once through the player-account endpoint.
+ * the Hub account. Games cannot create or rename an identity: names change
+ * only through the authenticated player-account endpoint.
  */
 export async function syncFriendsPublicProfile(
   { canonicalAccountId, handle },

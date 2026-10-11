@@ -15,7 +15,6 @@ import {
   getSessionId,
   markAccountDeleted,
   isEmailLike,
-  hasClaimedPlayerUsername,
   PlayerUsernameError,
   playerUsernameForAccount,
   publicAccount,
@@ -128,10 +127,10 @@ export async function createAccount(payload, options = {}) {
   const accountId = `acct_${randomUUID()}`;
   const username = playerUsernameForAccount({ playerHandle: requestedUsername });
   if (!username) {
-    const message = requestedUsername
-      ? 'Choose a username with 3-32 lowercase letters, numbers, underscores, or hyphens.'
-      : 'Choose a unique username for this account.';
-    return json(400, { error: message, code: 'invalid_username' });
+    return json(400, {
+      error: 'Choose a username with 3-20 letters, numbers, or underscores.',
+      code: 'invalid_username',
+    });
   }
   const account = {
     id: accountId,
@@ -194,42 +193,29 @@ export async function createAccount(payload, options = {}) {
   }), sessionCookie(session.token || session.id));
 }
 
-export async function claimUsername(event, payload, options = {}) {
+export async function changeUsername(event, payload, options = {}) {
   const resolveAccount = options.getAccountFromEvent || getAccountFromEvent;
   const reserveUsername = options.reservePlayerUsername || reservePlayerUsername;
+  const releaseUsername = options.releasePlayerUsernameReservation || releasePlayerUsernameReservation;
   const persistAccount = options.saveAccount || saveAccount;
   const startSession = options.createSession || createSession;
   const account = await resolveAccount(event);
 
   if (!account) {
-    return json(401, { error: 'Sign in before choosing a username.' });
+    return json(401, { error: 'Sign in before changing your username.' });
   }
 
-  if (hasClaimedPlayerUsername(account)) {
-    return json(409, {
-      error: 'This account already has a username. Usernames cannot be changed.',
-      code: 'username_already_claimed',
-    });
-  }
-
+  const previousUsername = playerUsernameForAccount(account);
   const username = playerUsernameForAccount({ playerHandle: payload.username || payload.playerHandle });
   if (!username) {
     return json(400, {
-      error: 'Choose a username with 3-32 lowercase letters, numbers, underscores, or hyphens.',
+      error: 'Choose a username with 3-20 letters, numbers, or underscores.',
       code: 'invalid_username',
     });
   }
 
-  const updated = {
-    ...account,
-    playerHandle: username,
-    playerName: username,
-    usernameClaimedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
   try {
-    await reserveUsername(username, updated);
+    await reserveUsername(username, account);
   } catch (error) {
     if (error instanceof PlayerUsernameError) {
       return json(error.statusCode, { error: error.message, code: error.code });
@@ -237,7 +223,37 @@ export async function claimUsername(event, payload, options = {}) {
     throw error;
   }
 
-  await persistAccount(updated);
+  const now = new Date().toISOString();
+  const updated = {
+    ...account,
+    playerHandle: username,
+    playerName: username,
+    usernameClaimedAt: account.usernameClaimedAt || now,
+    usernameChangedAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await persistAccount(updated);
+  } catch (error) {
+    if (username !== previousUsername) {
+      await releaseUsername(username, account).catch(() => {});
+    }
+    throw error;
+  }
+
+  if (previousUsername && previousUsername !== username) {
+    try {
+      await releaseUsername(previousUsername, account);
+    } catch (_error) {
+      // The new public identity is already durable. Keep it correct and leave
+      // a failed old-name cleanup recoverable rather than rolling it back.
+      console.error('Player username release failed after a rename', {
+        canonicalAccountId: account.canonicalAccountId || account.id,
+      });
+    }
+  }
+
   const session = await startSession(updated);
   return withCookie(
     json(200, { ok: true, account: publicPlayerAccount(updated) }),
@@ -286,6 +302,7 @@ export async function deleteAccount(event, payload, options = {}) {
     options.deleteSessionsForAccount || deleteSessionsForAccount;
   const removeAccount =
     options.deleteAccountRecord || deleteAccountRecord;
+  const releaseUsername = options.releasePlayerUsernameReservation || releasePlayerUsernameReservation;
   const deleteFriends = options.deleteFriendsForAccount
     || (hubFriendsEnabled(options.env || process.env) ? deleteDurableFriendsForAccount : null);
 
@@ -312,6 +329,7 @@ export async function deleteAccount(event, payload, options = {}) {
 
   await removeSessions(account.id);
   await removeAccount(account);
+  await releaseUsername(account.playerHandle, account).catch(() => {});
 
   return withCookie(
     json(200, {
@@ -479,6 +497,8 @@ export async function handler(event) {
       'request-email-verification': { limit: 5, windowMs: 60 * 60 * 1000 },
       'reset-password': { limit: 8, windowMs: 60 * 60 * 1000 },
       'verify-email': { limit: 8, windowMs: 60 * 60 * 1000 },
+      'claim-username': { limit: 20, windowMs: 60 * 60 * 1000 },
+      'change-username': { limit: 20, windowMs: 60 * 60 * 1000 },
     };
     const rateLimit = limits[payload.action];
 
@@ -498,8 +518,8 @@ export async function handler(event) {
       return createAccount(payload);
     }
 
-    if (payload.action === 'claim-username') {
-      return claimUsername(event, payload);
+    if (payload.action === 'change-username' || payload.action === 'claim-username') {
+      return changeUsername(event, payload);
     }
 
     if (payload.action === 'login') {

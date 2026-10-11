@@ -149,8 +149,8 @@ export async function createPlayerAccount(payload) {
   return result;
 }
 
-export function claimPlayerUsername(username) {
-  return postPlayerAccountAction('claim-username', { username });
+export function changePlayerUsername(username) {
+  return postPlayerAccountAction('change-username', { username });
 }
 
 export async function loginPlayerAccount(payload) {

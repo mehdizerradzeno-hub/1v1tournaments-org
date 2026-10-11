@@ -66,7 +66,7 @@ test('shared identity endpoint returns a stable authenticated canonical contract
   assert.deepEqual(body.identity.aliases, [{ provider: 'spades', legacyAccountId: 'legacy-spades' }]);
 });
 
-test('shared identity blocks accounts without a claimed username instead of generating a temporary handle', async () => {
+test('shared identity blocks accounts without a claimed username instead of inventing a compatibility handle', async () => {
   const aliasStore = new MemoryStore();
   const accountWithoutHandle = {
     ...account,

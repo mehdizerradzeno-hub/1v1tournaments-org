@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
+import { validatePlayerUsername } from './_account-utils.mjs';
 
 import { hasClaimedPlayerUsername, playerUsernameForAccount } from './_account-utils.mjs';
 
@@ -40,8 +41,8 @@ function canonicalId(value) {
 }
 
 function normalizedHandle(value) {
-  const handle = text(value, 32).replace(/^@/, '').toLowerCase();
-  if (!handle || !/^[a-z0-9._-]+$/.test(handle)) {
+  const { username: handle } = validatePlayerUsername(value);
+  if (!handle) {
     throw new FriendsAuthorityError('invalid_principal', 'The canonical account has no valid public handle.', 409);
   }
   return handle;
