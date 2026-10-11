@@ -223,13 +223,11 @@ test('Spades result callbacks use the same signed completion contract with seat 
   assert.equal(match.winnerId, 'signup-2');
   assert.deepEqual(match.completion.scores, { seat0: 120, seat1: 250 });
 
-  assert.throws(
-    () => normalizeTournamentResultCallback(
-      spadesResultPayload({ scores: { seat0: 120, seat1: -1 } }),
-      'spades-season-one',
-    ),
-    (error) => error.code === 'malformed_scores',
+  const penalizedResult = normalizeTournamentResultCallback(
+    spadesResultPayload({ scores: { seat0: 120, seat1: -100 } }),
+    'spades-season-one',
   );
+  assert.deepEqual(penalizedResult.scores, { seat0: 120, seat1: -100 });
   assert.throws(
     () => normalizeTournamentResultCallback(
       spadesResultPayload({ forfeit: true, forfeitReason: '' }),

@@ -136,10 +136,10 @@ export function assertTournamentTicketAccess({ record, bracket, match, player, r
   };
 }
 
-function cleanScore(value) {
+function cleanScore(value, { allowNegative = false } = {}) {
   if (value === undefined || value === null || value === '') return null;
   const score = Number(value);
-  return Number.isInteger(score) && score >= 0 ? score : NaN;
+  return Number.isInteger(score) && (allowNegative || score >= 0) ? score : NaN;
 }
 
 export function normalizeTournamentResultCallback(payload, tournamentSlug) {
@@ -166,11 +166,16 @@ export function normalizeTournamentResultCallback(payload, tournamentSlug) {
   const [homeScoreKey, awayScoreKey] = game === 'euchre'
     ? EUCHRE_SEATS
     : SPADES_SCORE_SEATS;
-  const homeScore = cleanScore(payload?.scores?.[homeScoreKey]);
-  const awayScore = cleanScore(payload?.scores?.[awayScoreKey]);
+  // Spades scores can legitimately be negative after nil or bag penalties.
+  // Euchre is a non-negative point game. The Hub stores a verified game
+  // result, so it must preserve each game's authoritative score semantics.
+  const scoreOptions = { allowNegative: game === 'spades' };
+  const homeScore = cleanScore(payload?.scores?.[homeScoreKey], scoreOptions);
+  const awayScore = cleanScore(payload?.scores?.[awayScoreKey], scoreOptions);
 
   if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
-    throw new TournamentGameContractError(400, `${game === 'euchre' ? 'Euchre' : 'Spades'} scores must be non-negative whole numbers.`, 'malformed_scores');
+    const requirement = game === 'euchre' ? 'non-negative whole numbers' : 'whole numbers';
+    throw new TournamentGameContractError(400, `${game === 'euchre' ? 'Euchre' : 'Spades'} scores must be ${requirement}.`, 'malformed_scores');
   }
 
   const isForfeit = payload?.forfeit === true;
