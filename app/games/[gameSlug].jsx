@@ -16,7 +16,7 @@ function normalizeParam(value) {
 }
 
 export default function GameRoute() {
-  const { gameSlug } = useLocalSearchParams();
+  const { gameSlug, view } = useLocalSearchParams();
 
-  return <GameScreen gameSlug={normalizeParam(gameSlug)} />;
+  return <GameScreen gameSlug={normalizeParam(gameSlug)} initialView={normalizeParam(view)} />;
 }
