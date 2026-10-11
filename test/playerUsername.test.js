@@ -1,16 +1,22 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   PlayerUsernameError,
   releasePlayerUsernameReservation,
   reservePlayerUsername,
+  publicAccount,
   validatePlayerUsername,
 } from '../netlify/functions/_account-utils.mjs';
 import {
   changeUsername,
   createAccount,
 } from '../netlify/functions/player-account.mjs';
+import { relinkSignupIdentity } from '../netlify/functions/tournament-signup.mjs';
+
+const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
 
 class MemoryStore {
   constructor() {
@@ -56,6 +62,71 @@ test('username policy normalizes case and accepts only 3-20 letters, numbers, or
   assert.match(validatePlayerUsername('north-star').error, /letters, numbers, and underscores/);
   assert.match(validatePlayerUsername('north.star').error, /letters, numbers, and underscores/);
   assert.match(validatePlayerUsername('north star').error, /letters, numbers, and underscores/);
+});
+
+test('username prompts match the shared policy and do not claim usernames are immutable', () => {
+  const source = readFileSync(checkInScreenFile, 'utf8');
+
+  assert.match(source, /3–20 letters, numbers, or underscores/);
+  assert.doesNotMatch(source, /3[-–]32 lowercase characters/);
+  assert.match(source, /You can change it later if another username is available\./);
+  assert.doesNotMatch(source, /It cannot be changed\./);
+});
+
+test('the current-account projection never exposes an unclaimed legacy display name', () => {
+  const legacy = {
+    id: 'acct-legacy',
+    canonicalAccountId: 'acct-legacy',
+    email: 'legacy@example.com',
+    playerHandle: '@legacy-name',
+    playerName: 'Temporary Legacy Name',
+  };
+
+  const publicLegacy = publicAccount(legacy);
+  assert.equal(publicLegacy.playerName, '');
+  assert.equal(publicLegacy.playerHandle, '');
+  assert.equal(publicLegacy.usernameRequired, true);
+  assert.equal(JSON.stringify(publicLegacy).includes(legacy.playerName), false);
+
+  const claimed = publicAccount({
+    ...legacy,
+    playerHandle: 'permanent_name',
+    usernameClaimedAt: '2026-10-11T00:00:00.000Z',
+  });
+  assert.equal(claimed.playerName, 'permanent_name');
+  assert.equal(claimed.playerHandle, 'permanent_name');
+  assert.equal(claimed.usernameRequired, false);
+});
+
+test('relinking a legacy tournament signup replaces its temporary name with the claimed username', () => {
+  const legacySignup = {
+    id: 'signup-legacy',
+    playerName: 'Temporary Table Name',
+    playerHandle: 'temporary-name',
+    notes: 'Existing registration note',
+    status: 'registered',
+    createdAt: '2026-10-10T10:00:00.000Z',
+  };
+  const account = {
+    id: 'acct-player',
+    canonicalAccountId: 'acct-player',
+    email: 'player@example.com',
+  };
+
+  const relinked = relinkSignupIdentity(legacySignup, {
+    account,
+    contactEmail: account.email,
+    now: '2026-10-11T12:00:00.000Z',
+    playerHandle: 'permanent_name',
+    tournamentSlug: 'spades-open',
+  });
+
+  assert.equal(relinked.playerName, 'permanent_name');
+  assert.equal(relinked.playerHandle, 'permanent_name');
+  assert.equal(relinked.canonicalAccountId, account.canonicalAccountId);
+  assert.equal(relinked.createdAt, legacySignup.createdAt);
+  assert.equal(relinked.notes, legacySignup.notes);
+  assert.equal(JSON.stringify(relinked).includes(legacySignup.playerName), false);
 });
 
 test('username reservation is case-insensitive, global, and idempotent for its owner', async () => {

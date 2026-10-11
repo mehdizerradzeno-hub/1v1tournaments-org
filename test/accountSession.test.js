@@ -5,6 +5,7 @@ import {
   clearSessionCookie,
   createSignedSessionToken,
   deleteSessionsForAccount,
+  getAccountFromEvent,
   getStoreWithFallback,
   getSessionId,
   parseSignedSessionToken,
@@ -37,6 +38,7 @@ test('signed player sessions round-trip trusted account claims', () => {
     id: 'account-1',
     playerHandle: '@player',
     playerName: 'Player One',
+    usernameClaimedAt: '2026-10-11T00:00:00.000Z',
   };
 
   const token = createSignedSessionToken(session, account);
@@ -46,7 +48,10 @@ test('signed player sessions round-trip trusted account claims', () => {
   assert.equal(parsed?.sessionId, session.id);
   assert.equal(parsed?.accountId, account.id);
   assert.equal(parsed?.accountEmail, account.email);
-  assert.equal(parsed?.playerName, account.playerName);
+  assert.equal(parsed?.playerHandle, 'player');
+  assert.equal(parsed?.usernameClaimedAt, account.usernameClaimedAt);
+  assert.equal('playerName' in (parsed || {}), false);
+  assert.equal(JSON.stringify(parsed).includes(account.playerName), false);
 });
 
 test('session cookies preserve signed tokens longer than generic form fields', () => {
@@ -57,10 +62,10 @@ test('session cookies preserve signed tokens longer than generic form fields', (
     id: 'session-long-token',
   }, {
     createdAt: new Date().toISOString(),
-    email: 'long-token@example.com',
+    email: `long-${'email'.repeat(95)}@example.com`,
     emailVerified: true,
     id: 'account-long-token',
-    playerHandle: `@${'handle'.repeat(60)}`,
+    playerHandle: '@long_handle',
     playerName: 'Long Token Player',
   });
   const event = {
@@ -72,6 +77,45 @@ test('session cookies preserve signed tokens longer than generic form fields', (
   assert.ok(token.length > 500);
   assert.equal(getSessionId(event), token);
   assert.equal(parseSignedSessionToken(getSessionId(event))?.sessionId, 'session-long-token');
+});
+
+test('signed-session propagation fallback preserves a claimed username without carrying a legacy name', async () => {
+  process.env.TOURNAMENT_SESSION_SECRET = TEST_SESSION_SECRET;
+  const now = Date.now();
+  const account = {
+    id: 'account-fallback',
+    canonicalAccountId: 'account-fallback',
+    createdAt: new Date(now).toISOString(),
+    email: 'fallback@example.com',
+    emailVerified: true,
+    playerHandle: 'fallback_player',
+    playerName: 'Temporary Legacy Name',
+    usernameClaimedAt: '2026-10-11T00:00:00.000Z',
+  };
+  const session = {
+    id: 'session-fallback',
+    accountId: account.id,
+    accountEmail: account.email,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 60_000).toISOString(),
+  };
+  const token = createSignedSessionToken(session, account);
+  const neverFound = { get: async () => null };
+
+  const resolved = await getAccountFromEvent({
+    headers: {
+      cookie: `one_v_one_player_session=${encodeURIComponent(token)}`,
+    },
+  }, {
+    accountStore: neverFound,
+    deletionStore: neverFound,
+    sessionStore: neverFound,
+  });
+
+  assert.equal(resolved?.playerHandle, 'fallback_player');
+  assert.equal(resolved?.usernameClaimedAt, account.usernameClaimedAt);
+  assert.equal('playerName' in (resolved || {}), false);
+  assert.equal(JSON.stringify(resolved).includes(account.playerName), false);
 });
 
 test('signed player sessions reject tampering and expiration', () => {

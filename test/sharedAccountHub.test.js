@@ -60,10 +60,11 @@ test('shared identity endpoint returns a stable authenticated canonical contract
   assert.equal(response.statusCode, 200);
   assert.equal(body.identity.protocolVersion, '2026-08-04');
   assert.equal(body.identity.canonicalAccountId, account.id);
-  assert.equal(body.identity.displayName, account.playerName);
+  assert.equal(body.identity.displayName, 'shared');
   assert.equal(body.identity.handle, 'shared');
   assert.equal(body.identity.emailVerified, account.emailVerified);
   assert.deepEqual(body.identity.aliases, [{ provider: 'spades', legacyAccountId: 'legacy-spades' }]);
+  assert.equal(JSON.stringify(body.identity).includes(account.playerName), false);
 });
 
 test('shared identity blocks accounts without a claimed username instead of inventing a compatibility handle', async () => {
@@ -190,6 +191,8 @@ test('one-time game authorization validates audience, expiration, and replay', a
 
   const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', { store, now: 2_000 });
   assert.equal(exchanged.canonicalAccountId, account.id);
+  assert.equal(exchanged.displayName, exchanged.handle);
+  assert.equal(exchanged.displayName, 'shared');
 
   await assert.rejects(
     exchangeGameAuthorization(issued.authorizationCode, 'spades', { store, now: 2_100 }),
@@ -254,6 +257,7 @@ test('authenticated game identity lookup resolves canonical and legacy rating ke
       [similarAccount.canonicalAccountId, 'shared2'],
     ],
   );
+  assert.ok(identities.every((identity) => identity.displayName === identity.handle));
   assert.equal(identities[0].aliases[0].legacyAccountId, 'legacy-spades');
 });
 

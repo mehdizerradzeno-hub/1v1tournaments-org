@@ -183,7 +183,10 @@ export async function sharedIdentityForAccount(account, options = {}) {
   return {
     protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
     canonicalAccountId,
-    displayName: cleanText(account.playerName),
+    // `playerName` is a legacy event-schema field.  A shared game identity
+    // must never revive that temporary/free-form name after the account has
+    // claimed its permanent username.
+    displayName: handle,
     handle,
     emailVerified: account.emailVerified !== false,
     aliases: await listAccountAliases(canonicalAccountId, options),

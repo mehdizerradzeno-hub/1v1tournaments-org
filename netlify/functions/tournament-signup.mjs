@@ -119,6 +119,35 @@ export function publicSignup(signup, currentAccount = null) {
   };
 }
 
+/**
+ * Reattach a pre-username signup to its canonical account. The supplied
+ * `playerHandle` is derived from the authenticated account immediately before
+ * this call, never from a browser request. Refresh both visible identity
+ * fields so a legacy temporary name cannot stay on an active roster.
+ */
+export function relinkSignupIdentity(existing, {
+  account,
+  contactEmail,
+  now,
+  playerHandle,
+  tournamentSlug,
+}) {
+  return {
+    ...existing,
+    tournamentSlug,
+    accountId: account.id,
+    accountCanonicalId: accountCanonicalId(account),
+    canonicalAccountId: accountCanonicalId(account),
+    accountEmail: account.email,
+    playerName: playerHandle,
+    contactEmail,
+    playerHandle,
+    status: existing.status || 'registered',
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+  };
+}
+
 async function loadTournamentSignups(store, tournamentSlug) {
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
   const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
@@ -290,20 +319,13 @@ export async function handler(event) {
 
     if (existing) {
       const now = new Date().toISOString();
-      const linkedSignup = {
-        ...existing,
-        tournamentSlug,
-        accountId: account.id,
-        accountCanonicalId: accountCanonicalId(account),
-        canonicalAccountId: accountCanonicalId(account),
-        accountEmail: account.email,
-        playerName: existing.playerName || playerName,
+      const linkedSignup = relinkSignupIdentity(existing, {
+        account,
         contactEmail,
-        playerHandle: existing.playerHandle || playerHandle,
-        status: existing.status || 'registered',
-        createdAt: existing.createdAt || now,
-        updatedAt: now,
-      };
+        now,
+        playerHandle,
+        tournamentSlug,
+      });
 
       await store.setJSON(key, linkedSignup, {
         metadata: {

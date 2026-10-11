@@ -123,7 +123,7 @@ function getToneColor(tone) {
 }
 
 function shortAccountName(account) {
-  const name = String(account?.playerName || account?.email || '').trim();
+  const name = String(account?.username || account?.playerHandle || account?.email || '').trim();
 
   if (!name) {
     return 'Player';

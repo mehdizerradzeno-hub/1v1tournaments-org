@@ -1025,7 +1025,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 <View style={styles.recoveryPanel}>
                   <Badge tone="accent">Username required</Badge>
                   <Text style={styles.recoveryTitle}>Choose your permanent 1v1 username</Text>
-                  <Text style={styles.recoveryCopy}>It is your public identity across games, friends, tournaments, and leagues. It cannot be changed.</Text>
+                  <Text style={styles.recoveryCopy}>It is your public identity across games, friends, tournaments, and leagues. You can change it later if another username is available.</Text>
                   <View style={styles.fieldGroup}>
                     <Text style={styles.fieldLabel}>Unique username</Text>
                     <TextInput
@@ -1038,7 +1038,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                       onChangeText={setUsername}
-                      placeholder="3-32 lowercase characters"
+                      placeholder="3–20 letters, numbers, or underscores"
                       placeholderTextColor="#6B766F"
                       style={styles.input}
                       value={username}

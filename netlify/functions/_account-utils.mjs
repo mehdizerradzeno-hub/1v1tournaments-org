@@ -256,6 +256,10 @@ export function createSignedSessionToken(session, account) {
     throw new Error('TOURNAMENT_SESSION_SECRET must contain at least 32 characters.');
   }
 
+  const username = hasClaimedPlayerUsername(account)
+    ? playerUsernameForAccount(account)
+    : '';
+
   const payload = {
     accountCreatedAt: account.createdAt,
     accountEmail: account.email,
@@ -263,11 +267,14 @@ export function createSignedSessionToken(session, account) {
     canonicalAccountId: accountCanonicalId(account),
     emailVerified: account.emailVerified !== false,
     expiresAt: session.expiresAt,
-    playerHandle: account.playerHandle || '',
-    playerName: account.playerName,
+    // A signed cookie is integrity-protected but not encrypted. Carry only a
+    // claimed public username for the short propagation fallback—never the
+    // old free-form playerName.
+    playerHandle: username,
     passwordChangedAt: account.passwordChangedAt || '',
     sessionCreatedAt: session.createdAt,
     sessionId: session.id,
+    usernameClaimedAt: username ? cleanText(account.usernameClaimedAt) : '',
   };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = sessionSignature(encodedPayload, secret);
@@ -398,9 +405,10 @@ export function publicAccount(account) {
     id: account.id,
     canonicalAccountId: account.canonicalAccountId || account.id,
     email: account.email,
-    // Preserve the legacy fields while making their public meaning explicit:
-    // only a claimed username is a player-facing identity going forward.
-    playerName: username || account.playerName || '',
+    // `playerName` remains on the private record only so historical event
+    // data can be read. Never expose it through the current-account API:
+    // until a player claims a username, they have no public game identity.
+    playerName: username,
     playerHandle: username,
     username,
     usernameRequired: !username,
@@ -643,7 +651,7 @@ export async function getAccountFromEvent(event, options = {}) {
       id: signedSession.accountId,
       canonicalAccountId: signedSession.canonicalAccountId || signedSession.accountId,
       playerHandle: signedSession.playerHandle || '',
-      playerName: signedSession.playerName,
+      usernameClaimedAt: signedSession.usernameClaimedAt || '',
       passwordChangedAt: signedSession.passwordChangedAt || '',
     };
   }
