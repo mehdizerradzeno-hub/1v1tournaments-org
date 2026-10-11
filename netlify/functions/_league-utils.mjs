@@ -36,6 +36,9 @@ function normalizeMatchResult(value = {}) {
     dispute: Boolean(value.dispute),
     source: cleanText(value.source),
     callbackId: cleanText(value.callbackId),
+    sourceTournamentSlug: cleanText(value.sourceTournamentSlug),
+    sourceTournamentMatchId: cleanText(value.sourceTournamentMatchId),
+    sourceCompletionId: cleanText(value.sourceCompletionId),
   };
 }
 
