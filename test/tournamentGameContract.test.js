@@ -73,6 +73,22 @@ function resultPayload(overrides = {}) {
   };
 }
 
+function spadesResultPayload(overrides = {}) {
+  return {
+    action: 'report-result',
+    protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
+    game: 'spades',
+    tournamentId: 'spades-season-one',
+    matchId: 'spades-season-one-r1-m1',
+    completionId: 'spades-room-1-completion-1',
+    winnerParticipantId: 'signup-2',
+    winnerCanonicalAccountId: 'acct-2',
+    scores: { seat0: 120, seat1: 250 },
+    forfeit: false,
+    ...overrides,
+  };
+}
+
 test('Euchre launch uses the configured route without inventing a match path', () => {
   const launch = new URL(buildTournamentLaunchUrl({
     game: 'euchre',
@@ -175,8 +191,8 @@ test('Euchre result callback validates protocol, required fields, scores, and fo
   assert.deepEqual(result.scores, { north: 10, south: 7 });
 
   assert.throws(
-    () => normalizeTournamentResultCallback(resultPayload({ game: 'spades' }), 'euchre-season-one'),
-    (error) => error.code === 'wrong_game',
+    () => normalizeTournamentResultCallback(resultPayload({ game: 'cribbage' }), 'euchre-season-one'),
+    (error) => error.code === 'unsupported_game',
   );
   assert.throws(
     () => normalizeTournamentResultCallback(resultPayload({ completionId: '' }), 'euchre-season-one'),
@@ -188,6 +204,37 @@ test('Euchre result callback validates protocol, required fields, scores, and fo
   );
   assert.throws(
     () => normalizeTournamentResultCallback(resultPayload({ forfeit: true }), 'euchre-season-one'),
+    (error) => error.code === 'malformed_forfeit',
+  );
+});
+
+test('Spades result callbacks use the same signed completion contract with seat scores', () => {
+  const result = normalizeTournamentResultCallback(spadesResultPayload(), 'spades-season-one');
+  assert.equal(result.game, 'spades');
+  assert.deepEqual(result.scores, { seat0: 120, seat1: 250 });
+
+  const bracket = buildBracket({
+    tournamentSlug: 'spades-season-one',
+    gameSlug: 'spades',
+    signups: [signup(1), signup(2)],
+  });
+  applyAuthoritativeTournamentResult(bracket, result);
+  const match = findMatch(bracket, 'spades-season-one-r1-m1');
+  assert.equal(match.winnerId, 'signup-2');
+  assert.deepEqual(match.completion.scores, { seat0: 120, seat1: 250 });
+
+  assert.throws(
+    () => normalizeTournamentResultCallback(
+      spadesResultPayload({ scores: { seat0: 120, seat1: -1 } }),
+      'spades-season-one',
+    ),
+    (error) => error.code === 'malformed_scores',
+  );
+  assert.throws(
+    () => normalizeTournamentResultCallback(
+      spadesResultPayload({ forfeit: true, forfeitReason: '' }),
+      'spades-season-one',
+    ),
     (error) => error.code === 'malformed_forfeit',
   );
 });
@@ -216,6 +263,22 @@ test('authoritative Euchre result advances once, preserves audit fields, and rej
   );
   assert.equal(match.winnerId, 'signup-1');
   assert.deepEqual(match.completion, completionAfterFirstCallback);
+});
+
+test('authoritative Euchre result rejects a different completion even when it names the same winner', () => {
+  const { bracket } = fixture();
+  applyAuthoritativeTournamentResult(
+    bracket,
+    normalizeTournamentResultCallback(resultPayload(), bracket.tournamentSlug),
+  );
+
+  assert.throws(
+    () => applyAuthoritativeTournamentResult(
+      bracket,
+      normalizeTournamentResultCallback(resultPayload({ completionId: 'second-completion' }), bracket.tournamentSlug),
+    ),
+    (error) => error.code === 'conflicting_result',
+  );
 });
 
 test('authoritative Euchre forfeit is recorded and advances only the assigned winner', () => {

@@ -18,6 +18,11 @@ import {
   normalizeTournamentGame,
   normalizeTournamentResultCallback,
 } from './_tournament-game-contract.mjs';
+import {
+  LinkedLeagueResultError,
+  syncLinkedLeagueTournamentResult,
+  validateLinkedLeagueTournamentSetup,
+} from './_linked-league-result.mjs';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
@@ -619,43 +624,102 @@ async function loadTournamentSignups(tournamentSlug) {
   return signups.filter(Boolean);
 }
 
-function publicBracket(bracket) {
-  if (!bracket) {
-    return null;
-  }
+function publicBracketPlayer(player) {
+  if (!player) return null;
 
+  // `id` is a bracket-local participant reference. Canonical account IDs,
+  // game account IDs, email addresses, and other identity bindings never
+  // belong in a browser-readable bracket response.
   return {
-    ...bracket,
-    participants: bracket.participants.map((participant) => ({
-      id: participant.id,
-      accountId: participant.accountId || '',
-      canonicalAccountId: participant.canonicalAccountId || participant.accountId || '',
-      seed: participant.seed,
-      name: participant.name,
-      handle: participant.handle || '',
-    })),
-    rounds: bracket.rounds.map((round) => ({
-      ...round,
-      matches: round.matches.map((match) => ({
-        ...match,
-        players: match.players.map((player) =>
-          player
-            ? {
-                id: player.id,
-                accountId: player.accountId || '',
-                canonicalAccountId: player.canonicalAccountId || player.accountId || '',
-                seed: player.seed,
-                name: player.name,
-                handle: player.handle || '',
-              }
-            : null,
-        ),
-      })),
-    })),
+    id: player.id,
+    seed: player.seed,
+    name: player.name,
+    handle: player.handle || '',
   };
 }
 
-function publicMatchDetails(bracket, matchId) {
+function publicCompletion(completion) {
+  if (!completion || typeof completion !== 'object') return null;
+
+  const scores = completion.scores && typeof completion.scores === 'object'
+    ? Object.fromEntries(Object.entries(completion.scores)
+      .filter(([, value]) => Number.isFinite(Number(value)))
+      .map(([seat, value]) => [cleanText(seat).slice(0, 32), Number(value)]))
+    : null;
+
+  return {
+    ...(scores && Object.keys(scores).length ? { scores } : {}),
+    ...(completion.forfeit === true ? { forfeit: true } : {}),
+    ...(cleanText(completion.forfeitReason) ? { forfeitReason: cleanText(completion.forfeitReason).slice(0, 160) } : {}),
+    ...(cleanText(completion.completedAt) ? { completedAt: cleanText(completion.completedAt).slice(0, 64) } : {}),
+  };
+}
+
+function publicMatch(match) {
+  return {
+    id: match.id,
+    label: match.label,
+    roundIndex: match.roundIndex,
+    matchIndex: match.matchIndex,
+    status: match.status,
+    players: (match.players || []).map(publicBracketPlayer),
+    winnerId: match.winnerId || null,
+    winnerName: match.winnerName || '',
+    loserId: match.loserId || null,
+    loserName: match.loserName || '',
+    nextMatchId: match.nextMatchId || null,
+    nextSlot: Number.isInteger(match.nextSlot) ? match.nextSlot : null,
+    loserNextMatchId: match.loserNextMatchId || null,
+    loserNextSlot: Number.isInteger(match.loserNextSlot) ? match.loserNextSlot : null,
+    resetMatchId: match.resetMatchId || null,
+    resetOnWinnerSlot: Number.isInteger(match.resetOnWinnerSlot) ? match.resetOnWinnerSlot : null,
+    roomUrl: match.roomUrl || '',
+    ...(match.completion ? { completion: publicCompletion(match.completion) } : {}),
+  };
+}
+
+function publicStanding(standing) {
+  return {
+    id: standing.id,
+    name: standing.name,
+    lives: Number.isInteger(standing.lives) ? standing.lives : null,
+    status: standing.status || '',
+  };
+}
+
+function publicWinner(winner) {
+  if (!winner) return null;
+  return {
+    id: winner.id,
+    name: winner.name,
+    ...(winner.handle ? { handle: winner.handle } : {}),
+  };
+}
+
+export function publicBracket(bracket) {
+  if (!bracket) return null;
+
+  return {
+    tournamentSlug: bracket.tournamentSlug,
+    status: bracket.status,
+    format: bracket.format,
+    gameSlug: bracket.gameSlug,
+    matchBaseUrl: bracket.matchBaseUrl || '',
+    participantCount: bracket.participantCount,
+    participants: (bracket.participants || []).map(publicBracketPlayer),
+    standings: (bracket.standings || []).map(publicStanding),
+    rounds: (bracket.rounds || []).map((round) => ({
+      index: round.index,
+      title: round.title,
+      matches: (round.matches || []).map(publicMatch),
+    })),
+    winner: publicWinner(bracket.winner),
+    createdAt: bracket.createdAt,
+    updatedAt: bracket.updatedAt,
+  };
+}
+
+export function publicMatchDetails(bracket, matchId) {
   if (!bracket) {
     return null;
   }
@@ -672,45 +736,7 @@ function publicMatchDetails(bracket, matchId) {
           index: round.index,
           title: round.title,
         },
-        match: {
-          ...match,
-          players: match.players.map((player) =>
-            player
-              ? {
-                  id: player.id,
-                  accountId: player.accountId || '',
-                  canonicalAccountId: player.canonicalAccountId || player.accountId || '',
-                  seed: player.seed,
-                  name: player.name,
-                  handle: player.handle || '',
-                }
-              : null,
-          ),
-        },
-        resultCallback: {
-          endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
-          method: 'POST',
-          tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
-          bodyTemplate: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'
-            ? {
-                action: 'report-result',
-                protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
-                game: 'euchre',
-                tournamentId: bracket.tournamentSlug,
-                matchId,
-                completionId: 'authoritative-euchre-completion-id',
-                winnerParticipantId: 'winner-participant-id-from-this-match',
-                winnerCanonicalAccountId: 'winner-canonical-account-id-from-this-match',
-                scores: { north: 10, south: 0 },
-                forfeit: false,
-                forfeitReason: '',
-              }
-            : {
-                action: 'report-winner',
-                matchId,
-                winnerId: 'winner-player-id-from-this-match',
-              },
-        },
+        match: publicMatch(match),
       };
     }
   }
@@ -864,7 +890,15 @@ export function applyAuthoritativeTournamentResult(bracket, result, now = new Da
   }
 
   if (match.status === 'final') {
-    if (match.winnerId === winner.id) {
+    const completion = match.completion;
+    const sameCompletion = completion
+      && completion.completionId === result.completionId
+      && completion.winnerParticipantId === result.winnerParticipantId
+      && completion.winnerCanonicalAccountId === result.winnerCanonicalAccountId
+      && JSON.stringify(completion.scores) === JSON.stringify(result.scores)
+      && completion.forfeit === result.forfeit
+      && completion.forfeitReason === result.forfeitReason;
+    if (match.winnerId === winner.id && sameCompletion) {
       return { duplicate: true, match };
     }
 
@@ -887,9 +921,30 @@ export function applyAuthoritativeTournamentResult(bracket, result, now = new Da
   return { duplicate: false, match };
 }
 
-async function reportAuthoritativeResultWithRetry(tournamentSlug, result) {
+function linkedLeagueError(error) {
+  if (error instanceof LinkedLeagueResultError) {
+    return json(error.statusCode, { error: error.message, code: error.code });
+  }
+
+  return json(503, {
+    error: 'The linked league result could not be recorded. The game may retry this completion safely.',
+    code: 'league_result_sync_unavailable',
+  });
+}
+
+async function syncLinkedLeagueResult(tournamentSlug, result, tournamentMatch, options = {}) {
+  const tournament = await (options.loadTournamentForBracket || loadTournamentForBracket)(tournamentSlug);
+  return (options.syncLinkedLeagueTournamentResult || syncLinkedLeagueTournamentResult)(
+    { tournament, tournamentMatch, result },
+  );
+}
+
+export async function reportAuthoritativeResultWithRetry(tournamentSlug, result, options = {}) {
+  const loadBracketWithMetadataForResult = options.loadBracketWithMetadata || loadBracketWithMetadata;
+  const saveBracketForResult = options.saveBracket || saveBracket;
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const loaded = await loadBracketWithMetadata(tournamentSlug);
+    const loaded = await loadBracketWithMetadataForResult(tournamentSlug);
 
     if (!loaded) {
       return { error: json(404, { error: 'Generate a bracket before reporting results.' }) };
@@ -908,13 +963,36 @@ async function reportAuthoritativeResultWithRetry(tournamentSlug, result) {
     }
 
     if (applied.duplicate) {
-      return { bracket: loaded.bracket, duplicate: true };
+      try {
+        const leagueSync = await syncLinkedLeagueResult(
+          tournamentSlug,
+          result,
+          applied.match,
+          options,
+        );
+        return { bracket: loaded.bracket, duplicate: true, leagueSync };
+      } catch (error) {
+        return { error: linkedLeagueError(error) };
+      }
     }
 
-    const savedBracket = await saveBracket(loaded.bracket, { onlyIfMatch: loaded.etag });
+    const savedBracket = await saveBracketForResult(loaded.bracket, { onlyIfMatch: loaded.etag });
 
     if (savedBracket.modified !== false) {
-      return { bracket: savedBracket, duplicate: false };
+      try {
+        const leagueSync = await syncLinkedLeagueResult(
+          tournamentSlug,
+          result,
+          findMatch(savedBracket, result.matchId),
+          options,
+        );
+        return { bracket: savedBracket, duplicate: false, leagueSync };
+      } catch (error) {
+        // The bracket completion is durable now. Returning a retryable error
+        // makes the game's outbox redeliver the same completion; the duplicate
+        // branch above performs the pending league write idempotently.
+        return { error: linkedLeagueError(error) };
+      }
     }
   }
 
@@ -1080,6 +1158,19 @@ export async function handler(event) {
         : tournamentMode.value === 'three-player-two-life'
           ? buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug })
           : buildBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug });
+
+      try {
+        // League fixtures are intentionally one assigned head-to-head event in
+        // this release. Tournament-placement points require a separately
+        // approved and versioned scoring contract.
+        await validateLinkedLeagueTournamentSetup({
+          tournament,
+          tournamentMatch: findMatch(bracket, `${tournamentSlug}-r1-m1`),
+          entrantCount: signups.length,
+        });
+      } catch (error) {
+        return linkedLeagueError(error);
+      }
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });

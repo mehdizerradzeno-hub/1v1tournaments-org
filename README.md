@@ -282,36 +282,14 @@ The Spades server verifies the ticket before seating a player:
 - Verify body: `{ "action": "verify-ticket", "matchId": "spades-summer-series-r1-m1", "ticket": "..." }`
 - The response includes the assigned `seatIndex` and public player details. Spades should use those values instead of client-entered names.
 
-The Spades app can load public match details directly from the tournament hub:
+The public bracket endpoint is display-only. It returns bracket-local IDs,
+public names/handles, and finalized scores, but never canonical account IDs,
+game account IDs, email addresses, callback credentials, or callback payloads.
+The game must use its verified match ticket—not a public bracket read—for the
+identity binding required to finalize a result.
 
-- Endpoint: `GET https://1v1tournaments.org/.netlify/functions/tournament-bracket?matchId=spades-summer-series-r1-m1`
-- Response shape:
-
-```json
-{
-  "ok": true,
-  "match": {
-    "tournamentSlug": "spades-summer-series",
-    "bracketStatus": "published",
-    "gameSlug": "spades",
-    "round": {
-      "index": 1,
-      "title": "Semifinals"
-    },
-    "match": {
-      "id": "spades-summer-series-r1-m1",
-      "players": []
-    },
-    "resultCallback": {
-      "endpoint": "https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=spades-summer-series",
-      "method": "POST",
-      "tokenEnv": "TOURNAMENT_MATCH_RESULT_TOKEN"
-    }
-  }
-}
-```
-
-After the room completes, the Spades app should report the winner back to the tournament hub:
+After the room completes, the game server should report its verified result to
+the tournament hub:
 
 - Endpoint: `POST https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=spades-summer-series`
 - Header: `Authorization: Bearer $TOURNAMENT_MATCH_RESULT_TOKEN`
@@ -320,15 +298,23 @@ After the room completes, the Spades app should report the winner back to the to
 
 ```json
 {
-  "action": "report-winner",
+  "action": "report-result",
+  "protocolVersion": "2026-08-04",
+  "game": "spades",
+  "tournamentId": "spades-summer-series",
   "matchId": "spades-summer-series-r1-m1",
-  "winnerId": "player-id-from-bracket"
+  "completionId": "authoritative-game-completion-id",
+  "winnerParticipantId": "participant-id-from-the-verified-ticket",
+  "winnerCanonicalAccountId": "canonical-id-from-the-verified-ticket",
+  "scores": { "seat0": 250, "seat1": 110 },
+  "forfeit": false
 }
 ```
 
 The `matchId` is the final path segment from the room URL, for example
-`https://1v1spades.com/match/spades-summer-series-r1-m1`.
-The `winnerId` must match one of the two bracket player IDs for that match.
+`https://1v1spades.com/match/spades-summer-series-r1-m1`. The Hub accepts a
+result only when its game, assigned participant, canonical identity, score
+shape, and completion ID match the verified bracket assignment.
 
 Successful responses return the updated bracket. The hub advances the winner into the next round and marks the tournament
 complete when the final is reported. Concurrent winner reports use conditional Blob writes and retry before returning
