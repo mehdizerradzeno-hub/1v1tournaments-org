@@ -32,7 +32,13 @@ import {
 } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getPublicGamePresentation } from '../lib/publicPresentationCatalog.js';
-import { getPublicBracketPresentation } from '../lib/publicBracketPresentation.js';
+import {
+  getPublicBracketPresentation,
+  getPublicChampionLabel,
+  getPublicMatchPlayerLabel,
+  getPublicMatchWinnerLabel,
+  isPublicMatchWinner,
+} from '../lib/publicBracketPresentation.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import {
   fetchTournamentPlayerStatus,
@@ -344,8 +350,8 @@ function getMatchPlayerRows(match) {
   if (players.length) {
     return players.map((player, index) => ({
       key: player?.id || `${match.id}-player-${index}`,
-      label: playerLabel(player),
-      isWinner: Boolean(match.winnerId && player?.id === match.winnerId) || playerLabel(player) === match.winnerName,
+      label: getPublicMatchPlayerLabel(player),
+      isWinner: isPublicMatchWinner(match, index),
       seed: player?.seed || index + 1,
     }));
   }
@@ -461,7 +467,7 @@ function getRosterGroups(signups, liveBracket) {
 }
 
 function matchPlayersLabel(match) {
-  const players = match?.players?.map(playerLabel).filter(Boolean) || [];
+  const players = match?.players?.map(getPublicMatchPlayerLabel).filter(Boolean) || [];
 
   if (players.length) {
     return players.join(' vs ');
@@ -1411,7 +1417,7 @@ function TournamentLobbyHero({
   const openSeats = signupSummary.loading ? '--' : String(getOpenSeats(signupSummary.count, advertisedRosterCap));
   const nextMatch = getNextPublicMatch(liveBracket);
   const isComplete = liveBracket?.status === 'complete' || Boolean(result);
-  const championName = liveBracket?.winner?.name || result?.winner || '';
+  const championName = getPublicChampionLabel(liveBracket) || result?.winner || '';
   const primaryAction = getPlayerPrimaryAction({
     checkInPath,
     isBracketLive,
@@ -1716,11 +1722,6 @@ function TournamentTabCommandCard({ body, primary, secondary, stats, title }) {
   );
 }
 
-function playerLabel(player) {
-  if (!player) return 'TBD';
-  return player.handle ? `${player.name} (${player.handle})` : player.name;
-}
-
 function statusTone(nextStep) {
   if (nextStep === 'ready-match' || nextStep === 'champion') return 'green';
   if (nextStep === 'sign-in' || nextStep === 'sign-up') return 'accent';
@@ -1826,7 +1827,7 @@ function PlayerStatusSpotlight({
     },
   ];
   const actionLabel = currentMatch ? 'Open My Match' : primaryAction?.label || 'Next Step';
-  const matchPlayers = currentMatch?.players?.map(playerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
+  const matchPlayers = currentMatch?.players?.map(getPublicMatchPlayerLabel).filter(Boolean).join(' vs ') || 'Assigned players';
 
   async function handlePlayMyMatch() {
     if (!currentMatch || opening) return;
@@ -1961,7 +1962,7 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug })
 
       {data?.signup ? (
         <Text style={styles.playerStatusCopy}>
-          Tournament seat confirmed for {playerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
+          Tournament seat confirmed for {getPublicMatchPlayerLabel({ name: data.signup.playerName, handle: data.signup.playerHandle })}.
         </Text>
       ) : signedInName ? (
         <Text style={styles.playerStatusCopy}>
@@ -1989,7 +1990,7 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug })
           <Text style={styles.playerMatchLabel}>
             {currentMatch.round.title} • {currentMatch.label}
           </Text>
-          <Text style={styles.playerMatchPlayers}>{currentMatch.players.map(playerLabel).join(' vs ')}</Text>
+          <Text style={styles.playerMatchPlayers}>{currentMatch.players.map(getPublicMatchPlayerLabel).join(' vs ')}</Text>
         </View>
       ) : null}
 
@@ -1998,7 +1999,7 @@ function PlayerTournamentStatus({ checkInPath, playerStatus, signInPath, slug })
           <Text style={styles.playerMatchLabel}>
             {data.waitingMatch.round.title} • {data.waitingMatch.label}
           </Text>
-          <Text style={styles.playerMatchPlayers}>{data.waitingMatch.players.map(playerLabel).join(' vs ')}</Text>
+          <Text style={styles.playerMatchPlayers}>{data.waitingMatch.players.map(getPublicMatchPlayerLabel).join(' vs ')}</Text>
         </View>
       ) : null}
 
@@ -2173,7 +2174,7 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
       {bracket.winner ? (
         <View style={styles.liveBracketChampionPanel}>
           <Text style={styles.liveBracketChampionLabel}>Champion</Text>
-          <Text style={styles.liveBracketChampionName}>{bracket.winner.name}</Text>
+          <Text style={styles.liveBracketChampionName}>{getPublicChampionLabel(bracket)}</Text>
           <Text style={styles.liveBracketChampionBody}>
             Final results are posted from this completed tournament bracket.
           </Text>
@@ -2224,7 +2225,7 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
                       </View>
                     ))}
                   </View>
-                  {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {match.winnerName}</Text> : null}
+                  {match.winnerName ? <Text style={styles.liveMatchWinner}>Winner: {getPublicMatchWinnerLabel(match)}</Text> : null}
                   <View style={styles.liveMatchActions}>
                     {match.status === 'ready' ? (
                       <ActionButton onPress={() => handleOpenMatch(match)} variant="secondary">

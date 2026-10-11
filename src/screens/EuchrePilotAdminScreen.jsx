@@ -8,14 +8,15 @@ import {
   reportTournamentMatchWinner,
   setEuchrePilotCheckIn,
 } from '../lib/tournamentHostingClient.js';
+import { formatEuchrePilotHostPlayer, getEuchrePilotNoShowLabel } from '../lib/euchrePilot.js';
 
 function parseCanonicalIds(value) {
   return String(value || '').split(/[\s,]+/).map((item) => item.trim()).filter(Boolean);
 }
 
-function confirmNoShow(playerName) {
+function confirmNoShow(player) {
   if (typeof globalThis.confirm !== 'function') return false;
-  return globalThis.confirm(`Advance ${playerName} because the opponent is a confirmed no-show? This finalizes the match.`);
+  return globalThis.confirm(`Advance ${formatEuchrePilotHostPlayer(player)} because the opponent is a confirmed no-show? This finalizes the match.`);
 }
 
 export default function EuchrePilotAdminScreen() {
@@ -74,7 +75,7 @@ export default function EuchrePilotAdminScreen() {
   }
 
   async function handleNoShow(match, winner) {
-    if (!confirmNoShow(winner.name)) return;
+    if (!confirmNoShow(winner)) return;
 
     await run(async () => {
       await reportTournamentMatchWinner({
@@ -141,7 +142,7 @@ export default function EuchrePilotAdminScreen() {
                 <View key={player.canonicalAccountId} style={styles.row}>
                   <View style={styles.rowCopy}>
                     <Text style={styles.rowTitle}>{player.playerName || player.playerHandle || 'Invited account'}</Text>
-                    <Text style={styles.meta}>{player.registered ? 'Registered' : 'Not registered'} · {player.checkedIn ? 'Checked in' : 'Missing check-in'}</Text>
+                    <Text style={styles.meta}>{player.registered ? 'Registered' : 'Not registered'} · {player.checkedIn ? 'Checked in' : 'Missing check-in'} · {player.canonicalAccountId}</Text>
                   </View>
                   <ActionButton disabled={!player.registered} onPress={() => handleCheckIn(player, !player.checkedIn)} variant={player.checkedIn ? 'secondary' : 'primary'}>
                     {player.checkedIn ? 'Undo check-in' : 'Check in'}
@@ -163,14 +164,14 @@ export default function EuchrePilotAdminScreen() {
                 <View key={match.id} style={styles.match}>
                   <Text style={styles.rowTitle}>{match.round} · {match.id}</Text>
                   <Text style={styles.meta}>{match.status} · room: {match.roomConnectionStatus} · callback: {match.callbackStatus}</Text>
-                  <Text style={styles.meta}>{match.players.map((player) => `${player.seat}: ${player.name}`).join(' vs ') || 'Waiting for assignment'}</Text>
+                  <Text style={styles.meta}>{match.players.map(formatEuchrePilotHostPlayer).join(' vs ') || 'Waiting for assignment'}</Text>
                   {match.status === 'ready' ? (
                     <>
                       <Text style={styles.note}>Reconnect: ask the player to reopen Play My Match from the tournament page. The active assignment remains deterministic.</Text>
                       <View style={styles.actions}>
                         {match.players.map((player) => (
                           <ActionButton key={player.participantId} onPress={() => handleNoShow(match, player)} variant="secondary">
-                            Advance {player.name} (no-show)
+                            {getEuchrePilotNoShowLabel(player)}
                           </ActionButton>
                         ))}
                       </View>

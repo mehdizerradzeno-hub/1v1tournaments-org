@@ -6,11 +6,23 @@ import { fileURLToPath } from 'node:url';
 import {
   buildEuchrePilotReadiness,
   evaluateEuchrePilotSignupAccess,
+  formatEuchrePilotHostPlayer,
+  getEuchrePilotNoShowLabel,
   normalizeInvitedCanonicalAccountIds,
   validateEuchrePilotConfiguration,
 } from '../src/lib/euchrePilot.js';
 
 const ids = Array.from({ length: 8 }, (_, index) => `acct_00000000-0000-4000-8000-00000000000${index}`);
+
+test('same-name pilot players have distinct host labels and no-show actions', () => {
+  const north = { name: 'Alex', seat: 'North', canonicalAccountId: ids[0], participantId: 'signup-0' };
+  const south = { name: 'Alex', seat: 'South', canonicalAccountId: ids[1], participantId: 'signup-1' };
+
+  assert.equal(formatEuchrePilotHostPlayer(north), `North: Alex · ${ids[0]}`);
+  assert.equal(formatEuchrePilotHostPlayer(south), `South: Alex · ${ids[1]}`);
+  assert.equal(getEuchrePilotNoShowLabel(north), 'Advance North: Alex (no-show)');
+  assert.equal(getEuchrePilotNoShowLabel(south), 'Advance South: Alex (no-show)');
+});
 
 test('invited pilot configuration accepts only unique canonical IDs for 4 or 8 seats', () => {
   assert.deepEqual(normalizeInvitedCanonicalAccountIds([ids[0], ids[0], 'legacy-1']), [ids[0]]);
@@ -97,6 +109,7 @@ test('pilot admin route and private host endpoint exist without changing public 
   const endpoint = fileURLToPath(new URL('../netlify/functions/tournament-pilot.mjs', import.meta.url));
   const signup = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
   const siteData = fileURLToPath(new URL('../src/lib/siteData.js', import.meta.url));
+  const hostScreen = fileURLToPath(new URL('../src/screens/EuchrePilotAdminScreen.jsx', import.meta.url));
 
   assert.equal(existsSync(route), true);
   const endpointSource = readFileSync(endpoint, 'utf8');
@@ -108,5 +121,7 @@ test('pilot admin route and private host endpoint exist without changing public 
   assert.match(endpointSource, /isHostedTournamentDeleted/);
   assert.match(endpointSource, /cannot accept check-in changes/);
   assert.match(readFileSync(signup, 'utf8'), /evaluateEuchrePilotSignupAccess/);
+  assert.match(readFileSync(hostScreen, 'utf8'), /getEuchrePilotNoShowLabel\(player\)/);
+  assert.match(readFileSync(hostScreen, 'utf8'), /player\.canonicalAccountId/);
   assert.match(readFileSync(siteData, 'utf8'), /Current tournament operations are Spades-only/);
 });

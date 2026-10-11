@@ -13,6 +13,20 @@ export function normalizePilotCanonicalAccountId(value) {
     : '';
 }
 
+export function formatEuchrePilotHostPlayer(player) {
+  const name = cleanText(player?.name || player?.playerName || player?.playerHandle, 120) || 'Invited account';
+  const seat = cleanText(player?.seat, 20);
+  const canonicalAccountId = normalizePilotCanonicalAccountId(player?.canonicalAccountId);
+  return `${seat ? `${seat}: ` : ''}${name}${canonicalAccountId ? ` · ${canonicalAccountId}` : ''}`;
+}
+
+export function getEuchrePilotNoShowLabel(player) {
+  const name = cleanText(player?.name, 120) || 'player';
+  const seat = cleanText(player?.seat, 20);
+  const identity = seat || normalizePilotCanonicalAccountId(player?.canonicalAccountId) || cleanText(player?.participantId, 80);
+  return `Advance ${identity ? `${identity}: ` : ''}${name} (no-show)`;
+}
+
 export function normalizeInvitedCanonicalAccountIds(value) {
   const incoming = Array.isArray(value)
     ? value
