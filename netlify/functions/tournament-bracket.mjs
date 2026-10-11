@@ -18,6 +18,11 @@ import {
   normalizeTournamentGame,
   normalizeTournamentResultCallback,
 } from './_tournament-game-contract.mjs';
+import {
+  LinkedLeagueResultError,
+  syncLinkedLeagueTournamentResult,
+  validateLinkedLeagueTournamentSetup,
+} from './_linked-league-result.mjs';
 
 const SPADES_MATCH_BASE_URL = 'https://1v1spades.com/match';
 
@@ -864,7 +869,15 @@ export function applyAuthoritativeTournamentResult(bracket, result, now = new Da
   }
 
   if (match.status === 'final') {
-    if (match.winnerId === winner.id) {
+    const completion = match.completion;
+    const sameCompletion = completion
+      && completion.completionId === result.completionId
+      && completion.winnerParticipantId === result.winnerParticipantId
+      && completion.winnerCanonicalAccountId === result.winnerCanonicalAccountId
+      && JSON.stringify(completion.scores) === JSON.stringify(result.scores)
+      && completion.forfeit === result.forfeit
+      && completion.forfeitReason === result.forfeitReason;
+    if (match.winnerId === winner.id && sameCompletion) {
       return { duplicate: true, match };
     }
 
@@ -887,9 +900,30 @@ export function applyAuthoritativeTournamentResult(bracket, result, now = new Da
   return { duplicate: false, match };
 }
 
-async function reportAuthoritativeResultWithRetry(tournamentSlug, result) {
+function linkedLeagueError(error) {
+  if (error instanceof LinkedLeagueResultError) {
+    return json(error.statusCode, { error: error.message, code: error.code });
+  }
+
+  return json(503, {
+    error: 'The linked league result could not be recorded. The game may retry this completion safely.',
+    code: 'league_result_sync_unavailable',
+  });
+}
+
+async function syncLinkedLeagueResult(tournamentSlug, result, tournamentMatch, options = {}) {
+  const tournament = await (options.loadTournamentForBracket || loadTournamentForBracket)(tournamentSlug);
+  return (options.syncLinkedLeagueTournamentResult || syncLinkedLeagueTournamentResult)(
+    { tournament, tournamentMatch, result },
+  );
+}
+
+export async function reportAuthoritativeResultWithRetry(tournamentSlug, result, options = {}) {
+  const loadBracketWithMetadataForResult = options.loadBracketWithMetadata || loadBracketWithMetadata;
+  const saveBracketForResult = options.saveBracket || saveBracket;
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const loaded = await loadBracketWithMetadata(tournamentSlug);
+    const loaded = await loadBracketWithMetadataForResult(tournamentSlug);
 
     if (!loaded) {
       return { error: json(404, { error: 'Generate a bracket before reporting results.' }) };
@@ -908,13 +942,36 @@ async function reportAuthoritativeResultWithRetry(tournamentSlug, result) {
     }
 
     if (applied.duplicate) {
-      return { bracket: loaded.bracket, duplicate: true };
+      try {
+        const leagueSync = await syncLinkedLeagueResult(
+          tournamentSlug,
+          result,
+          applied.match,
+          options,
+        );
+        return { bracket: loaded.bracket, duplicate: true, leagueSync };
+      } catch (error) {
+        return { error: linkedLeagueError(error) };
+      }
     }
 
-    const savedBracket = await saveBracket(loaded.bracket, { onlyIfMatch: loaded.etag });
+    const savedBracket = await saveBracketForResult(loaded.bracket, { onlyIfMatch: loaded.etag });
 
     if (savedBracket.modified !== false) {
-      return { bracket: savedBracket, duplicate: false };
+      try {
+        const leagueSync = await syncLinkedLeagueResult(
+          tournamentSlug,
+          result,
+          findMatch(savedBracket, result.matchId),
+          options,
+        );
+        return { bracket: savedBracket, duplicate: false, leagueSync };
+      } catch (error) {
+        // The bracket completion is durable now. Returning a retryable error
+        // makes Euchre's outbox redeliver the same completion; the duplicate
+        // branch above performs the pending league write idempotently.
+        return { error: linkedLeagueError(error) };
+      }
     }
   }
 
@@ -1080,6 +1137,19 @@ export async function handler(event) {
         : tournamentMode.value === 'three-player-two-life'
           ? buildThreePlayerTwoLifeBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug })
           : buildBracket({ tournamentSlug, signups, includeAdminFields: true, gameSlug: tournament?.gameSlug });
+
+      try {
+        // League fixtures are intentionally one assigned head-to-head event in
+        // this release. Tournament-placement points require a separately
+        // approved and versioned scoring contract.
+        await validateLinkedLeagueTournamentSetup({
+          tournament,
+          tournamentMatch: findMatch(bracket, `${tournamentSlug}-r1-m1`),
+          entrantCount: signups.length,
+        });
+      } catch (error) {
+        return linkedLeagueError(error);
+      }
       const savedBracket = await saveBracket(bracket);
 
       return json(201, { ok: true, bracket: savedBracket });

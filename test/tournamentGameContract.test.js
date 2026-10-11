@@ -218,6 +218,22 @@ test('authoritative Euchre result advances once, preserves audit fields, and rej
   assert.deepEqual(match.completion, completionAfterFirstCallback);
 });
 
+test('authoritative Euchre result rejects a different completion even when it names the same winner', () => {
+  const { bracket } = fixture();
+  applyAuthoritativeTournamentResult(
+    bracket,
+    normalizeTournamentResultCallback(resultPayload(), bracket.tournamentSlug),
+  );
+
+  assert.throws(
+    () => applyAuthoritativeTournamentResult(
+      bracket,
+      normalizeTournamentResultCallback(resultPayload({ completionId: 'second-completion' }), bracket.tournamentSlug),
+    ),
+    (error) => error.code === 'conflicting_result',
+  );
+});
+
 test('authoritative Euchre forfeit is recorded and advances only the assigned winner', () => {
   const { bracket, match } = fixture();
   const result = normalizeTournamentResultCallback(resultPayload({
