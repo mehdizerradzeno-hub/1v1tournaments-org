@@ -1,0 +1,21 @@
+{
+  "contractVersion": "2026-10-11-rank-projection-1",
+  "resource": "game-rank-projections",
+  "transport": {
+    "serviceAudiences": ["spades", "euchre"],
+    "methods": ["upsert", "lookup"],
+    "browserAccess": false,
+    "maximumLookupAccounts": 50
+  },
+  "identity": {
+    "serverOnly": "canonicalAccountId",
+    "forbiddenBrowserFields": ["canonicalAccountId", "rating", "wins", "losses"]
+  },
+  "projection": {
+    "key": ["canonicalAccountId", "game", "leaderboard", "season"],
+    "games": ["spades", "euchre"],
+    "statuses": ["ranked", "unranked"],
+    "requiredForRanked": ["rank", "asOf"],
+    "idempotency": "same timestamp and same projection is duplicate; same timestamp and different projection conflicts; older snapshots are ignored"
+  }
+}
