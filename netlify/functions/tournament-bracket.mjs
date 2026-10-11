@@ -42,7 +42,10 @@ function json(statusCode, body) {
 }
 
 function getMatchResultToken() {
-  return process.env.TOURNAMENT_MATCH_RESULT_TOKEN || getAdminToken();
+  // An authoritative game callback must never silently fall back to the
+  // broader host-admin credential. A missing dedicated game token is a
+  // configuration error and must fail closed until explicitly provisioned.
+  return String(process.env.TOURNAMENT_MATCH_RESULT_TOKEN || '').trim();
 }
 
 function getStoreWithFallback(name) {

@@ -334,10 +334,19 @@ test('Euchre result callback rejects missing server authentication and malformed
       body: JSON.stringify(resultPayload({ completionId: '' })),
     });
 
+    delete process.env.TOURNAMENT_MATCH_RESULT_TOKEN;
+    const missingDedicatedToken = await bracketHandler({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer test-only-admin-token' },
+      queryStringParameters: { slug: 'euchre-season-one' },
+      body: JSON.stringify(resultPayload()),
+    });
+
     assert.equal(unauthorized.statusCode, 401);
     assert.equal(adminTokenCannotReportGameResult.statusCode, 401);
     assert.equal(malformed.statusCode, 400);
     assert.equal(JSON.parse(malformed.body).code, 'malformed_result');
+    assert.equal(missingDedicatedToken.statusCode, 503);
   } finally {
     if (previousToken === undefined) {
       delete process.env.TOURNAMENT_MATCH_RESULT_TOKEN;
