@@ -13,6 +13,13 @@ const CODE_TTL_MS = 15 * 60 * 1000;
 const PASSWORD_RECOVERY_ORIGIN = 'https://1v1tournaments.org';
 const RESET_TOKEN_BYTES = 32;
 const MAX_CREDENTIAL_LENGTH = 512;
+const DEFAULT_PASSWORD_RECOVERY_PATH = '/account';
+const PASSWORD_RECOVERY_PATHS = new Set([
+  DEFAULT_PASSWORD_RECOVERY_PATH,
+  '/connect/euchre',
+  '/connect/gin',
+  '/connect/spades',
+]);
 
 function codeKey(purpose, email) {
   return `${purpose}/${accountKey(cleanEmail(email))}`;
@@ -66,8 +73,14 @@ export async function sendPlayerEmail({ to, subject, text, idempotencyKey = '' }
   return { configured: true, id: body.id || '', ok: true };
 }
 
-export function buildPasswordResetUrl({ email, token }) {
-  const url = new URL('/account?mode=reset', PASSWORD_RECOVERY_ORIGIN);
+export function normalizePasswordRecoveryPath(value) {
+  const path = String(value || '').trim();
+  return PASSWORD_RECOVERY_PATHS.has(path) ? path : DEFAULT_PASSWORD_RECOVERY_PATH;
+}
+
+export function buildPasswordResetUrl({ email, token, recoveryPath = DEFAULT_PASSWORD_RECOVERY_PATH }) {
+  const path = normalizePasswordRecoveryPath(recoveryPath);
+  const url = new URL(`${path}?mode=reset`, PASSWORD_RECOVERY_ORIGIN);
   url.hash = new URLSearchParams({
     email: cleanEmail(email),
     token: String(token || '').trim(),
@@ -85,7 +98,7 @@ function recoveryCredential(purpose, options = {}) {
 }
 
 export async function issuePlayerEmailCode(
-  { email, playerName = 'Player', purpose },
+  { email, playerName = 'Player', purpose, recoveryPath = DEFAULT_PASSWORD_RECOVERY_PATH },
   options = {},
 ) {
   const providerConfigured = options.providerConfigured ?? emailProviderConfigured();
@@ -124,7 +137,7 @@ export async function issuePlayerEmailCode(
           `Hi ${playerName || 'Player'},`,
           '',
           'Use this secure, one-time link to reset your 1v1 Tournaments password:',
-          buildPasswordResetUrl({ email, token: credential }),
+          buildPasswordResetUrl({ email, token: credential, recoveryPath }),
           '',
           'This link expires in 15 minutes and can be used only once.',
           'If it expires, request a new reset link from 1v1tournaments.org/account.',

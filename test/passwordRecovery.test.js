@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildPasswordResetUrl,
   consumePlayerEmailCode,
+  normalizePasswordRecoveryPath,
   issuePlayerEmailCode,
 } from '../netlify/functions/_player-email.mjs';
 import {
@@ -87,6 +88,42 @@ async function issueReset({ store = new MemoryStore(), token = resetToken } = {}
 
   return { message, result, store, token };
 }
+
+test('Euchre recovery stays on the account connector and rejects arbitrary return paths', () => {
+  const euchreUrl = new URL(buildPasswordResetUrl({
+    email,
+    token: resetToken,
+    recoveryPath: '/connect/euchre',
+  }));
+
+  assert.equal(euchreUrl.pathname, '/connect/euchre');
+  assert.equal(euchreUrl.searchParams.get('mode'), 'reset');
+  assert.equal(new URLSearchParams(euchreUrl.hash.slice(1)).get('token'), resetToken);
+  assert.equal(normalizePasswordRecoveryPath('/connect/euchre'), '/connect/euchre');
+  assert.equal(normalizePasswordRecoveryPath('https://attacker.example/reset'), '/account');
+  assert.equal(normalizePasswordRecoveryPath('//attacker.example/reset'), '/account');
+  assert.equal(normalizePasswordRecoveryPath('/connect/euchre?next=https://attacker.example'), '/account');
+});
+
+test('password-reset request forwards only the recovery UI context to email delivery', async () => {
+  let issued = null;
+  const response = await requestEmailCode({
+    contactEmail: email,
+    recoveryPath: '/connect/euchre',
+  }, 'reset-password', {
+    emailProviderConfigured: () => true,
+    getAccountByEmail: async () => ({ email, playerName: 'Recovery Test' }),
+    issuePlayerEmailCode: async (payload) => {
+      issued = payload;
+      return { configured: true, ok: true };
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(issued?.email, email);
+  assert.equal(issued?.purpose, 'reset-password');
+  assert.equal(issued?.recoveryPath, '/connect/euchre');
+});
 
 test('reset email uses the production fragment route and stores only a hashed 256-bit credential', async () => {
   const { message, result, store, token } = await issueReset();

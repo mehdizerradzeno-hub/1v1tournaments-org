@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+
 
 import {
   resolveAccountConnectMode,
   returnToGameWithoutAccountChange,
   runAccountHandoffOnce,
   signOutAccountConnectSession,
+  shouldShowConnectedAccount,
   verifiedAccountReturnCopy,
 } from '../src/lib/accountConnect.js';
 import {
@@ -28,6 +31,21 @@ test('Euchre account entry exposes sign in, create, reset, manage, and safe inva
   assert.equal(normalizeEuchreAccountMode('reset'), 'reset');
   assert.equal(normalizeEuchreAccountMode('manage'), 'manage');
   assert.equal(normalizeEuchreAccountMode('unknown'), 'signin');
+});
+
+test('a one-time recovery link overrides a stale signed-in Hub cookie', () => {
+  assert.equal(resolveAccountConnectMode('reset', {
+    hasAccount: true,
+    hasRecoveryCredential: true,
+    signedOutManageFallback: true,
+  }), 'reset');
+  assert.equal(resolveAccountConnectMode('reset', {
+    hasAccount: true,
+    hasRecoveryCredential: false,
+    signedOutManageFallback: true,
+  }), 'manage');
+  assert.equal(shouldShowConnectedAccount({ canonicalAccountId: 'acct_old' }, 'reset'), false);
+  assert.equal(shouldShowConnectedAccount({ canonicalAccountId: 'acct_old' }, 'manage'), true);
 });
 
 test('signed-in Euchre uses manage mode and signed-out manage safely returns to sign in', () => {
@@ -126,4 +144,20 @@ test('sign out rejects a response that did not clear the authoritative account',
     () => signOutAccountConnectSession(async () => ({ ok: true, account: { canonicalAccountId: 'acct_still_signed_in' } })),
     /could not be signed out/i,
   );
+});
+
+
+test('Euchre reset route preserves fragment credentials and connector return context', () => {
+  const routeSource = readFileSync(new URL('../app/connect/euchre.jsx', import.meta.url), 'utf8');
+  const screenSource = readFileSync(new URL('../src/screens/EuchreAccountConnectScreen.jsx', import.meta.url), 'utf8');
+
+  assert.match(routeSource, /readPasswordRecoveryFragment/);
+  assert.match(routeSource, /initialEmail=\{recovery\.email\}/);
+  assert.match(routeSource, /initialRecoveryToken=\{recovery\.token\}/);
+  const genericScreenSource = readFileSync(new URL('../src/screens/SpadesAccountConnectScreen.jsx', import.meta.url), 'utf8');
+
+  assert.match(screenSource, /passwordRecoveryPath=\{EUCHRE_ACCOUNT_ENTRY_ROUTE\}/);
+  assert.match(genericScreenSource, /setAccount\(null\)/);
+  assert.match(genericScreenSource, /account\.playerHandle/);
+  assert.match(genericScreenSource, /shouldShowConnectedAccount\(account, mode\)/);
 });
