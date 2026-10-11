@@ -31,6 +31,7 @@ import {
   returnToGameWithoutAccountChange,
   runAccountHandoffOnce,
   signOutAccountConnectSession,
+  shouldShowConnectedAccount,
   verifiedAccountReturnCopy,
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
@@ -82,6 +83,7 @@ export function GameAccountConnectScreen({
   destination = SPADES_ACCOUNT_DESTINATION,
   accountActions = SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
   prepareReturn = prepareSpadesAccountReturn,
+  passwordRecoveryPath = '/account',
   returnAfterSignOut = false,
   signedOutManageFallback = false,
   useHubShell = false,
@@ -111,9 +113,14 @@ export function GameAccountConnectScreen({
       .then((result) => {
         if (!active) return;
         setAccount(result.account || null);
-        if (result.account || (initialMode === 'manage' && signedOutManageFallback)) {
+        if (
+          result.account
+          || initialRecoveryToken
+          || (initialMode === 'manage' && signedOutManageFallback)
+        ) {
           setMode(resolveAccountConnectMode(initialMode, {
             hasAccount: Boolean(result.account),
+            hasRecoveryCredential: Boolean(initialRecoveryToken),
             signedOutManageFallback,
           }));
         }
@@ -213,7 +220,10 @@ export function GameAccountConnectScreen({
     setSubmitting(true);
     setError('');
     try {
-      const result = await requestPlayerPasswordReset({ contactEmail });
+      const result = await requestPlayerPasswordReset({
+        contactEmail,
+        recoveryPath: passwordRecoveryPath,
+      });
       setRecoveryRequested(Boolean(result.configured));
       if (result.configured) {
         setMessage(result.message || 'If that account exists, password reset instructions were sent.');
@@ -242,6 +252,8 @@ export function GameAccountConnectScreen({
         password: recoveryPassword,
         confirmPassword: recoveryConfirmPassword,
       });
+      handoffStartedRef.current = false;
+      setAccount(null);
       setPassword('');
       setRecoveryToken('');
       setRecoveryPassword('');
@@ -376,9 +388,10 @@ export function GameAccountConnectScreen({
       </View>
 
       <Surface style={styles.card}>
-        {account ? (
+        {shouldShowConnectedAccount(account, mode) ? (
           <>
             <Text style={styles.sectionTitle}>{account.playerName || 'Shared 1v1 account'}</Text>
+            {account.playerHandle ? <Text style={styles.muted}>{account.playerHandle}</Text> : null}
             <Text style={styles.muted}>{account.email || 'Account identity verified'}</Text>
             <ActionButton disabled={submitting} onPress={returnToGame}>
               {submitting ? 'Connecting...' : `Continue to ${gameName}`}

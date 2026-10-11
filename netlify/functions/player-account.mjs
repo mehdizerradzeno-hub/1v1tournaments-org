@@ -249,6 +249,7 @@ export async function requestEmailCode(payload, purpose, options = {}) {
         email,
         playerName: account.playerName,
         purpose,
+        recoveryPath: purpose === 'reset-password' ? payload.recoveryPath : undefined,
       });
     } catch {
       const logError = options.logError || console.error;

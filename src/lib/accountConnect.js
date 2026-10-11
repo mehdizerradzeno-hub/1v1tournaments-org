@@ -48,10 +48,22 @@ export async function runAccountHandoffOnce(handoffRef, operation) {
   }
 }
 
-export function resolveAccountConnectMode(requestedMode, { hasAccount = false, signedOutManageFallback = false } = {}) {
+export function resolveAccountConnectMode(
+  requestedMode,
+  {
+    hasAccount = false,
+    hasRecoveryCredential = false,
+    signedOutManageFallback = false,
+  } = {},
+) {
+  if (requestedMode === 'reset' && hasRecoveryCredential) return 'reset';
   if (hasAccount) return 'manage';
   if (requestedMode === 'manage' && signedOutManageFallback) return 'signin';
   return requestedMode;
+}
+
+export function shouldShowConnectedAccount(account, mode) {
+  return Boolean(account) && mode !== 'reset';
 }
 
 export function verifiedAccountReturnCopy(gameName) {
