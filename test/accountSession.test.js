@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   clearSessionCookie,
   createSignedSessionToken,
+  deleteSessionsForAccount,
   getStoreWithFallback,
   getSessionId,
   parseSignedSessionToken,
@@ -123,6 +124,54 @@ test('blob stores prefer the connected Netlify runtime context', () => {
 
   assert.equal(store, runtimeStore);
   assert.deepEqual(calls, ['player-account-codes']);
+});
+
+test('account session cleanup paginates with bounded parallel batches and deletes only matching sessions', async () => {
+  const records = Object.fromEntries(
+    Array.from({ length: 24 }, (_, index) => [
+      `session-${index}.json`,
+      { accountId: index % 3 === 0 ? 'target-account' : 'other-account' },
+    ]),
+  );
+  const deleted = [];
+  let paginated = false;
+  let activeReads = 0;
+  let maximumActiveReads = 0;
+  const store = {
+    list: ({ paginate } = {}) => {
+      paginated = paginate === true;
+      return (async function* listPages() {
+        const keys = Object.keys(records);
+        yield { blobs: keys.slice(0, 12).map((key) => ({ key })) };
+        yield { blobs: keys.slice(12).map((key) => ({ key })) };
+      }());
+    },
+    get: async (key) => {
+      activeReads += 1;
+      maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeReads -= 1;
+      return records[key];
+    },
+    delete: async (key) => {
+      deleted.push(key);
+    },
+  };
+
+  const deletedCount = await deleteSessionsForAccount('target-account', {
+    batchSize: 4,
+    store,
+  });
+  const expected = Object.entries(records)
+    .filter(([, value]) => value.accountId === 'target-account')
+    .map(([key]) => key)
+    .sort();
+
+  assert.equal(deletedCount, expected.length);
+  assert.deepEqual(deleted.sort(), expected);
+  assert.equal(paginated, true);
+  assert.ok(maximumActiveReads > 1);
+  assert.ok(maximumActiveReads <= 4);
 });
 
 test('blob stores retain explicit credentials as a non-runtime fallback', () => {

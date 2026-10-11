@@ -312,6 +312,46 @@ test('successful reset preserves canonical identity, invalidates sessions, rejec
   assert.equal(JSON.parse(newLogin.body).account.canonicalAccountId, original.canonicalAccountId);
 });
 
+test('a completed password reset still reports success when session cleanup has a partial storage failure', async () => {
+  const issued = await issueReset({ token: 'F'.repeat(43) });
+  const original = {
+    id: 'acct_partial_cleanup',
+    canonicalAccountId: 'acct_partial_cleanup',
+    email,
+    emailVerified: true,
+    playerName: 'Partial Cleanup Test',
+    password: createPasswordRecord('Old-password-1'),
+  };
+  let saved = structuredClone(original);
+  const logs = [];
+
+  const response = await resetAccountPassword({
+    contactEmail: email,
+    confirmPassword: 'New-password-2',
+    password: 'New-password-2',
+    token: issued.token,
+  }, {
+    consumePlayerEmailCode: (payload) => consumePlayerEmailCode(payload, {
+      now: () => baseTime + 1_000,
+      store: issued.store,
+    }),
+    deleteSessionsForAccount: async () => {
+      throw new Error('storage temporarily unavailable');
+    },
+    getAccountByEmail: async () => saved,
+    logError: (...args) => logs.push(args),
+    saveAccount: async (account) => {
+      saved = structuredClone(account);
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers['Set-Cookie'], /Max-Age=0/);
+  assert.equal(verifyPassword('New-password-2', saved.password), true);
+  assert.ok(saved.passwordChangedAt);
+  assert.deepEqual(logs, [['Player session cleanup failed after password reset']]);
+});
+
 test('a session created before the password change is rejected even if its stored record is briefly still readable', async () => {
   const previousSecret = process.env.TOURNAMENT_SESSION_SECRET;
   process.env.TOURNAMENT_SESSION_SECRET = 'password-recovery-session-test-secret-32-characters';

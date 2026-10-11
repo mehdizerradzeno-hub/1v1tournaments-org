@@ -16,6 +16,7 @@ const SESSION_PROPAGATION_GRACE_MS = 5 * 60 * 1000;
 const SESSION_TOKEN_PREFIX = 'v1';
 const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
+const SESSION_CLEANUP_BATCH_SIZE = 12;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
 export function getStoreWithFallback(name, options = {}) {
@@ -335,14 +336,32 @@ export async function deleteSessionsForAccount(accountId, options = {}) {
   if (!targetAccountId) return 0;
 
   const sessionStore = options.store || getStoreWithFallback('player-sessions');
-  const { blobs = [] } = await sessionStore.list();
+  const requestedBatchSize = Math.floor(Number(options.batchSize) || SESSION_CLEANUP_BATCH_SIZE);
+  const batchSize = Math.max(1, Math.min(50, requestedBatchSize));
   let deleted = 0;
 
-  for (const blob of blobs) {
-    const session = await sessionStore.get(blob.key, { type: 'json' });
-    if (cleanText(session?.accountId) !== targetAccountId) continue;
-    await sessionStore.delete(blob.key);
-    deleted += 1;
+  // Netlify Blobs provides an async iterator when paginate is true. Process a
+  // page at a time so an account reset does not first collect every session in
+  // a growing store. The promise fallback keeps injected test stores simple.
+  const listedPages = sessionStore.list({ paginate: true });
+  const pages = typeof listedPages?.[Symbol.asyncIterator] === 'function'
+    ? listedPages
+    : [await listedPages];
+
+  for await (const { blobs = [] } of pages) {
+    for (let index = 0; index < blobs.length; index += batchSize) {
+      const batch = blobs.slice(index, index + batchSize);
+      const sessions = await Promise.all(batch.map(async (blob) => ({
+        key: blob.key,
+        value: await sessionStore.get(blob.key, { type: 'json' }),
+      })));
+      const matchingKeys = sessions
+        .filter(({ value }) => cleanText(value?.accountId) === targetAccountId)
+        .map(({ key }) => key);
+
+      await Promise.all(matchingKeys.map((key) => sessionStore.delete(key)));
+      deleted += matchingKeys.length;
+    }
   }
 
   return deleted;
