@@ -597,6 +597,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   );
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /CompetitionFilterTabs/);
+  assert.match(leaderboardScreenSource, /Filter game ladders and tournament circuit by game/);
   assert.match(leaderboardScreenSource, /Current competition snapshot/);
   assert.match(leaderboardScreenSource, /title="Podium"/);
   assert.match(leaderboardScreenSource, /Search ranked players/);

@@ -139,11 +139,10 @@ export default function LeaderboardScreen() {
     ? gameRankBoards
     : gameRankBoards.filter((board) => board.game === activeGame);
   const filterItems = [
-    { id: 'all', label: 'All games', count: allEntries.length },
+    { id: 'all', label: 'All games' },
     ...games.map((game) => ({
       id: game.slug,
       label: game.name,
-      count: gameLeaderboards[game.slug]?.length || 0,
     })),
   ];
 
@@ -156,19 +155,19 @@ export default function LeaderboardScreen() {
       eyebrow="Competition rankings"
       footerNote="Verified Spades and Euchre game placements appear above. Tournament circuit standings below remain a separate, event-based leaderboard."
       heroVariant="compact"
-      lead="See the circuit leaders, search the full field, and understand exactly how posted tournament performance is ordered."
+      lead="Compare verified game ladders with tournament circuit leaders, then open each player’s permanent cross-game profile."
       publicShell
       subtitle="Game ladders • championships • finals"
       stickyActions={false}
       title="Rankings">
       <PlayerRouteStrip
-        body="Rankings update after results post. During an event, use the tournament page, My Match, or the live bracket."
+        body="Select a game to filter its verified ladder and tournament circuit. During an event, use the tournament page, My Match, or the live bracket."
       />
 
       <CompetitionFilterTabs
         activeId={activeGame}
         items={filterItems}
-        label="Filter tournament rankings by game"
+        label="Filter game ladders and tournament circuit by game"
         onSelect={setActiveGame}
       />
 
