@@ -4,7 +4,6 @@ import { connectLambda } from '@netlify/blobs';
 
 import {
   cleanEmail,
-  cleanText,
   clearSessionCookie,
   createPasswordRecord,
   createSession,
@@ -16,7 +15,12 @@ import {
   getSessionId,
   markAccountDeleted,
   isEmailLike,
+  hasClaimedPlayerUsername,
+  PlayerUsernameError,
+  playerUsernameForAccount,
   publicAccount,
+  releasePlayerUsernameReservation,
+  reservePlayerUsername,
   saveAccount,
   sessionCookie,
   verifyPassword,
@@ -93,15 +97,10 @@ function publicPlayerAccount(account) {
   };
 }
 
-async function createAccount(payload) {
+export async function createAccount(payload, options = {}) {
   const email = cleanEmail(payload.contactEmail || payload.email);
-  const playerName = cleanText(payload.playerName);
-  const playerHandle = cleanText(payload.playerHandle);
+  const requestedUsername = payload.username || payload.playerHandle;
   const passwordCheck = requirePassword(payload.password, payload.confirmPassword);
-
-  if (!playerName) {
-    return json(400, { error: 'Enter the player name for this account.' });
-  }
 
   if (!isEmailLike(email)) {
     return json(400, { error: 'Enter a valid email for this account.' });
@@ -111,7 +110,15 @@ async function createAccount(payload) {
     return json(400, { error: passwordCheck.error });
   }
 
-  const existing = await getAccountByEmail(email);
+  const resolveAccount = options.getAccountByEmail || getAccountByEmail;
+  const reserveUsername = options.reservePlayerUsername || reservePlayerUsername;
+  const releaseUsername = options.releasePlayerUsernameReservation || releasePlayerUsernameReservation;
+  const persistAccount = options.saveAccount || saveAccount;
+  const startSession = options.createSession || createSession;
+  const shouldVerifyEmails = options.verifiedEmailsRequired || verifiedEmailsRequired;
+  const providerConfigured = options.emailProviderConfigured || emailProviderConfigured;
+  const issueEmailCode = options.issuePlayerEmailCode || issuePlayerEmailCode;
+  const existing = await resolveAccount(email);
 
   if (existing) {
     return json(409, { error: 'That email already has a player account. Sign in instead.' });
@@ -119,34 +126,60 @@ async function createAccount(payload) {
 
   const now = new Date().toISOString();
   const accountId = `acct_${randomUUID()}`;
+  const username = playerUsernameForAccount({ playerHandle: requestedUsername });
+  if (!username) {
+    const message = requestedUsername
+      ? 'Choose a username with 3-32 lowercase letters, numbers, underscores, or hyphens.'
+      : 'Choose a unique username for this account.';
+    return json(400, { error: message, code: 'invalid_username' });
+  }
   const account = {
     id: accountId,
     canonicalAccountId: accountId,
     email,
-    playerName,
-    playerHandle,
-    emailVerified: !verifiedEmailsRequired(),
+    // Username is deliberately the only public name for newly created
+    // accounts. Keep playerName populated for the existing event schema.
+    playerName: username,
+    playerHandle: username,
+    usernameClaimedAt: now,
+    emailVerified: !shouldVerifyEmails(),
     password: createPasswordRecord(passwordCheck.password),
     createdAt: now,
     updatedAt: now,
   };
 
-  await saveAccount(account, {
-    onlyIfNew: true,
-    metadata: {
-      accountId: account.id,
-      email,
-      playerName,
-      createdAt: account.createdAt,
-    },
-  });
+  try {
+    await reserveUsername(username, account);
+  } catch (error) {
+    if (error instanceof PlayerUsernameError) {
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+    throw error;
+  }
 
-  const session = await createSession(account);
+  try {
+    await persistAccount(account, {
+      onlyIfNew: true,
+      metadata: {
+        accountId: account.id,
+        email,
+        playerName: username,
+        createdAt: account.createdAt,
+      },
+    });
+  } catch (error) {
+    // An account write that failed after a reservation must not strand an
+    // otherwise available username. Never release a reservation we do not own.
+    await releaseUsername(username, account).catch(() => {});
+    throw error;
+  }
+
+  const session = await startSession(account);
 
   let verificationDelivery = null;
 
-  if (!account.emailVerified && emailProviderConfigured()) {
-    verificationDelivery = await issuePlayerEmailCode({
+  if (!account.emailVerified && providerConfigured()) {
+    verificationDelivery = await issueEmailCode({
       email: account.email,
       playerName: account.playerName,
       purpose: 'verify-email',
@@ -159,6 +192,57 @@ async function createAccount(payload) {
     verificationRequired: !account.emailVerified,
     verificationDelivery,
   }), sessionCookie(session.token || session.id));
+}
+
+export async function claimUsername(event, payload, options = {}) {
+  const resolveAccount = options.getAccountFromEvent || getAccountFromEvent;
+  const reserveUsername = options.reservePlayerUsername || reservePlayerUsername;
+  const persistAccount = options.saveAccount || saveAccount;
+  const startSession = options.createSession || createSession;
+  const account = await resolveAccount(event);
+
+  if (!account) {
+    return json(401, { error: 'Sign in before choosing a username.' });
+  }
+
+  if (hasClaimedPlayerUsername(account)) {
+    return json(409, {
+      error: 'This account already has a username. Usernames cannot be changed.',
+      code: 'username_already_claimed',
+    });
+  }
+
+  const username = playerUsernameForAccount({ playerHandle: payload.username || payload.playerHandle });
+  if (!username) {
+    return json(400, {
+      error: 'Choose a username with 3-32 lowercase letters, numbers, underscores, or hyphens.',
+      code: 'invalid_username',
+    });
+  }
+
+  const updated = {
+    ...account,
+    playerHandle: username,
+    playerName: username,
+    usernameClaimedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    await reserveUsername(username, updated);
+  } catch (error) {
+    if (error instanceof PlayerUsernameError) {
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+    throw error;
+  }
+
+  await persistAccount(updated);
+  const session = await startSession(updated);
+  return withCookie(
+    json(200, { ok: true, account: publicPlayerAccount(updated) }),
+    sessionCookie(session.token || session.id),
+  );
 }
 
 export async function loginAccount(payload, options = {}) {
@@ -412,6 +496,10 @@ export async function handler(event) {
 
     if (payload.action === 'create') {
       return createAccount(payload);
+    }
+
+    if (payload.action === 'claim-username') {
+      return claimUsername(event, payload);
     }
 
     if (payload.action === 'login') {

@@ -14,8 +14,11 @@ async function readJsonResponse(response) {
   }
 }
 
-export async function fetchLeagues({ includeArchived = false } = {}) {
-  const query = includeArchived ? '?includeArchived=true' : '';
+export async function fetchLeagues({ includeArchived = false, admin = false } = {}) {
+  const params = new URLSearchParams();
+  if (includeArchived && admin) params.set('includeArchived', 'true');
+  if (admin) params.set('admin', 'true');
+  const query = params.size ? `?${params.toString()}` : '';
   const response = await fetch(`${LEAGUE_ENDPOINT}${query}`, {
     credentials: readCredentials(LEAGUE_ENDPOINT),
   });
@@ -28,8 +31,11 @@ export async function fetchLeagues({ includeArchived = false } = {}) {
   return result;
 }
 
-export async function fetchLeague(leagueId) {
-  const query = leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : '';
+export async function fetchLeague(leagueId, { admin = false } = {}) {
+  const params = new URLSearchParams();
+  if (leagueId) params.set('leagueId', leagueId);
+  if (admin) params.set('admin', 'true');
+  const query = params.size ? `?${params.toString()}` : '';
   const response = await fetch(`${LEAGUE_ENDPOINT}${query}`, {
     credentials: readCredentials(LEAGUE_ENDPOINT),
   });

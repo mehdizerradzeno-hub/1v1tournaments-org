@@ -44,6 +44,7 @@ const account = {
   emailVerified: true,
   playerName: 'Shared Player',
   playerHandle: '@shared',
+  usernameClaimedAt: '2026-10-11T00:00:00.000Z',
 };
 
 test('shared identity endpoint returns a stable authenticated canonical contract', async () => {
@@ -60,12 +61,12 @@ test('shared identity endpoint returns a stable authenticated canonical contract
   assert.equal(body.identity.protocolVersion, '2026-08-04');
   assert.equal(body.identity.canonicalAccountId, account.id);
   assert.equal(body.identity.displayName, account.playerName);
-  assert.equal(body.identity.handle, account.playerHandle);
+  assert.equal(body.identity.handle, 'shared');
   assert.equal(body.identity.emailVerified, account.emailVerified);
   assert.deepEqual(body.identity.aliases, [{ provider: 'spades', legacyAccountId: 'legacy-spades' }]);
 });
 
-test('shared identity supplies a stable compatibility handle without changing account data', async () => {
+test('shared identity blocks accounts without a claimed username instead of generating a temporary handle', async () => {
   const aliasStore = new MemoryStore();
   const accountWithoutHandle = {
     ...account,
@@ -73,56 +74,25 @@ test('shared identity supplies a stable compatibility handle without changing ac
     playerName: 'Existing Player',
     emailVerified: false,
   };
-  await addAccountAlias(
-    accountWithoutHandle,
-    { provider: 'spades', legacyAccountId: 'existing-spades-account' },
-    { store: aliasStore },
+  await assert.rejects(
+    sharedIdentityForAccount(accountWithoutHandle, { store: aliasStore }),
+    (error) => error instanceof SharedAccountContractError && error.code === 'username_required',
   );
-
-  const emptyHandleIdentity = await sharedIdentityForAccount(accountWithoutHandle, { store: aliasStore });
-  const missingHandleIdentity = await sharedIdentityForAccount(
-    { ...accountWithoutHandle, playerHandle: undefined },
-    { store: aliasStore },
+  await assert.rejects(
+    sharedIdentityForAccount(
+      { ...accountWithoutHandle, playerHandle: undefined },
+      { store: aliasStore },
+    ),
+    (error) => error instanceof SharedAccountContractError && error.code === 'username_required',
   );
-  const repeatedIdentity = await sharedIdentityForAccount(accountWithoutHandle, { store: aliasStore });
-
-  assert.equal(emptyHandleIdentity.handle, missingHandleIdentity.handle);
-  assert.equal(emptyHandleIdentity.handle, repeatedIdentity.handle);
-  assert.ok(emptyHandleIdentity.handle.length > 0);
-  assert.ok(emptyHandleIdentity.handle.length <= 32);
-  assert.match(emptyHandleIdentity.handle, /^[a-z0-9-]+$/);
-  assert.equal(emptyHandleIdentity.canonicalAccountId, accountWithoutHandle.canonicalAccountId);
-  assert.equal(emptyHandleIdentity.displayName, accountWithoutHandle.playerName);
-  assert.equal(emptyHandleIdentity.emailVerified, accountWithoutHandle.emailVerified);
-  assert.deepEqual(emptyHandleIdentity.aliases, [
-    { provider: 'spades', legacyAccountId: 'existing-spades-account' },
-  ]);
   assert.equal(accountWithoutHandle.playerHandle, '');
 
-  const response = await handleSharedAccountRequest({ httpMethod: 'GET' }, {
-    getAccountFromEvent: async () => accountWithoutHandle,
-    sharedIdentityForAccount: (value) => sharedIdentityForAccount(value, { store: aliasStore }),
-  });
-  assert.equal(response.statusCode, 200);
-  assert.equal(JSON.parse(response.body).identity.handle, emptyHandleIdentity.handle);
-
-  const authorizationStore = new MemoryStore();
-  const issued = await createGameAuthorization(emptyHandleIdentity, 'spades', {
-    store: authorizationStore,
-    now: 1_000,
-    codeFactory: () => 'compatibility-handle-code',
-  });
-  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
-    store: authorizationStore,
-    now: 2_000,
-  });
-  assert.equal(exchanged.handle, emptyHandleIdentity.handle);
   await assert.rejects(
-    exchangeGameAuthorization(issued.authorizationCode, 'spades', {
-      store: authorizationStore,
-      now: 2_100,
+    handleSharedAccountRequest({ httpMethod: 'GET' }, {
+      getAccountFromEvent: async () => accountWithoutHandle,
+      sharedIdentityForAccount: (value) => sharedIdentityForAccount(value, { store: aliasStore }),
     }),
-    (error) => error.code === 'authorization_replayed',
+    (error) => error instanceof SharedAccountContractError && error.code === 'username_required',
   );
 });
 
@@ -280,8 +250,8 @@ test('authenticated game identity lookup resolves canonical and legacy rating ke
   assert.deepEqual(
     identities.map((identity) => [identity.canonicalAccountId, identity.handle]),
     [
-      [account.canonicalAccountId, account.playerHandle],
-      [similarAccount.canonicalAccountId, similarAccount.playerHandle],
+      [account.canonicalAccountId, 'shared'],
+      [similarAccount.canonicalAccountId, 'shared2'],
     ],
   );
   assert.equal(identities[0].aliases[0].legacyAccountId, 'legacy-spades');
@@ -308,7 +278,7 @@ test('game identity lookup endpoint is server-authenticated and returns only pub
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(calls, [{ identityKeys: ['acct-shared-player'], audience: 'spades' }]);
-  assert.equal(body.identities[0].handle, account.playerHandle);
+  assert.equal(body.identities[0].handle, 'shared');
   assert.equal(JSON.stringify(body).includes(account.email), false);
 });
 

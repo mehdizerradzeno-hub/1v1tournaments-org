@@ -15,6 +15,7 @@ import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import { getTournamentGameName } from '../lib/tournamentCatalog.js';
 import {
+  claimPlayerUsername,
   createPlayerAccount,
   fetchPlayerAccount,
   fetchSignupSummary,
@@ -200,7 +201,7 @@ function getAccountFormStatus({
   confirmPassword,
   contactEmail,
   password,
-  playerName,
+  playerHandle,
   registrationOpen,
 }) {
   if (accountLoading) {
@@ -223,8 +224,8 @@ function getAccountFormStatus({
 
   const missingFields = [];
 
-  if (accountMode === 'create' && !playerName.trim()) {
-    missingFields.push('display name');
+  if (accountMode === 'create' && !playerHandle.trim()) {
+    missingFields.push('unique username');
   }
 
   if (!contactEmail.trim()) {
@@ -349,10 +350,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const [playerName, setPlayerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [notes, setNotes] = useState('');
-  const [showOptionalHandle, setShowOptionalHandle] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signup, setSignup] = useState(null);
   const [error, setError] = useState('');
@@ -663,9 +664,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
     try {
       const result = await createPlayerAccount({
-        playerName,
+        username: playerHandle,
+        playerName: playerHandle,
         contactEmail,
-        playerHandle,
         password,
         confirmPassword,
       });
@@ -677,7 +678,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPlayerName(nextAccount?.playerName || playerName);
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || playerHandle);
-      setShowOptionalHandle(false);
       setPassword('');
       setConfirmPassword('');
 
@@ -690,7 +690,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       if (isExistingAccountError(createError)) {
         setAccountMode('login');
         setConfirmPassword('');
-        setShowOptionalHandle(false);
         setAccountError('That email already has an account. I switched this form to Sign in so you can continue.');
       } else {
         setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
@@ -722,7 +721,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       setPlayerName(nextAccount?.playerName || '');
       setContactEmail(nextAccount?.email || contactEmail);
       setPlayerHandle(nextAccount?.playerHandle || '');
-      setShowOptionalHandle(false);
       setPassword('');
       setConfirmPassword('');
 
@@ -736,6 +734,31 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } finally {
       setAccountSubmitting(false);
       setAccountLoading(false);
+    }
+  }
+
+  async function handleClaimUsername() {
+    if (!username.trim()) {
+      setAccountError('Choose a unique username first.');
+      return;
+    }
+
+    setAccountSubmitting(true);
+    setAccountError('');
+    setAccountMessage('');
+    try {
+      const result = await claimPlayerUsername(username);
+      const nextAccount = await loadConfirmedAccount(result.account);
+      setAccount(nextAccount);
+      notifyPlayerAccountChanged(nextAccount);
+      setPlayerName(nextAccount?.playerName || '');
+      setPlayerHandle(nextAccount?.playerHandle || '');
+      setUsername('');
+      setAccountMessage('Username claimed. This account can now join the tournament.');
+    } catch (claimError) {
+      setAccountError(claimError instanceof Error ? claimError.message : 'Username could not be claimed.');
+    } finally {
+      setAccountSubmitting(false);
     }
   }
 
@@ -869,6 +892,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
   const accountNeedsVerification = account?.emailVerified === false;
+  const accountNeedsUsername = Boolean(account && (account.usernameRequired || !account.playerHandle));
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
   const confirmedSignup = signup
     || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
@@ -889,7 +913,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
       : isLoginMode
         ? 'Use your account email and password. After sign-in, tap Join Tournament to reserve the roster spot.'
-        : 'Enter your player name, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
+        : 'Choose a unique username, email, and password. After the account opens, tap Join Tournament to reserve the roster spot.';
   const authActionLabel = accountMode === 'create'
     ? 'Create Account'
     : 'Sign In';
@@ -900,7 +924,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     confirmPassword,
     contactEmail,
     password,
-    playerName,
+    playerHandle,
     registrationOpen,
   });
   const tournamentPath = getTournamentPath(visibleTournament.slug);
@@ -997,28 +1021,63 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                 </View>
               ) : null}
 
+              {accountNeedsUsername ? (
+                <View style={styles.recoveryPanel}>
+                  <Badge tone="accent">Username required</Badge>
+                  <Text style={styles.recoveryTitle}>Choose your permanent 1v1 username</Text>
+                  <Text style={styles.recoveryCopy}>It is your public identity across games, friends, tournaments, and leagues. It cannot be changed.</Text>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Unique username</Text>
+                    <TextInput
+                      {...formFieldProps({
+                        autoComplete: 'username',
+                        label: 'Unique username',
+                        name: 'username-claim',
+                        textContentType: 'username',
+                      })}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onChangeText={setUsername}
+                      placeholder="3-32 lowercase characters"
+                      placeholderTextColor="#6B766F"
+                      style={styles.input}
+                      value={username}
+                    />
+                  </View>
+                  <ActionButton disabled={accountSubmitting || !username.trim()} onPress={handleClaimUsername}>
+                    {accountSubmitting ? 'Saving...' : 'Claim Username'}
+                  </ActionButton>
+                </View>
+              ) : null}
+
               <View style={styles.joinActionPanel}>
                 <View style={styles.summaryTopRow}>
                   <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
                   <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
                 </View>
                 <Text style={styles.joinActionTitle}>
-                  {accountNeedsVerification
+                  {accountNeedsUsername
+                    ? 'Choose a username before joining.'
+                    : accountNeedsVerification
                     ? 'Verify your email before joining.'
                     : registrationOpen
                       ? `Reserve ${account.playerName}'s spot.`
                       : 'Registration is not open right now.'}
                 </Text>
                 <Text style={styles.joinActionCopy}>
-                  {accountNeedsVerification
+                  {accountNeedsUsername
+                    ? 'A permanent username keeps every game result and tournament seat tied to the same player profile.'
+                    : accountNeedsVerification
                     ? 'Enter the short code sent to this account email. Verification protects roster seats from account impersonation.'
                     : registrationOpen
                     ? `One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned ${gameName} match.`
                     : registrationMeta.actionCopy}
                 </Text>
                 <View style={styles.buttonRow}>
-                  <ActionButton disabled={!registrationOpen || accountNeedsVerification || submitting} onPress={handleSubmitSignup}>
-                    {accountNeedsVerification
+                  <ActionButton disabled={!registrationOpen || accountNeedsUsername || accountNeedsVerification || submitting} onPress={handleSubmitSignup}>
+                    {accountNeedsUsername
+                      ? 'Claim username first'
+                      : accountNeedsVerification
                       ? 'Verify email first'
                       : registrationOpen
                         ? (submitting ? 'Saving spot...' : 'Join Tournament')
@@ -1079,10 +1138,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   <Badge tone="green">Account linked</Badge>
                   <Text style={styles.accountEmail}>{account.email}</Text>
                 </View>
-                <Text style={styles.accountName}>{account.playerName}</Text>
-                {account.playerHandle ? <Text style={styles.summaryCopy}>{account.playerHandle}</Text> : null}
+                <Text style={styles.accountName}>{account.username || account.playerName}</Text>
+                {account.playerHandle ? <Text style={styles.summaryCopy}>@{account.playerHandle}</Text> : null}
                 <Text style={styles.accountStatusCopy}>
-                  Your account is ready for this tournament roster.
+                  {accountNeedsUsername ? 'Claim a username before this account can join a tournament.' : 'Your account is ready for this tournament roster.'}
                 </Text>
               </View>
 
@@ -1112,7 +1171,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     setAccountMode('create');
                     setAccountError('');
                     setAccountMessage('');
-                    setShowOptionalHandle(Boolean(playerHandle.trim()));
                   }}
                   variant={accountMode === 'create' ? 'primary' : 'secondary'}>
                   New player
@@ -1125,7 +1183,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     setConfirmPassword('');
                     setAccountError('');
                     setAccountMessage('');
-                    setShowOptionalHandle(false);
                   }}
                   variant={accountMode === 'login' ? 'primary' : 'secondary'}>
                   Already have account
@@ -1139,22 +1196,26 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               {accountMode === 'create' ? (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Tournament display name</Text>
+                  <Text style={styles.fieldLabel}>Unique username</Text>
                   <TextInput
                     {...formFieldProps({
-                      autoComplete: 'name',
-                      label: 'Tournament display name',
-                      name: 'display-name',
-                      textContentType: 'name',
+                      autoComplete: 'username',
+                      label: 'Unique username',
+                      name: 'username',
+                      textContentType: 'username',
                     })}
-                    autoCapitalize="words"
-                    onChangeText={setPlayerName}
-                    placeholder="Name shown on roster and bracket"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onChangeText={(value) => {
+                      setPlayerHandle(value);
+                      setPlayerName(value);
+                    }}
+                    placeholder="3-32 lowercase characters"
                     placeholderTextColor="#6B766F"
                     style={styles.input}
-                    value={playerName}
+                    value={playerHandle}
                   />
-                  <Text style={styles.fieldHint}>This is the public name people see in the roster, bracket, and results.</Text>
+                  <Text style={styles.fieldHint}>This permanent public name appears across games, friends, rosters, brackets, leagues, and results.</Text>
                 </View>
               ) : null}
 
@@ -1176,7 +1237,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   style={styles.input}
                   value={contactEmail}
                 />
-                <Text style={styles.fieldHint}>Used for sign-in. The public roster shows your display name, not your email.</Text>
+                <Text style={styles.fieldHint}>Used for sign-in and account recovery. It is never shown on public rosters.</Text>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -1245,44 +1306,6 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     ))}
                   </View>
                 </>
-              ) : null}
-
-              {accountMode === 'create' && (showOptionalHandle || playerHandle.trim()) ? (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Optional handle</Text>
-                  <TextInput
-                    {...formFieldProps({
-                      autoComplete: 'nickname',
-                      label: `Optional Discord or ${gameName} handle`,
-                      name: 'player-handle',
-                      textContentType: 'nickname',
-                    })}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={setPlayerHandle}
-                    onSubmitEditing={() => {
-                      if (accountFormStatus.ready) {
-                        handleCreateAccount();
-                      }
-                    }}
-                    placeholder={`Discord or ${gameName} name, if different`}
-                    placeholderTextColor="#6B766F"
-                    returnKeyType="go"
-                    style={styles.input}
-                    value={playerHandle}
-                  />
-                  <Text style={styles.fieldHint}>Skip this if your display name is enough. It is just extra context for the host.</Text>
-                </View>
-              ) : accountMode === 'create' ? (
-                <View style={styles.optionalFieldPrompt}>
-                  <View style={styles.optionalFieldCopy}>
-                    <Text style={styles.optionalFieldTitle}>Handle is optional</Text>
-                    <Text style={styles.optionalFieldBody}>Most players can skip this. Use it only if your Discord or {gameName} name is different.</Text>
-                  </View>
-                  <ActionButton onPress={() => setShowOptionalHandle(true)} variant="ghost">
-                    Add handle
-                  </ActionButton>
-                </View>
               ) : null}
 
               <View style={[styles.submitReadiness, accountFormStatus.ready && styles.submitReadinessReady]}>

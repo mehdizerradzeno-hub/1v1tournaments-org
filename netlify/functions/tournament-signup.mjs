@@ -5,6 +5,8 @@ import { connectLambda, getStore } from '@netlify/blobs';
 import {
   accountCanonicalId,
   getAccountFromEvent,
+  hasClaimedPlayerUsername,
+  playerUsernameForAccount,
 } from './_account-utils.mjs';
 import {
   isHostedTournamentDeleted,
@@ -235,17 +237,20 @@ export async function handler(event) {
     return json(403, { error: 'Verify this player account email before joining a tournament.' });
   }
 
-  const playerName = cleanText(account.playerName || payload.playerName);
   const contactEmail = cleanEmail(account.email);
-  const playerHandle = cleanText(account.playerHandle || payload.playerHandle);
+  const playerHandle = playerUsernameForAccount(account);
+  const playerName = playerHandle;
   const notes = cleanText(payload.notes);
 
   if (!tournamentSlug) {
     return json(400, { error: 'Choose a tournament before signing up.' });
   }
 
-  if (!playerName) {
-    return json(400, { error: 'Enter the player name for this signup.' });
+  if (!playerHandle || !hasClaimedPlayerUsername(account)) {
+    return json(409, {
+      error: 'Choose a unique username in your 1v1 account before joining a tournament.',
+      code: 'username_required',
+    });
   }
 
   if (!isEmailLike(contactEmail)) {

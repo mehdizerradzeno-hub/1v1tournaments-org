@@ -16,8 +16,30 @@ const SESSION_PROPAGATION_GRACE_MS = 5 * 60 * 1000;
 const SESSION_TOKEN_PREFIX = 'v1';
 const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
+export const PLAYER_USERNAME_MIN_LENGTH = 3;
+export const PLAYER_USERNAME_MAX_LENGTH = 32;
 const SESSION_CLEANUP_BATCH_SIZE = 12;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
+const RESERVED_PLAYER_USERNAMES = new Set([
+  'admin',
+  'administrator',
+  'moderator',
+  'official',
+  'root',
+  'support',
+  'system',
+  '1v1',
+  '1v1tournaments',
+]);
+
+export class PlayerUsernameError extends Error {
+  constructor(message, statusCode = 400, code = 'invalid_username') {
+    super(message);
+    this.name = 'PlayerUsernameError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 export function getStoreWithFallback(name, options = {}) {
   const createStore = options.getStore || getStore;
@@ -72,12 +94,125 @@ export function isEmailLike(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+/**
+ * A username is the one public player identity across 1v1. Keep the grammar
+ * deliberately small so it is stable in game clients, URLs, and brackets.
+ * A leading @ is accepted at input only and is never stored or returned.
+ */
+export function normalizePlayerUsername(value) {
+  return cleanText(value).replace(/^@+/, '').toLowerCase();
+}
+
+export function validatePlayerUsername(value) {
+  const username = normalizePlayerUsername(value);
+
+  if (
+    username.length < PLAYER_USERNAME_MIN_LENGTH
+    || username.length > PLAYER_USERNAME_MAX_LENGTH
+  ) {
+    return {
+      error: `Username must be ${PLAYER_USERNAME_MIN_LENGTH}-${PLAYER_USERNAME_MAX_LENGTH} characters.`,
+      username: '',
+    };
+  }
+
+  if (!/^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/.test(username)) {
+    return {
+      error: 'Username can use lowercase letters, numbers, underscores, and hyphens, and must start and end with a letter or number.',
+      username: '',
+    };
+  }
+
+  if (RESERVED_PLAYER_USERNAMES.has(username)) {
+    return { error: 'That username is reserved.', username: '' };
+  }
+
+  return { error: '', username };
+}
+
+export function playerUsernameForAccount(account) {
+  const result = validatePlayerUsername(account?.playerHandle);
+  return result.username;
+}
+
+/** A syntactically valid legacy handle is not a claimed global username. */
+export function hasClaimedPlayerUsername(account) {
+  return Boolean(playerUsernameForAccount(account) && cleanText(account?.usernameClaimedAt));
+}
+
 function identityKey(value) {
   return createHash('sha256').update(value).digest('hex').slice(0, 40);
 }
 
 export function accountKey(email) {
   return `${identityKey(cleanEmail(email))}.json`;
+}
+
+function playerUsernameKey(username) {
+  return `by-username/${identityKey(username)}.json`;
+}
+
+function usernameReservationOwner(record) {
+  return cleanText(record?.canonicalAccountId || record?.accountId);
+}
+
+/**
+ * Reserve a normalized username before persisting an account. `onlyIfNew`
+ * makes competing signups deterministic without exposing emails in the index.
+ */
+export async function reservePlayerUsername(value, account, options = {}) {
+  const { error, username } = validatePlayerUsername(value);
+  if (error) throw new PlayerUsernameError(error);
+
+  const canonicalAccountId = accountCanonicalId(account);
+  if (!canonicalAccountId) {
+    throw new PlayerUsernameError('A valid account is required to reserve a username.', 400, 'invalid_account');
+  }
+
+  const store = options.store || getStoreWithFallback('player-account-usernames');
+  const key = playerUsernameKey(username);
+  const record = {
+    accountId: cleanText(account.id),
+    canonicalAccountId,
+    createdAt: options.createdAt || new Date().toISOString(),
+    username,
+  };
+
+  try {
+    const result = await store.setJSON(key, record, { onlyIfNew: true });
+    if (result?.modified === false) {
+      throw new Error('Username reservation already exists.');
+    }
+    return { created: true, username };
+  } catch (_errorDuringReservation) {
+    const existing = await store.get(key, { type: 'json' }).catch(() => null);
+    if (usernameReservationOwner(existing) === canonicalAccountId) {
+      return { created: false, username };
+    }
+    if (existing) {
+      throw new PlayerUsernameError('That username is already taken.', 409, 'username_taken');
+    }
+
+    throw new PlayerUsernameError(
+      'Username registration is temporarily unavailable. Please try again.',
+      503,
+      'username_unavailable',
+    );
+  }
+}
+
+export async function releasePlayerUsernameReservation(value, account, options = {}) {
+  const { username } = validatePlayerUsername(value);
+  const canonicalAccountId = accountCanonicalId(account);
+  if (!username || !canonicalAccountId) return false;
+
+  const store = options.store || getStoreWithFallback('player-account-usernames');
+  const key = playerUsernameKey(username);
+  const existing = await store.get(key, { type: 'json' });
+  if (usernameReservationOwner(existing) !== canonicalAccountId) return false;
+
+  await store.delete(key);
+  return true;
 }
 
 export function sessionKey(sessionId) {
@@ -237,12 +372,20 @@ export function verifyPassword(password, storedPassword = {}) {
 export function publicAccount(account) {
   if (!account) return null;
 
+  const username = hasClaimedPlayerUsername(account)
+    ? playerUsernameForAccount(account)
+    : '';
+
   return {
     id: account.id,
     canonicalAccountId: account.canonicalAccountId || account.id,
     email: account.email,
-    playerName: account.playerName,
-    playerHandle: account.playerHandle || '',
+    // Preserve the legacy fields while making their public meaning explicit:
+    // only a claimed username is a player-facing identity going forward.
+    playerName: username || account.playerName || '',
+    playerHandle: username,
+    username,
+    usernameRequired: !username,
     emailVerified: account.emailVerified !== false,
     createdAt: account.createdAt,
   };

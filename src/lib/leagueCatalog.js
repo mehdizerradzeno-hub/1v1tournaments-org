@@ -500,8 +500,21 @@ function participantMatchIdentity(record, participantId) {
   };
 }
 
-export function buildLeagueStandings(league) {
+function activeLeagueSeasonId(record, requestedSeasonId = '') {
+  return cleanText(requestedSeasonId || record?.currentSeasonId || record?.season?.id);
+}
+
+function matchBelongsToSeason(match, seasonId) {
+  const matchSeasonId = cleanText(match?.seasonId);
+  // Older persisted fixtures did not carry seasonId. Treat those as current so
+  // a migration does not erase a live legacy season, but never mix an explicit
+  // prior season into the current table.
+  return !seasonId || !matchSeasonId || matchSeasonId === seasonId;
+}
+
+export function buildLeagueStandings(league, options = {}) {
   const record = buildLeagueRecord(league);
+  const seasonId = activeLeagueSeasonId(record, options.seasonId);
   const totals = new Map();
 
   const ensureTotals = (participantId, displayName = 'Player') => {
@@ -524,7 +537,7 @@ export function buildLeagueStandings(league) {
   };
 
   (record.matches || []).forEach((match) => {
-    if (!match || match.status !== 'complete' || !match.result) return;
+    if (!match || !matchBelongsToSeason(match, seasonId) || match.status !== 'complete' || !match.result) return;
 
     const homeId = match.homeTeam?.canonicalAccountId || match.homePlayerId;
     const awayId = match.awayTeam?.canonicalAccountId || match.awayPlayerId;
@@ -707,6 +720,12 @@ export function generateLeagueSchedule(league, options = {}) {
   const pairings = buildRoundPairings(enrolledIds, record.seasonConfig.doubleRoundRobin || false);
   const maxWeeks = Math.min(pairings.length, weekCount);
   const existing = [...record.matches];
+  const seasonId = activeLeagueSeasonId(record);
+  const priorSeasonExists = existing.some((match) => {
+    const matchSeasonId = cleanText(match?.seasonId);
+    return matchSeasonId && matchSeasonId !== seasonId;
+  });
+  const seasonKey = cleanId(seasonId, 'season');
 
   const matches = [];
   const schedule = [];
@@ -714,7 +733,9 @@ export function generateLeagueSchedule(league, options = {}) {
   for (let week = 1; week <= maxWeeks; week += 1) {
     const pairs = pairings[week - 1] || [];
     const weekMatches = pairs.map((pair, index) => {
-      const matchId = `${record.id}-w${week}-${index + 1}`;
+      const matchId = priorSeasonExists
+        ? `${record.id}-${seasonKey}-w${week}-${index + 1}`
+        : `${record.id}-w${week}-${index + 1}`;
       const existingMatch = existing.find((item) => item.id === matchId);
       const home = pair[0];
       const away = pair[1];
@@ -722,7 +743,7 @@ export function generateLeagueSchedule(league, options = {}) {
         id: matchId,
         gameSlug: record.gameSlug,
         leagueId: record.id,
-        seasonId: record.currentSeasonId || record.season?.id,
+        seasonId,
         divisionId: '',
         seasonWeek: week,
         weekIndex: week,
@@ -768,10 +789,12 @@ export function generateLeagueSchedule(league, options = {}) {
 export function nextLeagueMatch(league, accountIdentity = {}) {
   const record = buildLeagueRecord(league);
   const canonical = canonicalIdentityKey(accountIdentity);
+  const seasonId = activeLeagueSeasonId(record);
   if (!canonical) return null;
 
   const participantMatches = (record.matches || [])
     .filter((match) => {
+      if (!matchBelongsToSeason(match, seasonId)) return false;
       if (match.status !== 'scheduled') return false;
       return (
         cleanText(match.homeTeam?.canonicalAccountId) === canonical

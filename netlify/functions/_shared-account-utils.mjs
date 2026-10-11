@@ -5,7 +5,9 @@ import {
   accountCanonicalId,
   cleanText,
   getStoreWithFallback,
+  hasClaimedPlayerUsername,
   listAccountsByCanonicalIds,
+  playerUsernameForAccount,
 } from './_account-utils.mjs';
 
 export const SHARED_IDENTITY_PROTOCOL_VERSION = '2026-08-04';
@@ -169,11 +171,14 @@ export async function sharedIdentityForAccount(account, options = {}) {
   const canonicalAccountId = accountCanonicalId(account);
   if (!canonicalAccountId) return null;
 
-  const storedHandle = cleanText(account.playerHandle);
-  const handle = storedHandle || `player-${createHash('sha256')
-    .update(canonicalAccountId)
-    .digest('hex')
-    .slice(0, 24)}`;
+  const handle = playerUsernameForAccount(account);
+  if (!handle || !hasClaimedPlayerUsername(account)) {
+    throw new SharedAccountContractError(
+      'Choose a unique username in your 1v1 account before entering a game.',
+      409,
+      'username_required',
+    );
+  }
 
   return {
     protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,

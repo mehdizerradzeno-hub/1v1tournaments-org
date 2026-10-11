@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'expo-router';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -10,7 +10,7 @@ import {
   Section,
   Surface,
 } from '../components/hub-ui.jsx';
-import { getGameBySlug } from '../lib/siteData.js';
+import { getGameBySlug, getTournamentPath } from '../lib/siteData.js';
 import { buildLeagueRecord, nextLeagueMatch, leagueWeekLabel } from '../lib/leagueCatalog.js';
 import { formatShortDate } from '../lib/format.js';
 import { useHydrated } from '../lib/useHydrated.js';
@@ -44,6 +44,15 @@ const LEAGUE_VIEWS = [
 function leagueViewFromHash(hash) {
   const value = String(hash || '').replace(/^#/, '');
   return LEAGUE_VIEWS.some((view) => view.id === value) ? value : null;
+}
+
+function requestedLeagueId() {
+  const candidate = new URLSearchParams(globalThis.location?.search || '').get('league') || '';
+  return /^[a-z0-9][a-z0-9-]{0,239}$/i.test(candidate) ? candidate : '';
+}
+
+function selectedLeagueRecord(records, preferredId = '') {
+  return records.find((item) => item.id === preferredId) || records[0] || null;
 }
 
 function humanizeFormat(value, fallback = 'Weekly head-to-head') {
@@ -80,7 +89,16 @@ function displayCount(participants = [], status) {
   return participants.filter((player) => player.status === status).length;
 }
 
-function parsePlayerStatus(league, account) {
+function parsePlayerStatus(league, account, viewer) {
+  if (viewer?.membership) {
+    return {
+      participant: viewer.membership,
+      displayName: account?.playerName || account?.playerHandle || account?.email || 'You',
+      enrolled: viewer.membership.status === 'enrolled',
+      waitlisted: viewer.membership.status === 'waitlist',
+    };
+  }
+
   if (!league || !account) {
     return { participant: null, enrolled: false, waitlisted: false, displayName: 'You' };
   }
@@ -103,6 +121,23 @@ function parsePlayerStatus(league, account) {
   };
 }
 
+function viewerMatchAccess(viewer, matchId) {
+  return (viewer?.matchAccess || []).find((entry) => entry.matchId === matchId) || null;
+}
+
+function nextMatchForViewer(league, account, viewer) {
+  if (viewer) {
+    const access = (viewer.matchAccess || []).find((entry) => {
+      const match = (league?.matches || []).find((candidate) => candidate.id === entry.matchId);
+      return match && match.status !== 'complete';
+    });
+    if (!access) return null;
+    const match = (league?.matches || []).find((candidate) => candidate.id === access.matchId);
+    return match ? { ...match, roomUrl: access.roomUrl, viewerSeat: access.seat } : null;
+  }
+  return nextLeagueMatch(league, account);
+}
+
 function matchPreviewText(match = null) {
   if (!match) return 'No scheduled match.';
   const date = match.scheduledFor ? formatShortDate(match.scheduledFor) || 'TBD' : 'TBD';
@@ -111,7 +146,16 @@ function matchPreviewText(match = null) {
   return `${leagueWeekLabel(match.scheduledFor)} · ${home} vs ${away} · ${date}`;
 }
 
-function findMyStanding(league, account) {
+function sourceTournamentPath(result) {
+  if (result?.source !== 'tournament-authoritative-result') return '';
+  const slug = String(result?.sourceTournamentSlug || '').trim().toLowerCase();
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    ? getTournamentPath(slug)
+    : '';
+}
+
+function findMyStanding(league, account, viewer) {
+  if (viewer?.standing) return viewer.standing;
   if (!league || !account) return null;
 
   const canonical = String(account.canonicalAccountId || '').trim();
@@ -132,6 +176,7 @@ export default function LeaguesScreen() {
   const isAdminRoute = pathname.startsWith('/admin/leagues');
   const isHydrated = useHydrated();
   const [league, setLeague] = useState(null);
+  const [leagueViewer, setLeagueViewer] = useState(null);
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -151,6 +196,7 @@ export default function LeaguesScreen() {
   const [resultMatchId, setResultMatchId] = useState('');
   const [activeView, setActiveView] = useState('overview');
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const selectedLeagueIdRef = useRef('');
 
   useEffect(() => {
     function syncViewToHash() {
@@ -191,12 +237,18 @@ export default function LeaguesScreen() {
 
     async function loadLeagues() {
       try {
-        const response = await fetchLeagues();
+        const response = await fetchLeagues({ admin: isAdminRoute });
         const records = (response.leagues || []).map((item) => buildLeagueRecord(item));
+        const selected = selectedLeagueRecord(
+          records,
+          selectedLeagueIdRef.current || requestedLeagueId(),
+        );
         if (active) {
           startTransition(() => {
             setLeagues(records);
-            setLeague((previous) => previous ? records.find((item) => item.id === previous.id) || records[0] || null : records[0] || null);
+            selectedLeagueIdRef.current = selected?.id || '';
+            setLeague(selected);
+            setLeagueViewer(response.viewerByLeagueId?.[selected?.id] || null);
             setError('');
           });
         }
@@ -220,17 +272,17 @@ export default function LeaguesScreen() {
     return () => {
       active = false;
     };
-  }, [isHydrated, loadAttempt]);
+  }, [isAdminRoute, isHydrated, loadAttempt]);
 
-  const membership = useMemo(() => parsePlayerStatus(league, account), [league, account]);
+  const membership = useMemo(() => parsePlayerStatus(league, account, leagueViewer), [league, account, leagueViewer]);
   const nextMatch = useMemo(() => {
     if (!league || !account) return null;
-    return nextLeagueMatch(league, account);
-  }, [league, account]);
+    return nextMatchForViewer(league, account, leagueViewer);
+  }, [league, account, leagueViewer]);
 
   const myStanding = useMemo(
-    () => findMyStanding(league, account),
-    [league, account],
+    () => findMyStanding(league, account, leagueViewer),
+    [league, account, leagueViewer],
   );
   const canManageLeague = Boolean(isAdminRoute && account?.hostApproved);
   const enrolledCount = displayCount(league?.participants, 'enrolled');
@@ -261,10 +313,14 @@ export default function LeaguesScreen() {
     : 'Final standings';
 
   async function refreshLeagues() {
-    const next = await fetchLeagues();
+    const next = await fetchLeagues({ admin: isAdminRoute });
     const records = (next.leagues || []).map((item) => buildLeagueRecord(item));
+    const selected = selectedLeagueRecord(records, selectedLeagueIdRef.current || league?.id);
     setLeagues(records);
-    return records;
+    selectedLeagueIdRef.current = selected?.id || '';
+    setLeague(selected);
+    setLeagueViewer(next.viewerByLeagueId?.[selected?.id] || null);
+    return { records, selected };
   }
 
   async function handleSelectLeague(targetLeague) {
@@ -272,8 +328,11 @@ export default function LeaguesScreen() {
     setActionBusyType(`league-${targetLeague.id}`);
     setError('');
     try {
-      const next = buildLeagueRecord(await fetchLeague(targetLeague.id).then((payload) => payload.league || payload));
+      const payload = await fetchLeague(targetLeague.id, { admin: isAdminRoute });
+      const next = buildLeagueRecord(payload.league || payload);
+      selectedLeagueIdRef.current = next.id;
       setLeague(next);
+      setLeagueViewer(payload.viewer || null);
       setActiveView('overview');
     } catch (selectError) {
       setError(normalizeMessage(selectError));
@@ -327,9 +386,10 @@ export default function LeaguesScreen() {
         },
       });
 
-      const next = await fetchLeagues();
+      const next = await fetchLeagues({ admin: true });
       const records = (next.leagues || []).map((item) => buildLeagueRecord(item));
       setLeague(buildLeagueRecord(response.league || records[0]));
+      setLeagueViewer(null);
       setLeagues(records);
       setNewLeagueName('');
       setAdminToast('League created.');
@@ -346,8 +406,7 @@ export default function LeaguesScreen() {
     setAdminBusy(true);
     try {
       await archiveLeague({ token: adminToken, leagueId: league.id });
-      const refreshed = await refreshLeagues();
-      setLeague(refreshed.find((item) => item.id === league.id) || null);
+      await refreshLeagues();
       setAdminToast('League archived.');
     } catch (archiveError) {
       setAdminToast(normalizeMessage(archiveError));
@@ -402,7 +461,10 @@ export default function LeaguesScreen() {
 
     try {
       const result = await joinLeague({ leagueId: league.id });
-      setLeague(buildLeagueRecord(result.league || result));
+      const nextLeague = buildLeagueRecord(result.league || result);
+      selectedLeagueIdRef.current = nextLeague.id;
+      setLeague(nextLeague);
+      setLeagueViewer(result.viewer || null);
       await refreshLeagues();
       setAdminToast(result.waitlisted ? 'Added to the league waitlist.' : 'Joined league.');
     } catch (joinError) {
@@ -421,7 +483,10 @@ export default function LeaguesScreen() {
 
     try {
       const result = await leaveLeague(league.id);
-      setLeague(buildLeagueRecord(result.league || result));
+      const nextLeague = buildLeagueRecord(result.league || result);
+      selectedLeagueIdRef.current = nextLeague.id;
+      setLeague(nextLeague);
+      setLeagueViewer(result.viewer || null);
       await refreshLeagues();
       setAdminToast(membership.waitlisted ? 'Left the league waitlist.' : 'Left league.');
     } catch (leaveError) {
@@ -815,11 +880,20 @@ export default function LeaguesScreen() {
             <Section title="Match Schedule" description="Your weekly matchups, match status, and completed results.">
               {(league?.matches || []).length ? (
                 league.matches.map((match) => {
+                  const access = viewerMatchAccess(leagueViewer, match.id);
                   const isHome = account?.canonicalAccountId === match.homeTeam?.canonicalAccountId;
                   const isAway = account?.canonicalAccountId === match.awayTeam?.canonicalAccountId;
-                  const meSeat = isHome || isAway ? (isHome ? 'Home' : 'Away') : null;
+                  const meSeat = access?.seat === 'home'
+                    ? 'Home'
+                    : access?.seat === 'away'
+                      ? 'Away'
+                      : isHome || isAway
+                        ? (isHome ? 'Home' : 'Away')
+                        : null;
+                  const assignedRoomUrl = access?.roomUrl || match.roomUrl || '';
                   const homeName = match.homeTeam?.displayName || 'TBD';
                   const awayName = match.awayTeam?.displayName || 'TBD';
+                  const tournamentPath = sourceTournamentPath(match.result);
                   return (
                     <Surface key={match.id} style={styles.listRow}>
                       <View style={styles.listRowTop}>
@@ -828,13 +902,17 @@ export default function LeaguesScreen() {
                       </View>
                       <Text style={styles.listMeta}>{match.seasonWeek ? `Week ${match.seasonWeek}` : 'Match'} • {formatShortDate(match.scheduledFor) || 'TBD'} • {match.status}</Text>
                       {canManageLeague ? <Text style={styles.listMeta}>Match ID: {match.id} • Room: {match.roomUrl || 'Not assigned'}</Text> : null}
-                      {meSeat ? <Text style={styles.listMeta}>Your seat: {meSeat} • {match.roomUrl ? 'Match room ready' : 'Room not assigned yet'}</Text> : null}
+                      {meSeat ? <Text style={styles.listMeta}>Your seat: {meSeat} • {assignedRoomUrl ? 'Match room ready' : 'Room not assigned yet'}</Text> : null}
                       <Text style={styles.listMeta}>Result: {match.result ? `${match.result.homeScore}-${match.result.awayScore}` : 'not reported'}</Text>
+                      {tournamentPath ? <Text style={styles.listMeta}>Posted from a verified tournament result.</Text> : null}
                       <View style={styles.actionRow}>
-                        {meSeat && match.roomUrl && match.status !== 'complete' ? (
+                        {tournamentPath ? (
+                          <ActionButton href={tournamentPath} variant="ghost">View linked tournament</ActionButton>
+                        ) : null}
+                        {meSeat && assignedRoomUrl && match.status !== 'complete' ? (
                           <ActionButton
                             disabled={actionBusy}
-                            onPress={() => handleOpenAssignedMatch(match)}>
+                            onPress={() => handleOpenAssignedMatch({ ...match, roomUrl: assignedRoomUrl })}>
                             {actionBusyType === `launch-${match.id}` ? 'Opening...' : 'Open Match'}
                           </ActionButton>
                         ) : null}

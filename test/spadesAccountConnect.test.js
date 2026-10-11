@@ -137,14 +137,14 @@ test('Sign In uses the existing shared player-account login action', async () =>
 
 test('Create Account uses the existing shared player-account registration action', async () => {
   const body = await captureAccountAction(() => createPlayerAccount({
-    playerName: 'Test Player',
+    username: 'test_player',
     contactEmail: 'player@example.com',
     password: 'safe-test-password',
     confirmPassword: 'safe-test-password',
   }));
 
   assert.equal(body.action, 'create');
-  assert.equal(body.playerName, 'Test Player');
+  assert.equal(body.username, 'test_player');
 });
 
 test('Forgot and Reset Password use the existing recovery actions', async () => {

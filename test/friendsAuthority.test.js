@@ -18,12 +18,12 @@ import {
 } from '../netlify/functions/_friends-production-authority.mjs';
 
 const accounts = new Map([
-  ['acct-a', { canonicalAccountId: 'acct-a', playerHandle: 'alpha', playerName: 'Alpha' }],
-  ['acct-b', { canonicalAccountId: 'acct-b', playerHandle: 'bravo', playerName: 'Bravo' }],
-  ['acct-c', { canonicalAccountId: 'acct-c', playerHandle: 'charlie', playerName: 'Charlie' }],
-  ['acct-guest', { canonicalAccountId: 'acct-guest', playerHandle: 'guest', playerName: 'Guest', isGuest: true }],
-  ['acct-bot', { canonicalAccountId: 'acct-bot', playerHandle: 'bot', playerName: 'Bot', isBot: true }],
-  ['acct-blocked', { canonicalAccountId: 'acct-blocked', playerHandle: 'blocked', playerName: 'Blocked', blockedAt: '2026-10-07T12:00:00.000Z' }],
+  ['acct-a', { canonicalAccountId: 'acct-a', playerHandle: 'alpha', playerName: 'Alpha', usernameClaimedAt: '2026-10-11T00:00:00.000Z' }],
+  ['acct-b', { canonicalAccountId: 'acct-b', playerHandle: 'bravo', playerName: 'Bravo', usernameClaimedAt: '2026-10-11T00:00:00.000Z' }],
+  ['acct-c', { canonicalAccountId: 'acct-c', playerHandle: 'charlie', playerName: 'Charlie', usernameClaimedAt: '2026-10-11T00:00:00.000Z' }],
+  ['acct-guest', { canonicalAccountId: 'acct-guest', playerHandle: 'guest', playerName: 'Guest', usernameClaimedAt: '2026-10-11T00:00:00.000Z', isGuest: true }],
+  ['acct-bot', { canonicalAccountId: 'acct-bot', playerHandle: 'bot', playerName: 'Bot', usernameClaimedAt: '2026-10-11T00:00:00.000Z', isBot: true }],
+  ['acct-blocked', { canonicalAccountId: 'acct-blocked', playerHandle: 'blocked', playerName: 'Blocked', usernameClaimedAt: '2026-10-11T00:00:00.000Z', blockedAt: '2026-10-07T12:00:00.000Z' }],
 ]);
 
 function createAuthority(options = {}) {
@@ -174,13 +174,19 @@ test('production Friends authority uses the injected Database pool and server-on
   assert.ok(pool.client.queries.some(({ statement }) => statement.includes('INSERT INTO friends_relationships')));
 });
 
-test('trusted game exchanges hydrate a missing Friends public profile without replacing one', async () => {
+test('trusted game profile sync validates the already-claimed Hub username without changing it', async () => {
   const saved = [];
-  const account = { canonicalAccountId: 'acct-legacy', email: 'legacy@example.com', playerName: '' };
+  const account = {
+    canonicalAccountId: 'acct-legacy',
+    email: 'legacy@example.com',
+    playerHandle: 'legacy_player',
+    playerName: 'legacy_player',
+    usernameClaimedAt: '2026-10-11T00:00:00.000Z',
+  };
   const profile = await syncFriendsPublicProfile({
     canonicalAccountId: 'acct-legacy',
     handle: '@Legacy_Player',
-    displayName: 'Legacy Player',
+    displayName: 'Anything supplied by the game',
   }, {
     resolveAccount: async () => account,
     saveAccount: async (next) => saved.push(next),
@@ -188,16 +194,16 @@ test('trusted game exchanges hydrate a missing Friends public profile without re
   assert.deepEqual(profile, {
     canonicalAccountId: 'acct-legacy',
     handle: 'legacy_player',
-    displayName: 'Legacy Player',
+    displayName: 'legacy_player',
   });
-  assert.equal(saved.length, 1);
+  assert.equal(saved.length, 0);
   await assert.rejects(
     syncFriendsPublicProfile({
       canonicalAccountId: 'acct-legacy',
       handle: 'other-player',
       displayName: 'Other Player',
     }, {
-      resolveAccount: async () => ({ ...saved[0] }),
+      resolveAccount: async () => account,
       saveAccount: async () => {},
     }),
     (error) => error instanceof FriendsAuthorityError && error.code === 'public_profile_conflict',
@@ -279,7 +285,7 @@ test('presence projects only one coarse game label to accepted friends', async (
 
   await authority.heartbeatPresence({ audience: 'spades', actorCanonicalAccountId: 'acct-b' });
   const snapshot = await authority.snapshot({ audience: 'euchre', actorCanonicalAccountId: 'acct-a' });
-  assert.deepEqual(snapshot.friends, [{ canonicalAccountId: 'acct-b', handle: 'bravo', displayName: 'Bravo', presence: FRIENDS_PRESENCE.SPADES }]);
+  assert.deepEqual(snapshot.friends, [{ canonicalAccountId: 'acct-b', handle: 'bravo', displayName: 'bravo', presence: FRIENDS_PRESENCE.SPADES }]);
   assert.equal('presence' in snapshot.outgoing[0], false);
   assert.doesNotMatch(JSON.stringify(snapshot), /expiresAt|lastSeen|room|match|host|table|rating/i);
 

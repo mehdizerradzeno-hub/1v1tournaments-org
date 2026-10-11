@@ -149,6 +149,10 @@ export async function createPlayerAccount(payload) {
   return result;
 }
 
+export function claimPlayerUsername(username) {
+  return postPlayerAccountAction('claim-username', { username });
+}
+
 export async function loginPlayerAccount(payload) {
   const response = await fetch(ACCOUNT_ENDPOINT, {
     method: 'POST',

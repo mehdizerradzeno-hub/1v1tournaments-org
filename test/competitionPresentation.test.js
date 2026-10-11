@@ -24,6 +24,9 @@ test('public Leagues stays player-focused while host controls remain on the admi
   assert.match(leaguesScreenSource, /accountHref="\/account"/);
   assert.match(leaguesScreenSource, /formatShortDate\(match\.scheduledFor\) \|\| 'TBD'/);
   assert.match(leaguesScreenSource, /canManageLeague && resultMatchId/);
+  assert.match(leaguesScreenSource, /sourceTournamentSlug/);
+  assert.match(leaguesScreenSource, /source !== 'tournament-authoritative-result'/);
+  assert.match(leaguesScreenSource, /View linked tournament/);
   assert.match(leaguesScreenSource, /\{canManageLeague \? \(/);
 });
 

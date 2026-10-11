@@ -10,6 +10,7 @@ import {
   joinLeagueRecord,
   leaveLeagueRecord,
   leagueWeekLabel,
+  nextLeagueMatch,
 } from '../src/lib/leagueCatalog.js';
 
 test('buildLeagueRecord normalizes optional league fields', () => {
@@ -106,6 +107,51 @@ test('buildLeagueStandings computes wins, losses and win percent', () => {
   assert.equal(Math.round(alice?.winPercent), 50);
   assert.equal(bob?.wins, 0);
   assert.equal(bob?.losses, 1);
+});
+
+test('current-season standings and next-match selection exclude explicitly prior-season fixtures', () => {
+  const league = buildLeagueRecord({
+    id: 'season-boundary',
+    currentSeasonId: 'summer-2026',
+    season: { id: 'summer-2026', name: 'Summer 2026' },
+    participants: [
+      { canonicalAccountId: 'a1', accountId: 'a1', displayName: 'Alice' },
+      { canonicalAccountId: 'a2', accountId: 'a2', displayName: 'Bob' },
+    ],
+    matches: [
+      {
+        id: 'spring-final',
+        seasonId: 'spring-2026',
+        status: 'complete',
+        homeTeam: { canonicalAccountId: 'a1', displayName: 'Alice' },
+        awayTeam: { canonicalAccountId: 'a2', displayName: 'Bob' },
+        result: { winner: 'away', winnerId: 'a2', homeScore: 6, awayScore: 11 },
+      },
+      {
+        id: 'spring-pending',
+        seasonId: 'spring-2026',
+        status: 'scheduled',
+        scheduledFor: '2026-03-01T18:00:00.000Z',
+        homeTeam: { canonicalAccountId: 'a1', displayName: 'Alice' },
+        awayTeam: { canonicalAccountId: 'a2', displayName: 'Bob' },
+      },
+      {
+        id: 'summer-opener',
+        seasonId: 'summer-2026',
+        status: 'scheduled',
+        scheduledFor: '2026-06-01T18:00:00.000Z',
+        homeTeam: { canonicalAccountId: 'a1', displayName: 'Alice' },
+        awayTeam: { canonicalAccountId: 'a2', displayName: 'Bob' },
+      },
+    ],
+  });
+
+  const standings = buildLeagueStandings(league);
+  const alice = standings.find((entry) => entry.canonicalAccountId === 'a1');
+
+  assert.equal(alice?.gamesPlayed, 0);
+  assert.equal(alice?.losses, 0);
+  assert.equal(nextLeagueMatch(league, { canonicalAccountId: 'a1' })?.id, 'summer-opener');
 });
 
 test('generateLeagueSchedule creates matches for multiple weeks', () => {
@@ -237,6 +283,33 @@ test('generateLeagueSchedule preserves completed match results on regeneration',
   assert.equal(scheduled.matches.some((match) => match.status === 'complete'), true);
   const complete = scheduled.matches.find((match) => match.id === 'league-1-w1-1');
   assert.equal(complete?.result?.winnerId, 'a1');
+});
+
+test('a new season receives season-scoped fixture IDs without overwriting completed prior-season matches', () => {
+  const league = buildLeagueRecord({
+    id: 'seasonal-league',
+    currentSeasonId: 'summer-2026',
+    season: { id: 'summer-2026', name: 'Summer 2026' },
+    participants: [
+      { displayName: 'A', accountId: 'a1', canonicalAccountId: 'a1', status: 'enrolled' },
+      { displayName: 'B', accountId: 'a2', canonicalAccountId: 'a2', status: 'enrolled' },
+    ],
+    matches: [{
+      id: 'seasonal-league-w1-1',
+      seasonId: 'spring-2026',
+      status: 'complete',
+      homeTeam: { canonicalAccountId: 'a1', displayName: 'A' },
+      awayTeam: { canonicalAccountId: 'a2', displayName: 'B' },
+      result: { winner: 'home', winnerId: 'a1', homeScore: 11, awayScore: 5 },
+    }],
+  });
+
+  const scheduled = generateLeagueSchedule(league, { weekCount: 1 });
+  const currentMatch = scheduled.schedule[0].matches[0];
+
+  assert.equal(currentMatch.id, 'seasonal-league-summer-2026-w1-1');
+  assert.equal(currentMatch.seasonId, 'summer-2026');
+  assert.equal(scheduled.matches.find((match) => match.id === 'seasonal-league-w1-1')?.result?.winnerId, 'a1');
 });
 
 test('leagueWeekLabel formats a date string', () => {

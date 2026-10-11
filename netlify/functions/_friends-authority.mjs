@@ -1,6 +1,8 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
+import { hasClaimedPlayerUsername, playerUsernameForAccount } from './_account-utils.mjs';
+
 export const FRIENDS_CONTRACT_VERSION = '2026-10-07-presence-1';
 export const FRIENDS_ALLOWED_AUDIENCES = new Set(['spades', 'euchre']);
 export const FRIENDS_PAGE_DEFAULT = 25;
@@ -56,11 +58,11 @@ function publicProfile(account) {
     throw new FriendsAuthorityError('guest_or_bot', 'Only active human shared accounts can use Friends.', 403);
   }
   const canonicalAccountId = canonicalId(account.canonicalAccountId || account.id);
-  const handle = normalizedHandle(account.playerHandle || account.handle);
-  const displayName = text(account.playerName || account.displayName, 128);
-  if (!displayName) {
+  const handle = playerUsernameForAccount({ playerHandle: account.playerHandle || account.handle });
+  if (!handle || !hasClaimedPlayerUsername(account)) {
     throw new FriendsAuthorityError('invalid_principal', 'The canonical account has no valid public profile.', 409);
   }
+  const displayName = handle;
   return { canonicalAccountId, handle, displayName };
 }
 
