@@ -17,6 +17,8 @@ const SPONSOR_INQUIRIES_ENDPOINT = '/.netlify/functions/sponsor-inquiries';
 const SPONSOR_PROSPECTS_ENDPOINT = '/.netlify/functions/sponsor-prospects';
 const SPONSOR_COLLATERAL_ENDPOINT = '/.netlify/functions/sponsor-collateral';
 const SITE_ANALYTICS_ENDPOINT = '/.netlify/functions/site-analytics';
+const GAME_RANKINGS_ENDPOINT = '/.netlify/functions/game-rankings';
+const PLAYER_PROFILE_ENDPOINT = '/.netlify/functions/player-profile';
 const PRODUCTION_API_ORIGIN = 'https://1v1tournaments.org';
 const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
 const PASSWORD_RESET_REQUEST_TIMEOUT_MS = 45_000;
@@ -113,6 +115,50 @@ export async function fetchPlayerAccount() {
     throw new Error(result?.error || 'Player account could not be loaded.');
   }
 
+  return result;
+}
+
+export async function fetchPublicGameRankBoards({ game } = {}) {
+  const search = new URLSearchParams();
+  if (game) search.set('game', game);
+  const query = search.toString() ? `?${search.toString()}` : '';
+  const endpoint = `${readEndpoint(GAME_RANKINGS_ENDPOINT)}${query}`;
+  const response = await fetch(endpoint, { credentials: readCredentials(endpoint) });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.message || 'Game leaderboards could not be loaded.');
+  }
+  return result;
+}
+
+export async function fetchPublicGameRankings({ game, leaderboard, season, limit = 25, cursor = '' } = {}) {
+  const search = new URLSearchParams();
+  if (game) search.set('game', game);
+  if (leaderboard) search.set('leaderboard', leaderboard);
+  if (season) search.set('season', season);
+  if (limit) search.set('limit', String(limit));
+  if (cursor) search.set('cursor', cursor);
+  const endpoint = `${readEndpoint(GAME_RANKINGS_ENDPOINT)}?${search.toString()}`;
+  const response = await fetch(endpoint, { credentials: readCredentials(endpoint) });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.message || 'Game leaderboard entries could not be loaded.');
+  }
+  return result;
+}
+
+export async function fetchPublicPlayerProfile(handle) {
+  const normalized = String(handle || '').trim().replace(/^@/, '');
+  if (!normalized) throw new Error('A player username is required.');
+  const endpoint = `${readEndpoint(PLAYER_PROFILE_ENDPOINT)}?handle=${encodeURIComponent(normalized)}`;
+  const response = await fetch(endpoint, { credentials: readCredentials(endpoint) });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.message || 'Player profile could not be loaded.');
+  }
   return result;
 }
 

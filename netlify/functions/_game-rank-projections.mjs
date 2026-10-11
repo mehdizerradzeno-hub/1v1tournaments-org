@@ -5,6 +5,7 @@ import { getStoreWithFallback } from './_account-utils.mjs';
 
 export const GAME_RANK_PROJECTION_CONTRACT_VERSION = '2026-10-11-rank-projection-1';
 export const GAME_RANK_PROJECTION_STORE = 'game-rank-projections';
+export const GAME_RANKING_INDEX_PREFIX = 'ranking-index';
 
 const GAMES = new Set(['spades', 'euchre']);
 const STATUSES = new Set(['ranked', 'unranked']);
@@ -34,6 +35,10 @@ function canonicalAccountId(value) {
 
 function hash(value) {
   return createHash('sha256').update(String(value)).digest('hex');
+}
+
+function accountHash(value) {
+  return hash(value).slice(0, 48);
 }
 
 function game(value) {
@@ -112,7 +117,29 @@ export function normalizeGameRankProjection(payload = {}) {
 
 export function gameRankProjectionKey(projection) {
   const normalized = normalizeGameRankProjection(projection);
-  return `${hash(normalized.canonicalAccountId).slice(0, 48)}/${normalized.game}/${hash(normalized.leaderboard).slice(0, 24)}-${hash(normalized.season).slice(0, 24)}.json`;
+  return gameRankProjectionKeyFromHashes(
+    accountHash(normalized.canonicalAccountId),
+    normalized.game,
+    normalized.leaderboard,
+    normalized.season,
+  );
+}
+
+function gameRankProjectionKeyFromHashes(canonicalHash, gameValue, leaderboardValue, seasonValue) {
+  return `${canonicalHash}/${gameValue}/${hash(leaderboardValue).slice(0, 24)}-${hash(seasonValue).slice(0, 24)}.json`;
+}
+
+function rankingBucketPrefix(gameValue, leaderboardValue, seasonValue) {
+  return `${GAME_RANKING_INDEX_PREFIX}/${gameValue}/${hash(leaderboardValue).slice(0, 24)}-${hash(seasonValue).slice(0, 24)}`;
+}
+
+function rankingBoardKey(projection) {
+  return `${rankingBucketPrefix(projection.game, projection.leaderboard, projection.season)}/board.json`;
+}
+
+function rankingEntryKey(projection) {
+  if (projection.status !== 'ranked' || !projection.rank) return '';
+  return `${rankingBucketPrefix(projection.game, projection.leaderboard, projection.season)}/entries/${String(projection.rank).padStart(8, '0')}-${accountHash(projection.canonicalAccountId)}.json`;
 }
 
 function keyPrefix(canonical) {
@@ -162,6 +189,55 @@ async function writeWithEtag(store, key, value, etag) {
   return result?.modified !== false;
 }
 
+function rankingBoard(projection, prior = null) {
+  const priorAsOf = new Date(prior?.asOf || 0).getTime();
+  const nextAsOf = new Date(projection.asOf).getTime();
+
+  return {
+    contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION,
+    game: projection.game,
+    leaderboard: projection.leaderboard,
+    season: projection.season,
+    asOf: Number.isFinite(priorAsOf) && priorAsOf > nextAsOf ? prior.asOf : projection.asOf,
+  };
+}
+
+/**
+ * The primary projection remains account-private. The secondary board index
+ * contains only a one-way account hash and a rank; public callers reload and
+ * validate the primary record before a username can be returned.
+ */
+async function syncRankingIndex(store, projection, previous = null) {
+  const boardKey = rankingBoardKey(projection);
+  const currentBoard = await store.get(boardKey, { type: 'json' });
+  const board = rankingBoard(projection, currentBoard);
+  await store.setJSON(boardKey, board, {
+    metadata: {
+      contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION,
+      game: board.game,
+      leaderboard: board.leaderboard,
+      season: board.season,
+      asOf: board.asOf,
+    },
+  });
+
+  const nextKey = rankingEntryKey(projection);
+  const previousKey = previous ? rankingEntryKey(previous) : '';
+  if (nextKey) {
+    await store.setJSON(nextKey, {
+      contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION,
+      accountHash: accountHash(projection.canonicalAccountId),
+      rank: projection.rank,
+      asOf: projection.asOf,
+    }, {
+      metadata: { contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION, asOf: projection.asOf },
+    });
+  }
+  if (previousKey && previousKey !== nextKey && typeof store.delete === 'function') {
+    await store.delete(previousKey);
+  }
+}
+
 /**
  * Persists only the latest snapshot for one game/leaderboard/season key.
  * Older replays are harmless, and a same-timestamp mutation is rejected so a
@@ -183,6 +259,7 @@ export async function upsertGameRankProjection(payload, options = {}) {
       }
       if (incomingAt === existingAt) {
         if (fingerprint(existing) === fingerprint(incoming)) {
+          await syncRankingIndex(store, existing, existing);
           return { projection: existing, duplicate: true, stale: false };
         }
         throw new GameRankProjectionError(
@@ -194,6 +271,7 @@ export async function upsertGameRankProjection(payload, options = {}) {
     }
 
     if (await writeWithEtag(store, key, incoming, current?.etag)) {
+      await syncRankingIndex(store, incoming, existing);
       return { projection: incoming, duplicate: false, stale: false };
     }
   }
@@ -245,6 +323,122 @@ export async function lookupGameRankProjections(canonicalAccountIds, options = {
       )),
   })));
   return { contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION, projections };
+}
+
+function publicBoard(value) {
+  const normalized = {
+    game: game(value?.game),
+    leaderboard: leaderboard(value?.leaderboard),
+    season: season(value?.season),
+    asOf: timestamp(value?.asOf),
+  };
+  return { contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION, ...normalized };
+}
+
+function rankingLimit(value) {
+  if (value === undefined || value === null || value === '') return 25;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+    throw new GameRankProjectionError('invalid_limit', 'Ranking limit must be a whole number from 1 to 100.');
+  }
+  return parsed;
+}
+
+function rankingCursor(value) {
+  const cursor = text(value, 512);
+  if (cursor && /[\u0000-\u001f\u007f]/.test(cursor)) {
+    throw new GameRankProjectionError('invalid_cursor', 'Ranking cursor is invalid.');
+  }
+  return cursor;
+}
+
+/** Lists public board descriptors only; these records never include players. */
+export async function listPublishedGameRankBoards(options = {}) {
+  const store = projectionStore(options);
+  const requestedGame = options.game === undefined || options.game === null || options.game === ''
+    ? ''
+    : game(options.game);
+  const prefix = requestedGame
+    ? `${GAME_RANKING_INDEX_PREFIX}/${requestedGame}/`
+    : `${GAME_RANKING_INDEX_PREFIX}/`;
+  const boards = [];
+  let cursor = '';
+
+  do {
+    const page = await store.list({ prefix, ...(cursor ? { cursor } : {}) });
+    const keys = (page.blobs || [])
+      .map((blob) => text(blob?.key, 1_000))
+      .filter((key) => key.endsWith('/board.json'));
+    const records = await Promise.all(keys.map((key) => store.get(key, { type: 'json' })));
+    records.forEach((record) => {
+      try {
+        const board = publicBoard(record);
+        if (!requestedGame || board.game === requestedGame) boards.push(board);
+      } catch {
+        // One corrupt index record cannot make all public boards unavailable.
+      }
+    });
+    cursor = page.hasMore ? text(page.cursor, 512) : '';
+  } while (cursor);
+
+  return boards.sort((left, right) => (
+    left.game.localeCompare(right.game)
+    || right.asOf.localeCompare(left.asOf)
+    || left.leaderboard.localeCompare(right.leaderboard)
+    || right.season.localeCompare(left.season)
+  ));
+}
+
+/**
+ * Server-only ranking lookup for one board. The HTTP route must resolve these
+ * canonical identities to claimed usernames and strip all private fields.
+ */
+export async function listRankedGameProjections(options = {}) {
+  const requestedGame = game(options.game);
+  const requestedLeaderboard = leaderboard(options.leaderboard);
+  const requestedSeason = season(options.season);
+  const limit = rankingLimit(options.limit);
+  const cursor = rankingCursor(options.cursor);
+  const store = projectionStore(options);
+  const prefix = `${rankingBucketPrefix(requestedGame, requestedLeaderboard, requestedSeason)}/entries/`;
+  const page = await store.list({ prefix, ...(cursor ? { cursor } : {}) });
+  const projections = await Promise.all((page.blobs || []).map(async (blob) => {
+    const entryKey = text(blob?.key, 1_000);
+    const indexEntry = await store.get(entryKey, { type: 'json' });
+    const match = /entries\/\d{8}-([a-f0-9]{48})\.json$/.exec(entryKey);
+    if (!indexEntry || !match) return null;
+    const primaryKey = gameRankProjectionKeyFromHashes(
+      match[1], requestedGame, requestedLeaderboard, requestedSeason,
+    );
+    const projection = await store.get(primaryKey, { type: 'json' });
+    if (!projection) return null;
+    try {
+      const normalized = normalizeGameRankProjection(projection);
+      return normalized.game === requestedGame
+        && normalized.leaderboard === requestedLeaderboard
+        && normalized.season === requestedSeason
+        && normalized.status === 'ranked'
+        && normalized.rank === Number(indexEntry.rank)
+        ? normalized
+        : null;
+    } catch {
+      return null;
+    }
+  }));
+  const byAccount = new Map();
+  projections.filter(Boolean).forEach((projection) => {
+    const existing = byAccount.get(projection.canonicalAccountId);
+    if (!existing || projection.rank < existing.rank) byAccount.set(projection.canonicalAccountId, projection);
+  });
+
+  return {
+    contractVersion: GAME_RANK_PROJECTION_CONTRACT_VERSION,
+    board: { game: requestedGame, leaderboard: requestedLeaderboard, season: requestedSeason },
+    projections: [...byAccount.values()]
+      .sort((left, right) => left.rank - right.rank || left.asOf.localeCompare(right.asOf))
+      .slice(0, limit),
+    nextCursor: page.hasMore ? text(page.cursor, 512) || null : null,
+  };
 }
 
 function expectedServiceToken(audience, env) {

@@ -3,11 +3,14 @@ import test from 'node:test';
 
 import {
   GameRankProjectionError,
+  listPublishedGameRankBoards,
+  listRankedGameProjections,
   lookupGameRankProjections,
   normalizeGameRankProjection,
   upsertGameRankProjection,
 } from '../netlify/functions/_game-rank-projections.mjs';
 import { handleRankProjectionRequest } from '../netlify/functions/rank-projections.mjs';
+import { handleGameRankingsRequest } from '../netlify/functions/game-rankings.mjs';
 
 class ProjectionStore {
   constructor() {
@@ -33,6 +36,10 @@ class ProjectionStore {
     this.version += 1;
     this.records.set(key, { data: structuredClone(value), etag: `etag-${this.version}` });
     return { modified: true, etag: `etag-${this.version}` };
+  }
+
+  async delete(key) {
+    this.records.delete(key);
   }
 
   async list({ prefix = '' } = {}) {
@@ -111,6 +118,87 @@ test('trusted lookup returns only safe rank cards while retaining canonical IDs 
     ],
   }]);
   assert.doesNotMatch(JSON.stringify(lookup.projections[0].ranks), /1728|18|4.*losses/);
+});
+
+test('public board index exposes claimed usernames and rank cards without canonical IDs or game statistics', async () => {
+  const store = new ProjectionStore();
+  await upsertGameRankProjection(spadesProjection(), { store });
+  await upsertGameRankProjection(spadesProjection({
+    canonicalAccountId: 'canonical-bob',
+    rank: 1,
+    rating: 1810,
+    wins: 22,
+    losses: 3,
+    asOf: '2026-10-11T16:01:00.000Z',
+  }), { store });
+
+  const boards = await listPublishedGameRankBoards({ store, game: 'spades' });
+  assert.deepEqual(boards, [{
+    contractVersion: '2026-10-11-rank-projection-1',
+    game: 'spades',
+    leaderboard: 'v1_1_ranked',
+    season: '2026-q4',
+    asOf: '2026-10-11T16:01:00.000Z',
+  }]);
+  assert.doesNotMatch(JSON.stringify(boards), /canonical|rating|wins|losses/);
+
+  const serverRanking = await listRankedGameProjections({
+    store,
+    game: 'spades',
+    leaderboard: 'v1_1_ranked',
+    season: '2026-q4',
+  });
+  assert.deepEqual(serverRanking.projections.map((projection) => projection.rank), [1, 4]);
+  assert.equal(serverRanking.projections[0].canonicalAccountId, 'canonical-bob');
+
+  const response = await handleGameRankingsRequest({
+    httpMethod: 'GET',
+    queryStringParameters: {
+      game: 'spades',
+      leaderboard: 'v1_1_ranked',
+      season: '2026-q4',
+    },
+  }, {
+    projectionStore: store,
+    resolveAccounts: async () => [
+      {
+        canonicalAccountId: 'canonical-alice',
+        playerHandle: 'alice_ranked',
+        usernameClaimedAt: '2026-10-01T00:00:00.000Z',
+      },
+      {
+        canonicalAccountId: 'canonical-bob',
+        playerHandle: 'legacy-bob',
+      },
+    ],
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = JSON.parse(response.body);
+  assert.deepEqual(body.entries, [{
+    rank: 4,
+    player: { handle: 'alice_ranked', displayName: 'alice_ranked' },
+    provisional: false,
+    asOf: '2026-10-11T16:00:00.000Z',
+  }]);
+  assert.doesNotMatch(response.body, /canonical|rating|wins|losses|legacy-bob/);
+});
+
+test('rank index removes a player’s old slot after a newer projection', async () => {
+  const store = new ProjectionStore();
+  await upsertGameRankProjection(spadesProjection({ rank: 8 }), { store });
+  await upsertGameRankProjection(spadesProjection({
+    rank: 2,
+    asOf: '2026-10-11T16:02:00.000Z',
+  }), { store });
+
+  const ranking = await listRankedGameProjections({
+    store,
+    game: 'spades',
+    leaderboard: 'v1_1_ranked',
+    season: '2026-q4',
+  });
+  assert.deepEqual(ranking.projections.map((projection) => projection.rank), [2]);
 });
 
 test('HTTP contract is service-authenticated, game-bound, and account-checked', async () => {

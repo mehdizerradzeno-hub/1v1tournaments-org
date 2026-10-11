@@ -18,6 +18,7 @@ const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta
 const sponsorsRouteFile = fileURLToPath(new URL('../app/sponsors.jsx', import.meta.url));
 const mediaKitRouteFile = fileURLToPath(new URL('../app/media-kit.jsx', import.meta.url));
 const leaderboardRouteFile = fileURLToPath(new URL('../app/leaderboard.jsx', import.meta.url));
+const playerProfileRouteFile = fileURLToPath(new URL('../app/players/[handle].jsx', import.meta.url));
 const liveRouteFile = fileURLToPath(new URL('../app/live.jsx', import.meta.url));
 const streamRouteFile = fileURLToPath(new URL('../app/stream.jsx', import.meta.url));
 const nextRouteFile = fileURLToPath(new URL('../app/next.jsx', import.meta.url));
@@ -39,6 +40,7 @@ const homeScreenFile = fileURLToPath(new URL('../src/screens/HomeScreen.jsx', im
 const sponsorPublicScreenFile = fileURLToPath(new URL('../src/screens/SponsorPublicScreen.jsx', import.meta.url));
 const sponsorAdminScreenFile = fileURLToPath(new URL('../src/screens/SponsorAdminScreen.jsx', import.meta.url));
 const leaderboardScreenFile = fileURLToPath(new URL('../src/screens/LeaderboardScreen.jsx', import.meta.url));
+const playerProfileScreenFile = fileURLToPath(new URL('../src/screens/PlayerProfileScreen.jsx', import.meta.url));
 const liveScreenFile = fileURLToPath(new URL('../src/screens/LiveScreen.jsx', import.meta.url));
 const streamModeScreenFile = fileURLToPath(new URL('../src/screens/StreamModeScreen.jsx', import.meta.url));
 const nextScreenFile = fileURLToPath(new URL('../src/screens/NextScreen.jsx', import.meta.url));
@@ -53,6 +55,8 @@ const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.js
 const tournamentScreenFile = fileURLToPath(new URL('../src/screens/TournamentScreen.jsx', import.meta.url));
 const signupFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-signup.mjs', import.meta.url));
 const playerAccountFunctionFile = fileURLToPath(new URL('../netlify/functions/player-account.mjs', import.meta.url));
+const playerProfileFunctionFile = fileURLToPath(new URL('../netlify/functions/player-profile.mjs', import.meta.url));
+const gameRankingsFunctionFile = fileURLToPath(new URL('../netlify/functions/game-rankings.mjs', import.meta.url));
 const playerEmailFunctionFile = fileURLToPath(new URL('../netlify/functions/_player-email.mjs', import.meta.url));
 const rateLimitFunctionFile = fileURLToPath(new URL('../netlify/functions/_rate-limit.mjs', import.meta.url));
 const reminderFunctionFile = fileURLToPath(new URL('../netlify/functions/tournament-reminders.mjs', import.meta.url));
@@ -153,7 +157,7 @@ test('/sponsors and /media-kit stay wired to public sponsor pages', () => {
   assert.match(sponsorCollateralSource, /archive/);
 });
 
-test('/leaderboard stays wired to tournament-only rankings', () => {
+test('/leaderboard keeps tournament history distinct while wiring verified game ranks', () => {
   assert.ok(existsSync(leaderboardRouteFile));
   assert.ok(existsSync(leaderboardScreenFile));
   const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
@@ -161,6 +165,26 @@ test('/leaderboard stays wired to tournament-only rankings', () => {
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
   assert.match(leaderboardScreenSource, /Tournament rankings/);
   assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
+  assert.match(leaderboardScreenSource, /Verified game leaderboards/);
+  assert.match(leaderboardScreenSource, /fetchPublicGameRankBoards/);
+  assert.match(leaderboardScreenSource, /fetchPublicGameRankings/);
+});
+
+test('public player routes expose only permanent-username competitive cards', () => {
+  assert.ok(existsSync(playerProfileRouteFile));
+  assert.ok(existsSync(playerProfileScreenFile));
+  assert.ok(existsSync(playerProfileFunctionFile));
+  assert.ok(existsSync(gameRankingsFunctionFile));
+
+  const playerProfileScreenSource = readFileSync(playerProfileScreenFile, 'utf8');
+  const playerProfileFunctionSource = readFileSync(playerProfileFunctionFile, 'utf8');
+  const gameRankingsSource = readFileSync(gameRankingsFunctionFile, 'utf8');
+
+  assert.match(playerProfileScreenSource, /fetchPublicPlayerProfile/);
+  assert.match(playerProfileScreenSource, /Verified tournament results/);
+  assert.match(playerProfileFunctionSource, /Cache-Control': 'public, max-age=60/);
+  assert.match(gameRankingsSource, /listRankedGameProjections/);
+  assert.doesNotMatch(gameRankingsSource, /rating:|wins:|losses:|canonicalAccountId:/);
 });
 
 test('homepage is the multi-game platform hub', () => {
