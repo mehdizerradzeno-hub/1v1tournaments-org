@@ -100,6 +100,16 @@ test("homepage keeps selection and schedule reads within the public presentation
   assert.match(homeScreen, /SCHEDULE_REFRESH_MS/);
   assert.match(homeScreen, /const isDirectSpadesLaunch = game\.slug === 'spades' && game\.webReady && Boolean\(game\.playPath\)/);
   assert.match(homeScreen, /const isComingSoon = !game\.webReady/);
+  assert.match(homeScreen, /const cardIsDirectLaunch = isDirectSpadesLaunch/);
+  assert.match(homeScreen, /accessibilityRole=\{cardIsDirectLaunch \? 'link' : 'radio'\}/);
+  assert.match(homeScreen, /onKeyDown=\{handleCardKeyDown\}/);
+  assert.match(homeScreen, /Linking\.openURL\(game\.playPath\)/);
+  assert.match(homeScreen, /accessibilityLabel="Game cards"/);
+  assert.doesNotMatch(homeScreen, /accessibilityLabel="Choose a game" accessibilityRole="radiogroup"/);
+  assert.doesNotMatch(homeScreen, /setTurn\(0\)/);
+  assert.doesNotMatch(homeScreen, /setReturning/);
+  assert.doesNotMatch(homeScreen, /data-returning/);
+  assert.doesNotMatch(publicCardsCss, /data-physical-card-rotor=true\]\[data-returning=true\]/);
   assert.match(homeScreen, /disabled=\{isComingSoon\} href=\{isDirectSpadesLaunch \? game\.playPath : isComingSoon \? undefined : game\.infoPath\}/);
   assert.match(homeScreen, /isDirectSpadesLaunch \? 'Play Spades' : isComingSoon \? 'Coming soon' : 'Explore ' \+ game\.shortName/);
   assert.match(homeScreen, /No public ' \+ activeGameName \+ ' tournaments are scheduled/);
