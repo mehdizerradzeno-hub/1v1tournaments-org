@@ -7,6 +7,8 @@ import {
   buildThreePlayerTwoLifeBracket,
   checkInOpenStatus,
   findMatch,
+  publicBracket,
+  publicMatchDetails,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
 
@@ -70,6 +72,42 @@ test('8-player invited Euchre pilot builds seven deterministic single-eliminatio
   assert.equal(bracket.rounds[0].matches[0].id, 'euchre-pilot-eight-r1-m1');
   assert.equal(bracket.rounds[2].matches[0].id, 'euchre-pilot-eight-r3-m1');
   assert.equal(bracket.participants.every((participant) => participant.canonicalAccountId), true);
+});
+
+test('public bracket projections retain only bracket-local player references', () => {
+  const bracket = buildBracket({
+    tournamentSlug: 'public-bracket',
+    gameSlug: 'spades',
+    signups: [signup(1, 'Alpha'), signup(2, 'Bravo')],
+  });
+  const match = bracket.rounds[0].matches[0];
+  match.completion = {
+    completionId: 'private-completion-id',
+    winnerCanonicalAccountId: 'canonical-account-1',
+    winnerParticipantId: 'signup-1',
+    scores: { seat0: 250, seat1: 110 },
+    forfeit: true,
+    forfeitReason: 'disconnect',
+    completedAt: '2026-10-11T18:30:00.000Z',
+  };
+
+  const projected = publicBracket(bracket);
+  const serialized = JSON.stringify(projected);
+
+  assert.deepEqual(Object.keys(projected.participants[0]).sort(), ['handle', 'id', 'name', 'seed']);
+  assert.deepEqual(projected.rounds[0].matches[0].completion, {
+    scores: { seat0: 250, seat1: 110 },
+    forfeit: true,
+    forfeitReason: 'disconnect',
+    completedAt: '2026-10-11T18:30:00.000Z',
+  });
+  assert.doesNotMatch(serialized, /canonical-account|account-1|example\.com|private-completion-id/);
+  assert.doesNotMatch(serialized, /canonicalAccountId|accountId|winnerCanonicalAccountId|completionId/);
+
+  const matchDetails = publicMatchDetails(bracket, match.id);
+  assert.ok(matchDetails);
+  assert.doesNotMatch(JSON.stringify(matchDetails), /canonical-account|account-1|example\.com|private-completion-id/);
+  assert.equal(Object.hasOwn(matchDetails, 'resultCallback'), false);
 });
 
 test('4-player double-elimination bracket advances winners, losers, and reset final', () => {

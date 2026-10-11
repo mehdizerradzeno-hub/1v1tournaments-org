@@ -624,43 +624,102 @@ async function loadTournamentSignups(tournamentSlug) {
   return signups.filter(Boolean);
 }
 
-function publicBracket(bracket) {
-  if (!bracket) {
-    return null;
-  }
+function publicBracketPlayer(player) {
+  if (!player) return null;
 
+  // `id` is a bracket-local participant reference. Canonical account IDs,
+  // game account IDs, email addresses, and other identity bindings never
+  // belong in a browser-readable bracket response.
   return {
-    ...bracket,
-    participants: bracket.participants.map((participant) => ({
-      id: participant.id,
-      accountId: participant.accountId || '',
-      canonicalAccountId: participant.canonicalAccountId || participant.accountId || '',
-      seed: participant.seed,
-      name: participant.name,
-      handle: participant.handle || '',
-    })),
-    rounds: bracket.rounds.map((round) => ({
-      ...round,
-      matches: round.matches.map((match) => ({
-        ...match,
-        players: match.players.map((player) =>
-          player
-            ? {
-                id: player.id,
-                accountId: player.accountId || '',
-                canonicalAccountId: player.canonicalAccountId || player.accountId || '',
-                seed: player.seed,
-                name: player.name,
-                handle: player.handle || '',
-              }
-            : null,
-        ),
-      })),
-    })),
+    id: player.id,
+    seed: player.seed,
+    name: player.name,
+    handle: player.handle || '',
   };
 }
 
-function publicMatchDetails(bracket, matchId) {
+function publicCompletion(completion) {
+  if (!completion || typeof completion !== 'object') return null;
+
+  const scores = completion.scores && typeof completion.scores === 'object'
+    ? Object.fromEntries(Object.entries(completion.scores)
+      .filter(([, value]) => Number.isFinite(Number(value)))
+      .map(([seat, value]) => [cleanText(seat).slice(0, 32), Number(value)]))
+    : null;
+
+  return {
+    ...(scores && Object.keys(scores).length ? { scores } : {}),
+    ...(completion.forfeit === true ? { forfeit: true } : {}),
+    ...(cleanText(completion.forfeitReason) ? { forfeitReason: cleanText(completion.forfeitReason).slice(0, 160) } : {}),
+    ...(cleanText(completion.completedAt) ? { completedAt: cleanText(completion.completedAt).slice(0, 64) } : {}),
+  };
+}
+
+function publicMatch(match) {
+  return {
+    id: match.id,
+    label: match.label,
+    roundIndex: match.roundIndex,
+    matchIndex: match.matchIndex,
+    status: match.status,
+    players: (match.players || []).map(publicBracketPlayer),
+    winnerId: match.winnerId || null,
+    winnerName: match.winnerName || '',
+    loserId: match.loserId || null,
+    loserName: match.loserName || '',
+    nextMatchId: match.nextMatchId || null,
+    nextSlot: Number.isInteger(match.nextSlot) ? match.nextSlot : null,
+    loserNextMatchId: match.loserNextMatchId || null,
+    loserNextSlot: Number.isInteger(match.loserNextSlot) ? match.loserNextSlot : null,
+    resetMatchId: match.resetMatchId || null,
+    resetOnWinnerSlot: Number.isInteger(match.resetOnWinnerSlot) ? match.resetOnWinnerSlot : null,
+    roomUrl: match.roomUrl || '',
+    ...(match.completion ? { completion: publicCompletion(match.completion) } : {}),
+  };
+}
+
+function publicStanding(standing) {
+  return {
+    id: standing.id,
+    name: standing.name,
+    lives: Number.isInteger(standing.lives) ? standing.lives : null,
+    status: standing.status || '',
+  };
+}
+
+function publicWinner(winner) {
+  if (!winner) return null;
+  return {
+    id: winner.id,
+    name: winner.name,
+    ...(winner.handle ? { handle: winner.handle } : {}),
+  };
+}
+
+export function publicBracket(bracket) {
+  if (!bracket) return null;
+
+  return {
+    tournamentSlug: bracket.tournamentSlug,
+    status: bracket.status,
+    format: bracket.format,
+    gameSlug: bracket.gameSlug,
+    matchBaseUrl: bracket.matchBaseUrl || '',
+    participantCount: bracket.participantCount,
+    participants: (bracket.participants || []).map(publicBracketPlayer),
+    standings: (bracket.standings || []).map(publicStanding),
+    rounds: (bracket.rounds || []).map((round) => ({
+      index: round.index,
+      title: round.title,
+      matches: (round.matches || []).map(publicMatch),
+    })),
+    winner: publicWinner(bracket.winner),
+    createdAt: bracket.createdAt,
+    updatedAt: bracket.updatedAt,
+  };
+}
+
+export function publicMatchDetails(bracket, matchId) {
   if (!bracket) {
     return null;
   }
@@ -677,41 +736,7 @@ function publicMatchDetails(bracket, matchId) {
           index: round.index,
           title: round.title,
         },
-        match: {
-          ...match,
-          players: match.players.map((player) =>
-            player
-              ? {
-                  id: player.id,
-                  accountId: player.accountId || '',
-                  canonicalAccountId: player.canonicalAccountId || player.accountId || '',
-                  seed: player.seed,
-                  name: player.name,
-                  handle: player.handle || '',
-                }
-              : null,
-          ),
-        },
-        resultCallback: {
-          endpoint: `https://1v1tournaments.org/.netlify/functions/tournament-bracket?slug=${encodeURIComponent(bracket.tournamentSlug)}`,
-          method: 'POST',
-          tokenEnv: 'TOURNAMENT_MATCH_RESULT_TOKEN',
-          bodyTemplate: {
-            action: 'report-result',
-            protocolVersion: TOURNAMENT_GAME_PROTOCOL_VERSION,
-            game: normalizeTournamentGame(bracket.gameSlug || 'spades'),
-            tournamentId: bracket.tournamentSlug,
-            matchId,
-            completionId: 'authoritative-game-completion-id',
-            winnerParticipantId: 'winner-participant-id-from-this-match',
-            winnerCanonicalAccountId: 'winner-canonical-account-id-from-this-match',
-            scores: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'euchre'
-              ? { north: 10, south: 0 }
-              : { seat0: 250, seat1: 0 },
-            forfeit: false,
-            forfeitReason: '',
-          },
-        },
+        match: publicMatch(match),
       };
     }
   }
