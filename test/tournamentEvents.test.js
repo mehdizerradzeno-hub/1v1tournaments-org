@@ -10,6 +10,7 @@ import {
   normalizeHostedTournament,
   saveHostedTournament,
 } from '../netlify/functions/_tournament-events-utils.mjs';
+import { getNewHostedEventDiscovery } from '../src/lib/tournamentCatalog.js';
 
 const baseEvent = {
   title: 'Hosted tournament',
@@ -102,6 +103,25 @@ test('hosted tournament event normalization defaults legacy records to Spades', 
 test('hosted tournament event normalization persists canonical Spades and Euchre games', () => {
   assert.equal(normalizeHostedTournament({ ...baseEvent, gameSlug: 'spades' }).gameSlug, 'spades');
   assert.equal(normalizeHostedTournament({ ...baseEvent, gameSlug: 'euchre' }).gameSlug, 'euchre');
+});
+
+test('the private Euchre pilot stays unlisted after server normalization', async () => {
+  const event = normalizeHostedTournament({
+    ...baseEvent,
+    ...getNewHostedEventDiscovery('euchre'),
+    gameSlug: 'euchre',
+    registrationStatus: 'closed',
+  });
+  const store = new MemoryStore({ 'hosted-tournament.json': event });
+
+  assert.equal(event.visibility, 'unlisted');
+  assert.equal(event.publicDiscovery, false);
+  assert.equal(event.registrationStatus, 'closed');
+  assert.deepEqual(await listPublicHostedTournaments({
+    bracketStore: new MemoryStore(),
+    seriesStore: new MemoryStore(),
+    store,
+  }), []);
 });
 
 test('hosted tournament event normalization rejects unsupported game values', () => {

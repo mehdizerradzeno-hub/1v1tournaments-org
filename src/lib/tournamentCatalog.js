@@ -307,6 +307,16 @@ export function createTournamentRecord(payload = {}) {
   };
 }
 
+export function getNewHostedEventDiscovery(gameSlug) {
+  return normalizeTournamentGameSlug(gameSlug) === 'euchre'
+    ? { visibility: 'unlisted', publicDiscovery: false }
+    : { visibility: 'public', publicDiscovery: true };
+}
+
+export function getNewHostedEventRegistrationStatus(gameSlug) {
+  return normalizeTournamentGameSlug(gameSlug) === 'euchre' ? 'closed' : 'open';
+}
+
 export function isPublicTournamentVisible(tournament) {
   const visibility = String(tournament?.visibility || '').trim().toLowerCase();
   const status = String(tournament?.status || '').trim().toLowerCase();

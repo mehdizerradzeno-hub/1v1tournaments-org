@@ -24,6 +24,8 @@ import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } fr
 import {
   createTournamentRecord,
   getDefaultTournamentSummary,
+  getNewHostedEventDiscovery,
+  getNewHostedEventRegistrationStatus,
   getNextTournamentDraft,
   getTournamentGameName,
   mergeTournamentLists,
@@ -327,7 +329,11 @@ export default function AdminScreen() {
   const [scheduleTime, setScheduleTime] = useState(() => initialScheduleDefaults.time);
   const [scheduleTimeZone, setScheduleTimeZone] = useState(() => initialScheduleDefaults.timeZone);
   const [scheduleTimeZoneLabel, setScheduleTimeZoneLabel] = useState(() => initialScheduleDefaults.timeZoneLabel);
-  const [scheduleRegistrationStatus, setScheduleRegistrationStatus] = useState(() => initialScheduleDefaults.registrationStatus);
+  const [scheduleRegistrationStatus, setScheduleRegistrationStatus] = useState(() => (
+    startsNewEuchreEvent
+      ? getNewHostedEventRegistrationStatus('euchre')
+      : initialScheduleDefaults.registrationStatus
+  ));
   const [scheduleCheckInLeadMinutes, setScheduleCheckInLeadMinutes] = useState(() => initialScheduleDefaults.checkInLeadMinutes);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleMessage, setScheduleMessage] = useState('');
@@ -666,7 +672,7 @@ export default function AdminScreen() {
     setScheduleTime('20:00');
     setScheduleTimeZone('America/New_York');
     setScheduleTimeZoneLabel('ET');
-    setScheduleRegistrationStatus('open');
+    setScheduleRegistrationStatus(getNewHostedEventRegistrationStatus(nextGameSlug));
     setScheduleCheckInLeadMinutes('30');
     setEventFeedback('Fill in the event title, date, and start time, then save the tournament.', '');
     setScheduleFeedback('', '');
@@ -711,6 +717,7 @@ export default function AdminScreen() {
       badge: 'Host event',
       status: 'upcoming',
       links: [],
+      ...getNewHostedEventDiscovery(eventGameSlug),
     });
 
     return {
@@ -841,6 +848,9 @@ export default function AdminScreen() {
   function handleSelectEventGame(gameSlug) {
     const nextGameSlug = normalizeTournamentGameSlug(gameSlug);
     setEventGameSlug(nextGameSlug);
+    if (isCreatingNewEvent) {
+      setScheduleRegistrationStatus(getNewHostedEventRegistrationStatus(nextGameSlug));
+    }
     if (isCreatingNewEvent && isAutoEventDraft) {
       const draft = getNextTournamentDraft(nextGameSlug, adminTournaments);
       setEventTitle(draft.title);
@@ -1159,6 +1169,7 @@ export default function AdminScreen() {
       badge: isCreatingNewEvent ? 'Host event' : selectedTournament?.badge || 'Host event',
       status: 'upcoming',
       links: [],
+      ...(isCreatingNewEvent ? getNewHostedEventDiscovery(eventGameSlug) : {}),
     });
 
     try {
@@ -1189,7 +1200,10 @@ export default function AdminScreen() {
       setScheduleSettings(settingsResult.settings || null);
       applyEventFields(savedTournament);
       applyScheduleFields(savedTournament, settingsResult.settings || null);
-      setEventFeedback(`${savedTournament.title} is saved and public.`, '');
+      setEventFeedback(
+        `${savedTournament.title} is saved and ${savedTournament.publicDiscovery === false ? 'unlisted' : 'public'}.`,
+        '',
+      );
       setScheduleFeedback('Schedule and registration settings saved for this event.', '');
     } catch (saveError) {
       setEventFeedback('', saveError instanceof Error ? saveError.message : 'Could not save the tournament event.');
@@ -1439,7 +1453,17 @@ export default function AdminScreen() {
       { label: 'Registered', value: `${signupCount}${rosterCap ? ` / ${rosterCap}` : ''}`, tone: signupCount >= minimumPlayers ? 'green' : 'blue' },
       { label: 'Bracket', value: bracketLabel, tone: bracket ? 'green' : 'accent' },
       { label: 'Mode', value: activeTournamentMode.shortLabel, tone: canGenerateTournamentMode(activeTournamentMode.value) ? 'green' : 'accent' },
-      { label: 'Visibility', value: isArchived ? 'Archived' : 'Public', tone: isArchived ? 'rose' : 'green' },
+      {
+        label: 'Visibility',
+        value: isArchived
+          ? 'Archived'
+          : tournament?.visibility === 'private'
+            ? 'Private'
+            : tournament?.visibility === 'unlisted' || tournament?.publicDiscovery === false
+              ? 'Unlisted'
+              : 'Public',
+        tone: isArchived ? 'rose' : 'green',
+      },
       { label: 'Status', value: liveRegistrationMeta.label, tone: liveRegistrationMeta.tone },
       { label: 'Check-in', value: `${scheduleCheckInLeadMinutes || 30} min`, tone: 'blue' },
     ];
@@ -1506,7 +1530,11 @@ export default function AdminScreen() {
           <View style={styles.eventEditorPanel}>
             <View style={styles.metaRow}>
               <Badge tone="accent">Event details</Badge>
-              <Text style={styles.metaText}>These fields control what players see on the homepage, signup page, and tournament page.</Text>
+              <Text style={styles.metaText}>
+                {isCreatingNewEvent && eventGameSlug === 'euchre'
+                  ? 'New Euchre pilot events are unlisted and registration starts closed. Save the invite list before opening registration.'
+                  : 'These fields control what players see on the homepage, signup page, and tournament page.'}
+              </Text>
             </View>
 
             <View style={styles.scheduleGrid}>

@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   createTournamentRecord,
   getDefaultTournamentSummary,
+  getNewHostedEventDiscovery,
+  getNewHostedEventRegistrationStatus,
   getTournamentGameName,
   getNextTournamentDraft,
   getActiveOrFutureTournaments,
@@ -61,6 +63,25 @@ test('private and unlisted events remain available to admin and intentional dire
   assert.equal(adminCatalog[0].visibility, 'private');
   assert.equal(adminCatalog[1].visibility, 'unlisted');
   assert.deepEqual(getPublicTournamentCatalog([], hosted), []);
+});
+
+test('new Euchre host events default to unlisted while Spades remains public', () => {
+  const euchreDiscovery = getNewHostedEventDiscovery('euchre');
+  const spadesDiscovery = getNewHostedEventDiscovery('spades');
+  const euchre = createTournamentRecord({
+    ...euchreDiscovery,
+    gameSlug: 'euchre',
+    title: 'Private Euchre pilot',
+    date: '2026-10-13T01:00:00.000Z',
+  });
+
+  assert.deepEqual(euchreDiscovery, { visibility: 'unlisted', publicDiscovery: false });
+  assert.deepEqual(spadesDiscovery, { visibility: 'public', publicDiscovery: true });
+  assert.equal(getNewHostedEventRegistrationStatus('euchre'), 'closed');
+  assert.equal(getNewHostedEventRegistrationStatus('spades'), 'open');
+  assert.equal(isPubliclyDiscoverableTournament(euchre), false);
+  assert.equal(euchre.visibility, 'unlisted');
+  assert.equal(euchre.publicDiscovery, false);
 });
 
 test('hosted tournament records get the full public page shape from simple input', () => {

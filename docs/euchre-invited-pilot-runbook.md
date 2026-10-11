@@ -5,12 +5,12 @@ Public Euchre tournament discovery stays off throughout this pilot. Use only the
 ## Before players arrive
 
 1. Open `/admin` with a host-approved Tournaments account.
-2. Create a hosted tournament with game `euchre`, a 4- or 8-player roster cap, and the intended bracket mode.
+2. Create a hosted tournament with game `euchre`, a 4- or 8-player roster cap, and the intended bracket mode. Confirm the saved event is unlisted with registration closed.
 3. Keep the event link private. Do not change the public Euchre coming-soon lane.
 4. Open `/admin/euchre-pilot`.
 5. Enter the tournament slug, choose 4 or 8 seats, and add each invited player's exact `acct_` canonical account ID.
 6. Save the pilot policy. Never use display names, email addresses, or game-local IDs as admission authority.
-7. Send each admitted player the normal Tournaments event URL. Do not send room URLs or tickets.
+7. Open registration only after the allowlist is saved, then send each admitted player the normal Tournaments event URL. Do not send room URLs or tickets.
 
 ## Registration and check-in
 
