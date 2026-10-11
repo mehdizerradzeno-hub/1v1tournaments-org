@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createHostedTournament,
   deleteHostedTournament,
   isHostedTournamentDeleted,
   listPublicHostedTournaments,
   normalizeHostedTournament,
+  saveHostedTournament,
 } from '../netlify/functions/_tournament-events-utils.mjs';
 
 const baseEvent = {
@@ -25,6 +27,12 @@ class MemoryStore {
 
   async list() {
     return { blobs: [...this.records.keys()].map((key) => ({ key })) };
+  }
+
+  async set(key, value, options = {}) {
+    if (options.onlyIfNew && this.records.has(key)) return { modified: false };
+    this.records.set(key, JSON.parse(value));
+    return { modified: true };
   }
 
   async setJSON(key, value) {
@@ -65,6 +73,39 @@ test('hosted tournament event normalization rejects unsupported game values', ()
   assert.deepEqual(normalizeHostedTournament({ ...baseEvent, gameSlug: 'hearts' }), {
     error: 'Tournament game must be spades or euchre.',
   });
+});
+
+test('new hosted events use an atomic create and cannot replace an existing slug', async () => {
+  const store = new MemoryStore();
+  const original = { ...baseEvent, gameSlug: 'euchre', title: 'Euchre tournament 1' };
+  const replacement = { ...original, title: 'Different host event' };
+  const [first, second] = await Promise.all([
+    createHostedTournament(original, { email: 'first@example.com' }, { store }),
+    createHostedTournament(replacement, { email: 'second@example.com' }, { store }),
+  ]);
+
+  assert.equal([first, second].filter((result) => result.created).length, 1);
+  assert.equal([first, second].filter((result) => result.conflict).length, 1);
+  assert.equal((await store.get('hosted-tournament.json')).title, 'Euchre tournament 1');
+
+  const edited = await saveHostedTournament({
+    ...(await store.get('hosted-tournament.json')),
+    title: 'Intentional host edit',
+  }, { email: 'first@example.com' }, { store });
+
+  assert.equal(edited.title, 'Intentional host edit');
+  assert.equal((await store.get('hosted-tournament.json')).title, 'Intentional host edit');
+});
+
+test('new hosted events cannot replace a seeded tournament record', async () => {
+  const result = await createHostedTournament({
+    ...baseEvent,
+    slug: 'spades-summer-series',
+  }, null, { store: new MemoryStore() });
+
+  assert.equal(result.created, false);
+  assert.equal(result.conflict, true);
+  assert.equal(result.code, 'tournament_slug_conflict');
 });
 
 test('expired empty events are soft-deleted with an auditable tombstone', async () => {

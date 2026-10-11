@@ -221,6 +221,27 @@ export function slugifyTournamentTitle(value) {
     .slice(0, 80);
 }
 
+export function getNextTournamentDraft(gameSlug, tournaments = []) {
+  const normalizedGameSlug = normalizeTournamentGameSlug(gameSlug);
+  const gameName = getTournamentGameName(normalizedGameSlug);
+  const occupiedSlugs = new Set(
+    tournaments
+      .map((tournament) => slugifyTournamentTitle(tournament?.slug))
+      .filter(Boolean),
+  );
+  let ordinal = 1;
+  let title = `${gameName} tournament ${ordinal}`;
+  let slug = slugifyTournamentTitle(title);
+
+  while (occupiedSlugs.has(slug)) {
+    ordinal += 1;
+    title = `${gameName} tournament ${ordinal}`;
+    slug = slugifyTournamentTitle(title);
+  }
+
+  return { slug, title };
+}
+
 export function createTournamentRecord(payload = {}) {
   const title = cleanShortText(payload.title, 'Spades tournament');
   const slug = slugifyTournamentTitle(payload.slug || title) || 'spades-tournament';

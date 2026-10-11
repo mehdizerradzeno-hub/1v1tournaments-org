@@ -1,12 +1,15 @@
 import { connectLambda } from '@netlify/blobs';
 
 import { accountCanonicalId, cleanText } from './_account-utils.mjs';
+import { siteData } from '../../src/lib/siteData.js';
 import { requireTournamentAdmin } from './_host-auth.mjs';
 import {
+  createHostedTournament,
   deleteHostedTournament,
   listHostedTournaments,
   listPublicHostedTournaments,
   loadHostedTournament,
+  loadHostedTournamentRecord,
   normalizeHostedTournament,
   saveHostedTournament,
 } from './_tournament-events-utils.mjs';
@@ -95,7 +98,7 @@ export async function handler(event) {
     return json(400, { error: 'Tournament event payload must be valid JSON.' });
   }
 
-  if (!['delete', 'save', 'upsert', undefined].includes(payload.action)) {
+  if (!['create', 'delete', 'save', 'update', 'upsert', undefined].includes(payload.action)) {
     return json(400, { error: 'Choose a supported tournament event action.' });
   }
 
@@ -143,6 +146,39 @@ export async function handler(event) {
   }
 
   try {
+    if (payload.action === 'create') {
+      const creation = await createHostedTournament(tournament, adminCheck.account);
+
+      if (creation.conflict) {
+        return json(409, { error: creation.error, code: creation.code });
+      }
+
+      return json(201, {
+        ok: true,
+        hostAuth: adminCheck.method,
+        tournament: creation.tournament,
+        tournaments: await listHostedTournaments(),
+      });
+    }
+
+    const originalSlug = cleanText(payload.originalSlug || tournament.slug);
+
+    if (originalSlug !== tournament.slug) {
+      return json(409, {
+        error: 'Event URL slugs cannot be changed after creation. Keep the existing slug while editing this tournament.',
+        code: 'tournament_slug_rename_not_supported',
+      });
+    }
+
+    const existing = await loadHostedTournamentRecord(tournament.slug);
+
+    if (!existing && !siteData.tournaments.some((item) => item.slug === tournament.slug)) {
+      return json(404, {
+        error: 'That tournament does not exist yet. Create it before editing it.',
+        code: 'tournament_not_found',
+      });
+    }
+
     const savedTournament = await saveHostedTournament(tournament, adminCheck.account);
 
     return json(200, {

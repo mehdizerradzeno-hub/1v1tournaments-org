@@ -2,20 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, EmptyState, HubScreen, ResultCard, Section, Surface } from '../components/hub-ui.jsx';
-import {
-  EUCHRE_TOURNAMENT_ENTRY_PATHS,
-  collectReadyEuchreMatches,
-} from '../lib/euchreTournamentEntry.js';
+import { EUCHRE_TOURNAMENT_ENTRY_PATHS } from '../lib/euchreTournamentEntry.js';
 import { formatDateLine } from '../lib/format.js';
 import { getResults, siteData } from '../lib/siteData.js';
-import { fetchTournamentEvents, fetchTournamentPlayerStatus } from '../lib/tournamentHostingClient.js';
+import { fetchMyReadyTournamentMatches, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
 import { filterPublicEventsByGame, getPublicGamePresentation, getPublicPresentationEvents } from '../lib/publicPresentationCatalog.js';
 import { useVisibleNow } from '../lib/useVisibleNow.js';
 
-function MyEuchreMatchPanel({ events, enabled }) {
-  const [state, setState] = useState({ eventKey: '', status: 'idle', matches: [], signedIn: false });
-  const candidates = useMemo(() => events.filter((event) => event.status === 'live').slice(0, 12), [events]);
-  const candidateKey = useMemo(() => candidates.map((event) => event.slug).join(','), [candidates]);
+function MyEuchreMatchPanel({ enabled }) {
+  const [state, setState] = useState({ status: 'idle', matches: [], signedIn: false });
 
   useEffect(() => {
     if (!enabled) {
@@ -24,37 +19,29 @@ function MyEuchreMatchPanel({ events, enabled }) {
 
     let active = true;
 
-    if (!candidates.length) {
-      Promise.resolve().then(() => {
-        if (active) setState({ eventKey: candidateKey, status: 'ready', matches: [], signedIn: false });
+    fetchMyReadyTournamentMatches()
+      .then((result) => {
+        if (!active) return;
+        setState({
+          status: 'ready',
+          matches: Array.isArray(result.matches) ? result.matches : [],
+          signedIn: Boolean(result.account),
+        });
+      })
+      .catch(() => {
+        if (active) setState({ status: 'unavailable', matches: [], signedIn: false });
       });
-      return () => { active = false; };
-    }
-
-    Promise.allSettled(candidates.map(async (event) => ({
-      slug: event.slug,
-      status: await fetchTournamentPlayerStatus({ slug: event.slug }),
-    }))).then((results) => {
-      if (!active) return;
-      const statuses = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
-      setState({
-        eventKey: candidateKey,
-        status: statuses.length === candidates.length ? 'ready' : 'unavailable',
-        matches: collectReadyEuchreMatches(candidates, statuses),
-        signedIn: statuses.some(({ status }) => Boolean(status?.account)),
-      });
-    });
 
     return () => { active = false; };
-  }, [candidateKey, candidates, enabled]);
+  }, [enabled]);
 
   if (!enabled) return null;
-  const isChecking = state.status === 'idle' || state.eventKey !== candidateKey;
+  const isChecking = state.status === 'idle';
 
   return (
     <Section
       nativeID="my-match"
-      description="The Hub checks only live public Euchre events, then opens the ticketed match from its owning event page."
+      description="The Hub privately checks your live Euchre assignments, then opens the ticketed match from its owning event page."
       title="My Euchre Match">
       <Surface style={styles.myMatchPanel}>
         {isChecking ? <Text style={styles.availabilityText}>Checking your active Euchre assignments…</Text> : null}
@@ -75,7 +62,7 @@ function MyEuchreMatchPanel({ events, enabled }) {
           <EmptyState
             action={<ActionButton href={EUCHRE_TOURNAMENT_ENTRY_PATHS.browseEvents} variant="secondary">Browse Euchre Events</ActionButton>}
             body={state.signedIn
-              ? 'No live public Euchre match is assigned to this account right now. Open your event page to check its full status.'
+              ? 'No live Euchre match is assigned to this account right now. Open your event page to check its full status.'
               : 'Sign in through the Hub with the account used for registration, then open this path again to check your assignment.'}
             title={state.signedIn ? 'No ready Euchre match' : 'Sign in to find your match'}
           />
@@ -163,7 +150,7 @@ export default function GameScreen({ gameSlug, initialView = '' }) {
         </Section>
       ) : null}
 
-      <MyEuchreMatchPanel enabled={isMyMatchView} events={events} />
+      <MyEuchreMatchPanel enabled={isMyMatchView} />
 
       <Section nativeID="events" description="Only published, eligible public events for this game appear here." title="Live and upcoming tournaments">
         {events.length ? (

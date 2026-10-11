@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { fetchTournamentPlayerStatus } from '../src/lib/tournamentHostingClient.js';
+import {
+  fetchMyReadyTournamentMatches,
+  fetchTournamentPlayerStatus,
+} from '../src/lib/tournamentHostingClient.js';
 
 test('hosting client never exposes an HTML response as a user-facing error', async () => {
   const originalFetch = globalThis.fetch;
@@ -12,6 +15,23 @@ test('hosting client never exposes an HTML response as a user-facing error', asy
       fetchTournamentPlayerStatus({ slug: 'test-event' }),
       /The server returned an unreadable response\./,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('ready-match discovery uses the authenticated player-status scope', async () => {
+  const originalFetch = globalThis.fetch;
+  let request = null;
+  globalThis.fetch = async (input, init) => {
+    request = { init, url: String(input) };
+    return new Response(JSON.stringify({ account: { id: 'account-1' }, matches: [] }), { status: 200 });
+  };
+
+  try {
+    await fetchMyReadyTournamentMatches();
+    assert.match(request.url, /tournament-player-status\?game=euchre&scope=ready-matches/);
+    assert.equal(request.init.credentials, 'include');
   } finally {
     globalThis.fetch = originalFetch;
   }

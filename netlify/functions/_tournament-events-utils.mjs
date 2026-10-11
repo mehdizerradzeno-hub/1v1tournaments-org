@@ -66,6 +66,43 @@ function eventKey(tournamentSlug) {
   return `${cleanText(tournamentSlug)}.json`;
 }
 
+function hostedTournamentMetadata(tournament) {
+  return {
+    tournamentSlug: tournament.slug,
+    gameSlug: tournament.gameSlug,
+    date: tournament.date,
+    status: tournament.status,
+    updatedAt: tournament.updatedAt,
+  };
+}
+
+function tournamentForWrite(tournament, account, updatedAt) {
+  return {
+    ...tournament,
+    competitionMeta: normalizeCompetitionMeta(tournament?.competitionMeta || tournament?.leagueMeta || {}),
+    updatedAt,
+    updatedBy: account?.email || 'token',
+  };
+}
+
+async function writeNewTournament(store, key, tournament) {
+  const options = {
+    onlyIfNew: true,
+    metadata: hostedTournamentMetadata(tournament),
+  };
+
+  if (typeof store.set === 'function') {
+    return store.set(key, JSON.stringify(tournament), options);
+  }
+
+  if (await store.get(key, { type: 'json' })) {
+    return { modified: false };
+  }
+
+  await store.setJSON(key, tournament, options);
+  return { modified: true };
+}
+
 function byDateAsc(left, right) {
   if (left?.deleted && !right?.deleted) return 1;
   if (!left?.deleted && right?.deleted) return -1;
@@ -281,9 +318,8 @@ export async function saveHostedTournament(tournament, account = null, options =
   const updatedAt = options.updatedAt || new Date().toISOString();
   const existing = await store.get(eventKey(tournament?.slug), { type: 'json' });
   const existingRecurrence = existing?.recurrence || tournament?.recurrence;
-  const nextTournament = {
+  const nextTournament = tournamentForWrite({
     ...tournament,
-    competitionMeta: normalizeCompetitionMeta(tournament?.competitionMeta || tournament?.leagueMeta || {}),
     ...(existing?.seriesId ? {
       recurrence: {
         ...(existingRecurrence || {}),
@@ -299,19 +335,48 @@ export async function saveHostedTournament(tournament, account = null, options =
       seriesPending: existing.seriesPending,
       seriesRevision: tournament?.seriesRevision || existing.seriesRevision,
     } : {}),
-    updatedAt,
-    updatedBy: account?.email || 'token',
-  };
+  }, account, updatedAt);
 
   await store.setJSON(eventKey(nextTournament.slug), nextTournament, {
-    metadata: {
-      tournamentSlug: nextTournament.slug,
-      gameSlug: nextTournament.gameSlug,
-      date: nextTournament.date,
-      status: nextTournament.status,
-      updatedAt,
-    },
+    metadata: hostedTournamentMetadata(nextTournament),
   });
 
   return nextTournament;
+}
+
+export async function createHostedTournament(tournament, account = null, options = {}) {
+  const slug = cleanText(tournament?.slug);
+
+  if (!slug) {
+    return { conflict: false, created: false, error: 'Enter a URL slug before creating a tournament.', tournament: null };
+  }
+
+  const seededTournament = siteData.tournaments.find((item) => item.slug === slug);
+
+  if (seededTournament) {
+    return {
+      code: 'tournament_slug_conflict',
+      conflict: true,
+      created: false,
+      error: 'A tournament already uses this URL slug. Choose a different title or slug.',
+      tournament: seededTournament,
+    };
+  }
+
+  const store = options.store || getStoreWithFallback(STORE_NAME);
+  const updatedAt = options.updatedAt || new Date().toISOString();
+  const nextTournament = tournamentForWrite(tournament, account, updatedAt);
+  const result = await writeNewTournament(store, eventKey(slug), nextTournament);
+
+  if (!result?.modified) {
+    return {
+      code: 'tournament_slug_conflict',
+      conflict: true,
+      created: false,
+      error: 'A tournament already uses this URL slug. Choose a different title or slug.',
+      tournament: null,
+    };
+  }
+
+  return { conflict: false, created: true, tournament: nextTournament };
 }

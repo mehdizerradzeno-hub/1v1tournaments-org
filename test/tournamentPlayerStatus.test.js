@@ -7,7 +7,10 @@ import {
   findMatch,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
-import { findPlayerMatchStatus } from '../netlify/functions/tournament-player-status.mjs';
+import {
+  findPlayerMatchStatus,
+  findReadyEuchreAssignments,
+} from '../netlify/functions/tournament-player-status.mjs';
 
 function signup(index, name) {
   return {
@@ -111,4 +114,59 @@ test('3-player two-life eliminates a player only when lives reach zero', () => {
 
   assert.equal(caseyStatus.nextStep, 'eliminated');
   assert.equal(caseyStatus.finalMatch.label, 'Match 3');
+});
+
+test('ready-match discovery includes only the signed-in player’s private Euchre assignment', async () => {
+  const account = { id: 'account-1', canonicalAccountId: 'account-1', email: 'alex@example.com' };
+  const ownSignup = signup(1, 'Alex');
+  const otherSignup = signup(2, 'Blake');
+  const readyBracket = {
+    rounds: [{
+      index: 1,
+      title: 'Final',
+      matches: [{
+        id: 'private-euchre-r1-m1',
+        label: 'Final',
+        status: 'ready',
+        roomUrl: 'https://private.example/match',
+        matchIndex: 1,
+        players: [
+          { id: ownSignup.id, accountId: ownSignup.accountId, name: ownSignup.playerName },
+          { id: otherSignup.id, accountId: otherSignup.accountId, name: otherSignup.playerName },
+        ],
+      }],
+    }],
+  };
+  const events = [
+    { slug: 'private-euchre', title: 'Private Euchre pilot', gameSlug: 'euchre', status: 'live', visibility: 'private' },
+    { slug: 'other-private-euchre', title: 'Another private pilot', gameSlug: 'euchre', status: 'live', visibility: 'private' },
+    { slug: 'public-spades', title: 'Public Spades', gameSlug: 'spades', status: 'live' },
+  ];
+
+  const matches = await findReadyEuchreAssignments(account, {
+    events,
+    loadBracket: async () => readyBracket,
+    loadSignups: async (slug) => slug === 'private-euchre' ? [ownSignup, otherSignup] : [otherSignup],
+  });
+
+  assert.deepEqual(matches, [{
+    event: { slug: 'private-euchre', title: 'Private Euchre pilot' },
+    match: {
+      id: 'private-euchre-r1-m1',
+      label: 'Final',
+      status: 'ready',
+      round: { index: 1, title: 'Final' },
+      matchIndex: 1,
+    },
+  }]);
+  assert.equal(JSON.stringify(matches).includes('Blake'), false);
+  assert.equal(JSON.stringify(matches).includes('private.example'), false);
+});
+
+test('ready-match discovery reveals nothing without an authenticated account', async () => {
+  const matches = await findReadyEuchreAssignments(null, {
+    events: [{ slug: 'private-euchre', title: 'Private Euchre pilot', gameSlug: 'euchre', status: 'live' }],
+  });
+
+  assert.deepEqual(matches, []);
 });

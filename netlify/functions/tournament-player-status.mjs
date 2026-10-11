@@ -8,6 +8,7 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import { listHostedTournaments } from './_tournament-events-utils.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -67,6 +68,18 @@ function publicMatch(round, match) {
     matchIndex: match.matchIndex,
     players: match.players.map(publicPlayer),
     winnerName: match.winnerName || '',
+  };
+}
+
+function privateReadyMatch(match) {
+  if (!match) return null;
+
+  return {
+    id: match.id,
+    label: match.label,
+    status: match.status,
+    round: match.round,
+    matchIndex: match.matchIndex,
   };
 }
 
@@ -176,6 +189,40 @@ function signupMatchesAccount(signup, account) {
   );
 }
 
+export async function findReadyEuchreAssignments(account, options = {}) {
+  if (!account) return [];
+
+  const events = options.events || await listHostedTournaments();
+  const loadSignups = options.loadSignups || loadTournamentSignups;
+  const loadEventBracket = options.loadBracket || loadBracket;
+  const candidates = events.filter((event) => (
+    event?.gameSlug === 'euchre' && event.status === 'live'
+  ));
+  const resolved = await Promise.all(candidates.map(async (event) => {
+    const [signups, bracket] = await Promise.all([
+      loadSignups(event.slug),
+      loadEventBracket(event.slug),
+    ]);
+    const signup = signups.find((item) => signupMatchesAccount(item, account));
+
+    if (!signup) return null;
+
+    const currentMatch = findPlayerMatchStatus(bracket, signup).currentMatch;
+
+    if (!currentMatch) return null;
+
+    return {
+      event: {
+        slug: event.slug,
+        title: event.title,
+      },
+      match: privateReadyMatch(currentMatch),
+    };
+  }));
+
+  return resolved.filter(Boolean);
+}
+
 export function findPlayerMatchStatus(bracket, signup) {
   if (!bracket || !signup) {
     return {
@@ -281,6 +328,42 @@ export async function handler(event) {
   }
 
   const tournamentSlug = cleanText(event.queryStringParameters?.slug);
+  const scope = cleanText(event.queryStringParameters?.scope).toLowerCase();
+
+  if (scope === 'ready-matches') {
+    const gameSlug = cleanText(event.queryStringParameters?.game).toLowerCase();
+
+    if (gameSlug && gameSlug !== 'euchre') {
+      return json(400, { error: 'Ready-match discovery is available only for Euchre.' });
+    }
+
+    try {
+      const account = await getAccountFromEvent(event);
+
+      if (!account) {
+        return json(200, {
+          ok: true,
+          account: null,
+          gameSlug: 'euchre',
+          matches: [],
+          nextStep: 'sign-in',
+        });
+      }
+
+      const matches = await findReadyEuchreAssignments(account);
+
+      return json(200, {
+        ok: true,
+        account: publicAccount(account),
+        gameSlug: 'euchre',
+        matches,
+        nextStep: matches.length ? 'ready-match' : 'no-ready-match',
+      });
+    } catch (error) {
+      console.error('Tournament ready-match discovery failed', error);
+      return json(500, { error: 'Player tournament matches are not available yet.' });
+    }
+  }
 
   if (!tournamentSlug) {
     return json(400, { error: 'Choose a tournament before loading player status.' });

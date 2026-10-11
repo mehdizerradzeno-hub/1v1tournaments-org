@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -24,6 +24,7 @@ import { getCheckInPath, getGamePath, getGames, getTournamentPath, siteData } fr
 import {
   createTournamentRecord,
   getDefaultTournamentSummary,
+  getNextTournamentDraft,
   getTournamentGameName,
   mergeTournamentLists,
   normalizeTournamentGameSlug,
@@ -281,9 +282,8 @@ export default function AdminScreen() {
   const requestedHostGame = getRequestedHostTournamentGame(requestedGame);
   const startsNewEuchreEvent = requestedHostGame === 'euchre';
   const initialEventGameSlug = requestedHostGame || normalizeTournamentGameSlug(siteData.tournaments[0]?.gameSlug);
-  const initialEventTitle = startsNewEuchreEvent
-    ? `Euchre tournament ${siteData.tournaments.length + 1}`
-    : siteData.tournaments[0]?.title || '';
+  const initialEventDraft = getNextTournamentDraft(initialEventGameSlug, siteData.tournaments);
+  const initialEventTitle = startsNewEuchreEvent ? initialEventDraft.title : siteData.tournaments[0]?.title || '';
   const games = getGames();
   const gameLookup = useMemo(() => new Map(games.map((game) => [game.slug, game])), [games]);
   const storageAvailable = hasAdminStorage();
@@ -334,8 +334,11 @@ export default function AdminScreen() {
   const [scheduleError, setScheduleError] = useState('');
   const [hostedTournaments, setHostedTournaments] = useState([]);
   const [isCreatingNewEvent, setIsCreatingNewEvent] = useState(() => startsNewEuchreEvent);
+  const [isAutoEventDraft, setIsAutoEventDraft] = useState(() => startsNewEuchreEvent);
+  const isCreatingNewEventRef = useRef(startsNewEuchreEvent);
+  const isAutoEventDraftRef = useRef(startsNewEuchreEvent);
   const [eventTitle, setEventTitle] = useState(() => startsNewEuchreEvent ? initialEventTitle : initialScheduleDefaults.title || initialEventTitle);
-  const [eventSlug, setEventSlug] = useState(() => startsNewEuchreEvent ? slugifyTournamentTitle(initialEventTitle) : siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const [eventSlug, setEventSlug] = useState(() => startsNewEuchreEvent ? initialEventDraft.slug : siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
   const [eventGameSlug, setEventGameSlug] = useState(() => initialEventGameSlug);
   const [eventSummary, setEventSummary] = useState(() => startsNewEuchreEvent ? getDefaultTournamentSummary('euchre') : siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
   const [eventMode, setEventMode] = useState(() => siteData.tournaments[0]?.mode || 'single-elimination');
@@ -408,6 +411,7 @@ export default function AdminScreen() {
     () => adminTournaments.find((tournament) => tournament.slug === rosterSlug) || adminTournaments[0] || null,
     [adminTournaments, rosterSlug],
   );
+
   const liveTournament = useMemo(
     () => mergeTournamentSettings(selectedTournament, scheduleSettings),
     [selectedTournament, scheduleSettings],
@@ -468,7 +472,14 @@ export default function AdminScreen() {
         const result = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
 
         if (active) {
-          setHostedTournaments(result.tournaments || []);
+          const tournaments = result.tournaments || [];
+          setHostedTournaments(tournaments);
+
+          if (isCreatingNewEventRef.current && isAutoEventDraftRef.current) {
+            const draft = getNextTournamentDraft(eventGameSlug, mergeTournamentLists(siteData.tournaments, tournaments));
+            setEventTitle(draft.title);
+            setEventSlug(draft.slug);
+          }
         }
       } catch {
         if (active) {
@@ -482,7 +493,7 @@ export default function AdminScreen() {
     return () => {
       active = false;
     };
-  }, [rosterToken]);
+  }, [eventGameSlug, rosterToken]);
 
   useEffect(() => {
     if (isCreatingNewEvent) {
@@ -536,6 +547,16 @@ export default function AdminScreen() {
   function setFeedback(nextMessage = '', nextError = '') {
     setMessage(nextMessage);
     setError(nextError);
+  }
+
+  function setCreatingNewEvent(value) {
+    isCreatingNewEventRef.current = value;
+    setIsCreatingNewEvent(value);
+  }
+
+  function setAutoEventDraft(value) {
+    isAutoEventDraftRef.current = value;
+    setIsAutoEventDraft(value);
   }
 
   function setServerFeedback(nextMessage = '', nextError = '') {
@@ -592,6 +613,7 @@ export default function AdminScreen() {
 
     setEventTitle(tournament.title || '');
     setEventSlug(tournament.slug || '');
+    setAutoEventDraft(false);
     const gameSlug = normalizeTournamentGameSlug(tournament.gameSlug);
     const summary = tournament.detail || tournament.summary || '';
     setEventGameSlug(gameSlug);
@@ -608,18 +630,22 @@ export default function AdminScreen() {
   }
 
   function handleChangeEventTitle(value) {
+    setAutoEventDraft(false);
     setEventTitle(value);
-    setEventSlug(slugifyTournamentTitle(value));
+    if (isCreatingNewEvent) {
+      setEventSlug(slugifyTournamentTitle(value));
+    }
   }
 
   function handleNewTournamentDraft(gameSlug = 'spades') {
     const nextGameSlug = normalizeTournamentGameSlug(gameSlug);
-    const draftTitle = `${getTournamentGameName(nextGameSlug)} tournament ${adminTournaments.length + 1}`;
+    const draft = getNextTournamentDraft(nextGameSlug, adminTournaments);
 
-    setIsCreatingNewEvent(true);
+    setCreatingNewEvent(true);
+    setAutoEventDraft(true);
     setScheduleSettings(null);
-    setEventTitle(draftTitle);
-    setEventSlug(slugifyTournamentTitle(draftTitle));
+    setEventTitle(draft.title);
+    setEventSlug(draft.slug);
     if (nextGameSlug === 'euchre') {
       setEventGameSlug('euchre');
     } else {
@@ -815,6 +841,11 @@ export default function AdminScreen() {
   function handleSelectEventGame(gameSlug) {
     const nextGameSlug = normalizeTournamentGameSlug(gameSlug);
     setEventGameSlug(nextGameSlug);
+    if (isCreatingNewEvent && isAutoEventDraft) {
+      const draft = getNextTournamentDraft(nextGameSlug, adminTournaments);
+      setEventTitle(draft.title);
+      setEventSlug(draft.slug);
+    }
     setEventSummary((current) => (
       current === getDefaultTournamentSummary('spades') || current === getDefaultTournamentSummary('euchre')
         ? getDefaultTournamentSummary(nextGameSlug)
@@ -1132,6 +1163,7 @@ export default function AdminScreen() {
 
     try {
       const eventResult = await saveTournamentEvent({
+        create: isCreatingNewEvent,
         token,
         tournament: tournamentPayload,
       });
@@ -1150,7 +1182,8 @@ export default function AdminScreen() {
       const savedTournament = eventResult.tournament || tournamentPayload;
 
       setHostedTournaments(eventResult.tournaments || [savedTournament]);
-      setIsCreatingNewEvent(false);
+      setCreatingNewEvent(false);
+      setAutoEventDraft(false);
       setRosterSlug(savedTournament.slug);
       setEventSlug(savedTournament.slug);
       setScheduleSettings(settingsResult.settings || null);
@@ -1457,7 +1490,7 @@ export default function AdminScreen() {
                     <ActionButton
                       accessibilityState={{ selected }}
                       key={tournamentOption.slug}
-                      onPress={() => { setIsCreatingNewEvent(false); setRosterSlug(tournamentOption.slug); }}
+                      onPress={() => { setAutoEventDraft(false); setCreatingNewEvent(false); setRosterSlug(tournamentOption.slug); }}
                       variant={selected ? 'primary' : 'secondary'}>
                       {getTournamentPickerLabel(tournamentOption)}
                     </ActionButton>
@@ -1494,7 +1527,7 @@ export default function AdminScreen() {
                 <TextInput
                   autoCapitalize="none"
                   autoCorrect={false}
-                  onChangeText={setEventSlug}
+                  onChangeText={(value) => { setAutoEventDraft(false); setEventSlug(value); }}
                   placeholder="spades-friday-night-cup"
                   placeholderTextColor="#6B766F"
                   style={styles.input}
@@ -2134,7 +2167,7 @@ export default function AdminScreen() {
                     <ActionButton
                       accessibilityState={{ selected }}
                       key={tournamentOption.slug}
-                      onPress={() => setRosterSlug(tournamentOption.slug)}
+                      onPress={() => { setAutoEventDraft(false); setCreatingNewEvent(false); setRosterSlug(tournamentOption.slug); }}
                       style={styles.quickPickerButton}
                       variant={selected ? 'primary' : 'secondary'}>
                       {getTournamentPickerLabel(tournamentOption)}

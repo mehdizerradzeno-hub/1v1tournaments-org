@@ -378,7 +378,7 @@ export async function fetchTournamentEvent({ slug }) {
   };
 }
 
-export async function saveTournamentEvent({ token, tournament }) {
+export async function saveTournamentEvent({ create = false, originalSlug, token, tournament }) {
   const response = await fetch(EVENTS_ENDPOINT, {
     method: 'POST',
     credentials: 'include',
@@ -386,7 +386,8 @@ export async function saveTournamentEvent({ token, tournament }) {
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify({
-      action: 'save',
+      action: create ? 'create' : 'update',
+      ...(create ? {} : { originalSlug: originalSlug || tournament?.slug }),
       tournament,
     }),
   });
@@ -547,6 +548,21 @@ export async function fetchTournamentPlayerStatus({ slug }) {
 
   if (!response.ok) {
     throw new Error(result?.error || 'Player tournament status could not be loaded.');
+  }
+
+  return result;
+}
+
+export async function fetchMyReadyTournamentMatches({ gameSlug = 'euchre' } = {}) {
+  const query = new URLSearchParams({ game: gameSlug, scope: 'ready-matches' });
+  const endpoint = `${readEndpoint(PLAYER_STATUS_ENDPOINT)}?${query.toString()}`;
+  const response = await fetch(endpoint, {
+    credentials: readCredentials(endpoint),
+  });
+  const result = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(result?.error || 'Player tournament matches could not be loaded.');
   }
 
   return result;

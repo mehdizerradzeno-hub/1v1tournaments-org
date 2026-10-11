@@ -5,6 +5,7 @@ import {
   createTournamentRecord,
   getDefaultTournamentSummary,
   getTournamentGameName,
+  getNextTournamentDraft,
   getActiveOrFutureTournaments,
   getNextFutureTournament,
   getNextPublicTournament,
@@ -99,6 +100,19 @@ test('tournament game defaults to Spades and preserves explicit canonical games'
   assert.match(spades.checkIn.steps[2], /Spades/);
   assert.match(euchre.checkIn.steps[2], /Euchre/);
   assert.doesNotMatch(euchre.checkIn.steps[2], /Spades/);
+});
+
+test('new tournament drafts skip every occupied slug instead of reusing a default name', () => {
+  const draft = getNextTournamentDraft('euchre', [
+    { slug: 'euchre-tournament-1' },
+    { slug: 'euchre-tournament-2' },
+    { slug: 'spades-tournament-1' },
+  ]);
+
+  assert.deepEqual(draft, {
+    slug: 'euchre-tournament-3',
+    title: 'Euchre tournament 3',
+  });
 });
 
 test('known generated Spades check-in copy normalizes only for explicit Euchre events', () => {
