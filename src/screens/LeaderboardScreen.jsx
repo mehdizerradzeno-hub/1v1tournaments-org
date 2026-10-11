@@ -153,12 +153,12 @@ export default function LeaderboardScreen() {
         { label: 'Recent results', href: '/results' },
         { label: 'How ranking works', href: '/leaderboard#ranking-method', variant: 'secondary' },
       ]}
-      eyebrow="Tournament rankings"
-      footerNote="Tournament rankings are separate from the Spades in-game leaderboard and any future Euchre in-game leaderboard. This page tracks posted hosted-event performance only."
+      eyebrow="Competition rankings"
+      footerNote="Verified Spades and Euchre game placements appear above. Tournament circuit standings below remain a separate, event-based leaderboard."
       heroVariant="compact"
       lead="See the circuit leaders, search the full field, and understand exactly how posted tournament performance is ordered."
       publicShell
-      subtitle="Championships • finals • bracket record"
+      subtitle="Game ladders • championships • finals"
       stickyActions={false}
       title="Rankings">
       <PlayerRouteStrip

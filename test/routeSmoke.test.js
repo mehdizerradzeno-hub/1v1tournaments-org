@@ -163,8 +163,8 @@ test('/leaderboard keeps tournament history distinct while wiring verified game 
   const leaderboardScreenSource = readFileSync(leaderboardScreenFile, 'utf8');
 
   assert.match(leaderboardScreenSource, /buildTournamentLeaderboard/);
-  assert.match(leaderboardScreenSource, /Tournament rankings/);
-  assert.match(leaderboardScreenSource, /separate from the Spades in-game leaderboard/);
+  assert.match(leaderboardScreenSource, /Competition rankings/);
+  assert.match(leaderboardScreenSource, /Verified Spades and Euchre game placements/);
   assert.match(leaderboardScreenSource, /Verified game leaderboards/);
   assert.match(leaderboardScreenSource, /fetchPublicGameRankBoards/);
   assert.match(leaderboardScreenSource, /fetchPublicGameRankings/);
