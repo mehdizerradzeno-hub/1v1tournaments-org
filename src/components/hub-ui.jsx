@@ -287,7 +287,7 @@ function HeaderAccountChip({ account, loading, href }) {
 
   return (
     <LinkShell
-      accessibilityLabel={signedIn ? `Signed in as ${accountName}. Switch account.` : 'Sign in to your tournament account'}
+      accessibilityLabel={signedIn ? `Signed in as ${accountName}. Manage account or sign out.` : 'Sign in to your tournament account'}
       href={href}
       style={styles.accountChipShell}
       variant={signedIn ? 'secondary' : 'primary'}>
@@ -758,7 +758,7 @@ export function HubScreen({
       ? `${primaryPaths.checkInPath}#account-access`
       : `${primaryPaths.checkInPath}?mode=signin#account-access`
     : '/next';
-  const accountPath = accountHref || fallbackAccountPath;
+  const accountPath = accountHref || (resolvedPlayerAccount ? '/account?mode=manage' : fallbackAccountPath);
   const navItems = publicShell ? getPublicNavItems(primaryPaths) : getNavItems(primaryPaths);
   const mobileNavItems = publicShell
     ? getPublicMobileNavItems(primaryPaths)

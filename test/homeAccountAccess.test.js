@@ -18,6 +18,7 @@ test('Home always exposes the authoritative Shared Account control', () => {
   assert.match(homeSource, /accountHref="\/account"/);
   assert.match(hubSource, /fetchPlayerAccount/);
   assert.match(hubSource, /playerAccount/);
+  assert.match(hubSource, /resolvedPlayerAccount \? '\/account\?mode=manage' : fallbackAccountPath/);
   assert.match(hubSource, /Sign in/i);
 });
 
@@ -50,4 +51,5 @@ test('mobile header remains compact and exposes only one Sign Out action', () =>
   assert.match(hubSource, /const hasHydratedViewport = isHydrated && width > 0;/);
   assert.match(hubSource, /showTinyHeader = hasHydratedViewport && width < 520/);
   assert.equal(sharedAccountScreenSource.match(/'Sign Out'/g)?.length, 1);
+  assert.match(hubSource, /Manage account or sign out/);
 });
