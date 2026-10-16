@@ -891,6 +891,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const formatDetails = getSignupFormatDetails(visibleTournament);
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
+  const hostAccount = Boolean(account?.hostApproved);
   const accountNeedsVerification = account?.emailVerified === false;
   const accountNeedsUsername = Boolean(account && (account.usernameRequired || !account.playerHandle));
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
@@ -902,6 +903,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const arrivedFromSignInLink = Boolean(account && accountMode === 'login' && !hasSignupConfirmation);
   const mainTitle = hasSignupConfirmation
     ? 'You are on the roster'
+    : hostAccount
+      ? 'Host account — player signup disabled'
     : account
       ? 'Account ready. Join this tournament.'
       : isLoginMode
@@ -909,6 +912,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         : 'Create your player account';
   const mainCopy = hasSignupConfirmation
     ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
+    : hostAccount
+      ? 'Host accounts manage tournaments and cannot join them as players. Use a separate player account for gameplay.'
     : account
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
       : isLoginMode
@@ -934,7 +939,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const matchStatusPath = `${tournamentPath}#my-match`;
   const rosterPath = `/check-in/${visibleTournament.slug}#registered-players`;
   const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup, liveBracket });
-  const screenActions = hasSignupConfirmation
+  const screenActions = hostAccount
+    ? [{ label: 'Open Host controls', href: '/admin' }]
+    : hasSignupConfirmation
     ? [
         { label: 'My Match', href: matchStatusPath },
         { label: 'Roster', href: rosterPath, variant: 'secondary' },
@@ -987,7 +994,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
           {accountLoading ? <Text style={styles.summaryCopy}>Checking account status...</Text> : null}
 
-          {hasSignupConfirmation ? (
+          {hostAccount ? (
+            <View style={styles.signupCardComplete}>
+              <Badge tone="accent">Host account</Badge>
+              <Text style={styles.summaryTitle}>Host account — player signup disabled</Text>
+              <Text style={styles.summaryCopy}>
+                Host account cannot play. Keep tournament administration separate from player accounts.
+              </Text>
+              <ActionButton href="/admin">Open Host controls</ActionButton>
+            </View>
+          ) : hasSignupConfirmation ? (
             <SignupCompleteState
               account={account}
               accountMessage={accountMessage}

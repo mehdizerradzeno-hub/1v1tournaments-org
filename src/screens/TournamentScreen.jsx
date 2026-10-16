@@ -1233,6 +1233,7 @@ function TournamentLobbyHero({
   const isComplete = liveBracket?.status === 'complete' || Boolean(result);
   const championName = getPublicChampionLabel(liveBracket) || result?.winner || '';
   const currentMatch = playerStatus.data?.currentMatch || null;
+  const hostAccount = Boolean(playerStatus.data?.account?.hostApproved);
   const primaryAction = getPlayerPrimaryAction({
     checkInPath,
     isBracketLive,
@@ -1286,13 +1287,18 @@ function TournamentLobbyHero({
               : `${tournament.format} | ${tournament.location} | ${tournament.entryLine}`}
           </Text>
         </View>
+        {hostAccount ? <Text style={styles.playerStatusWarning}>Host account cannot play. Use a separate player account.</Text> : null}
         <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
-          <ActionButton
-            disabled={!isComplete && Boolean(currentMatch) && opening}
-            href={isComplete || !currentMatch ? (isComplete ? '/results' : primaryAction.href) : undefined}
-            onPress={!isComplete && currentMatch ? handlePlayMyMatch : undefined}>
-            {isComplete ? 'View Results' : currentMatch ? (opening ? 'Opening...' : 'Open My Match') : primaryAction.label}
-          </ActionButton>
+          {hostAccount ? (
+            <ActionButton href="/admin">Open Host Controls</ActionButton>
+          ) : (
+            <ActionButton
+              disabled={!isComplete && Boolean(currentMatch) && opening}
+              href={isComplete || !currentMatch ? (isComplete ? '/results' : primaryAction.href) : undefined}
+              onPress={!isComplete && currentMatch ? handlePlayMyMatch : undefined}>
+              {isComplete ? 'View Results' : currentMatch ? (opening ? 'Opening...' : 'Open My Match') : primaryAction.label}
+            </ActionButton>
+          )}
           {streams.length ? <ActionButton href="/stream" variant="secondary">Watch Tournament</ActionButton> : null}
         </View>
         {openError ? <Text style={styles.playerStatusWarning}>{openError}</Text> : null}
