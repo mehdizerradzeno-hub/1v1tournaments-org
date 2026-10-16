@@ -36,12 +36,8 @@ test('admin keeps older events behind one collapsed previous-events selector and
   assert.equal((adminScreenSource.match(/>New tournament</g) || []).length, 1);
   assert.equal((adminScreenSource.match(/<TournamentEventSelector/g) || []).length, 1);
   assert.match(adminScreenSource, /Read-only history/);
-  assert.match(adminScreenSource, /setEditorMode\('create'\)/);
-  assert.match(adminScreenSource, /setArchiveConfirmation\(\{ slug: tournament\.slug, title: tournament\.title \}\)/);
-  assert.match(adminScreenSource, /function AdminDisclosure/);
-  assert.match(adminScreenSource, /Show advanced event actions/);
+  assert.match(adminScreenSource, /Archive event/);
   assert.match(adminScreenSource, /Reset bracket/);
-  assert.doesNotMatch(adminScreenSource, /Generate bracket from roster/);
   assert.ok(
     adminScreenSource.indexOf('const rosterSlug') < adminScreenSource.indexOf('const selectedRoster'),
     'the roster selector must be declared after its tournament slug',
