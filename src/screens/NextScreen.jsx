@@ -641,11 +641,6 @@ export default function NextScreen({ showDiscovery = false }) {
       accountHref="/account"
       actions={[
         { label: primaryAction.label, href: primaryAction.href },
-        {
-          label: "Check Match Status",
-          href: `${tournamentPath}#my-match`,
-          variant: "secondary",
-        },
         hasTwitch
           ? { label: "Watch", href: "/stream", variant: "secondary" }
           : null,
@@ -694,7 +689,6 @@ export default function NextScreen({ showDiscovery = false }) {
         signupSummary={signupSummary}
         primaryAction={primaryAction}
         tournament={tournament}
-        tournamentPath={tournamentPath}
         statusTone={statusTone}
       />
       {showDiscovery ? (
@@ -721,7 +715,6 @@ function NextLobbyHero({
   signupCount,
   signupSummary,
   tournament,
-  tournamentPath,
   statusTone,
 }) {
   const { width } = useWindowDimensions();
@@ -807,13 +800,6 @@ function NextLobbyHero({
           >
             <ActionButton href={primaryHref} style={styles.heroExitButton}>
               {primaryLabel}
-            </ActionButton>
-            <ActionButton
-              href={`${tournamentPath}#my-match`}
-              style={styles.heroExitButton}
-              variant="secondary"
-            >
-              Check Match Status
             </ActionButton>
             <ActionButton
               href="/stream"
@@ -920,39 +906,6 @@ function NextLobbyHero({
             </Text>
           </View>
 
-          <View
-            style={[styles.heroActions, isPhone && styles.heroActionsPhone]}
-          >
-            {isPhone ? null : (
-              <View
-                dataSet={getMotionDataSet("cta")}
-                style={styles.primaryCtaMotion}
-              >
-                <ActionButton
-                  href={primaryHref}
-                  style={styles.primaryCtaButton}
-                >
-                  {primaryLabel}
-                </ActionButton>
-              </View>
-            )}
-            <View style={styles.secondaryActionRow}>
-              <ActionButton
-                href={`${tournamentPath}#my-match`}
-                style={styles.secondaryCtaButton}
-                variant="ghost"
-              >
-                Check Match Status
-              </ActionButton>
-              <ActionButton
-                href={tournamentPath}
-                style={styles.secondaryCtaButton}
-                variant="ghost"
-              >
-                Event
-              </ActionButton>
-            </View>
-          </View>
         </View>
       </View>
 

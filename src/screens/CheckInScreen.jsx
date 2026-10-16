@@ -14,6 +14,7 @@ import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/si
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
 import { getTournamentGameName } from '../lib/tournamentCatalog.js';
+import { getTournamentPlayerSteps } from '../lib/tournamentPlayerFlow.js';
 import {
   createPlayerAccount,
   fetchPlayerAccount,
@@ -273,38 +274,13 @@ function getAccountFormStatus({
   };
 }
 
-function getSignupProgressSteps({ account, confirmedSignup, liveBracket }) {
-  const signedUpName = confirmedSignup?.playerName || account?.playerName || 'Player';
-  const accountReady = Boolean(account || confirmedSignup);
-  const signedUp = Boolean(confirmedSignup);
-  const matchReady = Boolean(signedUp && liveBracket);
-
-  return [
-    {
-      body: accountReady ? `${signedUpName} is signed in.` : 'Create or sign in once.',
-      complete: accountReady,
-      current: !accountReady,
-      title: 'Account',
-    },
-    {
-      body: signedUp ? 'Roster spot saved.' : 'Join the tournament roster.',
-      complete: signedUp,
-      current: accountReady && !signedUp,
-      title: 'Signed Up',
-    },
-    {
-      body: matchReady ? 'Open your assigned table.' : 'Wait for the bracket to go live.',
-      complete: matchReady,
-      current: signedUp && !matchReady,
-      title: 'Match Ready',
-    },
-    {
-      body: 'Return here after the game.',
-      complete: false,
-      current: matchReady,
-      title: 'Results',
-    },
-  ];
+function getSignupProgressSteps({ account, confirmedSignup }) {
+  return getTournamentPlayerSteps({
+    account: account || (confirmedSignup ? { ...confirmedSignup } : null),
+    // A published bracket does not guarantee that this player has an assigned table.
+    currentMatch: null,
+    signup: confirmedSignup,
+  });
 }
 
 function getSignupStepTone(step) {
@@ -609,6 +585,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
       return;
     }
 
+    if (account.hostApproved) {
+      setError('Host accounts manage tournaments and cannot join them as players. Use a separate player account.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setSignup(null);
@@ -869,21 +850,27 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: Boolean(liveBracket) });
   const registrationOpen = registrationMeta.value === 'open';
   const accountNeedsVerification = account?.emailVerified === false;
+  const hostAccount = Boolean(account?.hostApproved);
   const passwordRequirements = getPasswordRequirements(password, confirmPassword);
-  const confirmedSignup = signup
-    || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
-    || null;
+  const confirmedSignup = hostAccount
+    ? null
+    : signup
+      || signupSummary.signups?.find((signupItem) => isOwnSignup(signupItem, account, signup))
+      || null;
   const hasSignupConfirmation = Boolean(confirmedSignup);
   const isLoginMode = accountMode === 'login';
-  const arrivedFromSignInLink = Boolean(account && accountMode === 'login' && !hasSignupConfirmation);
-  const mainTitle = hasSignupConfirmation
+  const mainTitle = hostAccount
+    ? 'Host account — player signup disabled.'
+    : hasSignupConfirmation
     ? 'You are on the roster'
     : account
       ? 'Account ready. Join this tournament.'
       : isLoginMode
         ? 'Sign in to your player account.'
         : 'Create your player account';
-  const mainCopy = hasSignupConfirmation
+  const mainCopy = hostAccount
+    ? 'This account manages tournaments. Use a separate signed-in player account to enter a bracket.'
+    : hasSignupConfirmation
     ? 'Your player account is linked to this tournament. Use My Match when the bracket is published.'
     : account
       ? 'Your account is signed in. One clear tap reserves your tournament spot.'
@@ -908,24 +895,19 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     ? `/check-in/${visibleTournament.slug}#${ACCOUNT_ACCESS_SECTION_ID}`
     : `/check-in/${visibleTournament.slug}?mode=signin#${ACCOUNT_ACCESS_SECTION_ID}`;
   const matchStatusPath = `${tournamentPath}#my-match`;
-  const rosterPath = `/check-in/${visibleTournament.slug}#registered-players`;
-  const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup, liveBracket });
-  const screenActions = hasSignupConfirmation
-    ? [
-        { label: 'My Match', href: matchStatusPath },
-        { label: 'Roster', href: rosterPath, variant: 'secondary' },
-        { label: 'Event', href: tournamentPath, variant: 'secondary' },
-      ]
-    : [
-        { label: 'Event', href: tournamentPath },
-        { label: 'Rules', href: '/rules', variant: 'secondary' },
-        { label: 'Watch', href: '/stream', variant: 'ghost' },
-      ];
+  const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup });
+  const screenAction = hostAccount
+    ? { label: 'Open Host Controls', href: '/admin' }
+    : hasSignupConfirmation
+      ? { label: 'My Match', href: matchStatusPath }
+      : account
+        ? { label: 'Join Tournament', href: accountAccessPath }
+        : { label: isLoginMode ? 'Sign in' : 'Create account', href: accountAccessPath };
 
   return (
     <HubScreen
       accountHref={accountAccessPath}
-      actions={screenActions}
+      actions={[screenAction]}
       eyebrow="Tournament registration"
       footerNote="Player accounts are required for tournament signups. Entry is free and no wagering is allowed."
       lead="Create or sign in to a player account, then reserve your spot. This keeps match seats tied to real tournament accounts."
@@ -938,15 +920,18 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         { label: 'Entry', value: 'Free', tone: 'green' },
       ]}
       subtitle={`${game?.name || 'Tournament'} • ${formatDateLine(visibleTournament.date, visibleTournament.timeZone, visibleTournament.timeZoneLabel)}`}
+      stickyActions={false}
       title={`Join ${visibleTournament.title}`}>
       <Section
-        description={hasSignupConfirmation
+        description={hostAccount
+          ? 'Host accounts manage this event and cannot reserve a player seat.'
+          : hasSignupConfirmation
           ? 'Your seat is saved. The next useful action is My Match after the host seeds the bracket.'
           : isLoginMode
             ? 'Sign in first. Joining the roster is a separate button after the account opens.'
             : 'One clear path: create your account, join the roster, then use My Match when the bracket goes live.'}
         nativeID={ACCOUNT_ACCESS_SECTION_ID}
-        title={hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in' : 'Create account'}>
+        title={hostAccount ? 'Host account' : hasSignupConfirmation ? 'You are in' : isLoginMode ? 'Sign in' : 'Create account'}>
         <Surface style={[styles.signupCard, hasSignupConfirmation && styles.signupCardComplete]}>
           <View style={styles.summaryTopRow}>
             <Badge tone="green">{signupCountLabel(signupSummary.count, signupSummary.loading)}</Badge>
@@ -973,64 +958,62 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               liveBracket={liveBracket}
               matchStatusPath={matchStatusPath}
               onLogout={handleLogoutAccount}
-              rosterPath={rosterPath}
               tournament={visibleTournament}
-              tournamentPath={tournamentPath}
             />
           ) : account ? (
             <>
-              {arrivedFromSignInLink ? (
-                <View style={styles.switchAccountPanel}>
-                  <Badge tone="accent">Signed in</Badge>
-                  <Text style={styles.switchAccountTitle}>Already signed in as {account.playerName}</Text>
-                  <Text style={styles.switchAccountCopy}>
-                    Join this tournament as {account.playerName}, or sign out first if another player is using this device.
-                  </Text>
-                  <View style={styles.buttonRow}>
-                    <ActionButton onPress={handleLogoutAccount}>
-                      {accountSubmitting ? 'Signing out...' : 'Sign out to switch'}
-                    </ActionButton>
-                    <ActionButton href={tournamentPath} variant="secondary">
-                      Event
-                    </ActionButton>
-                  </View>
-                </View>
-              ) : null}
-
               <View style={styles.joinActionPanel}>
-                <View style={styles.summaryTopRow}>
-                  <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
-                  <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
-                </View>
-                <Text style={styles.joinActionTitle}>
-                  {accountNeedsVerification
-                    ? 'Verify your email before joining.'
-                    : registrationOpen
-                      ? `Reserve ${account.playerName}'s spot.`
-                      : 'Registration is not open right now.'}
-                </Text>
-                <Text style={styles.joinActionCopy}>
-                  {accountNeedsVerification
-                    ? 'Enter the short code sent to this account email. Verification protects roster seats from account impersonation.'
-                    : registrationOpen
-                    ? `One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned ${gameName} match.`
-                    : registrationMeta.actionCopy}
-                </Text>
-                <View style={styles.buttonRow}>
-                  <ActionButton disabled={!registrationOpen || accountNeedsVerification || submitting} onPress={handleSubmitSignup}>
-                    {accountNeedsVerification
-                      ? 'Verify email first'
-                      : registrationOpen
-                        ? (submitting ? 'Saving spot...' : 'Join Tournament')
-                        : registrationMeta.label}
-                  </ActionButton>
-                  <ActionButton href={tournamentPath} variant="secondary">
-                    Event
-                  </ActionButton>
-                  <ActionButton onPress={handleLogoutAccount} variant="ghost">
-                    {accountSubmitting ? 'Signing out...' : 'Sign out'}
-                  </ActionButton>
-                </View>
+                {hostAccount ? (
+                  <>
+                    <View style={styles.summaryTopRow}>
+                      <Badge tone="accent">Host account</Badge>
+                      <Text style={styles.summaryWindow}>Player signup disabled</Text>
+                    </View>
+                    <Text style={styles.joinActionTitle}>Run this event from Host controls.</Text>
+                    <Text style={styles.joinActionCopy}>
+                      This account can create and manage tournaments, but it cannot reserve a player seat or open a player match.
+                    </Text>
+                    <View style={styles.buttonRow}>
+                      <ActionButton href="/admin">Open Host controls</ActionButton>
+                      <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                        {accountSubmitting ? 'Signing out...' : 'Sign out to switch'}
+                      </ActionButton>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.summaryTopRow}>
+                      <Badge tone={registrationOpen ? 'green' : 'accent'}>{registrationOpen ? 'Next step' : 'Registration'}</Badge>
+                      <Text style={styles.summaryWindow}>{registrationMeta.label}</Text>
+                    </View>
+                    <Text style={styles.joinActionTitle}>
+                      {accountNeedsVerification
+                        ? 'Verify your email before joining.'
+                        : registrationOpen
+                          ? `Reserve ${account.playerName}'s spot.`
+                          : 'Registration is not open right now.'}
+                    </Text>
+                    <Text style={styles.joinActionCopy}>
+                      {accountNeedsVerification
+                        ? 'Enter the short code sent to this account email. Verification protects roster seats from account impersonation.'
+                        : registrationOpen
+                        ? `One tap adds this account to the public roster. After the host seeds the bracket, My Match opens the assigned ${gameName} match.`
+                        : registrationMeta.actionCopy}
+                    </Text>
+                    <View style={styles.buttonRow}>
+                      <ActionButton disabled={!registrationOpen || accountNeedsVerification || submitting} onPress={handleSubmitSignup}>
+                        {accountNeedsVerification
+                          ? 'Verify email first'
+                          : registrationOpen
+                            ? (submitting ? 'Saving spot...' : 'Join Tournament')
+                            : registrationMeta.label}
+                      </ActionButton>
+                      <ActionButton onPress={handleLogoutAccount} variant="ghost">
+                        {accountSubmitting ? 'Signing out...' : 'Sign out'}
+                      </ActionButton>
+                    </View>
+                  </>
+                )}
               </View>
 
               {accountNeedsVerification ? (
@@ -1412,9 +1395,7 @@ function SignupCompleteState({
   liveBracket,
   matchStatusPath,
   onLogout,
-  rosterPath,
   tournament,
-  tournamentPath,
 }) {
   const playerName = confirmedSignup?.playerName || account?.playerName || 'your player account';
   const nextStep = liveBracket
@@ -1453,8 +1434,6 @@ function SignupCompleteState({
 
       <View style={styles.confirmationActions}>
         <ActionButton href={matchStatusPath}>My Match</ActionButton>
-        <ActionButton href={rosterPath} variant="secondary">See Roster</ActionButton>
-        <ActionButton href={tournamentPath} variant="secondary">Event Page</ActionButton>
         {onLogout ? (
           <ActionButton onPress={onLogout} variant="ghost">
             {accountSubmitting ? 'Signing out...' : 'Sign out'}

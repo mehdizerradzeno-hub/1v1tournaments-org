@@ -612,13 +612,6 @@ function PremiumCountdownHero({
           {primaryAction.label}
         </ActionButton>
         <ActionButton
-          href={matchStatusPath}
-          style={styles.heroActionButton}
-          variant="secondary"
-        >
-          Check Match Status
-        </ActionButton>
-        <ActionButton
           href={`${tournamentPath}#live-bracket`}
           style={styles.heroActionButton}
           variant="secondary"
@@ -953,9 +946,6 @@ function UpcomingTournamentList({
             </View>
             <View style={styles.upcomingActions}>
               <ActionButton href={action.href}>{action.label}</ActionButton>
-              <ActionButton href={matchPath} variant="secondary">
-                Check Match Status
-              </ActionButton>
             </View>
           </Surface>
         );
