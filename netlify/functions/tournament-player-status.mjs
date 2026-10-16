@@ -9,11 +9,18 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import {
+  HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+  HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+  isHostAccount,
+  isHostSignup,
+} from './_host-auth.mjs';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Origin': '*',
+  'Cache-Control': 'no-store, max-age=0, must-revalidate',
   'Content-Type': 'application/json',
 };
 
@@ -143,7 +150,7 @@ async function loadTournamentSignups(tournamentSlug) {
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
   const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
 
-  return signups.filter(Boolean).sort((first, second) => {
+  return signups.filter((signup) => signup && !isHostSignup(signup)).sort((first, second) => {
     return String(first.createdAt || '').localeCompare(String(second.createdAt || ''));
   });
 }
@@ -303,6 +310,25 @@ export async function handler(event) {
         finalMatch: null,
         nextStep: 'sign-in',
         statusLabel: statusLabel('sign-in'),
+      });
+    }
+
+    if (isHostAccount(account)) {
+      return json(200, {
+        ok: true,
+        tournamentSlug,
+        account: {
+          ...publicAccount(account),
+          hostApproved: true,
+        },
+        signup: null,
+        bracketStatus: null,
+        participantCount: 0,
+        currentMatch: null,
+        waitingMatch: null,
+        finalMatch: null,
+        nextStep: HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+        statusLabel: HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
       });
     }
 

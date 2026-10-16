@@ -3,6 +3,7 @@ import { connectLambda, getStore } from '@netlify/blobs';
 import {
   getAdminToken,
   getBearerToken,
+  isHostSignup,
   requireTournamentAdmin,
 } from './_host-auth.mjs';
 import {
@@ -89,6 +90,7 @@ const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Origin': '*',
+  'Cache-Control': 'no-store, max-age=0, must-revalidate',
   'Content-Type': 'application/json',
 };
 
@@ -687,7 +689,7 @@ async function loadTournamentSignups(tournamentSlug) {
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
   const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
 
-  return signups.filter(Boolean);
+  return signups.filter((signup) => signup && !isHostSignup(signup));
 }
 
 export function publicBracket(bracket) {

@@ -141,6 +141,12 @@ function cleanScore(value) {
   return Number.isInteger(score) && score >= 0 ? score : NaN;
 }
 
+function cleanSpadesScore(value) {
+  if (value === undefined || value === null || value === '') return NaN;
+  const score = Number(value);
+  return Number.isInteger(score) ? score : NaN;
+}
+
 export function normalizeTournamentResultCallback(payload, tournamentSlug) {
   const protocolVersion = cleanText(payload?.protocolVersion);
   const game = normalizeTournamentGame(payload?.game, '');
@@ -154,23 +160,12 @@ export function normalizeTournamentResultCallback(payload, tournamentSlug) {
     throw new TournamentGameContractError(400, 'Use the current tournament game protocol version.', 'wrong_protocol');
   }
 
-  if (game !== 'euchre') {
-    throw new TournamentGameContractError(400, 'This callback is not an Euchre tournament result.', 'wrong_game');
-  }
-
   if (!tournamentId || tournamentId !== cleanText(tournamentSlug)) {
     throw new TournamentGameContractError(400, 'The tournament result does not match this tournament.', 'wrong_tournament');
   }
 
   if (!matchId || !completionId || !winnerParticipantId || !winnerCanonicalAccountId) {
     throw new TournamentGameContractError(400, 'The result callback is missing required match identity fields.', 'malformed_result');
-  }
-
-  const north = cleanScore(payload?.scores?.north);
-  const south = cleanScore(payload?.scores?.south);
-
-  if (Number.isNaN(north) || Number.isNaN(south)) {
-    throw new TournamentGameContractError(400, 'Euchre scores must be non-negative whole numbers.', 'malformed_scores');
   }
 
   const isForfeit = payload?.forfeit === true;
@@ -180,16 +175,49 @@ export function normalizeTournamentResultCallback(payload, tournamentSlug) {
     throw new TournamentGameContractError(400, 'A forfeited match requires an authoritative reason.', 'malformed_forfeit');
   }
 
-  return {
-    protocolVersion,
-    game,
-    tournamentId,
-    matchId,
-    completionId,
-    winnerParticipantId,
-    winnerCanonicalAccountId,
-    scores: north === null && south === null ? null : { north, south },
-    forfeit: isForfeit,
-    forfeitReason: isForfeit ? forfeitReason : '',
-  };
+  if (game === 'euchre') {
+    const north = cleanScore(payload?.scores?.north);
+    const south = cleanScore(payload?.scores?.south);
+
+    if (Number.isNaN(north) || Number.isNaN(south)) {
+      throw new TournamentGameContractError(400, 'Euchre scores must be non-negative whole numbers.', 'malformed_scores');
+    }
+
+    return {
+      protocolVersion,
+      game,
+      tournamentId,
+      matchId,
+      completionId,
+      winnerParticipantId,
+      winnerCanonicalAccountId,
+      scores: north === null && south === null ? null : { north, south },
+      forfeit: isForfeit,
+      forfeitReason: isForfeit ? forfeitReason : '',
+    };
+  }
+
+  if (game === 'spades') {
+    const seat0 = cleanSpadesScore(payload?.scores?.seat0);
+    const seat1 = cleanSpadesScore(payload?.scores?.seat1);
+
+    if (Number.isNaN(seat0) || Number.isNaN(seat1)) {
+      throw new TournamentGameContractError(400, 'Spades scores must be signed whole numbers.', 'malformed_scores');
+    }
+
+    return {
+      protocolVersion,
+      game,
+      tournamentId,
+      matchId,
+      completionId,
+      winnerParticipantId,
+      winnerCanonicalAccountId,
+      scores: { seat0, seat1 },
+      forfeit: isForfeit,
+      forfeitReason: isForfeit ? forfeitReason : '',
+    };
+  }
+
+  throw new TournamentGameContractError(400, 'Choose a supported tournament game.', 'unsupported_game');
 }

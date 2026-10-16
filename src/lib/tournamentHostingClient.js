@@ -235,7 +235,9 @@ export async function fetchSignupSummary({ slug }) {
 
 export async function fetchTournamentSettings({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${readEndpoint(SETTINGS_ENDPOINT)}${query}`);
+  const response = await fetch(`${readEndpoint(SETTINGS_ENDPOINT)}${query}`, {
+    cache: 'no-store',
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -254,6 +256,7 @@ export async function fetchTournamentEvents({ slug, token, includePrivate = fals
   const query = search.toString() ? `?${search.toString()}` : '';
   const endpoint = `${readEndpoint(EVENTS_ENDPOINT)}${query}`;
   const response = await fetch(endpoint, {
+    cache: 'no-store',
     credentials: readCredentials(endpoint),
     headers: adminHeaders(token),
   });
@@ -488,7 +491,9 @@ export async function clearTournamentData({ token, slug }) {
 
 export async function fetchTournamentBracket({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
-  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`);
+  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`, {
+    cache: 'no-store',
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -510,7 +515,9 @@ export async function fetchTournamentMatch({ slug, matchId }) {
   }
 
   const query = params.toString() ? `?${params.toString()}` : '';
-  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`);
+  const response = await fetch(`${readEndpoint(BRACKET_ENDPOINT)}${query}`, {
+    cache: 'no-store',
+  });
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
@@ -524,6 +531,7 @@ export async function fetchTournamentPlayerStatus({ slug }) {
   const query = slug ? `?slug=${encodeURIComponent(slug)}` : '';
   const endpoint = `${readEndpoint(PLAYER_STATUS_ENDPOINT)}${query}`;
   const response = await fetch(endpoint, {
+    cache: 'no-store',
     credentials: readCredentials(endpoint),
   });
   const result = await readJsonResponse(response);
