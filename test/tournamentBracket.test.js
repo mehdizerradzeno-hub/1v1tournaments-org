@@ -7,6 +7,8 @@ import {
   buildThreePlayerTwoLifeBracket,
   checkInOpenStatus,
   findMatch,
+  publicBracket,
+  publicMatchDetails,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
 
@@ -45,6 +47,34 @@ test('bracket check-in reports when normal generation opens', () => {
   assert.equal(early.open, false);
   assert.match(early.error, /Bracket generation opens/);
   assert.equal(open.open, true);
+});
+
+test('public Spades routes follow the current deployment target after a bracket was stored', () => {
+  const previous = process.env.SPADES_MATCH_BASE_URL;
+  try {
+    process.env.SPADES_MATCH_BASE_URL = 'https://old-spades-qa.onrender.com/match';
+    const bracket = buildBracket({
+      tournamentSlug: 'route-refresh',
+      signups: [signup(1, 'One'), signup(2, 'Two')],
+    });
+
+    process.env.SPADES_MATCH_BASE_URL = 'https://current-spades-qa.onrender.com/match';
+    const publicView = publicBracket(bracket);
+    const publicMatch = publicMatchDetails(bracket, 'route-refresh-r1-m1');
+
+    assert.equal(publicView.matchBaseUrl, 'https://current-spades-qa.onrender.com/match');
+    assert.equal(
+      publicView.rounds[0].matches[0].roomUrl,
+      'https://current-spades-qa.onrender.com/match/route-refresh-r1-m1',
+    );
+    assert.equal(
+      publicMatch.match.roomUrl,
+      'https://current-spades-qa.onrender.com/match/route-refresh-r1-m1',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.SPADES_MATCH_BASE_URL;
+    else process.env.SPADES_MATCH_BASE_URL = previous;
+  }
 });
 
 test('4-player double-elimination bracket requires exactly four players', () => {

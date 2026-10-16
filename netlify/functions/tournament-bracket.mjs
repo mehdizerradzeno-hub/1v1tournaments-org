@@ -683,13 +683,20 @@ async function loadTournamentSignups(tournamentSlug) {
   return signups.filter(Boolean);
 }
 
-function publicBracket(bracket) {
+export function publicBracket(bracket) {
   if (!bracket) {
     return null;
   }
 
+  const publicRoomUrl = (match) => normalizeTournamentGame(bracket.gameSlug || 'spades') === 'spades'
+    ? roomUrl(bracket.tournamentSlug, match.roundIndex, match.matchIndex, 'spades')
+    : match.roomUrl || '';
+
   return {
     ...bracket,
+    matchBaseUrl: normalizeTournamentGame(bracket.gameSlug || 'spades') === 'spades'
+      ? spadesMatchBaseUrl()
+      : bracket.matchBaseUrl || '',
     participants: bracket.participants.map((participant) => ({
       id: participant.id,
       accountId: participant.accountId || '',
@@ -702,6 +709,7 @@ function publicBracket(bracket) {
       ...round,
       matches: round.matches.map((match) => ({
         ...match,
+        roomUrl: publicRoomUrl(match),
         players: match.players.map((player) =>
           player
             ? {
@@ -719,7 +727,7 @@ function publicBracket(bracket) {
   };
 }
 
-function publicMatchDetails(bracket, matchId) {
+export function publicMatchDetails(bracket, matchId) {
   if (!bracket) {
     return null;
   }
@@ -728,6 +736,9 @@ function publicMatchDetails(bracket, matchId) {
     const match = round.matches.find((item) => item.id === matchId);
 
     if (match) {
+      const currentRoomUrl = normalizeTournamentGame(bracket.gameSlug || 'spades') === 'spades'
+        ? roomUrl(bracket.tournamentSlug, match.roundIndex, match.matchIndex, 'spades')
+        : match.roomUrl || '';
       return {
         tournamentSlug: bracket.tournamentSlug,
         bracketStatus: bracket.status,
@@ -738,6 +749,7 @@ function publicMatchDetails(bracket, matchId) {
         },
         match: {
           ...match,
+          roomUrl: currentRoomUrl,
           players: match.players.map((player) =>
             player
               ? {
