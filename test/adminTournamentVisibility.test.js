@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   ADMIN_EDIT_WINDOW_MS,
   isTournamentInAdminEditWindow,
+  isTournamentReadOnlyHistory,
   partitionAdminTournaments,
 } from '../src/lib/adminTournamentVisibility.js';
 
@@ -19,6 +20,8 @@ test('admin edit window includes exactly seven days and moves older events to hi
 
   assert.equal(isTournamentInAdminEditWindow(atBoundary, { nowMs }), true);
   assert.equal(isTournamentInAdminEditWindow(older, { nowMs }), false);
+  assert.equal(isTournamentReadOnlyHistory(atBoundary, { nowMs }), false);
+  assert.equal(isTournamentReadOnlyHistory(older, { nowMs }), true);
 
   assert.deepEqual(
     partitionAdminTournaments([atBoundary, older, { slug: 'draft' }], { nowMs }),
@@ -33,4 +36,10 @@ test('admin keeps older events behind one collapsed previous-events selector and
   assert.equal((adminScreenSource.match(/>New tournament</g) || []).length, 1);
   assert.equal((adminScreenSource.match(/<TournamentEventSelector/g) || []).length, 1);
   assert.match(adminScreenSource, /Read-only history/);
+  assert.match(adminScreenSource, /setEditorMode\('create'\)/);
+  assert.match(adminScreenSource, /setArchiveConfirmation\(\{ slug: tournament\.slug, title: tournament\.title \}\)/);
+  assert.match(adminScreenSource, /function AdminDisclosure/);
+  assert.match(adminScreenSource, /Show advanced event actions/);
+  assert.match(adminScreenSource, /Reset bracket/);
+  assert.doesNotMatch(adminScreenSource, /Generate bracket from roster/);
 });
