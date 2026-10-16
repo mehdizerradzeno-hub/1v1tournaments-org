@@ -18,6 +18,7 @@ const MAX_SESSION_TOKEN_LENGTH = 4096;
 const MAX_FIELD_LENGTH = 500;
 export const PLAYER_USERNAME_MIN_LENGTH = 3;
 export const PLAYER_USERNAME_MAX_LENGTH = 20;
+export const USERNAME_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const SESSION_CLEANUP_BATCH_SIZE = 12;
 const IMMEDIATE_READ_RETRY_DELAYS_MS = [0, 75, 150, 300, 600, 1200];
 
@@ -123,6 +124,13 @@ export function playerUsernameForAccount(account) {
 /** A syntactically valid legacy handle is not a claimed global username. */
 export function hasClaimedPlayerUsername(account) {
   return Boolean(playerUsernameForAccount(account) && cleanText(account?.usernameClaimedAt));
+}
+
+export function usernameChangeAvailableAt(account) {
+  const changedAt = new Date(account?.usernameChangedAt || '').getTime();
+  if (!Number.isFinite(changedAt) || changedAt <= 0) return '';
+
+  return new Date(changedAt + USERNAME_CHANGE_COOLDOWN_MS).toISOString();
 }
 
 function identityKey(value) {
@@ -274,6 +282,7 @@ export function createSignedSessionToken(session, account) {
     passwordChangedAt: account.passwordChangedAt || '',
     sessionCreatedAt: session.createdAt,
     sessionId: session.id,
+    usernameChangedAt: account.usernameChangedAt || '',
     usernameClaimedAt: username ? cleanText(account.usernameClaimedAt) : '',
   };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -414,6 +423,7 @@ export function publicAccount(account) {
     usernameRequired: !username,
     emailVerified: account.emailVerified !== false,
     createdAt: account.createdAt,
+    usernameChangeAvailableAt: usernameChangeAvailableAt(account),
   };
 }
 
@@ -651,6 +661,7 @@ export async function getAccountFromEvent(event, options = {}) {
       id: signedSession.accountId,
       canonicalAccountId: signedSession.canonicalAccountId || signedSession.accountId,
       playerHandle: signedSession.playerHandle || '',
+      usernameChangedAt: signedSession.usernameChangedAt || '',
       usernameClaimedAt: signedSession.usernameClaimedAt || '',
       passwordChangedAt: signedSession.passwordChangedAt || '',
     };

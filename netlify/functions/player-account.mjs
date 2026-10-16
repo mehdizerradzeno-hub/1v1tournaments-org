@@ -22,6 +22,7 @@ import {
   reservePlayerUsername,
   saveAccount,
   sessionCookie,
+  usernameChangeAvailableAt,
   verifyPassword,
   withCookie,
 } from './_account-utils.mjs';
@@ -132,6 +133,7 @@ export async function createAccount(payload, options = {}) {
       code: 'invalid_username',
     });
   }
+
   const account = {
     id: accountId,
     canonicalAccountId: accountId,
@@ -214,6 +216,28 @@ export async function changeUsername(event, payload, options = {}) {
     });
   }
 
+  const nowValue = options.now ? options.now() : Date.now();
+  const nowMs = nowValue instanceof Date
+    ? nowValue.getTime()
+    : new Date(nowValue).getTime();
+  const safeNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+  const availableAt = usernameChangeAvailableAt(account);
+  const availableAtMs = new Date(availableAt).getTime();
+
+  if (
+    previousUsername
+    && username !== previousUsername
+    && Number.isFinite(availableAtMs)
+    && availableAtMs > safeNowMs
+  ) {
+    return json(429, {
+      error: `You can change your username again in ${Math.ceil((availableAtMs - safeNowMs) / 1000)} seconds.`,
+      code: 'username_change_cooldown',
+      retryAfterSeconds: Math.ceil((availableAtMs - safeNowMs) / 1000),
+      usernameChangeAvailableAt: availableAt,
+    });
+  }
+
   try {
     await reserveUsername(username, account);
   } catch (error) {
@@ -223,13 +247,15 @@ export async function changeUsername(event, payload, options = {}) {
     throw error;
   }
 
-  const now = new Date().toISOString();
+  const now = new Date(safeNowMs).toISOString();
   const updated = {
     ...account,
     playerHandle: username,
     playerName: username,
     usernameClaimedAt: account.usernameClaimedAt || now,
-    usernameChangedAt: now,
+    usernameChangedAt: username !== previousUsername
+      ? now
+      : account.usernameChangedAt || '',
     updatedAt: now,
   };
 

@@ -253,7 +253,11 @@ async function postPlayerAccountAction(action, payload = {}) {
   const result = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(result?.error || 'Player account action could not be completed.');
+    const error = new Error(result?.error || 'Player account action could not be completed.');
+    error.code = result?.code || '';
+    error.usernameChangeAvailableAt = result?.usernameChangeAvailableAt || '';
+    error.retryAfterSeconds = result?.retryAfterSeconds || 0;
+    throw error;
   }
 
   return result;

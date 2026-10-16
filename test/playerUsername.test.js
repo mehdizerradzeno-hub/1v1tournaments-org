@@ -8,6 +8,7 @@ import {
   releasePlayerUsernameReservation,
   reservePlayerUsername,
   publicAccount,
+  USERNAME_CHANGE_COOLDOWN_MS,
   validatePlayerUsername,
 } from '../netlify/functions/_account-utils.mjs';
 import {
@@ -17,6 +18,7 @@ import {
 import { relinkSignupIdentity } from '../netlify/functions/tournament-signup.mjs';
 
 const checkInScreenFile = fileURLToPath(new URL('../src/screens/CheckInScreen.jsx', import.meta.url));
+const accountConnectScreenFile = fileURLToPath(new URL('../src/screens/SpadesAccountConnectScreen.jsx', import.meta.url));
 
 class MemoryStore {
   constructor() {
@@ -71,6 +73,10 @@ test('username prompts match the shared policy and do not claim usernames are im
   assert.doesNotMatch(source, /3[-–]32 lowercase characters/);
   assert.match(source, /You can change it later if another username is available\./);
   assert.doesNotMatch(source, /It cannot be changed\./);
+
+  const accountSource = readFileSync(accountConnectScreenFile, 'utf8');
+  assert.match(accountSource, /once every 24 hours/);
+  assert.match(accountSource, /Username changes are locked for/);
 });
 
 test('the current-account projection never exposes an unclaimed legacy display name', () => {
@@ -219,6 +225,72 @@ test('a rename keeps the canonical account and releases the previous username', 
     created: true,
     username: 'old_name',
   });
+});
+
+test('a username rename is locked for 24 hours and exposes the retry timestamp', async () => {
+  const usernames = new MemoryStore();
+  const reserve = usernameReservation(usernames);
+  const release = usernameRelease(usernames);
+  const changedAt = '2026-10-16T12:00:00.000Z';
+  const account = {
+    id: 'acct-player',
+    canonicalAccountId: 'acct-player',
+    email: 'player@example.com',
+    playerName: 'old_name',
+    playerHandle: 'old_name',
+    usernameClaimedAt: changedAt,
+    usernameChangedAt: changedAt,
+  };
+  await reserve(account.playerHandle, account);
+  let saved = false;
+
+  const response = await changeUsername({ headers: {} }, { username: 'new_name' }, {
+    now: () => new Date('2026-10-16T12:00:00.000Z'),
+    getAccountFromEvent: async () => account,
+    reservePlayerUsername: reserve,
+    releasePlayerUsernameReservation: release,
+    saveAccount: async () => { saved = true; },
+  });
+
+  assert.equal(response.statusCode, 429);
+  const body = JSON.parse(response.body);
+  assert.equal(body.code, 'username_change_cooldown');
+  assert.equal(body.retryAfterSeconds, 86400);
+  assert.equal(body.usernameChangeAvailableAt, '2026-10-17T12:00:00.000Z');
+  assert.equal(saved, false);
+  assert.equal(publicAccount(account).usernameChangeAvailableAt, body.usernameChangeAvailableAt);
+  assert.equal(USERNAME_CHANGE_COOLDOWN_MS, 24 * 60 * 60 * 1000);
+});
+
+test('a username rename is allowed after the cooldown and starts a new timer', async () => {
+  const usernames = new MemoryStore();
+  const reserve = usernameReservation(usernames);
+  const release = usernameRelease(usernames);
+  const changedAt = '2026-10-16T12:00:00.000Z';
+  const account = {
+    id: 'acct-player',
+    canonicalAccountId: 'acct-player',
+    email: 'player@example.com',
+    playerName: 'old_name',
+    playerHandle: 'old_name',
+    usernameClaimedAt: changedAt,
+    usernameChangedAt: changedAt,
+  };
+  await reserve(account.playerHandle, account);
+  let saved = null;
+
+  const response = await changeUsername({ headers: {} }, { username: 'new_name' }, {
+    now: () => new Date('2026-10-17T12:00:00.000Z'),
+    getAccountFromEvent: async () => account,
+    reservePlayerUsername: reserve,
+    releasePlayerUsernameReservation: release,
+    saveAccount: async (updated) => { saved = structuredClone(updated); },
+    createSession: async () => ({ id: 'renamed-session', token: 'renamed-session' }),
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(saved.usernameChangedAt, '2026-10-17T12:00:00.000Z');
+  assert.equal(JSON.parse(response.body).account.usernameChangeAvailableAt, '2026-10-18T12:00:00.000Z');
 });
 
 test('a rename rejects a username held by another account without changing the signed-in account', async () => {

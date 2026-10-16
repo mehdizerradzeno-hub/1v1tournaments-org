@@ -37,6 +37,19 @@ import {
 } from '../lib/accountConnect.js';
 import { theme } from '../lib/theme.js';
 
+function formatUsernameCooldown(remainingMs) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 function inputProps(setValue, {
   autoComplete = 'off',
   label,
@@ -106,6 +119,8 @@ export function GameAccountConnectScreen({
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteExpanded, setDeleteExpanded] = useState(false);
+  const [usernameChangeAvailableAt, setUsernameChangeAvailableAt] = useState('');
+  const [usernameCooldownMs, setUsernameCooldownMs] = useState(0);
   const handoffStartedRef = useRef(false);
 
   useEffect(() => {
@@ -115,6 +130,7 @@ export function GameAccountConnectScreen({
         if (!active) return;
         setAccount(result.account || null);
         setUsernameDraft(result.account?.playerHandle || '');
+        setUsernameChangeAvailableAt(result.account?.usernameChangeAvailableAt || '');
         if (
           result.account
           || initialRecoveryToken
@@ -137,6 +153,21 @@ export function GameAccountConnectScreen({
       active = false;
     };
   }, [initialMode, initialRecoveryToken, signedOutManageFallback]);
+
+  useEffect(() => {
+    const updateCooldown = () => {
+      const availableAtMs = Date.parse(usernameChangeAvailableAt);
+      setUsernameCooldownMs(
+        Number.isFinite(availableAtMs) ? Math.max(0, availableAtMs - Date.now()) : 0,
+      );
+    };
+
+    updateCooldown();
+    if (!usernameChangeAvailableAt) return undefined;
+
+    const timer = setInterval(updateCooldown, 1000);
+    return () => clearInterval(timer);
+  }, [usernameChangeAvailableAt]);
 
   const selectMode = (nextMode) => {
     setMode(nextMode);
@@ -189,6 +220,7 @@ export function GameAccountConnectScreen({
       const result = await loginPlayerAccount({ contactEmail, password });
       setAccount(result.account || null);
       setUsernameDraft(result.account?.playerHandle || '');
+      setUsernameChangeAvailableAt(result.account?.usernameChangeAvailableAt || '');
       await returnToGame();
     } catch (signInError) {
       setSubmitting(false);
@@ -216,6 +248,7 @@ export function GameAccountConnectScreen({
       });
       setAccount(result.account || null);
       setUsernameDraft(result.account?.playerHandle || playerHandle);
+      setUsernameChangeAvailableAt(result.account?.usernameChangeAvailableAt || '');
       await returnToGame();
     } catch (createError) {
       setSubmitting(false);
@@ -327,6 +360,11 @@ export function GameAccountConnectScreen({
       return;
     }
 
+    if (usernameCooldownMs > 0 && usernameDraft.trim() !== account?.playerHandle) {
+      setError(`You can change your username again in ${formatUsernameCooldown(usernameCooldownMs)}.`);
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setMessage('');
@@ -336,8 +374,12 @@ export function GameAccountConnectScreen({
       setAccount(updated);
       setPlayerHandle(updated?.playerHandle || usernameDraft);
       setUsernameDraft(updated?.playerHandle || usernameDraft);
+      setUsernameChangeAvailableAt(updated?.usernameChangeAvailableAt || '');
       setMessage('Username updated across your 1v1 account.');
     } catch (usernameError) {
+      if (usernameError?.code === 'username_change_cooldown' && usernameError.usernameChangeAvailableAt) {
+        setUsernameChangeAvailableAt(usernameError.usernameChangeAvailableAt);
+      }
       setError(usernameError instanceof Error ? usernameError.message : 'Username could not be updated.');
     } finally {
       setSubmitting(false);
@@ -354,6 +396,7 @@ export function GameAccountConnectScreen({
       handoffStartedRef.current = false;
       setAccount(nextState.account);
       setMode(nextState.mode);
+      setUsernameChangeAvailableAt('');
       setPlayerHandle('');
       setUsernameDraft('');
       setContactEmail('');
@@ -435,8 +478,14 @@ export function GameAccountConnectScreen({
               returnKeyType="done"
               value={usernameDraft}
             />
-            <Text style={styles.muted}>Available usernames can be changed. Your Spades, Euchre, league, and tournament records stay with your account.</Text>
-            <ActionButton disabled={submitting || usernameDraft.trim() === account.playerHandle} onPress={saveUsername} variant="secondary">
+            {usernameCooldownMs > 0 ? (
+              <Text accessibilityLiveRegion="polite" style={styles.muted}>
+                Username changes are locked for {formatUsernameCooldown(usernameCooldownMs)}. Your next change will be available automatically.
+              </Text>
+            ) : (
+              <Text style={styles.muted}>Available usernames can be changed once every 24 hours. Your Spades, Euchre, league, and tournament records stay with your account.</Text>
+            )}
+            <ActionButton disabled={submitting || usernameCooldownMs > 0 || usernameDraft.trim() === account.playerHandle} onPress={saveUsername} variant="secondary">
               {submitting ? 'Saving...' : 'Save Username'}
             </ActionButton>
             <ActionButton disabled={submitting} onPress={returnToGame}>
