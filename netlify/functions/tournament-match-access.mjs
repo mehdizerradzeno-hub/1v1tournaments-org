@@ -226,6 +226,11 @@ export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRec
     return {
       ok: true,
       protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
+      // The Hub client uses this explicit audience to obtain its short-lived
+      // shared-account launch authorization. Keep it in the minimal Spades
+      // browser contract; without it, the client fails closed before it can
+      // open the already-issued tournament ticket.
+      game,
       matchId: match.id,
       tournamentSlug: bracket.tournamentSlug,
       seatIndex,

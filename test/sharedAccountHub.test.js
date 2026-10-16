@@ -437,6 +437,7 @@ test('Spades match access payload exposes only a canonical username to the brows
   assert.deepEqual(payload, {
     ok: true,
     protocolVersion: '2026-08-04',
+    game: 'spades',
     matchId: 'test-tournament-r1-m1',
     tournamentSlug: 'test-tournament',
     seatIndex: 0,
