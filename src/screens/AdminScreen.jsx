@@ -479,10 +479,6 @@ export default function AdminScreen() {
       }),
     [drafts, serverAllowlistText],
   );
-  const selectedRoster = useMemo(
-    () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || null,
-    [rosters, rosterSlug],
-  );
   const adminTournaments = useMemo(
     () => mergeTournamentLists(siteData.tournaments, hostedTournaments),
     [hostedTournaments],
@@ -499,6 +495,10 @@ export default function AdminScreen() {
     || (isHydrated ? adminTournamentGroups.current[0]?.slug : null)
     || adminTournaments[0]?.slug
     || initialTournamentSlug;
+  const selectedRoster = useMemo(
+    () => rosters.find((roster) => roster.tournamentSlug === rosterSlug) || null,
+    [rosters, rosterSlug],
+  );
   const selectedTournament = useMemo(
     () => editorMode === 'create'
       ? null

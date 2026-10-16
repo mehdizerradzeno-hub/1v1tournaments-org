@@ -42,4 +42,8 @@ test('admin keeps older events behind one collapsed previous-events selector and
   assert.match(adminScreenSource, /Show advanced event actions/);
   assert.match(adminScreenSource, /Reset bracket/);
   assert.doesNotMatch(adminScreenSource, /Generate bracket from roster/);
+  assert.ok(
+    adminScreenSource.indexOf('const rosterSlug') < adminScreenSource.indexOf('const selectedRoster'),
+    'the roster selector must be declared after its tournament slug',
+  );
 });
