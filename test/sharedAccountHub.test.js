@@ -401,7 +401,7 @@ test('game identity lookup endpoint is server-authenticated and returns only pub
   assert.equal(JSON.stringify(body).includes(account.email), false);
 });
 
-test('tournament signup and match access payloads expose canonical identity with legacy IDs', () => {
+test('Spades match access payload exposes only a canonical username to the browser', () => {
   const signup = publicSignup({
     id: 'signup-1',
     accountId: 'legacy-account',
@@ -414,7 +414,7 @@ test('tournament signup and match access payloads expose canonical identity with
   assert.equal(signup.canonicalAccountId, 'canonical-account');
 
   const payload = matchAccessPayload({
-    bracket: { tournamentSlug: 'test-tournament', status: 'published' },
+    bracket: { tournamentSlug: 'test-tournament', gameSlug: 'spades', status: 'published' },
     round: { index: 1, title: 'Round 1' },
     match: {
       id: 'test-tournament-r1-m1',
@@ -422,8 +422,8 @@ test('tournament signup and match access payloads expose canonical identity with
       status: 'ready',
       roomUrl: 'https://1v1spades.com/match/test-tournament-r1-m1',
       players: [
-        { id: 'signup-1', accountId: 'legacy-account', canonicalAccountId: 'canonical-account', name: 'Player' },
-        { id: 'signup-2', accountId: 'legacy-two', canonicalAccountId: 'canonical-two', name: 'Opponent' },
+        { id: 'signup-1', accountId: 'legacy-account', canonicalAccountId: 'canonical-account', name: 'Player', handle: 'player_one' },
+        { id: 'signup-2', accountId: 'legacy-two', canonicalAccountId: 'canonical-two', name: 'Opponent', handle: 'player_two' },
       ],
     },
     seatIndex: 0,
@@ -434,9 +434,39 @@ test('tournament signup and match access payloads expose canonical identity with
     },
   });
 
-  assert.equal(payload.player.canonicalAccountId, 'canonical-account');
-  assert.equal(payload.protocolVersion, '2026-08-04');
-  assert.equal(payload.identity.accountId, 'legacy-account');
-  assert.equal(payload.identity.canonicalAccountId, 'canonical-account');
-  assert.notEqual(payload.player.id, payload.identity.canonicalAccountId);
+  assert.deepEqual(payload, {
+    ok: true,
+    protocolVersion: '2026-08-04',
+    matchId: 'test-tournament-r1-m1',
+    tournamentSlug: 'test-tournament',
+    seatIndex: 0,
+    player: {
+      id: 'signup-1',
+      seed: null,
+      player: {
+        contractVersion: '2026-10-13-username-1',
+        username: 'player_one',
+      },
+    },
+    expiresAt: '2026-08-06T12:00:00.000Z',
+  });
+
+  assert.throws(
+    () => matchAccessPayload({
+      bracket: { tournamentSlug: 'test-tournament', gameSlug: 'spades', status: 'published' },
+      round: { index: 1, title: 'Round 1' },
+      match: {
+        id: 'test-tournament-r1-m1',
+        label: 'Match 1',
+        status: 'ready',
+        roomUrl: 'https://1v1spades.com/match/test-tournament-r1-m1',
+        players: [
+          { id: 'signup-1', handle: 'legacy display name' },
+          { id: 'signup-2', handle: 'player_two' },
+        ],
+      },
+      seatIndex: 0,
+    }),
+    (error) => error?.code === 'invalid_spades_username',
+  );
 });

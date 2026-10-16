@@ -30,6 +30,8 @@ import {
 const SPADES_MATCH_BASE_URL = process.env.SPADES_MATCH_BASE_URL || 'https://1v1spades.com/match';
 const EUCHRE_MATCH_BASE_URL = process.env.EUCHRE_MATCH_BASE_URL || '';
 const MATCH_ID_RE = /^([a-z0-9]+(?:-[a-z0-9]+)*)-r([1-9]\d*)-m([1-9]\d*)$/i;
+const SPADES_USERNAME_ONLY_TICKET_CONTRACT_VERSION = '2026-10-13-username-1';
+const RESERVED_SPADES_USERNAME_PATTERN = /^guest_?(?:[a-f0-9]{4,}|player)$/;
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -70,6 +72,40 @@ function publicPlayer(player) {
     seed: player.seed,
     name: player.name,
     handle: player.handle || '',
+  };
+}
+
+function canonicalSpadesUsername(value) {
+  const username = cleanText(value).replace(/^@+/, '').toLowerCase();
+
+  return /^[a-z0-9_]{3,20}$/.test(username)
+    && username !== 'guest'
+    && !RESERVED_SPADES_USERNAME_PATTERN.test(username)
+    ? username
+    : '';
+}
+
+function strictSpadesTicketPlayer(player) {
+  const id = cleanText(player?.id);
+  // A handle is the Hub's canonical public game username. Never fall back to
+  // roster names or account identifiers for a Spades browser ticket.
+  const username = canonicalSpadesUsername(player?.handle);
+
+  if (!id || !username) {
+    throw new TournamentGameContractError(
+      409,
+      'This Spades match needs a valid canonical username before it can start.',
+      'invalid_spades_username',
+    );
+  }
+
+  return {
+    id,
+    seed: Number.isInteger(player?.seed) ? player.seed : null,
+    player: {
+      contractVersion: SPADES_USERNAME_ONLY_TICKET_CONTRACT_VERSION,
+      username,
+    },
   };
 }
 
@@ -185,6 +221,18 @@ async function deleteTicket(ticket) {
 export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord = null }) {
   const player = match.players[seatIndex];
   const game = normalizeTournamentGame(bracket.gameSlug || ticketRecord?.game || 'spades');
+
+  if (game === 'spades') {
+    return {
+      ok: true,
+      protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
+      matchId: match.id,
+      tournamentSlug: bracket.tournamentSlug,
+      seatIndex,
+      player: strictSpadesTicketPlayer(player),
+      expiresAt: ticketRecord?.expiresAt || null,
+    };
+  }
 
   return {
     ok: true,
@@ -322,10 +370,22 @@ async function issueTicket(event, payload) {
     expiresAt: new Date(now + TOURNAMENT_MATCH_TICKET_TTL_MS).toISOString(),
   };
 
+  let accessPayload;
+
+  try {
+    accessPayload = matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record });
+  } catch (error) {
+    if (error instanceof TournamentGameContractError) {
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+
+    throw error;
+  }
+
   await saveTicket(ticket, record);
 
   return json(201, {
-    ...matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }),
+    ...accessPayload,
     account: publicAccount(account),
     ticket,
     roomUrl: launchUrl,
@@ -384,7 +444,15 @@ async function verifyTicket(payload) {
     throw error;
   }
 
-  return json(200, matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }));
+  try {
+    return json(200, matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }));
+  } catch (error) {
+    if (error instanceof TournamentGameContractError) {
+      return json(error.statusCode, { error: error.message, code: error.code });
+    }
+
+    throw error;
+  }
 }
 
 export async function handler(event) {
