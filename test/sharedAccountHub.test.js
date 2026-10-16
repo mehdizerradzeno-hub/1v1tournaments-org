@@ -111,16 +111,19 @@ test('shared identity supplies a stable compatibility handle without changing ac
     store: authorizationStore,
     now: 1_000,
     codeFactory: () => 'compatibility-handle-code',
+    returnOrigin: 'https://1v1spades.com',
   });
   const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
     store: authorizationStore,
     now: 2_000,
+    returnOrigin: 'https://1v1spades.com',
   });
   assert.equal(exchanged.handle, emptyHandleIdentity.handle);
   await assert.rejects(
     exchangeGameAuthorization(issued.authorizationCode, 'spades', {
       store: authorizationStore,
       now: 2_100,
+      returnOrigin: 'https://1v1spades.com',
     }),
     (error) => error.code === 'authorization_replayed',
   );
@@ -192,10 +195,12 @@ test('Spades alias repair preserves aliases and is returned by issue and exchang
     store: authorizationStore,
     now: 1_000,
     codeFactory: () => 'spades-alias-repair-code',
+    returnOrigin: 'https://1v1spades.com',
   });
   const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
     store: authorizationStore,
     now: 2_000,
+    returnOrigin: 'https://1v1spades.com',
   });
 
   assert.deepEqual(exchanged.aliases, [
@@ -211,6 +216,7 @@ test('one-time game authorization validates audience, expiration, and replay', a
     store,
     now: 1_000,
     codeFactory: () => 'single-use-code',
+    returnOrigin: 'https://1v1spades.com',
   });
 
   await assert.rejects(
@@ -218,11 +224,19 @@ test('one-time game authorization validates audience, expiration, and replay', a
     (error) => error.code === 'wrong_audience',
   );
 
-  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', { store, now: 2_000 });
+  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
+    store,
+    now: 2_000,
+    returnOrigin: 'https://1v1spades.com',
+  });
   assert.equal(exchanged.canonicalAccountId, account.id);
 
   await assert.rejects(
-    exchangeGameAuthorization(issued.authorizationCode, 'spades', { store, now: 2_100 }),
+    exchangeGameAuthorization(issued.authorizationCode, 'spades', {
+      store,
+      now: 2_100,
+      returnOrigin: 'https://1v1spades.com',
+    }),
     (error) => error.code === 'authorization_replayed',
   );
 
@@ -231,11 +245,86 @@ test('one-time game authorization validates audience, expiration, and replay', a
     now: 5_000,
     ttlMs: 1_000,
     codeFactory: () => 'expired-code',
+    returnOrigin: 'https://1v1spades.com',
   });
   await assert.rejects(
-    exchangeGameAuthorization(expired.authorizationCode, 'spades', { store, now: 6_001 }),
+    exchangeGameAuthorization(expired.authorizationCode, 'spades', {
+      store,
+      now: 6_001,
+      returnOrigin: 'https://1v1spades.com',
+    }),
     (error) => error.code === 'authorization_expired',
   );
+});
+
+test('Spades authorization is bound to its deployment and a rejected origin cannot consume it', async () => {
+  const store = new MemoryStore();
+  const identity = await sharedIdentityForAccount(account, { store: new MemoryStore() });
+  const returnOrigin = 'https://onev1-spades-c5e-accepted-qa.onrender.com';
+  const issued = await createGameAuthorization(identity, 'spades', {
+    store,
+    now: 1_000,
+    codeFactory: () => 'qa-bound-code',
+    returnOrigin,
+  });
+
+  await assert.rejects(
+    exchangeGameAuthorization(issued.authorizationCode, 'spades', {
+      store,
+      now: 2_000,
+      returnOrigin: 'https://1v1spades.com',
+    }),
+    (error) => error instanceof SharedAccountContractError && error.code === 'wrong_return_origin',
+  );
+
+  const exchanged = await exchangeGameAuthorization(issued.authorizationCode, 'spades', {
+    store,
+    now: 2_001,
+    returnOrigin,
+  });
+  assert.equal(exchanged.canonicalAccountId, account.canonicalAccountId);
+});
+
+test('the shared-account endpoint forwards the asserted Spades return origin on issue and exchange', async () => {
+  const store = new MemoryStore();
+  const identity = await sharedIdentityForAccount(account, { store: new MemoryStore() });
+  const returnOrigin = 'https://onev1-spades-c5e-accepted-qa.onrender.com';
+  const issueResponse = await handleSharedAccountRequest({
+    httpMethod: 'POST',
+    body: JSON.stringify({ action: 'issue-game-authorization', audience: 'spades', returnOrigin }),
+  }, {
+    getAccountFromEvent: async () => account,
+    sharedIdentityForAccount: async () => identity,
+    createGameAuthorization: (value, audience, options) => createGameAuthorization(value, audience, {
+      store,
+      now: 1_000,
+      codeFactory: () => 'endpoint-bound-code',
+      ...options,
+    }),
+  });
+  const issued = JSON.parse(issueResponse.body).authorization;
+
+  const exchangeResponse = await handleSharedAccountRequest({
+    httpMethod: 'POST',
+    headers: { authorization: 'Bearer test-game-secret' },
+    body: JSON.stringify({
+      action: 'exchange-game-authorization',
+      audience: 'spades',
+      authorizationCode: issued.authorizationCode,
+      returnOrigin,
+    }),
+  }, {
+    validateGameAuthorizationCaller: () => 'spades',
+    exchangeGameAuthorization: (authorizationCode, audience, options) => exchangeGameAuthorization(
+      authorizationCode,
+      audience,
+      { store, now: 2_000, ...options },
+    ),
+  });
+
+  assert.equal(issueResponse.statusCode, 201);
+  assert.equal(exchangeResponse.statusCode, 200);
+  assert.equal(JSON.parse(exchangeResponse.body).identity.canonicalAccountId, account.canonicalAccountId);
 });
 
 test('Gin is a supported isolated game audience for one-time authorizations', async () => {

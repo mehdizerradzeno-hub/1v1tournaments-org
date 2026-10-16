@@ -44,7 +44,11 @@ test('authenticated Spades issues immediately before opening with sharedAccountC
 
   assert.deepEqual(operations.map((operation) => operation.type), ['issue', 'open']);
   assert.equal(operations[0].endpoint, SHARED_ACCOUNT_ENDPOINT);
-  assert.deepEqual(operations[0].body, { action: 'issue-game-authorization', audience: 'spades' });
+  assert.deepEqual(operations[0].body, {
+    action: 'issue-game-authorization',
+    audience: 'spades',
+    returnOrigin: 'https://1v1spades.com',
+  });
   assert.equal(new URL(launch.url).searchParams.get(SHARED_ACCOUNT_CODE_QUERY_PARAMETER), 'spades-code');
 });
 
@@ -124,6 +128,10 @@ test('tournament match launch authorizes the game returned by match access', asy
       ]);
       assert.equal(requests[1].endpoint, SHARED_ACCOUNT_ENDPOINT);
       assert.equal(requests[1].body.audience, game);
+      assert.equal(
+        requests[1].body.returnOrigin,
+        game === 'spades' ? `https://${game}.example` : undefined,
+      );
       assert.equal(new URL(launch.roomUrl).searchParams.get('ticket'), 'opaque-ticket');
       assert.equal(new URL(launch.roomUrl).searchParams.get('sharedAccountCode'), `${game}-account-code`);
       assert.equal(

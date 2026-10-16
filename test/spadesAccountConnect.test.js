@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   normalizeSpadesAccountMode,
   prepareSpadesAccountReturn,
+  resolveSpadesAccountReturnDestination,
   spadesAccountDestination,
   SPADES_ACCOUNT_ENTRY_ROUTE,
   SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
@@ -49,8 +50,8 @@ test('Spades account entry exposes the three required signed-out actions', () =>
 test('Spades account destination preserves production by default and accepts only a QA HTTPS origin', () => {
   assert.equal(spadesAccountDestination(undefined), 'https://1v1spades.com/');
   assert.equal(
-    spadesAccountDestination('https://onev1-spades-tournament-qa.onrender.com', true),
-    'https://onev1-spades-tournament-qa.onrender.com/',
+    spadesAccountDestination('https://onev1-spades-c5e-accepted-qa.onrender.com', true),
+    'https://onev1-spades-c5e-accepted-qa.onrender.com/',
   );
 
   assert.throws(
@@ -59,10 +60,11 @@ test('Spades account destination preserves production by default and accepts onl
   );
 
   for (const invalid of [
-    'http://onev1-spades-tournament-qa.onrender.com',
-    'https://user:password@onev1-spades-tournament-qa.onrender.com',
-    'https://onev1-spades-tournament-qa.onrender.com/account',
-    'https://onev1-spades-tournament-qa.onrender.com/?redirect=production',
+    'http://onev1-spades-c5e-accepted-qa.onrender.com',
+    'https://user:password@onev1-spades-c5e-accepted-qa.onrender.com',
+    'https://onev1-spades-c5e-accepted-qa.onrender.com/account',
+    'https://onev1-spades-c5e-accepted-qa.onrender.com/?redirect=production',
+    'https://onev1-spades-tournament-qa.onrender.com',
   ]) {
     assert.throws(
       () => spadesAccountDestination(invalid),
@@ -73,6 +75,25 @@ test('Spades account destination preserves production by default and accepts onl
     () => spadesAccountDestination('https://1v1spades.com', true),
     /Invalid EXPO_PUBLIC_SPADES_ACCOUNT_DESTINATION/,
   );
+});
+
+test('Spades return targets accept only exact reviewed game origins', () => {
+  assert.equal(
+    resolveSpadesAccountReturnDestination('https://onev1-spades-c5e-accepted-qa.onrender.com/'),
+    'https://onev1-spades-c5e-accepted-qa.onrender.com/',
+  );
+
+  for (const invalid of [
+    '',
+    'https://evil.example',
+    'https://1v1spades.com.evil.example/',
+    'https://1v1spades.com/?next=https://evil.example',
+    'https://user:password@1v1spades.com/',
+    'https://1v1spades.com/match/controlled-smoke',
+    ['https://1v1spades.com/', 'https://onev1-spades-c5e-accepted-qa.onrender.com/'],
+  ]) {
+    assert.throws(() => resolveSpadesAccountReturnDestination(invalid), /Invalid Spades account return target/);
+  }
 });
 
 test('successful account auth issues the established one-time Spades handoff', async () => {
@@ -94,10 +115,35 @@ test('successful account auth issues the established one-time Spades handoff', a
   assert.deepEqual(JSON.parse(requests[0].init.body), {
     action: 'issue-game-authorization',
     audience: 'spades',
+    returnOrigin: 'https://1v1spades.com',
   });
   assert.equal(launch.authorized, true);
   assert.equal(new URL(launch.url).origin, 'https://1v1spades.com');
   assert.equal(new URL(launch.url).searchParams.get('sharedAccountCode'), 'opaque-one-time-code');
+});
+
+test('successful QA account auth returns only to the requested QA origin', async () => {
+  const requests = [];
+  const destination = 'https://onev1-spades-c5e-accepted-qa.onrender.com/';
+  const launch = await prepareSpadesAccountReturn(async (url, init) => {
+    requests.push({ url, init });
+    return new Response(JSON.stringify({
+      authorization: {
+        authorizationCode: 'qa-opaque-one-time-code',
+        audience: 'spades',
+        protocolVersion: '2026-08-04',
+        expiresAt: '2026-08-07T15:00:00.000Z',
+      },
+    }), { status: 200 });
+  }, destination);
+
+  assert.deepEqual(JSON.parse(requests[0].init.body), {
+    action: 'issue-game-authorization',
+    audience: 'spades',
+    returnOrigin: 'https://onev1-spades-c5e-accepted-qa.onrender.com',
+  });
+  assert.equal(new URL(launch.url).origin, 'https://onev1-spades-c5e-accepted-qa.onrender.com');
+  assert.equal(new URL(launch.url).searchParams.get('sharedAccountCode'), 'qa-opaque-one-time-code');
 });
 
 test('Sign In uses the existing shared player-account login action', async () => {

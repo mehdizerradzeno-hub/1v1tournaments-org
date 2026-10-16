@@ -56,13 +56,17 @@ export async function handleSharedAccountRequest(event, dependencies = {}) {
     const account = await resolveAccount(event);
     if (!account) return json(401, { error: 'Sign in before authorizing a game.' });
     const identity = await resolveIdentity(account);
-    const authorization = await issueAuthorization(identity, payload.audience);
+    const authorization = await issueAuthorization(identity, payload.audience, {
+      returnOrigin: payload.returnOrigin,
+    });
     return json(201, { ok: true, authorization });
   }
 
   if (payload.action === 'exchange-game-authorization') {
     const audience = authorizeGame(event, payload.audience);
-    const identity = await exchangeAuthorization(payload.authorizationCode, audience);
+    const identity = await exchangeAuthorization(payload.authorizationCode, audience, {
+      returnOrigin: payload.returnOrigin,
+    });
     return json(200, { ok: true, identity });
   }
 

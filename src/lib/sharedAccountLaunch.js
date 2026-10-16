@@ -47,7 +47,11 @@ async function readJsonResponse(response) {
   }
 }
 
-export async function issueSharedAccountAuthorization({ audience: audienceValue, fetchImpl = globalThis.fetch }) {
+export async function issueSharedAccountAuthorization({
+  audience: audienceValue,
+  returnOrigin,
+  fetchImpl = globalThis.fetch,
+}) {
   const audience = normalizeAudience(audienceValue);
   if (!audience) {
     throw new SharedAccountLaunchError('Shared account launch supports only configured games.', {
@@ -61,16 +65,18 @@ export async function issueSharedAccountAuthorization({ audience: audienceValue,
     });
   }
 
+  const payload = {
+    action: 'issue-game-authorization',
+    audience,
+    ...(audience === 'spades' ? { returnOrigin } : {}),
+  };
   const response = await fetchImpl(SHARED_ACCOUNT_ENDPOINT, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 'issue-game-authorization',
-      audience,
-    }),
+    body: JSON.stringify(payload),
   });
   const result = await readJsonResponse(response);
 
@@ -133,7 +139,11 @@ export async function prepareSharedAccountLaunch({
 
   let authorization;
   try {
-    authorization = await issueSharedAccountAuthorization({ audience, fetchImpl });
+    authorization = await issueSharedAccountAuthorization({
+      audience,
+      ...(audience === 'spades' ? { returnOrigin: destination.origin } : {}),
+      fetchImpl,
+    });
   } catch (error) {
     if (error instanceof SharedAccountLaunchError && error.code === 'unauthenticated' && !requireAccount) {
       return {

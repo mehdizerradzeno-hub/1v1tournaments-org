@@ -14,6 +14,11 @@ export const GAME_AUTHORIZATION_TTL_MS = 2 * 60 * 1000;
 const ALIAS_STORE_NAME = 'shared-account-aliases';
 const AUTHORIZATION_STORE_NAME = 'shared-account-authorizations';
 const SUPPORTED_GAMES = new Set(['spades', 'euchre', 'gin']);
+const SPADES_AUTHORIZATION_RETURN_ORIGINS = new Set([
+  'https://1v1spades.com',
+  'https://onev1-spades-phase1-qa-20260923.onrender.com',
+  'https://onev1-spades-c5e-accepted-qa.onrender.com',
+]);
 const GAME_SECRET_ENVIRONMENT_KEYS = Object.freeze({
   spades: 'SHARED_ACCOUNT_SPADES_SECRET',
   euchre: 'SHARED_ACCOUNT_EUCHRE_SECRET',
@@ -40,6 +45,46 @@ function resolveStore(store, name) {
 export function normalizeGameAudience(value) {
   const audience = cleanText(value).toLowerCase();
   return SUPPORTED_GAMES.has(audience) ? audience : '';
+}
+
+function normalizeSpadesAuthorizationReturnOrigin(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) {
+    throw new SharedAccountContractError(
+      'A Spades return origin is required for account authorization.',
+      400,
+      'return_origin_required',
+    );
+  }
+  if (raw.length > 2048) {
+    throw new SharedAccountContractError(
+      'The Spades return origin is invalid.',
+      400,
+      'invalid_return_origin',
+    );
+  }
+
+  try {
+    const url = new URL(raw);
+    if (
+      url.protocol !== 'https:'
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+      || url.pathname !== '/'
+      || !SPADES_AUTHORIZATION_RETURN_ORIGINS.has(url.origin)
+    ) {
+      throw new Error('Unapproved Spades return origin');
+    }
+    return url.origin;
+  } catch {
+    throw new SharedAccountContractError(
+      'The Spades return origin is invalid.',
+      400,
+      'invalid_return_origin',
+    );
+  }
 }
 
 function normalizeAlias(value = {}) {
@@ -269,6 +314,10 @@ export async function createGameAuthorization(identity, audienceValue, options =
     throw new SharedAccountContractError('A current canonical identity is required.', 400, 'invalid_identity');
   }
 
+  const returnOrigin = audience === 'spades'
+    ? normalizeSpadesAuthorizationReturnOrigin(options.returnOrigin)
+    : null;
+
   const store = resolveStore(options.store, AUTHORIZATION_STORE_NAME);
   const authorizationCode = (options.codeFactory || (() => randomBytes(32).toString('base64url')))();
   const now = Number(options.now ?? Date.now());
@@ -277,6 +326,7 @@ export async function createGameAuthorization(identity, audienceValue, options =
     protocolVersion: SHARED_IDENTITY_PROTOCOL_VERSION,
     audience,
     identity,
+    ...(returnOrigin ? { returnOrigin } : {}),
     issuedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ttlMs).toISOString(),
   };
@@ -287,6 +337,7 @@ export async function createGameAuthorization(identity, audienceValue, options =
       audience,
       canonicalAccountId: identity.canonicalAccountId,
       expiresAt: record.expiresAt,
+      ...(returnOrigin ? { returnOrigin } : {}),
     },
   });
 
@@ -312,6 +363,21 @@ export async function exchangeGameAuthorization(authorizationCode, audienceValue
   }
   if (record.audience !== audience) {
     throw new SharedAccountContractError('That account authorization belongs to a different game.', 403, 'wrong_audience');
+  }
+  // Records issued before this binding was introduced have no field and can
+  // expire naturally. Every newly issued Spades code has one; require the
+  // server-authenticated exchange caller to assert the same origin before
+  // claiming it, so a QA redirect cannot be consumed by production.
+  if (record.audience === 'spades' && Object.hasOwn(record, 'returnOrigin')) {
+    const boundReturnOrigin = normalizeSpadesAuthorizationReturnOrigin(record.returnOrigin);
+    const assertedReturnOrigin = normalizeSpadesAuthorizationReturnOrigin(options.returnOrigin);
+    if (boundReturnOrigin !== assertedReturnOrigin) {
+      throw new SharedAccountContractError(
+        'That account authorization belongs to a different Spades deployment.',
+        403,
+        'wrong_return_origin',
+      );
+    }
   }
   if (new Date(record.expiresAt).getTime() <= Number(options.now ?? Date.now())) {
     throw new SharedAccountContractError('That account authorization expired.', 401, 'authorization_expired');

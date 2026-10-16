@@ -630,8 +630,17 @@ export function GameAccountConnectScreen({
   );
 }
 
-export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
-  return <GameAccountConnectScreen initialMode={initialMode} />;
+export default function SpadesAccountConnectScreen({
+  initialMode = 'signin',
+  destination = SPADES_ACCOUNT_DESTINATION,
+}) {
+  return (
+    <GameAccountConnectScreen
+      initialMode={initialMode}
+      destination={destination}
+      prepareReturn={(fetchImpl) => prepareSpadesAccountReturn(fetchImpl, destination)}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
