@@ -40,7 +40,7 @@ test('same-name players are distinguished by participant ID for winner highlight
   assert.equal(getPublicChampionLabel({ participants: [players[0], { ...players[1], name: 'Bailey' }], winner: { id: 'signup-south', name: 'Bailey' } }), 'Bailey');
 });
 
-test('tournament bracket heading, dashboard, format and roster share the same presentation labels', async () => {
+test('tournament bracket heading, format and roster share the same presentation labels', async () => {
   const source = await readFile(new URL('../src/screens/TournamentScreen.jsx', import.meta.url), 'utf8');
 
   assert.match(source, /getPublicBracketPresentation\(\{/);
@@ -51,6 +51,5 @@ test('tournament bracket heading, dashboard, format and roster share the same pr
   assert.match(source, /\{bracketPresentation\.statusLabel\}<\/Badge>/);
   assert.match(source, /seeded in the \$\{bracketPresentation\.label\.toLowerCase\(\)\}/);
   assert.match(source, /\$\{bracketPresentation\.label\}: \$\{bracketSizeLabel/);
-  assert.match(source, /dashboardTileMeta\}>\{liveBracket \? bracketPresentation\.label\.toLowerCase\(\)/);
   assert.doesNotMatch(source, /seeded in the live bracket|\? `Live bracket:|liveBracket \? 'live bracket'/);
 });

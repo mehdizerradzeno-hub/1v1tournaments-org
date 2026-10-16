@@ -23,22 +23,12 @@ function hubViewportMarkup({ hydrated, width }) {
   };
 }
 
-test('the Twitch arrival actions take the available row at phone widths', () => {
-  assert.match(tournamentScreenSource, /const usePhoneActionLayout = width > 0 && width <= 430;/);
-  assert.match(
-    tournamentScreenSource,
-    /style=\{\[styles\.arrivalActions, usePhoneActionLayout && styles\.arrivalActionsPhone\]\}/,
-  );
-  assert.match(
-    tournamentScreenSource,
-    /arrivalActionsPhone:\s*\{\s*flexBasis: '100%',\s*width: '100%',\s*\}/,
-  );
-  assert.match(tournamentScreenSource, /arrivalActions:\s*\{[\s\S]*?flexWrap: 'wrap'/);
-});
-
-test('every Twitch arrival action preserves a 44px minimum touch target', () => {
-  assert.equal((tournamentScreenSource.match(/style=\{styles\.arrivalAction\}/g) || []).length, 3);
-  assert.match(tournamentScreenSource, /arrivalAction:\s*\{\s*minHeight: 44,\s*\}/);
+test('the tournament hub has one state-derived player CTA and no generic match launch buttons', () => {
+  assert.match(tournamentScreenSource, /getTournamentPlayerAction/);
+  assert.match(tournamentScreenSource, /stickyActions=\{false\}/);
+  assert.doesNotMatch(tournamentScreenSource, /Check Match Status/);
+  assert.doesNotMatch(tournamentScreenSource, />Play match/);
+  assert.match(tournamentScreenSource, /Assigned players open this table from the Overview\./);
 });
 
 test('the longest tournament tab uses a compact phone label', () => {
