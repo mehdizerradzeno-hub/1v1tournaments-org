@@ -51,6 +51,28 @@ test('4-player double-elimination keeps a player alive after first loss', () => 
   assert.equal(blakeStatus.waitingMatch.label, 'Losers Round 1');
 });
 
+test('player status refreshes an existing Spades room URL from the current deployment target', () => {
+  const previous = process.env.SPADES_MATCH_BASE_URL;
+  try {
+    process.env.SPADES_MATCH_BASE_URL = 'https://current-spades-qa.onrender.com/match';
+    const bracket = buildFourPlayerDoubleEliminationBracket({
+      tournamentSlug: 'status-route-refresh',
+      signups: [signup(1, 'Alex'), signup(2, 'Blake'), signup(3, 'Casey'), signup(4, 'Drew')],
+    });
+    const status = findPlayerMatchStatus(bracket, bracket.participants[0]);
+
+    assert.equal(status.nextStep, 'ready-match');
+    assert.ok(status.currentMatch);
+    assert.equal(
+      status.currentMatch?.roomUrl,
+      'https://current-spades-qa.onrender.com/match/status-route-refresh-r1-m1',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.SPADES_MATCH_BASE_URL;
+    else process.env.SPADES_MATCH_BASE_URL = previous;
+  }
+});
+
 test('4-player double-elimination eliminates a player after second loss', () => {
   const signups = [
     signup(1, 'Alex'),

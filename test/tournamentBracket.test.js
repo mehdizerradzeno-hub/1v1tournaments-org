@@ -9,6 +9,7 @@ import {
   findMatch,
   publicBracket,
   publicMatchDetails,
+  publicRoomUrl,
   setMatchWinner,
 } from '../netlify/functions/tournament-bracket.mjs';
 
@@ -69,6 +70,10 @@ test('public Spades routes follow the current deployment target after a bracket 
     );
     assert.equal(
       publicMatch.match.roomUrl,
+      'https://current-spades-qa.onrender.com/match/route-refresh-r1-m1',
+    );
+    assert.equal(
+      publicRoomUrl(bracket, bracket.rounds[0].matches[0]),
       'https://current-spades-qa.onrender.com/match/route-refresh-r1-m1',
     );
   } finally {

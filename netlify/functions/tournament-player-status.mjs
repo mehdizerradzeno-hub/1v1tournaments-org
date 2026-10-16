@@ -1,4 +1,5 @@
 import { connectLambda } from '@netlify/blobs';
+import { publicRoomUrl } from './tournament-bracket.mjs';
 
 import {
   cleanEmail,
@@ -52,14 +53,14 @@ function publicPlayer(player) {
   };
 }
 
-function publicMatch(round, match) {
+function publicMatch(bracket, round, match) {
   if (!match) return null;
 
   return {
     id: match.id,
     label: match.label,
     status: match.status,
-    roomUrl: match.roomUrl,
+    roomUrl: publicRoomUrl(bracket, match),
     round: {
       index: round.index,
       title: round.title,
@@ -201,7 +202,7 @@ export function findPlayerMatchStatus(bracket, signup) {
   const current = playerMatches.find(({ match }) => match.status === 'ready');
   if (current) {
     return {
-      currentMatch: publicMatch(current.round, current.match),
+      currentMatch: publicMatch(bracket, current.round, current.match),
       waitingMatch: null,
       finalMatch: null,
       nextStep: 'ready-match',
@@ -212,7 +213,7 @@ export function findPlayerMatchStatus(bracket, signup) {
   if (waiting) {
     return {
       currentMatch: null,
-      waitingMatch: publicMatch(waiting.round, waiting.match),
+      waitingMatch: publicMatch(bracket, waiting.round, waiting.match),
       finalMatch: null,
       nextStep: 'wait-opponent',
     };
@@ -224,7 +225,7 @@ export function findPlayerMatchStatus(bracket, signup) {
     return {
       currentMatch: null,
       waitingMatch: null,
-      finalMatch: lostMatch ? publicMatch(lostMatch.round, lostMatch.match) : null,
+      finalMatch: lostMatch ? publicMatch(bracket, lostMatch.round, lostMatch.match) : null,
       nextStep: 'eliminated',
     };
   }
