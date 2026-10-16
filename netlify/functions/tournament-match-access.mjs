@@ -11,6 +11,12 @@ import {
   getStoreWithFallback,
   publicAccount,
 } from './_account-utils.mjs';
+import {
+  HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+  HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+  isHostAccount,
+  isHostSignup,
+} from './_host-auth.mjs';
 import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
 import { isHostedTournamentDeleted } from './_tournament-events-utils.mjs';
 import {
@@ -35,6 +41,7 @@ const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Origin': '*',
+  'Cache-Control': 'no-store, max-age=0, must-revalidate',
   'Content-Type': 'application/json',
 };
 
@@ -145,7 +152,7 @@ async function loadTournamentSignups(tournamentSlug) {
   const { blobs } = await store.list({ prefix: `${tournamentSlug}/` });
   const signups = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
 
-  return signups.filter(Boolean);
+  return signups.filter((signup) => signup && !isHostSignup(signup));
 }
 
 async function findSignupForAccount(tournamentSlug, account) {
@@ -230,6 +237,13 @@ async function issueTicket(event, payload) {
 
   if (!account) {
     return json(401, { error: 'Sign in on 1v1 Tournaments before opening this match.' });
+  }
+
+  if (isHostAccount(account)) {
+    return json(403, {
+      error: HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+      code: HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+    });
   }
 
   const matchId = cleanMatchId(payload.matchId);
@@ -344,6 +358,16 @@ async function verifyTicket(payload) {
 
   if (!record) {
     return json(401, { error: 'This match ticket was not found. Open the match from 1v1 Tournaments again.' });
+  }
+
+  // A ticket may be verified without a live Hub session. Re-check the
+  // immutable ticket identity so an older host-issued ticket cannot bypass
+  // the player-admission boundary after host approval is configured.
+  if (isHostAccount({ id: record.accountId, email: record.accountEmail })) {
+    return json(403, {
+      error: HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+      code: HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+    });
   }
 
   assertTournamentMatchNotRevoked(await loadTournamentMatchRevocation(record.matchId));

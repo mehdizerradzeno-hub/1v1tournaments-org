@@ -39,6 +39,24 @@ export function isHostAccount(account) {
   );
 }
 
+/**
+ * A signup is persisted separately from the account record, so host checks
+ * must also understand the stored signup shape.  This prevents an older host
+ * signup from being treated as a playable seat after the account is approved.
+ */
+export function isHostSignup(signup) {
+  if (!signup) return false;
+
+  return isHostAccount({
+    id: signup.accountId || signup.canonicalAccountId || signup.accountCanonicalId,
+    email: signup.accountEmail || signup.contactEmail,
+  });
+}
+
+export const HOST_ACCOUNT_PLAYER_BLOCK_CODE = 'host_account_cannot_play';
+export const HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE =
+  'Host accounts manage tournaments and cannot join them as players. Use a separate player account.';
+
 export function hasHostAllowlist() {
   const allowlist = getHostAllowlist();
   return allowlist.accountIds.length > 0 || allowlist.emails.length > 0;

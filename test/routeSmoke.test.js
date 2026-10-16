@@ -539,6 +539,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentBracketSource, /accountId/);
   assert.match(tournamentBracketSource, /isHostedTournamentDeleted/);
   assert.match(tournamentBracketSource, /cannot generate a new bracket/);
+  assert.match(tournamentBracketSource, /'Cache-Control': 'no-store, max-age=0, must-revalidate'/);
   assert.match(tournamentMatchAccessSource, /tournament-match-tickets/);
   assert.match(tournamentMatchAccessSource, /getAccountFromEvent/);
   assert.match(tournamentMatchAccessSource, /issue-ticket/);
@@ -548,6 +549,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentMatchAccessSource, /findSignupForAccount/);
   assert.match(tournamentMatchAccessSource, /assertTournamentTicketAccess/);
   assert.match(tournamentMatchAccessSource, /signupId/);
+  assert.match(tournamentMatchAccessSource, /'Cache-Control': 'no-store, max-age=0, must-revalidate'/);
   assert.match(tournamentMatchAccessSource, /getJsonWithRetry/);
   assert.doesNotMatch(tournamentMatchAccessSource, /consistency: 'strong'/);
   assert.match(tournamentPlayerStatusSource, /getAccountFromEvent/);
@@ -558,9 +560,11 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentPlayerStatusSource, /three-player-two-life/);
   assert.match(tournamentPlayerStatusSource, /four-player-double-elimination/);
   assert.match(tournamentPlayerStatusSource, /contactEmail/);
+  assert.match(tournamentPlayerStatusSource, /'Cache-Control': 'no-store, max-age=0, must-revalidate'/);
   assert.match(tournamentSettingsSource, /requireTournamentAdmin/);
   assert.match(tournamentSettingsSource, /saveTournamentSettings/);
   assert.match(tournamentSettingsSource, /action === 'reset'/);
+  assert.match(tournamentSettingsSource, /'Cache-Control': 'no-store, max-age=0, must-revalidate'/);
   assert.match(tournamentSettingsUtilsSource, /tournament-settings/);
   assert.match(tournamentSettingsUtilsSource, /registrationStatus/);
   assert.match(tournamentEventsSource, /requireTournamentAdmin/);
@@ -568,6 +572,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentEventsSource, /listPublicHostedTournaments/);
   assert.match(tournamentEventsSource, /saveHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /tournament-events/);
+  assert.match(tournamentEventsSource, /'Cache-Control': 'no-store, max-age=0, must-revalidate'/);
   assert.match(tournamentEventsUtilsSource, /normalizeHostedTournament/);
   assert.match(tournamentEventsUtilsSource, /deletedAt/);
   assert.match(tournamentEventsUtilsSource, /deletedBy/);
@@ -675,6 +680,7 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hostingClientSource, /resetTournamentSettings/);
   assert.match(hostingClientSource, /fetchTournamentMatch/);
   assert.match(hostingClientSource, /issueTournamentMatchTicket/);
+  assert.match(hostingClientSource, /cache: 'no-store'/);
   assert.match(tournamentCatalogSource, /createTournamentRecord/);
   assert.match(tournamentCatalogSource, /getTournamentMode/);
   assert.match(tournamentCatalogSource, /slugifyTournamentTitle/);

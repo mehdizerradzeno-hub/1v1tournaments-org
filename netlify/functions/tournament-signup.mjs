@@ -9,6 +9,12 @@ import {
   playerUsernameForAccount,
 } from './_account-utils.mjs';
 import {
+  HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+  HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+  isHostAccount,
+  isHostSignup,
+} from './_host-auth.mjs';
+import {
   isHostedTournamentDeleted,
   loadHostedTournament,
 } from './_tournament-events-utils.mjs';
@@ -158,7 +164,9 @@ async function loadTournamentSignups(store, tournamentSlug) {
 }
 
 async function publicSignupSummary(store, tournamentSlug, currentAccount = null) {
-  const signups = await loadTournamentSignups(store, tournamentSlug);
+  const signups = (await loadTournamentSignups(store, tournamentSlug)).filter(
+    (signup) => !isHostSignup(signup),
+  );
   const { settings } = await getTournamentDate(tournamentSlug);
 
   return {
@@ -260,6 +268,13 @@ export async function handler(event) {
 
   if (!account) {
     return json(401, { error: 'Create or sign in to a player account before signing up.' });
+  }
+
+  if (isHostAccount(account)) {
+    return json(403, {
+      error: HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
+      code: HOST_ACCOUNT_PLAYER_BLOCK_CODE,
+    });
   }
 
   if (String(process.env.REQUIRE_VERIFIED_PLAYER_EMAILS || '').trim().toLowerCase() === 'true' && account.emailVerified === false) {
