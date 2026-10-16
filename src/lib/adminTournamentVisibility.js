@@ -13,6 +13,10 @@ export function isTournamentInAdminEditWindow(tournament, { nowMs = Date.now() }
   return startMs === null || startMs >= nowMs - ADMIN_EDIT_WINDOW_MS;
 }
 
+export function isTournamentReadOnlyHistory(tournament, options) {
+  return !isTournamentInAdminEditWindow(tournament, options);
+}
+
 export function partitionAdminTournaments(tournaments = [], options) {
   return tournaments.reduce(
     (groups, tournament) => {

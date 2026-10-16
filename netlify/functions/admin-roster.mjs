@@ -1,6 +1,7 @@
 import { connectLambda, getStore } from '@netlify/blobs';
 
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import {
   collectSpadesTeardownTargets,
   loadTournamentTeardown,
@@ -9,6 +10,8 @@ import {
   requestSpadesRoomAbandonment,
   TournamentTeardownError,
 } from './_tournament-teardown-utils.mjs';
+import { isTournamentReadOnlyHistory } from '../../src/lib/adminTournamentVisibility.js';
+import { siteData } from '../../src/lib/siteData.js';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -23,6 +26,19 @@ function json(statusCode, body) {
     headers,
     body: JSON.stringify(body),
   };
+}
+
+async function historicalTournamentResponse(tournamentSlug) {
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug) || null;
+  const tournament = hostedTournament || seededTournament;
+
+  return tournament && isTournamentReadOnlyHistory(tournament)
+    ? json(409, {
+      error: 'This tournament is read-only history and its roster cannot be cleared.',
+      code: 'tournament_history_read_only',
+    })
+    : null;
 }
 
 function cleanSlug(value) {
@@ -181,6 +197,12 @@ export async function handler(event) {
 
       if (!tournamentSlug) {
         return json(400, { error: 'Choose a tournament before clearing test data.' });
+      }
+
+      const historicalResponse = await historicalTournamentResponse(tournamentSlug);
+
+      if (historicalResponse) {
+        return historicalResponse;
       }
 
       const result = await safelyClearTournament(tournamentSlug, adminCheck.method);

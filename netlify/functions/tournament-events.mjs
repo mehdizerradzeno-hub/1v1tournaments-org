@@ -2,6 +2,8 @@ import { connectLambda } from '@netlify/blobs';
 
 import { accountCanonicalId, cleanText } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { isTournamentReadOnlyHistory } from '../../src/lib/adminTournamentVisibility.js';
+import { siteData } from '../../src/lib/siteData.js';
 import {
   deleteHostedTournament,
   listHostedTournaments,
@@ -25,6 +27,19 @@ function json(statusCode, body) {
     headers,
     body: JSON.stringify(body),
   };
+}
+
+async function historicalTournamentResponse(tournamentSlug) {
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug) || null;
+  const tournament = hostedTournament || seededTournament;
+
+  return tournament && isTournamentReadOnlyHistory(tournament)
+    ? json(409, {
+      error: 'This tournament is read-only history and cannot be changed.',
+      code: 'tournament_history_read_only',
+    })
+    : null;
 }
 
 export async function handler(event) {
@@ -108,6 +123,12 @@ export async function handler(event) {
     }
 
     try {
+      const historicalResponse = await historicalTournamentResponse(tournamentSlug);
+
+      if (historicalResponse) {
+        return historicalResponse;
+      }
+
       const deletion = await deleteHostedTournament(tournamentSlug, {
         deletedBy: accountCanonicalId(adminCheck.account) || adminCheck.method,
       });
@@ -144,6 +165,12 @@ export async function handler(event) {
   }
 
   try {
+    const historicalResponse = await historicalTournamentResponse(tournament.slug);
+
+    if (historicalResponse) {
+      return historicalResponse;
+    }
+
     const savedTournament = await saveHostedTournament(tournament, adminCheck.account);
 
     return json(200, {

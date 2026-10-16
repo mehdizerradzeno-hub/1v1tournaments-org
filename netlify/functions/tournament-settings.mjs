@@ -1,6 +1,7 @@
 import { connectLambda } from '@netlify/blobs';
 
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { loadHostedTournament } from './_tournament-events-utils.mjs';
 import {
   deleteTournamentSettings,
   loadTournamentSettings,
@@ -8,6 +9,8 @@ import {
   saveTournamentSettings,
 } from './_tournament-settings-utils.mjs';
 import { cleanText } from './_account-utils.mjs';
+import { isTournamentReadOnlyHistory } from '../../src/lib/adminTournamentVisibility.js';
+import { siteData } from '../../src/lib/siteData.js';
 
 const headers = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -23,6 +26,19 @@ function json(statusCode, body) {
     headers,
     body: JSON.stringify(body),
   };
+}
+
+async function historicalTournamentResponse(tournamentSlug) {
+  const hostedTournament = await loadHostedTournament(tournamentSlug);
+  const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === tournamentSlug) || null;
+  const tournament = hostedTournament || seededTournament;
+
+  return tournament && isTournamentReadOnlyHistory(tournament)
+    ? json(409, {
+      error: 'This tournament is read-only history and its schedule cannot be changed.',
+      code: 'tournament_history_read_only',
+    })
+    : null;
 }
 
 export async function handler(event) {
@@ -73,7 +89,17 @@ export async function handler(event) {
 
   const tournamentSlug = cleanText(requestedSlug || payload.tournamentSlug);
 
+  if (!tournamentSlug) {
+    return json(400, { error: 'Choose a tournament before changing schedule settings.' });
+  }
+
   try {
+    const historicalResponse = await historicalTournamentResponse(tournamentSlug);
+
+    if (historicalResponse) {
+      return historicalResponse;
+    }
+
     if (payload.action === 'reset') {
       await deleteTournamentSettings(tournamentSlug);
 

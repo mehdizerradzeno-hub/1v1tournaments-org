@@ -10,6 +10,7 @@ import {
   isHostedTournamentDeleted,
   loadHostedTournament,
 } from './_tournament-events-utils.mjs';
+import { isTournamentReadOnlyHistory } from '../../src/lib/adminTournamentVisibility.js';
 import { siteData } from '../../src/lib/siteData.js';
 import { canGenerateTournamentMode, getTournamentMode } from '../../src/lib/tournamentModes.js';
 import { normalizeCheckInLeadMinutes } from '../../src/lib/tournamentSettings.js';
@@ -852,6 +853,15 @@ async function loadTournamentForBracket(tournamentSlug) {
   return hostedTournament ? { ...(seededTournament || {}), ...hostedTournament } : seededTournament;
 }
 
+function historicalTournamentResponse(tournament) {
+  return tournament && isTournamentReadOnlyHistory(tournament)
+    ? json(409, {
+      error: 'This tournament is read-only history and its bracket cannot be changed.',
+      code: 'tournament_history_read_only',
+    })
+    : null;
+}
+
 export function checkInOpenStatus(tournament, now = new Date()) {
   const startDate = new Date(tournament?.date);
 
@@ -1118,6 +1128,11 @@ export async function handler(event) {
       }
 
       const tournament = await loadTournamentForBracket(tournamentSlug);
+      const historicalResponse = historicalTournamentResponse(tournament);
+
+      if (historicalResponse) {
+        return historicalResponse;
+      }
       const checkInStatus = checkInOpenStatus(tournament);
 
       if (!checkInStatus.open && payload.allowEarly !== true) {
@@ -1170,6 +1185,12 @@ export async function handler(event) {
         return adminCheck.error;
       }
 
+      const historicalResponse = historicalTournamentResponse(await loadTournamentForBracket(tournamentSlug));
+
+      if (historicalResponse) {
+        return historicalResponse;
+      }
+
       await deleteBracket(tournamentSlug);
 
       return json(200, { ok: true, bracket: null });
@@ -1180,6 +1201,12 @@ export async function handler(event) {
 
       if (reporterCheck.error) {
         return reporterCheck.error;
+      }
+
+      const historicalResponse = historicalTournamentResponse(await loadTournamentForBracket(tournamentSlug));
+
+      if (historicalResponse) {
+        return historicalResponse;
       }
 
       const matchId = cleanText(payload.matchId);
