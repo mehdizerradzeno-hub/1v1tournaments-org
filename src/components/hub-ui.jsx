@@ -5,6 +5,7 @@ import { Link, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 
 import { theme } from '../lib/theme.js';
+import { buildTournamentAccountPath } from '../lib/accountConnect.js';
 import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
 import { fetchPlayerAccount, fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
@@ -95,8 +96,8 @@ function getStickyActionItems(paths) {
   ];
 }
 
-const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
-const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' });
+const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Kufam, Georgia, serif' });
+const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'DM Mono, monospace' });
 
 function isInternalHref(href) {
   return typeof href === 'string' && href.startsWith('/');
@@ -754,10 +755,13 @@ export function HubScreen({
   const resolvedPlayerAccountLoading = accountOverride !== undefined ? false : playerAccountLoading;
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
   const fallbackAccountPath = navTournamentSlug
-    ? resolvedPlayerAccount
-      ? `${primaryPaths.checkInPath}#account-access`
-      : `${primaryPaths.checkInPath}?mode=signin#account-access`
-    : '/next';
+    ? buildTournamentAccountPath(
+      primaryPaths.checkInPath,
+      resolvedPlayerAccount ? 'manage' : 'signin',
+    )
+    : resolvedPlayerAccount
+      ? '/account?mode=manage'
+      : '/account?mode=signin';
   const accountPath = accountHref || fallbackAccountPath;
   const navItems = publicShell ? getPublicNavItems(primaryPaths) : getNavItems(primaryPaths);
   const mobileNavItems = publicShell
@@ -1222,8 +1226,9 @@ const styles = StyleSheet.create({
   brandTitle: {
     color: theme.colors.text,
     fontSize: 18,
+    fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: -0.45,
   },
   brandDomain: {
     color: theme.colors.muted,
@@ -1501,12 +1506,12 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   heroTitle: {
-    color: theme.colors.text,
-    fontSize: 32,
-    lineHeight: 36,
+    color: '#F0D59B',
+    fontSize: 35,
+    lineHeight: 38,
     fontFamily: DISPLAY_FONT,
     fontWeight: '800',
-    letterSpacing: 0,
+    letterSpacing: -1.3,
     maxWidth: 720,
   },
   heroTitleCompact: {

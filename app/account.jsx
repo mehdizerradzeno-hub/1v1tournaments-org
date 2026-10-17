@@ -7,7 +7,7 @@ import {
 } from '../src/lib/accountConnect.js';
 
 export default function TournamentAccountRoute() {
-  const { mode } = useLocalSearchParams();
+  const { mode, returnTo } = useLocalSearchParams();
   const recovery = readPasswordRecoveryFragment();
 
   return (
@@ -15,6 +15,7 @@ export default function TournamentAccountRoute() {
       initialEmail={recovery.email}
       initialMode={normalizeTournamentAccountMode(mode)}
       initialRecoveryToken={recovery.token}
+      returnTo={returnTo}
     />
   );
 }

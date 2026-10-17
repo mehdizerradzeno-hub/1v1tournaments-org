@@ -4,6 +4,31 @@ export const SHARED_ACCOUNT_ACTIONS = Object.freeze([
   { id: 'reset', label: 'Reset Password' },
 ]);
 
+const TOURNAMENT_CHECK_IN_PATH = /^\/check-in\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
+
+export function resolveTournamentAccountDestination(value) {
+  const destination = Array.isArray(value) ? value[0] : value;
+
+  if (typeof destination !== 'string') return '/';
+
+  const normalizedDestination = destination.trim();
+  return TOURNAMENT_CHECK_IN_PATH.test(normalizedDestination)
+    ? normalizedDestination
+    : '/';
+}
+
+export function buildTournamentAccountPath(returnTo = '/', mode = 'signin') {
+  const destination = resolveTournamentAccountDestination(returnTo);
+  const accountMode = normalizeTournamentAccountMode(mode);
+  const search = new URLSearchParams({ mode: accountMode });
+
+  if (destination !== '/') {
+    search.set('returnTo', destination);
+  }
+
+  return `/account?${search.toString()}`;
+}
+
 export function normalizeTournamentAccountMode(value) {
   const mode = Array.isArray(value) ? value[0] : value;
   return mode === 'create' || mode === 'reset' || mode === 'manage' ? mode : 'signin';

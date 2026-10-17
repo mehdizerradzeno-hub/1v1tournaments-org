@@ -107,6 +107,7 @@ export function GameAccountConnectScreen({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteExpanded, setDeleteExpanded] = useState(false);
   const handoffStartedRef = useRef(false);
+  const showSignInWhileAccountLoads = useHubShell && initialMode === 'signin' && !initialRecoveryToken;
 
   useEffect(() => {
     let active = true;
@@ -376,7 +377,7 @@ export function GameAccountConnectScreen({
     }
   };
 
-  if (loading) {
+  if (loading && !showSignInWhileAccountLoads) {
     if (useHubShell) {
       return (
         <HubScreen

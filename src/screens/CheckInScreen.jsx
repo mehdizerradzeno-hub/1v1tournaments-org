@@ -10,6 +10,7 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
+import { buildTournamentAccountPath } from '../lib/accountConnect.js';
 import { getGameBySlug, getTournamentBySlug, getTournamentPath } from '../lib/siteData.js';
 import { getEffectiveRegistrationStatus, mergeTournamentSettings } from '../lib/tournamentSettings.js';
 import { getTournamentMode } from '../lib/tournamentModes.js';
@@ -933,9 +934,10 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     registrationOpen,
   });
   const tournamentPath = getTournamentPath(visibleTournament.slug);
-  const accountAccessPath = account
-    ? `/check-in/${visibleTournament.slug}#${ACCOUNT_ACCESS_SECTION_ID}`
-    : `/check-in/${visibleTournament.slug}?mode=signin#${ACCOUNT_ACCESS_SECTION_ID}`;
+  const accountAccessPath = buildTournamentAccountPath(
+    `/check-in/${visibleTournament.slug}`,
+    account ? 'manage' : 'signin',
+  );
   const matchStatusPath = `${tournamentPath}#my-match`;
   const rosterPath = `/check-in/${visibleTournament.slug}#registered-players`;
   const signupProgressSteps = getSignupProgressSteps({ account, confirmedSignup, liveBracket });

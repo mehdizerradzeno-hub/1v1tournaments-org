@@ -11,6 +11,12 @@ export default function RootLayout() {
     <>
       <Head>
         <title>1v1 Tournaments</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Kufam:wght@500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
         <meta
           name="description"
           content="One account for competitive Spades and Euchre, tournaments, leagues, rankings, and results."
@@ -21,6 +27,10 @@ export default function RootLayout() {
           #root {
             background: ${theme.colors.background};
             min-height: 100%;
+          }
+
+          body {
+            font-family: "DM Sans", Arial, sans-serif;
           }
         `}</style>
       </Head>

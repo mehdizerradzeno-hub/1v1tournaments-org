@@ -1,12 +1,15 @@
 import { GameAccountConnectScreen } from './SpadesAccountConnectScreen.jsx';
-import { SHARED_ACCOUNT_ACTIONS } from '../lib/accountConnect.js';
+import {
+  resolveTournamentAccountDestination,
+  SHARED_ACCOUNT_ACTIONS,
+} from '../lib/accountConnect.js';
 
 const TOURNAMENT_HOME_DESTINATION = '/';
 
-async function prepareTournamentAccountReturn() {
+async function prepareTournamentAccountReturn(destination) {
   return {
     authorized: true,
-    url: TOURNAMENT_HOME_DESTINATION,
+    url: destination,
   };
 }
 
@@ -14,17 +17,20 @@ export default function TournamentAccountScreen({
   initialEmail = '',
   initialMode = 'signin',
   initialRecoveryToken = '',
+  returnTo = TOURNAMENT_HOME_DESTINATION,
 }) {
+  const destination = resolveTournamentAccountDestination(returnTo);
+
   return (
     <GameAccountConnectScreen
       accountActions={SHARED_ACCOUNT_ACTIONS}
       badgeLabel="1V1 ACCOUNT"
-      destination={TOURNAMENT_HOME_DESTINATION}
+      destination={destination}
       gameName="Tournament Hub"
       initialEmail={initialEmail}
       initialMode={initialMode}
       initialRecoveryToken={initialRecoveryToken}
-      prepareReturn={prepareTournamentAccountReturn}
+      prepareReturn={() => prepareTournamentAccountReturn(destination)}
       returnAfterSignOut
       signedOutManageFallback
       useHubShell

@@ -588,7 +588,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(hubUiSource, /fetchPlayerAccount/);
   assert.match(hubUiSource, /hostApproved/);
   assert.match(hubUiSource, /accountHref/);
-  assert.match(hubUiSource, /#account-access/);
+  assert.match(hubUiSource, /buildTournamentAccountPath/);
+  assert.doesNotMatch(hubUiSource, /\?mode=signin#account-access/);
   assert.match(hubUiSource, /showMobileNav/);
   assert.match(nextScreenSource, /Check Match Status/);
   assert.match(nextScreenSource, /mergeTournamentSettings/);
@@ -615,8 +616,8 @@ test('phase 1 signup capture and public counts stay wired through Netlify Functi
   assert.match(tournamentScreenSource, /nativeID="my-match"/);
   assert.match(tournamentScreenSource, /nativeID="registered-players"/);
   assert.match(tournamentScreenSource, /getSignInPath/);
-  assert.match(tournamentScreenSource, /mode=signin/);
-  assert.match(tournamentScreenSource, /#account-access/);
+  assert.match(tournamentScreenSource, /buildTournamentAccountPath/);
+  assert.doesNotMatch(tournamentScreenSource, /\?mode=signin#account-access/);
   assert.match(tournamentScreenSource, /TOURNAMENT_TABS/);
   assert.match(tournamentScreenSource, /TournamentTabs/);
   assert.match(tournamentScreenSource, /TournamentEventConsole/);

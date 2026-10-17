@@ -18,6 +18,7 @@ import {
   Surface,
 } from '../components/hub-ui.jsx';
 import { formatDateLine } from '../lib/format.js';
+import { buildTournamentAccountPath } from '../lib/accountConnect.js';
 import {
   buildResultFromTournamentBracket,
   getGameBySlug,
@@ -197,7 +198,7 @@ function actualBracketPreviewLabel(count, minimumPlayers, loading = false) {
 }
 
 function getSignInPath(checkInPath) {
-  return `${checkInPath}?mode=signin#account-access`;
+  return buildTournamentAccountPath(checkInPath);
 }
 
 function getPlayerAccountState(playerStatus) {
@@ -224,7 +225,7 @@ function getPlayerPrimaryAction({
 
   return getTournamentPlayerAction({
     account,
-    checkInPath,
+    checkInPath: account ? checkInPath : signInPath,
     currentMatch,
     isBracketLive,
     matchStatusPath,
