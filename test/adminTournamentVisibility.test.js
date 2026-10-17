@@ -26,11 +26,14 @@ test('admin edit window includes exactly seven days and moves older events to hi
   );
 });
 
-test('admin keeps older events behind one collapsed previous-events selector and one creator', () => {
+test('admin opens on current game-grouped events and leaves older events out of the host picker', () => {
   assert.match(adminScreenSource, /partitionAdminTournaments/);
-  assert.match(adminScreenSource, /Previous tournaments \(\$\{previousTournaments\.length\}\)/);
-  assert.match(adminScreenSource, /setShowPrevious\(\(current\) => !current\)/);
-  assert.equal((adminScreenSource.match(/>New tournament</g) || []).length, 1);
+  assert.match(adminScreenSource, /getInitialHostTournamentSlug/);
+  assert.match(adminScreenSource, /TOURNAMENT_GAME_OPTIONS\.map/);
+  assert.match(adminScreenSource, /New \{game\.label\} event/);
+  assert.match(adminScreenSource, /No current \{game\.label\} events/);
+  assert.match(adminScreenSource, /Past events stay in the public record, not in the host picker/);
+  assert.doesNotMatch(adminScreenSource, /Previous tournaments \(\$\{previousTournaments\.length\}\)/);
   assert.equal((adminScreenSource.match(/<TournamentEventSelector/g) || []).length, 1);
-  assert.match(adminScreenSource, /Read-only history/);
+  assert.match(adminScreenSource, /Choose Spades or Euchre first/);
 });

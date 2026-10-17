@@ -39,7 +39,6 @@ import {
 } from '../lib/tournamentModes.js';
 import {
   dateToScheduleFields,
-  getRegistrationStatusMeta,
   getScheduleFieldDefaults,
   mergeTournamentSettings,
   REGISTRATION_STATUS_OPTIONS,
@@ -122,69 +121,6 @@ function formatHostDateTime(tournament) {
     timeZone: tournament?.timeZone || 'America/New_York',
     timeZoneName: 'short',
   });
-}
-
-function getStartTimingLabel(tournament) {
-  const startDate = new Date(tournament?.date);
-
-  if (Number.isNaN(startDate.getTime())) {
-    return 'No start time';
-  }
-
-  const diffMs = startDate.getTime() - Date.now();
-  const absMinutes = Math.max(1, Math.round(Math.abs(diffMs) / 60000));
-
-  if (diffMs < 0) {
-    if (absMinutes < 60) return `Started ${absMinutes} min ago`;
-    return `Started ${Math.round(absMinutes / 60)} hr ago`;
-  }
-
-  if (absMinutes < 60) return `Starts in ${absMinutes} min`;
-  if (absMinutes < 1440) return `Starts in ${Math.round(absMinutes / 60)} hr`;
-  return `Starts in ${Math.round(absMinutes / 1440)} days`;
-}
-
-function getTournamentLifecycleLabel(tournament) {
-  const status = String(tournament?.status || 'upcoming').toLowerCase();
-
-  if (status === 'complete') return 'Complete';
-  if (status === 'expired') return 'Expired';
-  if (status === 'live') return 'Live';
-  if (status === 'archived') return 'Archived';
-  if (status === 'deleted') return 'Deleted';
-  return 'Upcoming';
-}
-
-function getTournamentPickerLabel(tournament) {
-  return `${tournament.title} - ${getTournamentLifecycleLabel(tournament)}`;
-}
-
-function getBracketPreviewLabel(signupCount, tournament) {
-  const minimumPlayers = tournament?.minimumPlayers || 2;
-  const rosterCap = tournament?.rosterCap || 0;
-
-  if (signupCount < minimumPlayers) {
-    return `Needs ${minimumPlayers} players`;
-  }
-
-  if (signupCount <= 2) return '2-player final';
-  if (signupCount <= 4) return '4-player bracket';
-  if (!rosterCap || signupCount <= rosterCap) return `${rosterCap || signupCount}-player bracket`;
-  return `${signupCount} signed up, over target`;
-}
-
-function getRosterPolicyLabel(tournament, mode) {
-  if (mode?.value === 'four-player-double-elimination') {
-    return 'Exactly 4 players enter. Lose twice and you are out.';
-  }
-
-  if (mode?.value === 'three-player-two-life') {
-    return 'Exactly 3 players enter. Everyone starts with two lives.';
-  }
-
-  const rosterCap = tournament?.rosterCap || 'an open';
-  const minimumPlayers = tournament?.minimumPlayers || mode?.minimumPlayers || 2;
-  return `Advertise ${rosterCap}-player seats, run with ${minimumPlayers}+ players, and let the actual bracket flex to the roster that shows up.`;
 }
 
 function canGenerateWithSignupCount(mode, signupCount) {
@@ -280,67 +216,51 @@ function numberField(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function TournamentEventSelector({ currentTournaments, previousTournaments, rosterSlug, onSelectTournament, onNewTournament }) {
-  const [open, setOpen] = useState(false);
-  const [showPrevious, setShowPrevious] = useState(false);
-  const selectedTournament = [...currentTournaments, ...previousTournaments]
-    .find((tournament) => tournament.slug === rosterSlug);
+function getInitialHostTournamentSlug(tournaments) {
+  return partitionAdminTournaments(tournaments).current[0]?.slug || '';
+}
 
-  function selectTournament(slug) {
-    onSelectTournament(slug);
-    setOpen(false);
-    setShowPrevious(false);
-  }
+function TournamentEventSelector({ currentTournaments, rosterSlug, onSelectTournament, onNewTournament }) {
+  const tournamentsByGame = useMemo(
+    () => TOURNAMENT_GAME_OPTIONS.map((game) => ({
+      ...game,
+      tournaments: currentTournaments.filter((tournament) => normalizeTournamentGameSlug(tournament.gameSlug) === game.value),
+    })),
+    [currentTournaments],
+  );
 
   return (
     <View style={styles.eventSelector}>
-      <Text style={styles.fieldLabel}>Select tournament</Text>
-      <ActionButton
-        accessibilityState={{ expanded: open }}
-        onPress={() => setOpen((current) => !current)}
-        variant="secondary">
-        {selectedTournament ? getTournamentPickerLabel(selectedTournament) : 'Choose tournament'}
-      </ActionButton>
-      {open ? (
-        <Surface style={styles.eventSelectorMenu}>
-          <Text style={styles.eventSelectorLabel}>Current events</Text>
-          <View style={styles.eventSelectorOptions}>
-            {currentTournaments.map((tournament) => (
-              <ActionButton
-                accessibilityState={{ selected: rosterSlug === tournament.slug }}
-                key={tournament.slug}
-                onPress={() => selectTournament(tournament.slug)}
-                variant={rosterSlug === tournament.slug ? 'primary' : 'secondary'}>
-                {getTournamentPickerLabel(tournament)}
+      <Text style={styles.fieldLabel}>Choose an event</Text>
+      <Text style={styles.eventSelectorIntro}>Start with the game, then open a current event or create the next one.</Text>
+      <Surface style={styles.eventSelectorMenu}>
+        {tournamentsByGame.map((game) => (
+          <View key={game.value} style={styles.eventSelectorGameGroup}>
+            <View style={styles.eventSelectorGameHeader}>
+              <Text style={styles.eventSelectorLabel}>{game.label}</Text>
+              <ActionButton onPress={() => onNewTournament(game.value)} variant={game.value === 'spades' ? 'primary' : 'secondary'}>
+                New {game.label} event
               </ActionButton>
-            ))}
-          </View>
-          {previousTournaments.length ? (
-            <View style={styles.eventSelectorPrevious}>
-              <ActionButton
-                accessibilityState={{ expanded: showPrevious }}
-                onPress={() => setShowPrevious((current) => !current)}
-                variant="ghost">
-                {showPrevious ? 'Hide previous tournaments' : `Previous tournaments (${previousTournaments.length})`}
-              </ActionButton>
-              {showPrevious ? (
-                <View style={styles.eventSelectorOptions}>
-                  {previousTournaments.map((tournament) => (
-                    <ActionButton
-                      accessibilityState={{ selected: rosterSlug === tournament.slug }}
-                      key={tournament.slug}
-                      onPress={() => selectTournament(tournament.slug)}
-                      variant={rosterSlug === tournament.slug ? 'primary' : 'secondary'}>
-                      {getTournamentPickerLabel(tournament)}
-                    </ActionButton>
-                  ))}
-                </View>
-              ) : null}
             </View>
-          ) : null}
-        </Surface>
-      ) : null}
-      <ActionButton onPress={onNewTournament} variant="secondary">New tournament</ActionButton>
+            {game.tournaments.length ? (
+              <View style={styles.eventSelectorOptions}>
+                {game.tournaments.map((tournament) => (
+                  <ActionButton
+                    accessibilityState={{ selected: rosterSlug === tournament.slug }}
+                    key={tournament.slug}
+                    onPress={() => onSelectTournament(tournament.slug)}
+                    variant={rosterSlug === tournament.slug ? 'primary' : 'secondary'}>
+                    {tournament.title}
+                  </ActionButton>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.eventSelectorEmpty}>No current {game.label} events.</Text>
+            )}
+          </View>
+        ))}
+      </Surface>
+      <Text style={styles.eventSelectorHistory}>Past events stay in the public record, not in the host picker.</Text>
     </View>
   );
 }
@@ -386,9 +306,10 @@ export default function AdminScreen() {
   const [serverMessage, setServerMessage] = useState('');
   const [serverError, setServerError] = useState('');
   const [rosterToken, setRosterToken] = useState('');
-  const [rosterSlug, setRosterSlug] = useState(() => siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const initialHostTournamentSlug = getInitialHostTournamentSlug(siteData.tournaments);
+  const [rosterSlug, setRosterSlug] = useState(() => initialHostTournamentSlug);
   const initialScheduleDefaults = getScheduleFieldDefaults(
-    siteData.tournaments.find((tournament) => tournament.slug === rosterSlug) || siteData.tournaments[0],
+    siteData.tournaments.find((tournament) => tournament.slug === initialHostTournamentSlug) || siteData.tournaments[0],
   );
   const [scheduleSettings, setScheduleSettings] = useState(null);
   const [scheduleDate, setScheduleDate] = useState(() => initialScheduleDefaults.date);
@@ -483,18 +404,14 @@ export default function AdminScreen() {
     () => partitionAdminTournaments(adminTournaments),
     [adminTournaments],
   );
-  const selectedTournament = useMemo(
-    () => adminTournaments.find((tournament) => tournament.slug === rosterSlug) || adminTournaments[0] || null,
-    [adminTournaments, rosterSlug],
-  );
-  const selectedTournamentIsHistorical = adminTournamentGroups.previous
-    .some((tournament) => tournament.slug === selectedTournament?.slug);
+  const selectedTournament = adminTournamentGroups.current.find((tournament) => tournament.slug === rosterSlug)
+    || adminTournamentGroups.current[0]
+    || null;
 
   const liveTournament = useMemo(
     () => mergeTournamentSettings(selectedTournament, scheduleSettings),
     [selectedTournament, scheduleSettings],
   );
-  const liveRegistrationMeta = getRegistrationStatusMeta(liveTournament?.registrationStatus);
   const isHostApproved = Boolean(playerAccount?.hostApproved);
   const hasPrivateAdminAccess = mode === 'unlocked';
   const showDraftTools = hasPrivateAdminAccess && !isHostApproved;
@@ -553,6 +470,16 @@ export default function AdminScreen() {
           const tournaments = result.tournaments || [];
           setHostedTournaments(tournaments);
 
+          if (!isCreatingNewEventRef.current && !rosterSlug) {
+            const currentTournamentSlug = getInitialHostTournamentSlug(
+              mergeTournamentLists(siteData.tournaments, tournaments),
+            );
+
+            if (currentTournamentSlug) {
+              setRosterSlug(currentTournamentSlug);
+            }
+          }
+
           if (isCreatingNewEventRef.current && isAutoEventDraftRef.current) {
             const draft = getNextTournamentDraft(eventGameSlug, mergeTournamentLists(siteData.tournaments, tournaments));
             setEventTitle(draft.title);
@@ -571,7 +498,7 @@ export default function AdminScreen() {
     return () => {
       active = false;
     };
-  }, [eventGameSlug, rosterToken]);
+  }, [eventGameSlug, rosterSlug, rosterToken]);
 
   useEffect(() => {
     if (isCreatingNewEvent) {
@@ -721,6 +648,7 @@ export default function AdminScreen() {
 
     setCreatingNewEvent(true);
     setAutoEventDraft(true);
+    setRosterSlug('');
     setScheduleSettings(null);
     setEventTitle(draft.title);
     setEventSlug(draft.slug);
@@ -1497,100 +1425,51 @@ export default function AdminScreen() {
     }
   }
 
+  function renderTournamentSelectionSection() {
+    return (
+      <Section
+        description="Choose Spades or Euchre first. Only current events appear here, so the host center opens on work you can act on."
+        nativeID="select-tournament"
+        title="Select an event">
+        <TournamentEventSelector
+          currentTournaments={adminTournamentGroups.current}
+          onNewTournament={handleNewTournamentDraft}
+          onSelectTournament={(slug) => {
+            setAutoEventDraft(false);
+            setCreatingNewEvent(false);
+            setRosterSlug(slug);
+          }}
+          rosterSlug={rosterSlug}
+        />
+      </Section>
+    );
+  }
+
   function renderScheduleSection() {
-    const tournament = liveTournament || selectedTournament;
+    const tournament = isCreatingNewEvent ? null : liveTournament || selectedTournament;
     const isArchived = tournament?.status === 'archived';
-    const isHistorical = selectedTournamentIsHistorical;
     const signupCount = activeSignupCount;
-    const rosterCap = tournament?.rosterCap || 0;
-    const minimumPlayers = tournament?.minimumPlayers || 2;
     const tournamentPath = getTournamentPath(rosterSlug);
     const signupPath = getCheckInPath(rosterSlug);
-    const bracketLabel = bracket?.participantCount
-      ? `${bracket.participantCount} seeded`
-      : getBracketPreviewLabel(signupCount, tournament);
     const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, signupCount);
-    const nextHostAction = !hasHostCredential
-      ? 'Confirm host access first.'
-      : isArchived
-        ? 'Archived events are hidden from upcoming pages. Save event to publish it again.'
-      : !playerCountReady
-        ? 'Edit the event, save it, then share the signup link.'
-        : bracket
-          ? 'Send players to My Match and monitor results.'
-          : bracketReadiness.ready
-            ? 'Generate the bracket when the roster is ready.'
-            : bracketReadiness.body;
-    const publisherStats = [
-      { label: 'Start', value: getStartTimingLabel(tournament), tone: 'accent' },
-      { label: 'Registered', value: `${signupCount}${rosterCap ? ` / ${rosterCap}` : ''}`, tone: signupCount >= minimumPlayers ? 'green' : 'blue' },
-      { label: 'Bracket', value: bracketLabel, tone: bracket ? 'green' : 'accent' },
-      { label: 'Mode', value: activeTournamentMode.shortLabel, tone: canGenerateTournamentMode(activeTournamentMode.value) ? 'green' : 'accent' },
-      {
-        label: 'Visibility',
-        value: isArchived
-          ? 'Archived'
-          : tournament?.visibility === 'private'
-            ? 'Private'
-            : tournament?.visibility === 'unlisted' || tournament?.publicDiscovery === false
-              ? 'Unlisted'
-              : 'Public',
-        tone: isArchived ? 'rose' : 'green',
-      },
-      { label: 'Status', value: liveRegistrationMeta.label, tone: liveRegistrationMeta.tone },
-      { label: 'Check-in', value: `${scheduleCheckInLeadMinutes || 30} min`, tone: 'blue' },
-    ];
 
     return (
       <Section
         action={<ActionButton href="/" variant="secondary">Home</ActionButton>}
-        description="Pick the event, set the start time, open or close registration, then run the roster from the same screen."
+        description={isCreatingNewEvent ? 'Set up the new event, then save it before sharing the signup page.' : 'Edit the selected event, then run its roster and bracket below.'}
         nativeID={isCreatingNewEvent ? 'host-event' : 'edit-tournament'}
-        title="Edit selected tournament">
+        title={isCreatingNewEvent ? 'Create event' : 'Edit event'}>
         <Surface style={styles.publisherPanel}>
-          <View style={styles.publisherHero}>
-            <View style={styles.publisherCopy}>
-              <View style={styles.metaRow}>
-                <Badge tone="accent">Host command center</Badge>
-                <Text style={styles.publisherKicker}>{nextHostAction}</Text>
-              </View>
-              <Text style={styles.publisherTitle}>{tournament?.title || rosterSlug}</Text>
-              <Text style={styles.publisherDate}>{formatHostDateTime(tournament)}</Text>
-              <Text style={styles.copy}>
-                {getRosterPolicyLabel(tournament, activeTournamentMode)}
-              </Text>
-            </View>
-
-            <View style={styles.publisherStatGrid}>
-              {publisherStats.map((stat) => (
-                <View key={stat.label} style={[styles.publisherStat, styles[`publisherStat${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
-                  <Text style={styles.publisherStatLabel}>{stat.label}</Text>
-                  <Text style={styles.publisherStatValue}>{stat.value}</Text>
-                </View>
-              ))}
-            </View>
+          <View style={styles.eventEditorIntro}>
+            <Badge tone={isCreatingNewEvent ? 'accent' : isArchived ? 'rose' : 'green'}>
+              {isCreatingNewEvent ? `New ${eventGameSlug} event` : isArchived ? 'Archived event' : 'Selected event'}
+            </Badge>
+            <Text style={styles.metaText}>
+              {isCreatingNewEvent
+                ? 'Choose the game, date, registration state, and public details.'
+                : `${tournament?.title} · ${formatHostDateTime(tournament)}`}
+            </Text>
           </View>
-
-          <TournamentEventSelector
-            currentTournaments={adminTournamentGroups.current}
-            onNewTournament={handleNewTournamentDraft}
-            onSelectTournament={(slug) => { setAutoEventDraft(false); setCreatingNewEvent(false); setRosterSlug(slug); }}
-            previousTournaments={adminTournamentGroups.previous}
-            rosterSlug={rosterSlug}
-          />
-
-          {isHistorical ? (
-            <View style={styles.historicalTournamentNotice}>
-              <Badge tone="blue">Read-only history</Badge>
-              <Text style={styles.historicalTournamentNoticeText}>
-                This tournament started more than seven days ago. Its details remain available, but routine editing and lifecycle actions are disabled.
-              </Text>
-            </View>
-          ) : null}
-
-          <View
-            pointerEvents={isHistorical ? 'none' : 'auto'}
-            style={isHistorical && styles.historicalEditor}>
           <View style={styles.eventEditorPanel}>
             <View style={styles.metaRow}>
               <Badge tone="accent">Event details</Badge>
@@ -1890,21 +1769,6 @@ export default function AdminScreen() {
             </View>
           ) : null}
 
-          <View style={styles.publisherWorkflow}>
-            <View style={styles.workflowStep}>
-              <Badge tone="accent">1</Badge>
-              <Text style={styles.workflowText}>Save the event date and registration state.</Text>
-            </View>
-            <View style={styles.workflowStep}>
-              <Badge tone="blue">2</Badge>
-              <Text style={styles.workflowText}>Share the signup page until enough players are registered.</Text>
-            </View>
-            <View style={styles.workflowStep}>
-              <Badge tone="green">3</Badge>
-              <Text style={styles.workflowText}>Generate the bracket, then players use My Match.</Text>
-            </View>
-          </View>
-
           <View style={styles.rosterSummary}>
             <Badge tone={scheduleSettings ? 'green' : 'blue'}>{scheduleSettings ? 'Saved override' : 'Seed default'}</Badge>
             <Text style={styles.metaText}>
@@ -1921,30 +1785,26 @@ export default function AdminScreen() {
             <ActionButton disabled={!hasHostCredential || eventSaving} onPress={handleSaveTournamentEvent}>
               {eventSaving ? 'Saving...' : 'Save event'}
             </ActionButton>
-            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleSaveScheduleSettings} variant="secondary">
-              {scheduleLoading ? 'Saving...' : 'Save schedule only'}
-            </ActionButton>
-            <ActionButton href={signupPath} variant="secondary">
-              Open signup page
-            </ActionButton>
-            <ActionButton href={tournamentPath} variant="secondary">
-              Open tournament page
-            </ActionButton>
-            <ActionButton disabled={!hasHostCredential || !playerCountReady || bracketLoading} onPress={handleGenerateBracket} variant="secondary">
-              {bracketLoading ? 'Generating...' : 'Generate bracket'}
-            </ActionButton>
-            <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleResetScheduleSettings} variant="ghost">
-              Reset schedule
-            </ActionButton>
+            {!isCreatingNewEvent ? (
+              <>
+                <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleSaveScheduleSettings} variant="secondary">
+                  {scheduleLoading ? 'Saving...' : 'Save schedule only'}
+                </ActionButton>
+                <ActionButton href={signupPath} variant="secondary">
+                  Open signup page
+                </ActionButton>
+                <ActionButton href={tournamentPath} variant="secondary">
+                  Open tournament page
+                </ActionButton>
+                <ActionButton disabled={!hasHostCredential || !playerCountReady || bracketLoading} onPress={handleGenerateBracket} variant="secondary">
+                  {bracketLoading ? 'Generating...' : 'Generate bracket'}
+                </ActionButton>
+                <ActionButton disabled={!hasHostCredential || scheduleLoading} onPress={handleResetScheduleSettings} variant="ghost">
+                  Reset schedule
+                </ActionButton>
+              </>
+            ) : null}
           </View>
-
-          <View style={styles.editorLifecycleNote}>
-            <Badge tone="blue">Lifecycle controls moved up</Badge>
-            <Text style={styles.editorLifecycleText}>
-              Archive, clear/delete, bracket generation, and roster refresh now live in Tournament controls at the top of this page.
-            </Text>
-          </View>
-        </View>
         </Surface>
       </Section>
     );
@@ -2177,7 +2037,7 @@ export default function AdminScreen() {
   }
 
   function renderHostQuickControls() {
-    if (showDraftTools) {
+    if (showDraftTools || isCreatingNewEvent || !selectedTournament) {
       return null;
     }
 
@@ -2185,13 +2045,9 @@ export default function AdminScreen() {
     const tournamentPath = getTournamentPath(rosterSlug);
     const signupPath = getCheckInPath(rosterSlug);
     const isArchived = tournament?.status === 'archived';
-    const isHistorical = selectedTournamentIsHistorical;
     const deleteBlockedByActiveMatch = hasActiveTournamentMatches(bracket);
-    const lifecycleLabel = getTournamentLifecycleLabel(tournament);
     const playerCountReady = canGenerateWithSignupCount(activeTournamentMode, activeSignupCount);
-    const nextHostMove = isHistorical
-      ? 'This older event is available as read-only history.'
-      : !hasHostCredential
+    const nextHostMove = !hasHostCredential
       ? 'Sign in as host to unlock editing, clearing, and bracket actions.'
       : isArchived
         ? 'This event is archived. Publish it again before promoting it.'
@@ -2204,77 +2060,19 @@ export default function AdminScreen() {
             : activeSignupCount
               ? 'Keep signups open until the roster reaches the bracket minimum.'
               : 'Save the event, then share the signup page.';
-    const quickStats = [
-      { label: 'Selected', value: tournament?.title || rosterSlug, tone: 'accent' },
-      { label: 'Start', value: getStartTimingLabel(tournament), tone: 'blue' },
-      { label: 'Roster', value: `${activeSignupCount}${tournament?.rosterCap ? ` / ${tournament.rosterCap}` : ''}`, tone: activeSignupCount ? 'green' : 'blue' },
-      { label: 'Bracket', value: bracket ? `${bracket.participantCount || 0} seeded` : 'Not generated', tone: bracket ? 'green' : 'accent' },
-      {
-        label: 'Status',
-        value: tournament?.status === 'upcoming'
-          ? `${lifecycleLabel} - ${liveRegistrationMeta.label}`
-          : lifecycleLabel,
-        tone: ['archived', 'expired', 'deleted'].includes(tournament?.status)
-          ? 'rose'
-          : tournament?.status === 'complete' || tournament?.status === 'live'
-            ? 'green'
-            : liveRegistrationMeta.tone,
-      },
-    ];
 
     return (
       <Section
-        description="The host controls you need most are first: edit the event, open player pages, seed the bracket, archive, or clear test data."
+        description="Open player pages, refresh the roster, seed the bracket, or manage this event's lifecycle."
         nativeID="host-quick-controls"
-        title="Tournament controls">
+        title="Run selected event">
         <Surface style={styles.quickControlPanel}>
-          <View style={styles.quickControlHeader}>
-            <View style={styles.quickControlCopy}>
-              <Badge tone={hasHostCredential ? 'green' : 'accent'}>{hasHostCredential ? 'Host ready' : 'Host access needed'}</Badge>
-              <Text style={styles.quickControlTitle}>{tournament?.title || rosterSlug}</Text>
-              <Text style={styles.quickControlBody}>
-                {nextHostMove}
-              </Text>
-            </View>
-
-            <View style={styles.quickStatGrid}>
-              {quickStats.map((stat) => (
-                <View key={stat.label} style={[styles.quickStat, styles[`quickStat${stat.tone[0].toUpperCase()}${stat.tone.slice(1)}`]]}>
-                  <Text style={styles.quickStatLabel}>{stat.label}</Text>
-                  <Text numberOfLines={2} style={styles.quickStatValue}>{stat.value}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.quickPickerBlock}>
-            <Text style={styles.quickPickerLabel}>Current event selection is in the editor.</Text>
-            {isHistorical ? <Text style={styles.metaText}>Historical events keep their public and record links, but no host mutations are available here.</Text> : null}
-          </View>
-
-          <View style={styles.quickFlowStrip}>
-            <View style={styles.quickFlowStep}>
-              <Badge tone="accent">1</Badge>
-              <Text style={styles.quickFlowText}>Edit date and registration</Text>
-            </View>
-            <View style={styles.quickFlowStep}>
-              <Badge tone="blue">2</Badge>
-              <Text style={styles.quickFlowText}>Share signup and refresh roster</Text>
-            </View>
-            <View style={styles.quickFlowStep}>
-              <Badge tone="green">3</Badge>
-              <Text style={styles.quickFlowText}>Generate bracket and send My Match</Text>
-            </View>
-            <View style={styles.quickFlowStep}>
-              <Badge tone="green">4</Badge>
-              <Text style={styles.quickFlowText}>Review results or archive event</Text>
-            </View>
+          <View style={styles.metaRow}>
+            <Badge tone={hasHostCredential ? 'green' : 'accent'}>{hasHostCredential ? 'Host ready' : 'Host access needed'}</Badge>
+            <Text style={styles.metaText}>{nextHostMove}</Text>
           </View>
 
           <View style={styles.quickActionGrid}>
-            <ActionButton href="/admin#edit-tournament" style={styles.quickActionButton}>
-              Edit selected event
-            </ActionButton>
             <ActionButton href="/admin/analytics" style={styles.quickActionButton} variant="secondary">
               Site analytics
             </ActionButton>
@@ -2285,14 +2083,14 @@ export default function AdminScreen() {
               Open signup
             </ActionButton>
             <ActionButton
-              disabled={isHistorical || !hasHostCredential || !playerCountReady || bracketLoading}
+              disabled={!hasHostCredential || !playerCountReady || bracketLoading}
               onPress={handleGenerateBracket}
               style={styles.quickActionButton}
               variant="secondary">
               {bracketLoading ? 'Generating...' : 'Generate bracket'}
             </ActionButton>
             <ActionButton
-              disabled={isHistorical || !hasHostCredential || !playerCountReady || bracketLoading}
+              disabled={!hasHostCredential || !playerCountReady || bracketLoading}
               onPress={handleGenerateEarlyTestBracket}
               style={styles.quickActionButton}
               variant="ghost">
@@ -2302,21 +2100,21 @@ export default function AdminScreen() {
               {rosterLoading ? 'Refreshing...' : 'Refresh roster'}
             </ActionButton>
             <ActionButton
-              disabled={isHistorical || !hasHostCredential || archiveLoading || isArchived}
+              disabled={!hasHostCredential || archiveLoading || isArchived}
               onPress={handleRequestArchiveTournament}
               style={styles.quickActionButton}
               variant="secondary">
               {isArchived ? 'Archived' : 'Archive event'}
             </ActionButton>
             <ActionButton
-              disabled={isHistorical || !hasHostCredential || clearLoading}
+              disabled={!hasHostCredential || clearLoading}
               onPress={handleRequestClearTournamentData}
               style={styles.quickActionButton}
               variant="danger">
               Clear roster only
             </ActionButton>
             <ActionButton
-              disabled={isHistorical || !hasHostCredential || deleteLoading || deleteBlockedByActiveMatch}
+              disabled={!hasHostCredential || deleteLoading || deleteBlockedByActiveMatch}
               onPress={handleRequestDeleteTournament}
               style={styles.quickActionButton}
               variant="danger">
@@ -2917,7 +2715,7 @@ export default function AdminScreen() {
           <View style={styles.selectedTournamentNotice}>
             <Badge tone="accent">Selected event</Badge>
             <Text style={styles.metaText}>
-              {liveTournament?.title || rosterSlug}. Change the selected event in Post tournament at the top.
+              {liveTournament?.title || rosterSlug}. Change the selected event in the event selector at the top.
             </Text>
           </View>
 
@@ -3167,6 +2965,7 @@ export default function AdminScreen() {
   ];
 
   const modeTone = mode === 'unlocked' ? 'green' : mode === 'locked' ? 'rose' : 'blue';
+  const hasSelectedHostEvent = Boolean(selectedTournament) && !isCreatingNewEvent;
 
   if (mode === 'unsupported' && !canShowHostConsole) {
     return (
@@ -3335,7 +3134,7 @@ export default function AdminScreen() {
       }
       subtitle={showDraftTools ? 'Draft tournament editor' : 'Tournament host dashboard'}
       title={showDraftTools ? 'Private admin console' : 'Host control center'}>
-      {renderHostQuickControls()}
+      {renderTournamentSelectionSection()}
 
       <Section
         action={
@@ -3383,27 +3182,44 @@ export default function AdminScreen() {
         </Surface>
       </Section>
 
-      {renderScheduleSection()}
+      {isCreatingNewEvent || selectedTournament ? (
+        renderScheduleSection()
+      ) : (
+        <Section
+          description="Create the first current event when there is nothing active to edit."
+          title="No current event">
+          <EmptyState
+            body="Older tournaments stay out of the host center. Start a new Spades or Euchre event from the selector above."
+            title="Choose a game to continue"
+          />
+        </Section>
+      )}
 
-      {renderHostRunSection()}
+      {hasSelectedHostEvent ? (
+        <>
+          {renderHostQuickControls()}
 
-      <Section
-        description="Keep public Euchre discovery off while a host runs a 4- or 8-player canonical-account pilot."
-        title="Invited Euchre pilot">
-        <Surface style={styles.panel}>
-          <View style={styles.metaRow}>
-            <Badge tone="accent">Host only</Badge>
-            <Text style={styles.metaText}>Configure admissions, attendance, assignments, results, and recovery guidance in the isolated pilot console.</Text>
-          </View>
-          <ActionButton href="/admin/euchre-pilot">Open Euchre pilot console</ActionButton>
-        </Surface>
-      </Section>
+          {renderHostRunSection()}
 
-      {renderLiveRosterSection()}
+          <Section
+            description="Keep public Euchre discovery off while a host runs a 4- or 8-player canonical-account pilot."
+            title="Invited Euchre pilot">
+            <Surface style={styles.panel}>
+              <View style={styles.metaRow}>
+                <Badge tone="accent">Host only</Badge>
+                <Text style={styles.metaText}>Configure admissions, attendance, assignments, results, and recovery guidance in the isolated pilot console.</Text>
+              </View>
+              <ActionButton href="/admin/euchre-pilot">Open Euchre pilot console</ActionButton>
+            </Surface>
+          </Section>
 
-      {renderBracketManagerSection()}
+          {renderLiveRosterSection()}
 
-      {renderStreamCommandSection()}
+          {renderBracketManagerSection()}
+
+          {renderStreamCommandSection()}
+        </>
+      ) : null}
 
       {showDraftTools ? (
         <>
@@ -3598,6 +3414,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 16,
     padding: 14,
+  },
+  eventEditorIntro: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   packetBox: {
     color: '#F4EFE6',
@@ -4287,16 +4109,32 @@ const styles = StyleSheet.create({
   },
   eventSelector: {
     gap: 10,
-    marginTop: 18,
+  },
+  eventSelectorIntro: {
+    color: '#A7A29A',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   eventSelectorMenu: {
     backgroundColor: 'rgba(8, 25, 21, 0.98)',
     borderColor: 'rgba(214, 162, 78, 0.34)',
-    gap: 10,
     padding: 14,
   },
+  eventSelectorGameGroup: {
+    gap: 10,
+    paddingVertical: 12,
+  },
+  eventSelectorGameHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
   eventSelectorLabel: {
-    color: '#A7A29A',
+    color: '#F4EFE6',
+    flex: 1,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -4308,29 +4146,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  eventSelectorPrevious: {
-    borderTopColor: 'rgba(244, 239, 230, 0.10)',
-    borderTopWidth: 1,
-    gap: 8,
-    paddingTop: 10,
-  },
-  historicalEditor: {
-    opacity: 0.56,
-  },
-  historicalTournamentNotice: {
-    backgroundColor: 'rgba(94, 127, 163, 0.10)',
-    borderColor: 'rgba(94, 127, 163, 0.34)',
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-    marginTop: 16,
-    padding: 14,
-  },
-  historicalTournamentNoticeText: {
-    color: '#D4DDD7',
-    fontSize: 14,
+  eventSelectorEmpty: {
+    color: '#A7A29A',
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 21,
+    lineHeight: 19,
+  },
+  eventSelectorHistory: {
+    color: '#A7A29A',
+    fontSize: 12,
+    lineHeight: 18,
   },
   tournamentPicker: {
     flexDirection: 'row',
