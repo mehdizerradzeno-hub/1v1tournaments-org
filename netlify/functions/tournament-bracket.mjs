@@ -1,4 +1,5 @@
-import { connectLambda, getStore } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
+import { handleNetlifyWebRequest } from './_netlify-web-handler.mjs';
 
 import {
   getAdminToken,
@@ -845,6 +846,9 @@ async function reportWinnerWithRetry(tournamentSlug, matchId, winnerId) {
     if (!loaded) {
       return { error: json(404, { error: 'Generate a bracket before reporting winners.' }) };
     }
+    if (loaded.bracket.euchreLeagueAssignment) {
+      return { error: json(403, { error: 'League games require authoritative results.', code: 'authoritative_results_only' }) };
+    }
 
     const match = findMatch(loaded.bracket, matchId);
 
@@ -958,6 +962,11 @@ export async function reportAuthoritativeResultWithRetry(tournamentSlug, result,
     let applied;
 
     try {
+      if (loaded.bracket.euchreLeagueAssignment) {
+        const validate = options.validateEuchreLeagueGameCompletion
+          || (await import('./_euchre-league-games.mjs')).validateEuchreLeagueGameCompletion;
+        await validate({ bracket: loaded.bracket, result });
+      }
       applied = applyAuthoritativeTournamentResult(loaded.bracket, result);
     } catch (error) {
       if (error instanceof TournamentGameContractError) {
@@ -1051,11 +1060,7 @@ function requireAuthoritativeGameReporter(event) {
   return { ok: true, method: 'match-result-token' };
 }
 
-export async function handler(event) {
-  if (event.blobs) {
-    connectLambda(event);
-  }
-
+export async function handleTournamentBracketEvent(event) {
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
   }
@@ -1123,6 +1128,9 @@ export async function handler(event) {
       }
 
       const tournament = await loadTournamentForBracket(tournamentSlug);
+      if (tournament?.competitionMeta?.raw?.leagueFormatVersion === 'euchre-1v1-season-v1') {
+        return json(409, { error: 'League game brackets are managed by the league.', code: 'league_managed_bracket' });
+      }
       const checkInStatus = checkInOpenStatus(tournament);
 
       if (!checkInStatus.open && payload.allowEarly !== true) {
@@ -1188,6 +1196,9 @@ export async function handler(event) {
         return adminCheck.error;
       }
 
+      const existing = await loadBracket(tournamentSlug);
+      if (existing?.euchreLeagueAssignment) return json(409, { error: 'League game brackets cannot be reset manually.', code: 'league_managed_bracket' });
+
       await deleteBracket(tournamentSlug);
 
       return json(200, { ok: true, bracket: null });
@@ -1249,4 +1260,8 @@ export async function handler(event) {
     console.error('Bracket management failed', error);
     return json(500, { error: 'Bracket storage is not available yet.' });
   }
+}
+
+export default function netlifyHandler(request) {
+  return handleNetlifyWebRequest(request, handleTournamentBracketEvent);
 }

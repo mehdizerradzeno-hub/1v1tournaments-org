@@ -2,6 +2,7 @@ import {
   loadLeagueById,
   upsertLeagueMatchResult,
 } from './_league-utils.mjs';
+import { EUCHRE_LEAGUE_VERSION, EuchreLeagueError } from '../../src/lib/euchreLeagueSeason.js';
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -165,6 +166,23 @@ export async function syncLinkedLeagueTournamentResult(
   const writeLeagueResult = dependencies.upsertLeagueMatchResult || upsertLeagueMatchResult;
   const league = await loadLeague(assignment.leagueId);
   const linked = buildLinkedLeagueTournamentResult({ tournament, tournamentMatch, result, league });
+  if (league.leagueFormatVersion === EUCHRE_LEAGUE_VERSION) {
+    const repo = dependencies.euchreLeagueRepository
+      || (await import('./_euchre-league-store.mjs')).runtimeEuchreLeagueRepository();
+    try {
+      const updated = await repo.recordGame(linked.leagueId, linked.matchId, {
+        tournamentSlug: cleanText(tournament.slug || tournament.tournamentSlug),
+        tournamentMatchId: tournamentMatch.id, completionId: result.completionId,
+        winnerCanonicalAccountId: result.winnerCanonicalAccountId,
+        scores: result.scores, forfeit: result.forfeit, forfeitReason: result.forfeitReason,
+      });
+      return { linked: true, leagueId: linked.leagueId, matchId: linked.matchId,
+        duplicate: Boolean(updated.duplicate), seriesComplete: Boolean(updated.seriesComplete) };
+    } catch (error) {
+      if (error instanceof EuchreLeagueError) throw new LinkedLeagueResultError(error.statusCode, error.code, error.message);
+      throw error;
+    }
+  }
   const updated = await writeLeagueResult(linked.leagueId, linked.matchId, linked.result, {
     source: linked.result.source,
     callbackId: linked.result.callbackId,

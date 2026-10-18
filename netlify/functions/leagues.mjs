@@ -7,6 +7,7 @@ import {
   playerUsernameForAccount,
 } from './_account-utils.mjs';
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { EuchreLeagueError } from '../../src/lib/euchreLeagueSeason.js';
 import {
   addLeagueParticipant,
   archiveLeague,
@@ -271,6 +272,7 @@ export async function handleLeagueReadRequest(event, dependencies = {}) {
     if (leagueId) {
       const league = await loadById(leagueId);
       if (!league) return json(404, { error: 'That league was not found.' });
+      if (league.leagueFormatVersion === 'euchre-1v1-season-v1') return json(409, { error: 'Use the Euchre league page for this season.', code: 'versioned_league_required' });
       if (adminRequested) return json(200, { ok: true, league });
       const payload = publicLeagueReadPayload(league, account);
       if (!payload) return json(404, { error: 'That league was not found.' });
@@ -288,7 +290,7 @@ export async function handleLeagueReadRequest(event, dependencies = {}) {
   }
 }
 
-export async function handler(event) {
+async function handleLeagueRequest(event) {
   if (event.blobs) {
     connectLambda(event);
   }
@@ -513,4 +515,12 @@ export async function handler(event) {
   }
 
   return json(400, { error: 'Choose a supported league action.' });
+}
+
+export async function handler(event) {
+  try { return await handleLeagueRequest(event); }
+  catch (error) {
+    if (error instanceof EuchreLeagueError) return json(error.statusCode, { error: error.message, code: error.code });
+    throw error;
+  }
 }

@@ -13,6 +13,15 @@ import {
   isTournamentDeleted,
 } from '../../src/lib/tournamentLifecycle.js';
 import { siteData } from '../../src/lib/siteData.js';
+import { EUCHRE_LEAGUE_VERSION, EuchreLeagueError } from '../../src/lib/euchreLeagueSeason.js';
+
+/** Internal game resources are created by the league outbox, never generic host editing. */
+export function assertManualTournamentMutationAllowed(tournament) {
+  if (tournament?.competitionMeta?.raw?.leagueFormatVersion === EUCHRE_LEAGUE_VERSION
+    || /^elg-[a-f0-9]{32}$/.test(tournament?.slug || '')) {
+    throw new EuchreLeagueError('league_managed_tournament', 'This game is managed by its Euchre league. Use the league organizer dashboard.');
+  }
+}
 
 const STORE_NAME = 'tournament-events';
 const SERIES_STORE_NAME = 'tournament-series';
@@ -282,6 +291,7 @@ export async function deleteHostedTournament(tournamentSlug, options = {}) {
   const bracketStore = options.bracketStore || getStoreWithFallback('tournament-brackets');
   const existing = await store.get(eventKey(slug), { type: 'json' });
   const seededTournament = siteData.tournaments.find((tournament) => tournament.slug === slug) || null;
+  assertManualTournamentMutationAllowed(existing || { slug });
 
   if (isTournamentDeleted(existing)) {
     return { alreadyDeleted: true, deleted: true, tournament: existing };
@@ -335,6 +345,8 @@ export async function saveHostedTournament(tournament, account = null, options =
   const store = options.store || getStoreWithFallback(STORE_NAME);
   const updatedAt = options.updatedAt || new Date().toISOString();
   const existing = await store.get(eventKey(tournament?.slug), { type: 'json' });
+  assertManualTournamentMutationAllowed(existing);
+  assertManualTournamentMutationAllowed(tournament);
   const existingRecurrence = existing?.recurrence || tournament?.recurrence;
   const nextTournament = tournamentForWrite({
     ...tournament,

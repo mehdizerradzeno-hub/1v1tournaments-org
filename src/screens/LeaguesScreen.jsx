@@ -617,10 +617,12 @@ export default function LeaguesScreen() {
         : 'Competitive weekly leagues. Join, track your standing, and play your scheduled matches.'}
       actions={isAdminRoute
         ? [
+            { label: 'Euchre league operations', href: '/admin/euchre-leagues', variant: 'secondary' },
             { label: 'Public leagues', href: '/leagues', variant: 'secondary' },
             { label: 'Admin home', href: '/admin', variant: 'ghost' },
           ]
         : [
+            { label: 'Euchre 1V1 Leagues', href: '/leagues/euchre', variant: 'primary' },
             { label: 'Tournaments', href: '/tournaments', variant: 'secondary' },
             { label: 'Results', href: '/results', variant: 'ghost' },
             account?.hostApproved
