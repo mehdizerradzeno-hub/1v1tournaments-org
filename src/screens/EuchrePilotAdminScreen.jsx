@@ -98,7 +98,7 @@ export default function EuchrePilotAdminScreen() {
           <Text style={styles.title}>Invited Euchre pilot</Text>
           <Text style={styles.lead}>Configure 4 or 8 canonical accounts, check attendance, and monitor bracket delivery.</Text>
         </View>
-        <ActionButton href="/admin" variant="secondary">Tournament admin</ActionButton>
+        <ActionButton href="/admin/tournaments" variant="secondary">Tournament admin</ActionButton>
       </View>
 
       <Section description="Create the Euchre event in Tournament admin first, then attach this private allowlist." title="Pilot access">

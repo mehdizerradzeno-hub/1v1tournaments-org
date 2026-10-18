@@ -1003,7 +1003,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
               <Text style={styles.summaryCopy}>
                 Host account cannot play. Keep tournament administration separate from player accounts.
               </Text>
-              <ActionButton href="/admin">Open Host controls</ActionButton>
+              <ActionButton href="/admin/tournaments">Open Host controls</ActionButton>
             </View>
           ) : hasSignupConfirmation ? (
             <SignupCompleteState

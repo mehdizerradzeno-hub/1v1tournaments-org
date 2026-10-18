@@ -170,7 +170,8 @@ export default function EuchreLeaguesScreen({ organizer = false }) {
   return <HubScreen title={organizer ? 'Euchre league operations' : 'Euchre 1V1 Leagues'} eyebrow="Weekly competition"
     subtitle="Your division. Your season. One champion."
     lead="Best of three. Every game first to 10. Verified results, weekly division play, and a seeded championship."
-    actions={[{ label: organizer ? 'Public Euchre leagues' : 'Organizer dashboard', href: organizer ? '/leagues/euchre' : '/admin/euchre-leagues', variant: 'secondary' },
+    actions={[...(organizer ? [{ label: 'Admin dashboard', href: '/admin', variant: 'secondary' }] : []),
+      { label: organizer ? 'Public Euchre leagues' : 'Organizer dashboard', href: organizer ? '/leagues/euchre' : '/admin/euchre-leagues', variant: 'secondary' },
       { label: 'All leagues', href: '/leagues', variant: 'ghost' }, { label: 'Account', href: '/account', variant: 'ghost' }]}
     stickyActions={false} heroVariant="compact">
     {organizer && <Surface style={styles.stack}><Text style={styles.title}>Existing host access</Text>

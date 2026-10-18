@@ -75,5 +75,6 @@ test('host UI removes the player action and routes the account to host controls'
   assert.match(checkInSource, /Open Host controls/);
   assert.match(tournamentSource, /account\?\.hostApproved/);
   assert.match(tournamentSource, /Host account cannot play/);
-  assert.match(tournamentSource, /href="\/admin"/);
+  assert.match(checkInSource, /href="\/admin\/tournaments">Open Host controls<\/ActionButton>/);
+  assert.match(tournamentSource, /href="\/admin\/tournaments">Open Host Controls<\/ActionButton>/);
 });

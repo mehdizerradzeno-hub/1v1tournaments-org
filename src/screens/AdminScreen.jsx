@@ -2972,10 +2972,8 @@ export default function AdminScreen() {
   }
 
   const actions = [
-    { label: 'Home', href: '/' },
-    { label: 'Sponsors', href: '/admin/sponsors', variant: 'secondary' },
-    { label: 'Spades', href: getGamePath(siteData.site.primaryGameSlug), variant: 'secondary' },
-    { label: 'Rules', href: '/rules', variant: 'ghost' },
+    { label: 'Admin dashboard', href: '/admin', variant: 'secondary' },
+    { label: 'Public tournaments', href: '/tournaments', variant: 'ghost' },
   ];
 
   const modeTone = mode === 'unlocked' ? 'green' : mode === 'locked' ? 'rose' : 'blue';
@@ -3147,7 +3145,8 @@ export default function AdminScreen() {
             ]
       }
       subtitle={showDraftTools ? 'Draft tournament editor' : 'Tournament host dashboard'}
-      title={showDraftTools ? 'Private admin console' : 'Host control center'}>
+      title={showDraftTools ? 'Private tournament drafts' : 'Tournament operations'}
+      stickyActions={false}>
       {renderTournamentSelectionSection()}
 
       <Section
