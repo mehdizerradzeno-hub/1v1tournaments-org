@@ -268,8 +268,9 @@ function TournamentEventSelector({ currentTournaments, rosterSlug, onSelectTourn
 }
 
 export default function AdminScreen() {
-  const { game: requestedGame } = useLocalSearchParams();
+  const { game: requestedGame, event: requestedEvent } = useLocalSearchParams();
   const requestedHostGame = getRequestedHostTournamentGame(requestedGame);
+  const requestedEventSlug = slugifyTournamentTitle(Array.isArray(requestedEvent) ? requestedEvent[0] : requestedEvent);
   const startsNewPrivateEvent = isPrivatePilotGame(requestedHostGame);
   const initialEventGameSlug = requestedHostGame || normalizeTournamentGameSlug(siteData.tournaments[0]?.gameSlug);
   const initialEventDraft = getNextTournamentDraft(initialEventGameSlug, siteData.tournaments);
@@ -308,7 +309,7 @@ export default function AdminScreen() {
   const [serverMessage, setServerMessage] = useState('');
   const [serverError, setServerError] = useState('');
   const [rosterToken, setRosterToken] = useState('');
-  const initialHostTournamentSlug = getInitialHostTournamentSlug(siteData.tournaments);
+  const initialHostTournamentSlug = requestedEventSlug || getInitialHostTournamentSlug(siteData.tournaments);
   const [rosterSlug, setRosterSlug] = useState(() => initialHostTournamentSlug);
   const initialScheduleDefaults = getScheduleFieldDefaults(
     siteData.tournaments.find((tournament) => tournament.slug === initialHostTournamentSlug) || siteData.tournaments[0],
@@ -466,10 +467,20 @@ export default function AdminScreen() {
 
     async function loadHostedTournaments() {
       try {
-        const result = await fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() });
+        const [directoryResult, selectedResult] = await Promise.allSettled([
+          fetchTournamentEvents({ includePrivate: true, token: rosterToken.trim() }),
+          rosterSlug ? fetchTournamentEvents({ slug: rosterSlug }) : Promise.resolve(null),
+        ]);
+
+        if (directoryResult.status === 'rejected') {
+          throw directoryResult.reason;
+        }
 
         if (active) {
-          const tournaments = result.tournaments || [];
+          const selected = selectedResult.status === 'fulfilled' ? selectedResult.value?.tournament : null;
+          const tournaments = selected
+            ? mergeTournamentLists(directoryResult.value.tournaments || [], [selected])
+            : directoryResult.value.tournaments || [];
           setHostedTournaments(tournaments);
 
           if (!isCreatingNewEventRef.current && !rosterSlug) {
@@ -1190,7 +1201,7 @@ export default function AdminScreen() {
       });
       const savedTournament = eventResult.tournament || tournamentPayload;
 
-      setHostedTournaments(eventResult.tournaments || [savedTournament]);
+      setHostedTournaments(mergeTournamentLists(eventResult.tournaments || [], [savedTournament]));
       setCreatingNewEvent(false);
       setAutoEventDraft(false);
       setRosterSlug(savedTournament.slug);
@@ -1341,7 +1352,7 @@ export default function AdminScreen() {
       ]);
       const savedTournament = eventResult.tournament || archivedTournament;
 
-      setHostedTournaments(eventResult.tournaments || [savedTournament]);
+      setHostedTournaments(mergeTournamentLists(eventResult.tournaments || [], [savedTournament]));
       setRosterSlug(savedTournament.slug);
       setEventSlug(savedTournament.slug);
       setScheduleSettings(settingsResult.settings || null);

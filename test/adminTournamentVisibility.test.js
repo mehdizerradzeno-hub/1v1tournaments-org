@@ -33,6 +33,9 @@ test('admin opens on current game-grouped events and leaves older events out of 
   assert.match(adminScreenSource, /New \{game\.label\} event/);
   assert.match(adminScreenSource, /No current \{game\.label\} events/);
   assert.match(adminScreenSource, /Past events stay in the public record, not in the host picker/);
+  assert.match(adminScreenSource, /event: requestedEvent/);
+  assert.match(adminScreenSource, /fetchTournamentEvents\(\{ slug: rosterSlug \}\)/);
+  assert.match(adminScreenSource, /mergeTournamentLists\(eventResult\.tournaments \|\| \[\], \[savedTournament\]\)/);
   assert.doesNotMatch(adminScreenSource, /Previous tournaments \(\$\{previousTournaments\.length\}\)/);
   assert.equal((adminScreenSource.match(/<TournamentEventSelector/g) || []).length, 1);
   assert.match(adminScreenSource, /Choose a game first/);
