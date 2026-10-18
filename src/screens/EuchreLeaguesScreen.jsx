@@ -189,7 +189,7 @@ export default function EuchreLeaguesScreen({ organizer = false }) {
     <Section title={organizer ? 'Your seasons' : 'Find your season'} description="Choose a league to view its schedule and standings. Results refresh every 30 seconds."
       action={<ActionButton variant="ghost" onPress={load} disabled={busy}>Refresh</ActionButton>}>
       {!loading && records.length === 0 && <Surface><Text style={styles.muted}>{organizer ? 'No managed Euchre seasons yet.' : 'No public Euchre leagues yet. Check back for the next season.'}</Text></Surface>}
-      <View style={styles.row}>{records.map(record => <ActionButton key={record.id} variant={record.id === selectedId ? 'primary' : 'secondary'}
+      <View style={styles.row}>{records.map(record => <ActionButton key={record.id} style={styles.leagueChoice} variant={record.id === selectedId ? 'primary' : 'secondary'}
         onPress={() => { setSelectedId(record.id); setConfirm(''); setCsv(null); setWeek('all'); setDivision('all'); }}>{record.name}</ActionButton>)}</View>
       {!loading && requestedId && !league && <Text style={styles.muted}>This league is unavailable or requires organizer access.</Text>}
     </Section>
@@ -257,6 +257,7 @@ export default function EuchreLeaguesScreen({ organizer = false }) {
 const styles = StyleSheet.create({
   stack: { gap: 16 }, row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  leagueChoice: { flexShrink: 1, minWidth: 0, maxWidth: '100%', marginRight: 0 },
   division: { flexGrow: 1, flexShrink: 1, flexBasis: 350, minWidth: 0, gap: 12 }, fixture: { flexGrow: 1, flexShrink: 1, flexBasis: 350, minWidth: 0, gap: 12 },
   field: { gap: 8, flexGrow: 1, minWidth: 160 }, label: { color: theme.colors.muted, fontSize: 13 },
   input: { color: theme.colors.text, backgroundColor: theme.colors.background, borderColor: theme.colors.lineStrong, borderWidth: 1,

@@ -30,6 +30,11 @@ test('personal fixtures use the wrapping grid and cards can shrink on narrow lay
   }
 });
 
+test('league selectors constrain long names to the available phone width', () => {
+  assert.match(screen, /<ActionButton key=\{record\.id\} style=\{styles\.leagueChoice\}/);
+  assert.ok(screen.includes("leagueChoice: { flexShrink: 1, minWidth: 0, maxWidth: '100%', marginRight: 0 }"));
+});
+
 // Source-level wiring witnesses complement actual browser interaction tests.
 test('league page clears private records, viewers and exports when a read or entitlement fails', () => {
   const clear = screen.slice(screen.indexOf('const clearLeagueAccess ='), screen.indexOf('const load ='));
