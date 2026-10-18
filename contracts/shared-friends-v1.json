@@ -1,11 +1,11 @@
 {
-  "contractVersion": "2026-10-07-presence-1",
+  "contractVersion": "2026-10-13-username-1",
   "resource": "shared-friends",
   "principal": {
     "identifier": "canonicalAccountId",
     "forbiddenIdentifiers": ["displayName", "handle", "email", "gamePlayerId", "roomId", "entrantId", "guestId", "botId"]
   },
-  "publicProfile": ["canonicalAccountId", "handle", "displayName"],
+  "publicProfile": ["canonicalAccountId", "username"],
   "relationshipStates": ["pending", "accepted"],
   "operations": ["search", "snapshot", "send", "accept", "decline", "cancel", "remove", "presence-heartbeat", "presence-clear", "account-delete"],
   "presence": {
