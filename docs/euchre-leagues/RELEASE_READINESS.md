@@ -1,7 +1,8 @@
 # Euchre 1V1 Leagues release readiness
 
-Status: deployment authorized by the user on October 18, 2026, but not published.
-The session rejected GitHub writes because its approval policy disallows them.
+Status: PR [#19](https://github.com/mehdizerradzeno-hub/1v1tournaments-org/pull/19)
+was published by the user, but must not be merged until its preview passes
+the runtime smoke. The session cannot publish the follow-up fix itself.
 No production/QA database writes or migrations are part of this release.
 Desktop browser verification and actual screenshots are complete. Mobile
 verification and a real deployed-game smoke remain release gates.
@@ -162,8 +163,39 @@ Latest evidence logs: `/private/tmp/euchre-league-current-gates.4ExKTz`.
 | Whitespace | Passed; direct `git diff --check`. |
 | Browser/screenshots | Synthetic desktop checks passed; five actual screenshots saved above. Mobile remains unverified because the viewport override did not apply. |
 
-No branch or PR was published by this session, and the Netlify URL setting
-was left unchanged. Use the prepared source-only release bundle from a
-normal Terminal to create the release branch/PR. It starts from the exact
-upstream commit tested above and stops if `main` has moved. Desktop evidence
-is ready for review; mobile and live-smoke limitations remain.
+The user published commit `6c2611202d95c39fe6561651b75adbe4316ba49a` to PR #19.
+Quality checks and Netlify packaging passed, but actual preview loading failed.
+The Netlify production URL setting remains unchanged.
+
+## Preview runtime correction
+
+The public preview page rendered, but its league data request failed. Netlify
+function logs explicitly report `BlobsConsistencyError`. The installed SDK's
+legacy `connectLambda` implementation replaces the environment context without
+the uncached edge URL required for strong reads; the real SDK regression
+reproduces the failure before any storage request. See the
+[Netlify SDK adapter](https://github.com/netlify/primitives/blob/main/packages/blobs/src/lambda_compat.ts)
+and [native strong-read API](https://docs.netlify.com/build/data-and-storage/netlify-blobs/#consistency).
+
+The follow-up source uses native Web API entry points for `euchre-leagues`,
+`tournament-match-access` and `tournament-bracket`, preserving Netlify's
+injected storage context. A shared adapter preserves the existing JSON body,
+headers, cookies, query and status contract; bodyless preflight responses stay
+bodyless. It never accepts storage configuration from client input. Existing
+tournament logic and strong/conditional writes are unchanged.
+
+Regression tests use the actual installed SDK with synthetic credentials,
+reserved `.invalid` endpoints and intercepted GET-only requests. They cover
+the legacy failure, native strong reads through the public league entry point,
+all three native entry points, preflight, malformed JSON and request/response
+transport. Existing bracket tests retain all assertions with the event handler
+import renamed. No remote storage is read or written by these tests.
+
+The follow-up is local in `/private/tmp/euchre-leagues-publish.toVSkW`.
+Validation passed: 418 tests, 0 failures, 0 skips; native-runtime-suite.log
+(157.61 seconds). Typecheck, the 42-route web export and whitespace checks
+passed; lint has 0 errors and the same three existing warnings. Logs use the
+`native-runtime-` prefix in the evidence directory above; export output is
+`/private/tmp/euchre-leagues-native-runtime-web`.
+Push it to the existing PR, then require a fresh successful preview data load
+before merging. A passing build alone does not close this runtime blocker.

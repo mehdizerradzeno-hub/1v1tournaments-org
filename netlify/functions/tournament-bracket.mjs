@@ -1,4 +1,5 @@
-import { connectLambda, getStore } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
+import { handleNetlifyWebRequest } from './_netlify-web-handler.mjs';
 
 import {
   getAdminToken,
@@ -1059,11 +1060,7 @@ function requireAuthoritativeGameReporter(event) {
   return { ok: true, method: 'match-result-token' };
 }
 
-export async function handler(event) {
-  if (event.blobs) {
-    connectLambda(event);
-  }
-
+export async function handleTournamentBracketEvent(event) {
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
   }
@@ -1263,4 +1260,8 @@ export async function handler(event) {
     console.error('Bracket management failed', error);
     return json(500, { error: 'Bracket storage is not available yet.' });
   }
+}
+
+export default function netlifyHandler(request) {
+  return handleNetlifyWebRequest(request, handleTournamentBracketEvent);
 }

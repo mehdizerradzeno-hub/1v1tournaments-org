@@ -14,7 +14,7 @@ import {
   applyAuthoritativeTournamentResult,
   buildBracket,
   findMatch,
-  handler as bracketHandler,
+  handleTournamentBracketEvent as bracketHandler,
 } from '../netlify/functions/tournament-bracket.mjs';
 import { matchAccessPayload, ticketKey } from '../netlify/functions/tournament-match-access.mjs';
 

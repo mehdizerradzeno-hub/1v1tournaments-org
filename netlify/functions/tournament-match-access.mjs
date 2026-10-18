@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { connectLambda } from '@netlify/blobs';
+import { handleNetlifyWebRequest } from './_netlify-web-handler.mjs';
 
 import {
   cleanEmail,
@@ -421,11 +421,7 @@ async function verifyTicket(payload) {
   return json(200, matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }));
 }
 
-export async function handler(event) {
-  if (event.blobs) {
-    connectLambda(event);
-  }
-
+export async function handleTournamentMatchAccessEvent(event) {
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
   }
@@ -457,4 +453,8 @@ export async function handler(event) {
     console.error('Tournament match access failed', error);
     return json(500, { error: 'Match access is not available yet.' });
   }
+}
+
+export default function netlifyHandler(request) {
+  return handleNetlifyWebRequest(request, handleTournamentMatchAccessEvent);
 }

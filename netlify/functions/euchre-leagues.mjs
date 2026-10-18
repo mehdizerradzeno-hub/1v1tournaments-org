@@ -1,4 +1,4 @@
-import { connectLambda } from '@netlify/blobs';
+import { handleNetlifyWebRequest } from './_netlify-web-handler.mjs';
 import { getAccountFromEvent } from './_account-utils.mjs';
 import { requireEuchreLeagueHost, euchreLeaguePlayerIdentity } from './_euchre-league-auth.mjs';
 import { runtimeEuchreLeagueRepository } from './_euchre-league-store.mjs';
@@ -130,7 +130,6 @@ export async function handleEuchreLeagueRequest(event, dependencies = {}) {
   }
 }
 
-export async function handler(event) {
-  if (event.blobs) connectLambda(event);
-  return handleEuchreLeagueRequest(event);
+export default function netlifyHandler(request) {
+  return handleNetlifyWebRequest(request, handleEuchreLeagueRequest);
 }
