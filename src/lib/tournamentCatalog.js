@@ -312,13 +312,13 @@ export function createTournamentRecord(payload = {}) {
 }
 
 export function getNewHostedEventDiscovery(gameSlug) {
-  return normalizeTournamentGameSlug(gameSlug) === 'euchre'
+  return ['euchre', 'gin'].includes(normalizeTournamentGameSlug(gameSlug))
     ? { visibility: 'unlisted', publicDiscovery: false }
     : { visibility: 'public', publicDiscovery: true };
 }
 
 export function getNewHostedEventRegistrationStatus(gameSlug) {
-  return normalizeTournamentGameSlug(gameSlug) === 'euchre' ? 'closed' : 'open';
+  return ['euchre', 'gin'].includes(normalizeTournamentGameSlug(gameSlug)) ? 'closed' : 'open';
 }
 
 export function isPublicTournamentVisible(tournament) {

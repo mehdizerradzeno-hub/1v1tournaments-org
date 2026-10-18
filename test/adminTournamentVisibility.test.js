@@ -35,5 +35,6 @@ test('admin opens on current game-grouped events and leaves older events out of 
   assert.match(adminScreenSource, /Past events stay in the public record, not in the host picker/);
   assert.doesNotMatch(adminScreenSource, /Previous tournaments \(\$\{previousTournaments\.length\}\)/);
   assert.equal((adminScreenSource.match(/<TournamentEventSelector/g) || []).length, 1);
-  assert.match(adminScreenSource, /Choose Spades or Euchre first/);
+  assert.match(adminScreenSource, /Choose a game first/);
+  assert.match(adminScreenSource, /Gin Rummy/);
 });

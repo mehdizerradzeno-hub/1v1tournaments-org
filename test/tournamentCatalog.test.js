@@ -65,8 +65,9 @@ test('private and unlisted events remain available to admin and intentional dire
   assert.deepEqual(getPublicTournamentCatalog([], hosted), []);
 });
 
-test('new Euchre host events default to unlisted while Spades remains public', () => {
+test('new private-game host events default to unlisted while Spades remains public', () => {
   const euchreDiscovery = getNewHostedEventDiscovery('euchre');
+  const ginDiscovery = getNewHostedEventDiscovery('gin');
   const spadesDiscovery = getNewHostedEventDiscovery('spades');
   const euchre = createTournamentRecord({
     ...euchreDiscovery,
@@ -76,8 +77,10 @@ test('new Euchre host events default to unlisted while Spades remains public', (
   });
 
   assert.deepEqual(euchreDiscovery, { visibility: 'unlisted', publicDiscovery: false });
+  assert.deepEqual(ginDiscovery, { visibility: 'unlisted', publicDiscovery: false });
   assert.deepEqual(spadesDiscovery, { visibility: 'public', publicDiscovery: true });
   assert.equal(getNewHostedEventRegistrationStatus('euchre'), 'closed');
+  assert.equal(getNewHostedEventRegistrationStatus('gin'), 'closed');
   assert.equal(getNewHostedEventRegistrationStatus('spades'), 'open');
   assert.equal(isPubliclyDiscoverableTournament(euchre), false);
   assert.equal(euchre.visibility, 'unlisted');

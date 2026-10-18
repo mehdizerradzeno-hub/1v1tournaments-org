@@ -768,7 +768,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Run selected event/);
   assert.match(adminScreenSource, /Site analytics/);
   assert.match(adminScreenSource, /Select an event/);
-  assert.match(adminScreenSource, /Choose Spades or Euchre first/);
+  assert.match(adminScreenSource, /Choose a game first/);
   assert.match(adminScreenSource, /New \{game\.label\} event/);
   assert.match(adminScreenSource, /Refresh roster/);
   assert.match(adminScreenSource, /Clear roster only/);
@@ -780,7 +780,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Tournament mode/);
   assert.match(adminScreenSource, /TOURNAMENT_MODES/);
   assert.match(adminScreenSource, /TOURNAMENT_GAME_OPTIONS/);
-  assert.match(adminScreenSource, /setEventGameSlug\('spades'\)/);
+  assert.match(adminScreenSource, /setEventGameSlug\(nextGameSlug\)/);
   assert.match(adminScreenSource, /const gameSlug = normalizeTournamentGameSlug\(tournament\.gameSlug\)/);
   assert.match(adminScreenSource, /setEventGameSlug\(gameSlug\)/);
   assert.match(adminScreenSource, /\['spades', 'euchre', 'gin'\]/);

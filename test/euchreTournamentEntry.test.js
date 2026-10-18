@@ -15,6 +15,7 @@ test('Euchre entry paths keep discovery, host creation, and assigned matches in 
   });
   assert.equal(getRequestedHostTournamentGame('euchre'), 'euchre');
   assert.equal(getRequestedHostTournamentGame(['euchre', 'spades']), 'euchre');
+  assert.equal(getRequestedHostTournamentGame('gin'), 'gin');
   assert.equal(getRequestedHostTournamentGame('spades'), null);
 });
 

@@ -92,7 +92,9 @@ const CODE_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default:
 const TOURNAMENT_GAME_OPTIONS = Object.freeze([
   { label: 'Spades', value: 'spades' },
   { label: 'Euchre', value: 'euchre' },
+  { label: 'Gin Rummy', value: 'gin' },
 ]);
+const isPrivatePilotGame = (gameSlug) => ['euchre', 'gin'].includes(gameSlug);
 
 function canUseClipboard() {
   return typeof globalThis.navigator !== 'undefined' && Boolean(globalThis.navigator?.clipboard?.writeText);
@@ -268,10 +270,10 @@ function TournamentEventSelector({ currentTournaments, rosterSlug, onSelectTourn
 export default function AdminScreen() {
   const { game: requestedGame } = useLocalSearchParams();
   const requestedHostGame = getRequestedHostTournamentGame(requestedGame);
-  const startsNewEuchreEvent = requestedHostGame === 'euchre';
+  const startsNewPrivateEvent = isPrivatePilotGame(requestedHostGame);
   const initialEventGameSlug = requestedHostGame || normalizeTournamentGameSlug(siteData.tournaments[0]?.gameSlug);
   const initialEventDraft = getNextTournamentDraft(initialEventGameSlug, siteData.tournaments);
-  const initialEventTitle = startsNewEuchreEvent ? initialEventDraft.title : siteData.tournaments[0]?.title || '';
+  const initialEventTitle = startsNewPrivateEvent ? initialEventDraft.title : siteData.tournaments[0]?.title || '';
   const games = getGames();
   const gameLookup = useMemo(() => new Map(games.map((game) => [game.slug, game])), [games]);
   const storageAvailable = hasAdminStorage();
@@ -317,8 +319,8 @@ export default function AdminScreen() {
   const [scheduleTimeZone, setScheduleTimeZone] = useState(() => initialScheduleDefaults.timeZone);
   const [scheduleTimeZoneLabel, setScheduleTimeZoneLabel] = useState(() => initialScheduleDefaults.timeZoneLabel);
   const [scheduleRegistrationStatus, setScheduleRegistrationStatus] = useState(() => (
-    startsNewEuchreEvent
-      ? getNewHostedEventRegistrationStatus('euchre')
+    startsNewPrivateEvent
+      ? getNewHostedEventRegistrationStatus(requestedHostGame)
       : initialScheduleDefaults.registrationStatus
   ));
   const [scheduleCheckInLeadMinutes, setScheduleCheckInLeadMinutes] = useState(() => initialScheduleDefaults.checkInLeadMinutes);
@@ -326,14 +328,14 @@ export default function AdminScreen() {
   const [scheduleMessage, setScheduleMessage] = useState('');
   const [scheduleError, setScheduleError] = useState('');
   const [hostedTournaments, setHostedTournaments] = useState([]);
-  const [isCreatingNewEvent, setIsCreatingNewEvent] = useState(() => startsNewEuchreEvent);
-  const [isAutoEventDraft, setIsAutoEventDraft] = useState(() => startsNewEuchreEvent);
-  const isCreatingNewEventRef = useRef(startsNewEuchreEvent);
-  const isAutoEventDraftRef = useRef(startsNewEuchreEvent);
-  const [eventTitle, setEventTitle] = useState(() => startsNewEuchreEvent ? initialEventTitle : initialScheduleDefaults.title || initialEventTitle);
-  const [eventSlug, setEventSlug] = useState(() => startsNewEuchreEvent ? initialEventDraft.slug : siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
+  const [isCreatingNewEvent, setIsCreatingNewEvent] = useState(() => startsNewPrivateEvent);
+  const [isAutoEventDraft, setIsAutoEventDraft] = useState(() => startsNewPrivateEvent);
+  const isCreatingNewEventRef = useRef(startsNewPrivateEvent);
+  const isAutoEventDraftRef = useRef(startsNewPrivateEvent);
+  const [eventTitle, setEventTitle] = useState(() => startsNewPrivateEvent ? initialEventTitle : initialScheduleDefaults.title || initialEventTitle);
+  const [eventSlug, setEventSlug] = useState(() => startsNewPrivateEvent ? initialEventDraft.slug : siteData.site.primaryTournamentSlug || siteData.tournaments[0]?.slug || '');
   const [eventGameSlug, setEventGameSlug] = useState(() => initialEventGameSlug);
-  const [eventSummary, setEventSummary] = useState(() => startsNewEuchreEvent ? getDefaultTournamentSummary('euchre') : siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
+  const [eventSummary, setEventSummary] = useState(() => startsNewPrivateEvent ? getDefaultTournamentSummary(initialEventGameSlug) : siteData.tournaments[0]?.detail || siteData.tournaments[0]?.summary || '');
   const [eventMode, setEventMode] = useState(() => siteData.tournaments[0]?.mode || 'single-elimination');
   const [eventRosterCap, setEventRosterCap] = useState(() => String(siteData.tournaments[0]?.rosterCap || 8));
   const [eventMinimumPlayers, setEventMinimumPlayers] = useState(() => String(siteData.tournaments[0]?.minimumPlayers || 2));
@@ -652,11 +654,7 @@ export default function AdminScreen() {
     setScheduleSettings(null);
     setEventTitle(draft.title);
     setEventSlug(draft.slug);
-    if (nextGameSlug === 'euchre') {
-      setEventGameSlug('euchre');
-    } else {
-      setEventGameSlug('spades');
-    }
+    setEventGameSlug(nextGameSlug);
     setEventSummary(getDefaultTournamentSummary(nextGameSlug));
     setEventMode('single-elimination');
     setEventRosterCap('8');
@@ -1428,7 +1426,7 @@ export default function AdminScreen() {
   function renderTournamentSelectionSection() {
     return (
       <Section
-        description="Choose Spades or Euchre first. Only current events appear here, so the host center opens on work you can act on."
+        description="Choose a game first. Only current events appear here, so the host center opens on work you can act on."
         nativeID="select-tournament"
         title="Select an event">
         <TournamentEventSelector
@@ -1474,8 +1472,8 @@ export default function AdminScreen() {
             <View style={styles.metaRow}>
               <Badge tone="accent">Event details</Badge>
               <Text style={styles.metaText}>
-                {isCreatingNewEvent && eventGameSlug === 'euchre'
-                  ? 'New Euchre pilot events are unlisted and registration starts closed. Save the invite list before opening registration.'
+                {isCreatingNewEvent && isPrivatePilotGame(eventGameSlug)
+                  ? `New ${getTournamentGameName(eventGameSlug)} pilot events are unlisted and registration starts closed. Save the invite list before opening registration.`
                   : 'These fields control what players see on the homepage, signup page, and tournament page.'}
               </Text>
             </View>
@@ -2794,8 +2792,13 @@ export default function AdminScreen() {
   }
 
   function renderBracketManagerSection() {
-    const gameName = getTournamentGameName((liveTournament || selectedTournament)?.gameSlug);
-    const gameDestination = gameName === 'Euchre' ? 'the configured Euchre service' : '1v1spades.com';
+    const gameSlug = normalizeTournamentGameSlug((liveTournament || selectedTournament)?.gameSlug);
+    const gameName = getTournamentGameName(gameSlug);
+    const gameDestination = gameSlug === 'euchre'
+      ? 'the configured Euchre service'
+      : gameSlug === 'gin'
+        ? 'the configured Gin Rummy service'
+        : '1v1spades.com';
     const readyMatches = bracket?.rounds
       ?.flatMap((round) => round.matches.map((match) => ({ ...match, roundTitle: round.title })))
       ?.filter((match) => match.players?.filter(Boolean).length === 2) || [];
@@ -3189,7 +3192,7 @@ export default function AdminScreen() {
           description="Create the first current event when there is nothing active to edit."
           title="No current event">
           <EmptyState
-            body="Older tournaments stay out of the host center. Start a new Spades or Euchre event from the selector above."
+            body="Older tournaments stay out of the host center. Start a new event from the selector above."
             title="Choose a game to continue"
           />
         </Section>
@@ -3201,7 +3204,7 @@ export default function AdminScreen() {
 
           {renderHostRunSection()}
 
-          <Section
+          {normalizeTournamentGameSlug((liveTournament || selectedTournament)?.gameSlug) === 'euchre' && <Section
             description="Keep public Euchre discovery off while a host runs a 4- or 8-player canonical-account pilot."
             title="Invited Euchre pilot">
             <Surface style={styles.panel}>
@@ -3211,7 +3214,7 @@ export default function AdminScreen() {
               </View>
               <ActionButton href="/admin/euchre-pilot">Open Euchre pilot console</ActionButton>
             </Surface>
-          </Section>
+          </Section>}
 
           {renderLiveRosterSection()}
 

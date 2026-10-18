@@ -9,9 +9,8 @@ function firstValue(value) {
 }
 
 export function getRequestedHostTournamentGame(value) {
-  return String(firstValue(value) || '').trim().toLowerCase() === 'euchre'
-    ? 'euchre'
-    : null;
+  const game = String(firstValue(value) || '').trim().toLowerCase();
+  return ['euchre', 'gin'].includes(game) ? game : null;
 }
 
 export function collectReadyEuchreMatches(events = [], playerStatuses = []) {
