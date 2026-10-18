@@ -3,7 +3,9 @@ import { connectLambda } from '@netlify/blobs';
 import { accountCanonicalId, cleanText } from './_account-utils.mjs';
 import { siteData } from '../../src/lib/siteData.js';
 import { requireTournamentAdmin } from './_host-auth.mjs';
+import { EuchreLeagueError } from '../../src/lib/euchreLeagueSeason.js';
 import {
+  assertManualTournamentMutationAllowed,
   createHostedTournament,
   deleteHostedTournament,
   listHostedTournaments,
@@ -135,6 +137,7 @@ export async function handler(event) {
         tournaments: await listHostedTournaments(),
       });
     } catch (error) {
+      if (error instanceof EuchreLeagueError) return json(error.statusCode, { error: error.message, code: error.code });
       console.error('Tournament event delete failed', error);
       return json(500, { error: 'Tournament event storage is not available yet.' });
     }
@@ -147,6 +150,7 @@ export async function handler(event) {
   }
 
   try {
+    assertManualTournamentMutationAllowed(tournament);
     if (payload.action === 'create') {
       const creation = await createHostedTournament(tournament, adminCheck.account);
 
@@ -189,6 +193,7 @@ export async function handler(event) {
       tournaments: await listHostedTournaments(),
     });
   } catch (error) {
+    if (error instanceof EuchreLeagueError) return json(error.statusCode, { error: error.message, code: error.code });
     console.error('Tournament event save failed', error);
     return json(500, { error: 'Tournament event storage is not available yet.' });
   }

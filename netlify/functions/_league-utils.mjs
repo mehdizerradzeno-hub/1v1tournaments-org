@@ -10,6 +10,7 @@ import {
   promoteFromWaitlist,
   standingsToCsv,
 } from '../../src/lib/leagueCatalog.js';
+import { EUCHRE_LEAGUE_VERSION, EuchreLeagueError, euchreLeagueStandings } from '../../src/lib/euchreLeagueSeason.js';
 
 const STORE_NAME = 'leagues';
 const LEAGUE_RESULT_WRITE_ATTEMPTS = 3;
@@ -55,6 +56,17 @@ async function loadLeague(store, leagueId) {
   return store.get(leagueKey(leagueId), { type: 'json' });
 }
 
+function assertLegacyLeague(league) {
+  if (league?.leagueFormatVersion === EUCHRE_LEAGUE_VERSION) {
+    throw new EuchreLeagueError('versioned_league_required', 'Manage this league through the Euchre league endpoint.');
+  }
+  return league;
+}
+
+async function loadMutableLeague(store, leagueId) {
+  return assertLegacyLeague(await loadLeague(store, leagueId));
+}
+
 async function loadLeagueWithMetadata(store, leagueId) {
   const key = leagueKey(leagueId);
   if (typeof store.getWithMetadata === 'function') {
@@ -88,6 +100,9 @@ async function saveLeagueResult(store, league, etag) {
 }
 
 function withStandings(record) {
+  if (record.leagueFormatVersion === EUCHRE_LEAGUE_VERSION) {
+    return { ...record, standings: euchreLeagueStandings(record).flatMap(division => division.standings) };
+  }
   return {
     ...buildLeagueRecord(record),
     standings: buildLeagueStandings(record),
@@ -100,6 +115,7 @@ export async function listLeagues({ includeArchived = false } = {}) {
   const leagues = await Promise.all(blobs.map((blob) => store.get(blob.key, { type: 'json' })));
   return leagues
     .filter(Boolean)
+    .filter(league => league.leagueFormatVersion !== EUCHRE_LEAGUE_VERSION)
     .filter((league) => includeArchived || league.status !== 'archived')
     .map((league) => ({
       ...withStandings(league),
@@ -113,10 +129,11 @@ export async function loadLeagueById(leagueId) {
   return league ? withStandings(league) : null;
 }
 
-export async function saveLeague(record = {}, account = null) {
-  const store = getLeagueStore();
+export async function saveLeague(record = {}, account = null, options = {}) {
+  const store = options.store || getLeagueStore();
   const next = buildLeagueRecord(record);
-  const existing = await loadLeague(store, next.id);
+  const loaded = await loadLeagueWithMetadata(store, next.id);
+  const existing = assertLegacyLeague(loaded?.league);
 
   const updated = {
     ...buildLeagueRecord(existing || {}),
@@ -127,7 +144,8 @@ export async function saveLeague(record = {}, account = null) {
     createdAt: existing?.createdAt || nowIso(),
   };
 
-  await store.setJSON(leagueKey(updated.id), updated, {
+  const saved = await store.setJSON(leagueKey(updated.id), updated, {
+    ...(existing ? loaded.etag ? { onlyIfMatch: loaded.etag } : {} : { onlyIfNew: true }),
     metadata: {
       leagueId: updated.id,
       status: updated.status,
@@ -135,6 +153,7 @@ export async function saveLeague(record = {}, account = null) {
       gameSlug: updated.gameSlug,
     },
   });
+  if (saved?.modified === false) throw new EuchreLeagueError('write_conflict', 'The league changed while saving. Reload before trying again.');
 
   return {
     ...withStandings(updated),
@@ -143,7 +162,7 @@ export async function saveLeague(record = {}, account = null) {
 
 export async function archiveLeague(leagueId, account = null) {
   const store = getLeagueStore();
-  const existing = await loadLeague(store, leagueId);
+  const existing = await loadMutableLeague(store, leagueId);
 
   if (!existing) return null;
 
@@ -161,7 +180,7 @@ export async function archiveLeague(leagueId, account = null) {
 
 export async function setLeagueRegistration(leagueId, isOpen, account = null) {
   const store = getLeagueStore();
-  const existing = await loadLeague(store, leagueId);
+  const existing = await loadMutableLeague(store, leagueId);
 
   if (!existing) return null;
 
@@ -178,7 +197,7 @@ export async function setLeagueRegistration(leagueId, isOpen, account = null) {
 
 export async function addLeagueParticipant(leagueId, accountIdentity = {}, options = {}) {
   const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
+  const league = await loadMutableLeague(store, leagueId);
   if (!league) return null;
 
   if (league.status === 'archived') {
@@ -223,7 +242,7 @@ export async function addLeagueParticipant(leagueId, accountIdentity = {}, optio
 
 export async function removeLeagueParticipant(leagueId, accountIdentity = {}, options = {}) {
   const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
+  const league = await loadMutableLeague(store, leagueId);
   if (!league) return null;
 
   const update = leaveLeagueRecord(league, accountIdentity, options);
@@ -244,7 +263,7 @@ export async function removeLeagueParticipant(leagueId, accountIdentity = {}, op
 }
 
 export async function replaceLeagueParticipant(leagueId, targetIdentity, accountIdentity = {}) {
-  const league = await loadLeague(getLeagueStore(), leagueId);
+  const league = await loadMutableLeague(getLeagueStore(), leagueId);
   if (!league) return null;
 
   const players = [...(league.participants || [])];
@@ -265,7 +284,7 @@ export async function replaceLeagueParticipant(leagueId, targetIdentity, account
 
 export async function promoteLeagueWaitlist(leagueId, accountIdentity = {}) {
   const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
+  const league = await loadMutableLeague(store, leagueId);
   if (!league) return null;
 
   const update = promoteFromWaitlist(league, accountIdentity);
@@ -293,6 +312,7 @@ export async function upsertLeagueMatchResult(leagueId, matchId, result = {}, op
   for (let attempt = 0; attempt < LEAGUE_RESULT_WRITE_ATTEMPTS; attempt += 1) {
     const loaded = await loadLeagueWithMetadata(store, leagueId);
     if (!loaded?.league) return null;
+    assertLegacyLeague(loaded.league);
 
     const updated = applyLeagueMatchResult(loaded.league, matchId, resolvedResult, {
       force: Boolean(options.force),
@@ -337,7 +357,7 @@ export async function upsertLeagueMatchResult(leagueId, matchId, result = {}, op
 
 export async function launchLeagueMatch(leagueId, matchId, roomUrl = '', account = null) {
   const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
+  const league = await loadMutableLeague(store, leagueId);
   if (!league) return null;
 
   const matches = [...(league.matches || [])];
@@ -382,7 +402,7 @@ export async function launchLeagueMatch(leagueId, matchId, roomUrl = '', account
 
 export async function regenerateLeagueSchedule(leagueId, options = {}) {
   const store = getLeagueStore();
-  const league = await loadLeague(store, leagueId);
+  const league = await loadMutableLeague(store, leagueId);
   if (!league) return null;
 
   const next = generateLeagueSchedule(league, {
@@ -397,6 +417,7 @@ export async function regenerateLeagueSchedule(leagueId, options = {}) {
 export async function exportLeagueStandings(leagueId) {
   const league = await loadLeagueById(leagueId);
   if (!league) return '';
+  assertLegacyLeague(league);
 
   return standingsToCsv(league);
 }

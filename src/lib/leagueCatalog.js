@@ -634,7 +634,7 @@ export function buildLeagueStandings(league, options = {}) {
   return standings.map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
-function buildRoundPairings(participants, doubleRoundRobin = false) {
+export function buildRoundPairings(participants, doubleRoundRobin = false) {
   const ids = [...participants];
   if (ids.length < 2) return [];
 

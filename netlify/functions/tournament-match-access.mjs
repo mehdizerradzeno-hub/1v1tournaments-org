@@ -232,14 +232,15 @@ export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRec
   };
 }
 
-async function issueTicket(event, payload) {
-  const account = await getAccountFromEvent(event);
+export async function issueTournamentMatchTicket(event, payload, dependencies = {}) {
+  const account = await (dependencies.getAccountFromEvent || getAccountFromEvent)(event);
 
   if (!account) {
     return json(401, { error: 'Sign in on 1v1 Tournaments before opening this match.' });
   }
 
-  if (isHostAccount(account)) {
+  const hostAccount = dependencies.isHostAccount ? dependencies.isHostAccount(account) : isHostAccount(account);
+  if (hostAccount) {
     return json(403, {
       error: HOST_ACCOUNT_PLAYER_BLOCK_MESSAGE,
       code: HOST_ACCOUNT_PLAYER_BLOCK_CODE,
@@ -253,14 +254,14 @@ async function issueTicket(event, payload) {
     return json(400, { error: 'Choose a valid tournament match before opening the game.' });
   }
 
-  if (await isHostedTournamentDeleted(tournamentSlug)) {
+  if (await (dependencies.isHostedTournamentDeleted || isHostedTournamentDeleted)(tournamentSlug)) {
     return json(410, {
       error: 'This tournament has been deleted and cannot issue new Play Match access.',
       code: 'tournament_deleted',
     });
   }
 
-  const bracket = await loadBracket(tournamentSlug);
+  const bracket = await (dependencies.loadBracket || loadBracket)(tournamentSlug);
   const matchLookup = findMatch(bracket, matchId);
 
   if (!bracket || !matchLookup) {
@@ -270,11 +271,16 @@ async function issueTicket(event, payload) {
   const { round, match } = matchLookup;
   const game = normalizeTournamentGame(bracket.gameSlug || 'spades');
 
+  if (bracket.euchreLeagueAssignment) {
+    const { assertEuchreLeagueTicketAccess } = await import('./_euchre-league-games.mjs');
+    await assertEuchreLeagueTicketAccess(bracket, account, dependencies);
+  }
+
   if (match.status === 'final') {
     return json(409, { error: 'This match already has a final result.' });
   }
 
-  assertTournamentMatchNotRevoked(await loadTournamentMatchRevocation(matchId));
+  assertTournamentMatchNotRevoked(await (dependencies.loadTournamentMatchRevocation || loadTournamentMatchRevocation)(matchId));
 
   const readyPlayers = match.players.filter(Boolean);
 
@@ -286,7 +292,7 @@ async function issueTicket(event, payload) {
   let seatIndex = findPlayerSeat(match, account);
 
   if (seatIndex === -1) {
-    signup = await findSignupForAccount(tournamentSlug, account);
+    signup = await (dependencies.findSignupForAccount || findSignupForAccount)(tournamentSlug, account);
     seatIndex = findPlayerSeat(match, account, signup);
   }
 
@@ -294,7 +300,7 @@ async function issueTicket(event, payload) {
     return json(403, { error: 'This account is not assigned to that match.' });
   }
 
-  const now = Date.now();
+  const now = dependencies.clock ? new Date(dependencies.clock()).getTime() : Date.now();
   const ticket = randomBytes(32).toString('base64url');
   let launchUrl;
 
@@ -304,8 +310,8 @@ async function issueTicket(event, payload) {
       matchId,
       ticket,
       tournamentSlug,
-      spadesBaseUrl: SPADES_MATCH_BASE_URL,
-      euchreBaseUrl: EUCHRE_MATCH_BASE_URL,
+      spadesBaseUrl: dependencies.spadesBaseUrl ?? SPADES_MATCH_BASE_URL,
+      euchreBaseUrl: dependencies.euchreBaseUrl ?? EUCHRE_MATCH_BASE_URL,
     });
   } catch (error) {
     if (error instanceof TournamentGameContractError) {
@@ -336,7 +342,7 @@ async function issueTicket(event, payload) {
     expiresAt: new Date(now + TOURNAMENT_MATCH_TICKET_TTL_MS).toISOString(),
   };
 
-  await saveTicket(ticket, record);
+  await (dependencies.saveTicket || saveTicket)(ticket, record);
 
   return json(201, {
     ...matchAccessPayload({ bracket, round, match, seatIndex, ticketRecord: record }),
@@ -380,6 +386,10 @@ async function verifyTicket(payload) {
   }
 
   const { round, match } = matchLookup;
+  if (bracket.euchreLeagueAssignment) {
+    const { assertEuchreLeagueTicketAccess } = await import('./_euchre-league-games.mjs');
+    await assertEuchreLeagueTicketAccess(bracket, { id: record.accountId, canonicalAccountId: record.canonicalAccountId }, { allowPaused: true });
+  }
   const seatIndex = Number(record.seatIndex);
   const player = seatIndex === 0 || seatIndex === 1 ? match.players[seatIndex] : null;
 
@@ -434,7 +444,7 @@ export async function handler(event) {
 
   try {
     if (payload.action === 'issue-ticket') {
-      return issueTicket(event, payload);
+      return issueTournamentMatchTicket(event, payload);
     }
 
     if (payload.action === 'verify-ticket') {
@@ -443,6 +453,7 @@ export async function handler(event) {
 
     return json(400, { error: 'Choose a supported match access action.' });
   } catch (error) {
+    if (error instanceof TournamentGameContractError) return json(error.statusCode, { error: error.message, code: error.code });
     console.error('Tournament match access failed', error);
     return json(500, { error: 'Match access is not available yet.' });
   }

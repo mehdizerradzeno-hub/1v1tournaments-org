@@ -227,17 +227,16 @@ test('profile sync is limited to authenticated game services and does not open t
     createAuthority: () => { throw new Error('should not create Friends authority'); },
     syncProfile: async (payload) => {
       calls.push(payload);
-      return { canonicalAccountId: payload.canonicalAccountId, handle: payload.handle, displayName: 'Alpha' };
+      return { canonicalAccountId: payload.canonicalAccountId, handle: payload.handle };
     },
   });
   assert.equal(response.statusCode, 200);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].handle, 'alpha');
+  assert.deepEqual(calls[0], { canonicalAccountId: 'acct-a', handle: 'alpha', audience: 'spades' });
   assert.deepEqual(JSON.parse(response.body).profile, {
     canonicalAccountId: 'acct-a', username: 'alpha',
   });
 });
-
 
 test('Friends transport projects only claimed usernames in search and snapshot', async () => {
   const authority = createAuthority();
