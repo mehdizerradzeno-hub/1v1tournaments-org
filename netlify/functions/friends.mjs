@@ -30,11 +30,6 @@ function parseBody(event) {
   }
 }
 
-/**
- * Production resolves the server-only transactional authority only after the
- * Hub feature gate and game-service authentication pass. Tests may inject an
- * authority backed by the in-memory atomic store.
- */
 export async function handleFriendsRequest(event, dependencies = {}) {
   const env = dependencies.env || process.env;
   if (event.httpMethod === 'OPTIONS') return json(204, {});
@@ -49,40 +44,23 @@ export async function handleFriendsRequest(event, dependencies = {}) {
         ok: true,
         profile: await (dependencies.syncProfile || syncFriendsPublicProfile)({
           canonicalAccountId: payload.actorCanonicalAccountId,
-          handle: payload.handle,
-          displayName: payload.displayName,
+          username: payload.username,
           audience,
         }),
       });
     }
-    const authority = dependencies.authority
-      || await (dependencies.createAuthority || createProductionFriendsAuthority)();
+    const authority = dependencies.authority || await (dependencies.createAuthority || createProductionFriendsAuthority)();
     const actorCanonicalAccountId = payload.actorCanonicalAccountId;
     const idempotencyKey = event.headers?.['idempotency-key'] || event.headers?.['Idempotency-Key'];
-    if (payload.action === 'search') {
-      return json(200, { ok: true, ...(await authority.search({ audience, actorCanonicalAccountId, query: payload.query, cursor: payload.cursor, limit: payload.limit })) });
-    }
-    if (payload.action === 'snapshot') {
-      return json(200, { ok: true, ...(await authority.snapshot({ audience, actorCanonicalAccountId, cursors: payload.cursors, limit: payload.limit })) });
-    }
-    if (payload.action === 'presence-heartbeat') {
-      return json(200, { ok: true, ...(await authority.heartbeatPresence({ audience, actorCanonicalAccountId })) });
-    }
-    if (payload.action === 'presence-clear') {
-      return json(200, { ok: true, ...(await authority.clearPresence({ audience, actorCanonicalAccountId })) });
-    }
-    if (['send', 'accept', 'decline', 'cancel', 'remove'].includes(payload.action)) {
-      return json(200, { ok: true, ...(await authority.mutate({ audience, action: payload.action, actorCanonicalAccountId, targetCanonicalAccountId: payload.targetCanonicalAccountId, idempotencyKey })) });
-    }
+    if (payload.action === 'search') return json(200, { ok: true, ...(await authority.search({ audience, actorCanonicalAccountId, query: payload.query, cursor: payload.cursor, limit: payload.limit })) });
+    if (payload.action === 'snapshot') return json(200, { ok: true, ...(await authority.snapshot({ audience, actorCanonicalAccountId, cursors: payload.cursors, limit: payload.limit })) });
+    if (payload.action === 'presence-heartbeat') return json(200, { ok: true, ...(await authority.heartbeatPresence({ audience, actorCanonicalAccountId })) });
+    if (payload.action === 'presence-clear') return json(200, { ok: true, ...(await authority.clearPresence({ audience, actorCanonicalAccountId })) });
+    if (['send', 'accept', 'decline', 'cancel', 'remove'].includes(payload.action)) return json(200, { ok: true, ...(await authority.mutate({ audience, action: payload.action, actorCanonicalAccountId, targetCanonicalAccountId: payload.targetCanonicalAccountId, idempotencyKey })) });
     return json(400, { ok: false, code: 'invalid_action' });
   } catch (error) {
-    if (error instanceof FriendsAuthorityError) {
-      return json(error.statusCode, { ok: false, code: error.code, message: error.message });
-    }
-    console.error('Friends authority request failed', {
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      code: typeof error?.code === 'string' ? error.code : undefined,
-    });
+    if (error instanceof FriendsAuthorityError) return json(error.statusCode, { ok: false, code: error.code, message: error.message });
+    console.error('Friends authority request failed', { errorName: error instanceof Error ? error.name : 'UnknownError', code: typeof error?.code === 'string' ? error.code : undefined });
     return json(503, { ok: false, code: 'hub_unavailable' });
   }
 }
