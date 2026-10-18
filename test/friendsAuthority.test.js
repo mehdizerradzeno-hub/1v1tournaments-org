@@ -73,7 +73,7 @@ class RecordingFriendsPool {
 
 test('shared Friends contract artifact stays frozen', () => {
   const content = readFileSync(new URL('../contracts/shared-friends-v1.json', import.meta.url));
-  assert.equal(createHash('sha256').update(content).digest('hex'), '834c6407123107e2e99519bb0f737b96503fb7fcef3afe8e30f10aa53d14362c');
+  assert.equal(createHash('sha256').update(content).digest('hex'), 'e768aa70f0446db4dcd963aedcfec0dcd8744d697270f0ae13b2ed4a3e6ffe5f');
 });
 
 test('Netlify Database migration preserves normalized relationship and privacy constraints', () => {
@@ -219,8 +219,7 @@ test('profile sync is limited to authenticated game services and does not open t
       audience: 'spades',
       action: 'profile-sync',
       actorCanonicalAccountId: 'acct-a',
-      handle: 'alpha',
-      displayName: 'Alpha',
+      username: 'alpha',
     }),
   }, {
     env: { HUB_FRIENDS_ENABLED: 'true' },
@@ -228,14 +227,34 @@ test('profile sync is limited to authenticated game services and does not open t
     createAuthority: () => { throw new Error('should not create Friends authority'); },
     syncProfile: async (payload) => {
       calls.push(payload);
-      return { canonicalAccountId: payload.canonicalAccountId, handle: payload.handle, displayName: payload.displayName };
+      return { canonicalAccountId: payload.canonicalAccountId, handle: payload.handle, displayName: 'Alpha' };
     },
   });
   assert.equal(response.statusCode, 200);
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].handle, 'alpha');
   assert.deepEqual(JSON.parse(response.body).profile, {
-    canonicalAccountId: 'acct-a', handle: 'alpha', displayName: 'Alpha',
+    canonicalAccountId: 'acct-a', username: 'alpha',
   });
+});
+
+
+test('Friends transport projects only claimed usernames in search and snapshot', async () => {
+  const authority = createAuthority();
+  const options = { env: { HUB_FRIENDS_ENABLED: 'true' }, validateCaller: () => 'spades', authority };
+  const request = (action, extra = {}) => handleFriendsRequest({
+    httpMethod: 'POST',
+    headers: { authorization: 'Bearer service-secret' },
+    body: JSON.stringify({ audience: 'spades', action, actorCanonicalAccountId: 'acct-a', ...extra }),
+  }, options);
+  const search = JSON.parse((await request('search', { query: 'bravo' })).body);
+  assert.equal(search.contractVersion, '2026-10-13-username-1');
+  assert.deepEqual(search.items, [{ canonicalAccountId: 'acct-b', username: 'bravo' }]);
+  await authority.mutate({ audience: 'spades', action: 'send', actorCanonicalAccountId: 'acct-a', targetCanonicalAccountId: 'acct-b' });
+  const snapshot = JSON.parse((await request('snapshot')).body);
+  assert.equal(snapshot.contractVersion, '2026-10-13-username-1');
+  assert.deepEqual(snapshot.outgoing, [{ canonicalAccountId: 'acct-b', username: 'bravo' }]);
+  assert.doesNotMatch(JSON.stringify({ items: search.items, outgoing: snapshot.outgoing }), /handle|displayName|email|guest/i);
 });
 
 test('crossed requests are serialized into one accepted relationship', async () => {
