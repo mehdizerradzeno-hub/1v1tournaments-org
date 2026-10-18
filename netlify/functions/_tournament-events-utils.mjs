@@ -157,7 +157,7 @@ export function normalizeHostedTournament(payload = {}) {
   }
 
   if (requestedGameSlug && !TOURNAMENT_GAME_SLUGS.includes(requestedGameSlug)) {
-    return { error: 'Tournament game must be spades or euchre.' };
+    return { error: 'Tournament game must be Spades, Euchre, or Gin Rummy.' };
   }
 
   const record = createTournamentRecord({

@@ -1,7 +1,7 @@
 import { getTournamentMode, getTournamentModeValue } from './tournamentModes.js';
 
 const DEFAULT_GAME_SLUG = 'spades';
-export const TOURNAMENT_GAME_SLUGS = Object.freeze(['spades', 'euchre']);
+export const TOURNAMENT_GAME_SLUGS = Object.freeze(['spades', 'euchre', 'gin']);
 const DEFAULT_TIME_ZONE = 'America/New_York';
 const DEFAULT_TIME_ZONE_LABEL = 'ET';
 const DEFAULT_ROSTER_CAP = 8;
@@ -81,7 +81,11 @@ export function normalizeTournamentGameSlug(value, fallback = DEFAULT_GAME_SLUG)
 }
 
 export function getTournamentGameName(value) {
-  return normalizeTournamentGameSlug(value) === 'euchre' ? 'Euchre' : 'Spades';
+  const gameSlug = normalizeTournamentGameSlug(value);
+
+  if (gameSlug === 'euchre') return 'Euchre';
+  if (gameSlug === 'gin') return 'Gin Rummy';
+  return 'Spades';
 }
 
 export function getDefaultTournamentSummary(value) {
@@ -96,7 +100,7 @@ function normalizeTournamentCheckIn(value, gameSlug) {
   const steps = incomingSteps.map((step) => {
     const text = cleanText(step);
 
-    if (gameSlug === 'euchre' && text === DEFAULT_CHECK_IN.steps[2]) {
+    if (gameSlug !== 'spades' && text === DEFAULT_CHECK_IN.steps[2]) {
       return defaultMatchStep;
     }
 

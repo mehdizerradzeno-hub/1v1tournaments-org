@@ -623,8 +623,8 @@ export default function AdminScreen() {
     const summary = tournament.detail || tournament.summary || '';
     setEventGameSlug(gameSlug);
     setEventSummary(
-      gameSlug === 'euchre' && summary === getDefaultTournamentSummary('spades')
-        ? getDefaultTournamentSummary('euchre')
+      gameSlug !== 'spades' && summary === getDefaultTournamentSummary('spades')
+        ? getDefaultTournamentSummary(gameSlug)
         : summary,
     );
     setEventMode(getTournamentMode(tournament.mode).value);
@@ -857,7 +857,7 @@ export default function AdminScreen() {
       setEventSlug(draft.slug);
     }
     setEventSummary((current) => (
-      current === getDefaultTournamentSummary('spades') || current === getDefaultTournamentSummary('euchre')
+      ['spades', 'euchre', 'gin'].some((game) => current === getDefaultTournamentSummary(game))
         ? getDefaultTournamentSummary(nextGameSlug)
         : current
     ));
@@ -3116,7 +3116,7 @@ export default function AdminScreen() {
       }
       lead={
         showDraftTools
-          ? 'Draft tournaments can be edited here without changing the public Spades and Euchre gameplay files.'
+          ? 'Draft tournaments can be edited here without changing any game’s gameplay files.'
           : 'View registered players, generate brackets, and run matches from your host-approved account.'
       }
       stats={

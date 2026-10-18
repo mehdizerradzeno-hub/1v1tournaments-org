@@ -22,21 +22,22 @@ import {
 test('the site policy copy stays free-entry and no-wagering', () => {
   assert.equal(siteData.site.entryPolicy, 'Free entry, no buy-in, no wagering.');
   assert.match(siteData.site.headline, /account-based signups/i);
-  assert.match(siteData.site.headline, /Spades match links/i);
+  assert.match(siteData.site.headline, /game-specific match links/i);
   assert.match(siteData.site.tagline, /Sign up/i);
   assert.match(siteData.site.tagline, /match link/i);
   assert.equal(siteData.site.contactEmail, 'hello@1v1tournaments.org');
 });
 
-test('game paths keep Spades and Euchre on short routes', () => {
+test('game paths keep every configured game on a short route', () => {
   assert.equal(getGamePath('spades'), '/spades');
   assert.equal(getGamePath('euchre'), '/euchre');
+  assert.equal(getGamePath('gin'), '/gin');
 });
 
-test('games are sorted for the lineup page and only include Spades and Euchre', () => {
+test('games are sorted for the lineup page and include the Gin Rummy staging integration', () => {
   assert.deepEqual(
     getGames().map((game) => game.slug),
-    ['spades', 'euchre'],
+    ['spades', 'euchre', 'gin'],
   );
 });
 
@@ -52,6 +53,14 @@ test('the Euchre lane stays public-but-coming-soon', () => {
   assert.equal(getGameBySlug('euchre')?.status, 'coming soon');
   assert.equal(getGameBySlug('euchre')?.featuredTournamentSlug, null);
   assert.deepEqual(getTournamentsForGame('euchre').map((tournament) => tournament.slug), []);
+});
+
+test('the Gin Rummy lane exposes the shared-hub integration without inventing a public event', () => {
+  assert.equal(getTournamentBySlug('gin-rummy-preview-night'), null);
+  assert.equal(getGameBySlug('gin')?.name, 'Gin Rummy');
+  assert.equal(getGameBySlug('gin')?.status, 'coming soon');
+  assert.equal(getGameBySlug('gin')?.featuredTournamentSlug, null);
+  assert.deepEqual(getTournamentsForGame('gin').map((tournament) => tournament.slug), []);
 });
 
 test('the YouTube channel link points at the new channel URL', () => {

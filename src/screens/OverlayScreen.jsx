@@ -125,9 +125,8 @@ function getMatchBroadcastStatus(match) {
 function StreamBracketBoard({ bracket, tournament }) {
   const rounds = bracket?.rounds || [];
   const champion = bracket?.winner?.name || bracket?.winner?.playerName || bracket?.championName || '';
-  const gameName = String(tournament?.gameSlug || tournament?.game || 'spades').toLowerCase() === 'euchre'
-    ? 'Euchre'
-    : 'Spades';
+  const gameSlug = String(tournament?.gameSlug || tournament?.game || 'spades').toLowerCase();
+  const gameName = gameSlug === 'gin' ? 'Gin Rummy' : gameSlug === 'euchre' ? 'Euchre' : 'Spades';
 
   return (
     <View style={styles.broadcastBoard}>

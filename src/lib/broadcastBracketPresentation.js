@@ -140,13 +140,14 @@ export function buildBroadcastBracketModel({ event, bracket, now = Date.now() } 
     matches: (Array.isArray(round?.matches) ? round.matches : []).map((match, matchIndex) => publicMatch(match, roundIndex, matchIndex)),
   }));
   const status = eventStatus(event, bracket, now);
-  const gameSlug = cleanText(event?.gameSlug || bracket?.gameSlug, 'spades').toLowerCase() === 'euchre' ? 'euchre' : 'spades';
+  const requestedGameSlug = cleanText(event?.gameSlug || bracket?.gameSlug, 'spades').toLowerCase();
+  const gameSlug = ['spades', 'euchre', 'gin'].includes(requestedGameSlug) ? requestedGameSlug : 'spades';
 
   return {
     title: cleanText(event.title, '1V1 Tournament'),
     slug: cleanText(event.slug || bracket?.tournamentSlug),
     gameSlug,
-    gameName: gameSlug === 'euchre' ? 'Euchre' : 'Spades',
+    gameName: gameSlug === 'gin' ? 'Gin Rummy' : gameSlug === 'euchre' ? 'Euchre' : 'Spades',
     series: /reddit/i.test(`${event.title || ''} ${event.badge || ''}`) ? 'Reddit Community Cup' : '',
     status,
     statusLabel: status === 'check-in' ? 'Check-in' : `${status.charAt(0).toUpperCase()}${status.slice(1)}`,

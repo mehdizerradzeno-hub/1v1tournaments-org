@@ -2,6 +2,7 @@ export const APP_STORE_SPADES_URL = 'https://apps.apple.com/us/app/1v1-spades/id
 export const APP_STORE_EUCHRE_URL = 'https://apps.apple.com/us/app/euchre-1v1/id6788707299';
 export const WEB_SPADES_URL = 'https://1v1spades.com';
 export const WEB_EUCHRE_URL = 'https://1v1euchre.com';
+export const WEB_GIN_URL = 'https://onev1-gin-staging.onrender.com/';
 export const TOURNAMENTS_URL = 'https://1v1tournaments.org';
 export const DISCORD_URL = 'https://discord.gg/WUmaXz7X6';
 export const TWITCH_URL = 'https://www.twitch.tv/1v1compspades';
@@ -14,6 +15,7 @@ export const downloadLinks = {
   appStoreEuchre: APP_STORE_EUCHRE_URL,
   webSpades: WEB_SPADES_URL,
   webEuchre: WEB_EUCHRE_URL,
+  webGin: WEB_GIN_URL,
   tournaments: TOURNAMENTS_URL,
   discord: DISCORD_URL,
   twitch: TWITCH_URL,

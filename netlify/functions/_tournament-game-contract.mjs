@@ -4,8 +4,8 @@ import { SHARED_IDENTITY_PROTOCOL_VERSION } from './_shared-account-utils.mjs';
 export const TOURNAMENT_GAME_PROTOCOL_VERSION = SHARED_IDENTITY_PROTOCOL_VERSION;
 export const TOURNAMENT_MATCH_TICKET_TTL_MS = 30 * 60 * 1000;
 
-const SUPPORTED_GAMES = new Set(['spades', 'euchre']);
-const EUCHRE_SEATS = ['north', 'south'];
+const SUPPORTED_GAMES = new Set(['spades', 'euchre', 'gin']);
+const TWO_PLAYER_SEATS = ['north', 'south'];
 const SPADES_SCORE_SEATS = ['seat0', 'seat1'];
 const TOURNAMENT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -35,7 +35,7 @@ export function tournamentSeat(game, seatIndex) {
     throw new TournamentGameContractError(403, 'This ticket has an invalid player assignment.', 'invalid_seat');
   }
 
-  return normalizedGame === 'euchre' ? EUCHRE_SEATS[seatIndex] : `player-${seatIndex + 1}`;
+  return normalizedGame === 'spades' ? `player-${seatIndex + 1}` : TWO_PLAYER_SEATS[seatIndex];
 }
 
 export function buildTournamentReturnPath(tournamentSlug) {
@@ -48,7 +48,7 @@ export function buildTournamentReturnPath(tournamentSlug) {
   return `/tournaments/${slug}`;
 }
 
-export function buildTournamentLaunchUrl({ game, matchId, ticket, tournamentSlug, spadesBaseUrl, euchreBaseUrl }) {
+export function buildTournamentLaunchUrl({ game, matchId, ticket, tournamentSlug, spadesBaseUrl, euchreBaseUrl, ginBaseUrl }) {
   const normalizedGame = normalizeTournamentGame(game);
   const cleanId = cleanText(matchId);
   const cleanTicket = cleanText(ticket);
@@ -64,12 +64,12 @@ export function buildTournamentLaunchUrl({ game, matchId, ticket, tournamentSlug
     return url.toString();
   }
 
-  const base = cleanText(euchreBaseUrl);
+  const base = cleanText(normalizedGame === 'gin' ? ginBaseUrl : euchreBaseUrl);
 
   if (!base) {
     throw new TournamentGameContractError(
       409,
-      'Euchre tournament launch is not configured yet.',
+      `${normalizedGame === 'gin' ? 'Gin Rummy' : 'Euchre'} tournament launch is not configured yet.`,
       'game_unavailable',
     );
   }
@@ -163,19 +163,20 @@ export function normalizeTournamentResultCallback(payload, tournamentSlug) {
     throw new TournamentGameContractError(400, 'The result callback is missing required match identity fields.', 'malformed_result');
   }
 
-  const [homeScoreKey, awayScoreKey] = game === 'euchre'
-    ? EUCHRE_SEATS
-    : SPADES_SCORE_SEATS;
+  const [homeScoreKey, awayScoreKey] = game === 'spades'
+    ? SPADES_SCORE_SEATS
+    : TWO_PLAYER_SEATS;
   // Spades scores can legitimately be negative after nil or bag penalties.
-  // Euchre is a non-negative point game. The Hub stores a verified game
-  // result, so it must preserve each game's authoritative score semantics.
+  // Euchre and Gin are non-negative point games. The Hub stores a verified
+  // game result, so it must preserve each game's authoritative score semantics.
   const scoreOptions = { allowNegative: game === 'spades' };
   const homeScore = cleanScore(payload?.scores?.[homeScoreKey], scoreOptions);
   const awayScore = cleanScore(payload?.scores?.[awayScoreKey], scoreOptions);
 
   if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
-    const requirement = game === 'euchre' ? 'non-negative whole numbers' : 'whole numbers';
-    throw new TournamentGameContractError(400, `${game === 'euchre' ? 'Euchre' : 'Spades'} scores must be ${requirement}.`, 'malformed_scores');
+    const requirement = game === 'spades' ? 'whole numbers' : 'non-negative whole numbers';
+    const gameName = game === 'gin' ? 'Gin Rummy' : game === 'euchre' ? 'Euchre' : 'Spades';
+    throw new TournamentGameContractError(400, `${gameName} scores must be ${requirement}.`, 'malformed_scores');
   }
 
   const isForfeit = payload?.forfeit === true;
@@ -195,9 +196,9 @@ export function normalizeTournamentResultCallback(payload, tournamentSlug) {
     winnerCanonicalAccountId,
     scores: homeScore === null && awayScore === null
       ? null
-      : game === 'euchre'
-        ? { north: homeScore, south: awayScore }
-        : { seat0: homeScore, seat1: awayScore },
+      : game === 'spades'
+        ? { seat0: homeScore, seat1: awayScore }
+        : { north: homeScore, south: awayScore },
     forfeit: isForfeit,
     forfeitReason: isForfeit ? forfeitReason : '',
   };

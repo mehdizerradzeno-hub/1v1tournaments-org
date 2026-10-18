@@ -72,7 +72,7 @@ function FeaturedPanel({ model }) {
   return (
     <View dataSet={isChampion ? { broadcastChampion: 'true' } : undefined} style={[styles.featurePanel, isChampion && styles.championPanel]}>
       <View style={styles.featureIcon}>
-        <Text style={styles.featureSuit}>{isChampion ? '1V1' : model.gameSlug === 'euchre' ? 'D' : 'S'}</Text>
+        <Text style={styles.featureSuit}>{isChampion ? '1V1' : model.gameSlug === 'gin' ? 'G' : model.gameSlug === 'euchre' ? 'D' : 'S'}</Text>
       </View>
       <Text style={styles.featureEyebrow}>{featured.eyebrow}</Text>
       <Text style={[styles.featureTitle, isChampion && styles.championTitle]}>{featured.title}</Text>

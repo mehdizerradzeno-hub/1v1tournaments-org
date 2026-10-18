@@ -13,6 +13,7 @@ import {
 
 const spadesRouteFile = fileURLToPath(new URL('../app/spades.jsx', import.meta.url));
 const euchreRouteFile = fileURLToPath(new URL('../app/euchre.jsx', import.meta.url));
+const ginRouteFile = fileURLToPath(new URL('../app/gin.jsx', import.meta.url));
 const aboutRouteFile = fileURLToPath(new URL('../app/about.jsx', import.meta.url));
 const contactRouteFile = fileURLToPath(new URL('../app/contact.jsx', import.meta.url));
 const sponsorsRouteFile = fileURLToPath(new URL('../app/sponsors.jsx', import.meta.url));
@@ -98,6 +99,11 @@ test('/spades stays wired to the dedicated Spades route file', () => {
 test('/euchre stays wired to the dedicated Euchre route file', () => {
   assert.equal(getGamePath('euchre'), '/euchre');
   assert.ok(existsSync(euchreRouteFile));
+});
+
+test('/gin stays wired to the dedicated Gin Rummy route file', () => {
+  assert.equal(getGamePath('gin'), '/gin');
+  assert.ok(existsSync(ginRouteFile));
 });
 
 test('/about stays wired to the public organization page', () => {
@@ -777,7 +783,7 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /setEventGameSlug\('spades'\)/);
   assert.match(adminScreenSource, /const gameSlug = normalizeTournamentGameSlug\(tournament\.gameSlug\)/);
   assert.match(adminScreenSource, /setEventGameSlug\(gameSlug\)/);
-  assert.match(adminScreenSource, /getDefaultTournamentSummary\('euchre'\)/);
+  assert.match(adminScreenSource, /\['spades', 'euchre', 'gin'\]/);
   assert.match(adminScreenSource, /gameSlug: eventGameSlug/);
   assert.match(adminScreenSource, /Save event/);
   assert.match(adminScreenSource, /Past events stay in the public record, not in the host picker/);

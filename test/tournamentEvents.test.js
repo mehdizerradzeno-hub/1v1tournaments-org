@@ -100,9 +100,10 @@ test('hosted tournament event normalization defaults legacy records to Spades', 
   assert.equal(normalizeHostedTournament(baseEvent).gameSlug, 'spades');
 });
 
-test('hosted tournament event normalization persists canonical Spades and Euchre games', () => {
+test('hosted tournament event normalization persists every supported game', () => {
   assert.equal(normalizeHostedTournament({ ...baseEvent, gameSlug: 'spades' }).gameSlug, 'spades');
   assert.equal(normalizeHostedTournament({ ...baseEvent, gameSlug: 'euchre' }).gameSlug, 'euchre');
+  assert.equal(normalizeHostedTournament({ ...baseEvent, gameSlug: 'gin' }).gameSlug, 'gin');
 });
 
 test('the private Euchre pilot stays unlisted after server normalization', async () => {
@@ -126,7 +127,7 @@ test('the private Euchre pilot stays unlisted after server normalization', async
 
 test('hosted tournament event normalization rejects unsupported game values', () => {
   assert.deepEqual(normalizeHostedTournament({ ...baseEvent, gameSlug: 'hearts' }), {
-    error: 'Tournament game must be spades or euchre.',
+    error: 'Tournament game must be Spades, Euchre, or Gin Rummy.',
   });
 });
 

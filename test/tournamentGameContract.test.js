@@ -116,6 +116,29 @@ test('Euchre launch uses the configured route without inventing a match path', (
   );
 });
 
+test('Gin Rummy launch uses the configured Gin route and preserves its hub return context', () => {
+  const launch = new URL(buildTournamentLaunchUrl({
+    game: 'gin',
+    matchId: 'gin-season-one-r1-m1',
+    ticket: 'opaque-ticket',
+    tournamentSlug: 'gin-season-one',
+    ginBaseUrl: 'https://onev1-gin-staging.onrender.com/',
+  }));
+
+  assert.equal(launch.origin, 'https://onev1-gin-staging.onrender.com');
+  assert.equal(launch.pathname, '/');
+  assert.equal(launch.searchParams.get('matchId'), 'gin-season-one-r1-m1');
+  assert.equal(launch.searchParams.get('ticket'), 'opaque-ticket');
+  assert.equal(launch.searchParams.get('tournamentReturnPath'), '/tournaments/gin-season-one');
+  assert.throws(() => buildTournamentLaunchUrl({
+    game: 'gin',
+    matchId: 'match-1',
+    ticket: 'opaque-ticket',
+    tournamentSlug: 'gin-season-one',
+    ginBaseUrl: '',
+  }), (error) => error instanceof TournamentGameContractError && error.code === 'game_unavailable');
+});
+
 test('Spades launch path and opaque ticket hashing remain unchanged', () => {
   const launch = new URL(buildTournamentLaunchUrl({
     game: 'spades',
@@ -158,6 +181,33 @@ test('valid Euchre ticket is player, canonical identity, game, match, and seat b
   assert.equal(access.canonicalAccountId, 'acct-1');
   assert.equal(access.seat, 'north');
   assert.equal(access.roomId, match.id);
+});
+
+test('Gin ticket preserves the north/south seat model required by the Gin room engine', () => {
+  const { bracket, match, record, player } = fixture();
+  bracket.gameSlug = 'gin';
+  bracket.tournamentSlug = 'gin-season-one';
+  match.id = 'gin-season-one-r1-m1';
+  record.game = 'gin';
+  record.tournamentId = 'gin-season-one';
+  record.tournamentSlug = 'gin-season-one';
+  record.tournamentReturnPath = '/tournaments/gin-season-one';
+  record.matchId = match.id;
+  record.roomId = match.id;
+  const round = bracket.rounds.find((item) => item.matches.includes(match));
+  const payload = matchAccessPayload({ bracket, round, match, seatIndex: 0, ticketRecord: record });
+  const access = assertTournamentTicketAccess({
+    bracket,
+    match,
+    record,
+    player,
+    request: { game: 'gin', matchId: match.id, canonicalAccountId: 'acct-1', seat: 'north' },
+  });
+
+  assert.equal(payload.game, 'gin');
+  assert.deepEqual(payload.tournamentContext, { returnPath: '/tournaments/gin-season-one' });
+  assert.equal(payload.seat, 'north');
+  assert.equal(access.seat, 'north');
 });
 
 test('Euchre ticket rejects wrong game, player, canonical identity, seat, expiry, and completion', () => {
@@ -235,6 +285,26 @@ test('Spades result callbacks use the same signed completion contract with seat 
     ),
     (error) => error.code === 'malformed_forfeit',
   );
+});
+
+test('Gin result callback advances only a Gin bracket and retains Gin match scores', () => {
+  const { bracket, match } = fixture();
+  bracket.gameSlug = 'gin';
+  bracket.tournamentSlug = 'gin-season-one';
+  match.id = 'gin-season-one-r1-m1';
+  const result = normalizeTournamentResultCallback(resultPayload({
+    game: 'gin',
+    tournamentId: 'gin-season-one',
+    matchId: match.id,
+    completionId: 'gin-room-1-completion-1',
+    scores: { north: 100, south: 87 },
+  }), bracket.tournamentSlug);
+
+  const applied = applyAuthoritativeTournamentResult(bracket, result);
+  assert.equal(applied.duplicate, false);
+  assert.equal(match.status, 'final');
+  assert.equal(match.winnerId, 'signup-1');
+  assert.deepEqual(match.completion.scores, { north: 100, south: 87 });
 });
 
 test('authoritative Euchre result advances once, preserves audit fields, and rejects conflict', () => {

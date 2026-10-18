@@ -35,6 +35,7 @@ import {
 
 const SPADES_MATCH_BASE_URL = process.env.SPADES_MATCH_BASE_URL || 'https://1v1spades.com/match';
 const EUCHRE_MATCH_BASE_URL = process.env.EUCHRE_MATCH_BASE_URL || '';
+const GIN_MATCH_BASE_URL = process.env.GIN_MATCH_BASE_URL || 'https://onev1-gin-staging.onrender.com/';
 const MATCH_ID_RE = /^([a-z0-9]+(?:-[a-z0-9]+)*)-r([1-9]\d*)-m([1-9]\d*)$/i;
 
 const headers = {
@@ -200,11 +201,11 @@ export function matchAccessPayload({ bracket, round, match, seatIndex, ticketRec
     game,
     tournamentId: bracket.tournamentSlug,
     tournamentSlug: bracket.tournamentSlug,
-    tournamentContext: game === 'euchre'
-      ? {
+    tournamentContext: game === 'spades'
+      ? null
+      : {
           returnPath: ticketRecord?.tournamentReturnPath || buildTournamentReturnPath(bracket.tournamentSlug),
-        }
-      : null,
+        },
     bracketStatus: bracket.status,
     round: {
       index: round.index,
@@ -312,6 +313,7 @@ export async function issueTournamentMatchTicket(event, payload, dependencies = 
       tournamentSlug,
       spadesBaseUrl: dependencies.spadesBaseUrl ?? SPADES_MATCH_BASE_URL,
       euchreBaseUrl: dependencies.euchreBaseUrl ?? EUCHRE_MATCH_BASE_URL,
+      ginBaseUrl: dependencies.ginBaseUrl ?? GIN_MATCH_BASE_URL,
     });
   } catch (error) {
     if (error instanceof TournamentGameContractError) {
@@ -336,7 +338,7 @@ export async function issueTournamentMatchTicket(event, payload, dependencies = 
     seatIndex,
     seat: tournamentSeat(game, seatIndex),
     roomId: match.id,
-    tournamentReturnPath: game === 'euchre' ? buildTournamentReturnPath(tournamentSlug) : '',
+    tournamentReturnPath: game === 'spades' ? '' : buildTournamentReturnPath(tournamentSlug),
     participantIds: match.players.filter(Boolean).map((participant) => participant.id),
     issuedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + TOURNAMENT_MATCH_TICKET_TTL_MS).toISOString(),

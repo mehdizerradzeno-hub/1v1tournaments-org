@@ -47,10 +47,10 @@ export const siteData = {
   site: {
     name: '1v1 Tournaments',
     domain: '1v1tournaments.org',
-    headline: 'Free-entry card tournaments with account-based signups, hosted brackets, and Spades match links.',
+    headline: 'Free-entry card tournaments with account-based signups, hosted brackets, and game-specific match links.',
     tagline: 'Sign up, get seeded, open your match link, and play.',
     entryPolicy: 'Free entry, no buy-in, no wagering.',
-    adminNote: 'Tournament pages manage signups, brackets, match links, and winner advancement. Spades remains the gameplay app.',
+    adminNote: 'Tournament pages manage signups, brackets, match links, and winner advancement. Each game remains responsible for its own gameplay.',
     contactEmail: 'hello@1v1tournaments.org',
     primaryGameSlug: 'spades',
     primaryTournamentSlug: 'spades-summer-series',
@@ -59,10 +59,10 @@ export const siteData = {
     summary: '1v1 Tournaments is the public home for free-entry, skill-based card-game events.',
     mission: 'Run simple free-entry card tournaments with one clear path for players and one private path for the host.',
     focus: [
-      'Account-based Spades signups',
+      'Account-based game signups',
       'Hosted brackets and match links',
       'Posted results and stream links',
-      'Euchre coming soon',
+      'Euchre and Gin Rummy integrations',
     ],
     contactEmail: 'hello@1v1tournaments.org',
     responseNote: 'Replies are handled manually for now.',
@@ -192,6 +192,45 @@ export const siteData = {
         },
       ],
     },
+    {
+      slug: 'gin',
+      name: 'Gin Rummy',
+      status: 'coming soon',
+      badge: 'Staging integration',
+      sortOrder: 3,
+      shortPath: '/gin',
+      summary: 'Gin Rummy now uses the shared account, ticket, bracket, and result-callback contract while its standard Gin engine remains independent.',
+      heroCopy: 'Gin Rummy uses the same 1v1 Tournaments account and bracket flow. Public events stay release-gated until the Gin service is approved.',
+      accent: '#7F9F77',
+      featuredTournamentSlug: null,
+      quickFacts: [
+        { label: 'Entry', value: 'Free' },
+        { label: 'Buy-in', value: 'None' },
+        { label: 'Status', value: 'Staging integration' },
+      ],
+      highlights: [
+        'One 1v1 Tournaments account can open a Gin table with a single-use Gin authorization.',
+        'The hub issues player-bound Gin match tickets and advances the bracket from authoritative Gin results.',
+        'Gin hands, stock, discard pile, melds, and scoring remain Gin-only game state.',
+      ],
+      ruleSections: [
+        {
+          title: 'Integration status',
+          items: [
+            'Gin Rummy uses the shared signup, bracket, player-ticket, and result-reporting infrastructure.',
+            'Host-created Gin events can use the same tournament workflow once the Gin deployment configuration is approved.',
+            'No public Gin event is scheduled yet.',
+          ],
+        },
+        {
+          title: 'Game boundary',
+          items: [
+            'Gin uses standard two-player Gin Rummy rules and its own server-authoritative engine.',
+            'The tournament hub never interprets Gin cards, melds, knocks, or score decisions.',
+          ],
+        },
+      ],
+    },
   ],
   tournaments: [
     {
@@ -283,14 +322,14 @@ export const siteData = {
         items: [
           'Use the private admin page to load account-linked signups.',
           'Generate the bracket from the live roster.',
-          'Let Spades report match winners automatically, then use manual advance only as a backup.',
+          'Let the assigned game report match winners automatically, then use manual advance only as a backup.',
         ],
       },
       {
         title: 'Site scope',
         items: [
           'The hub owns tournament registration and bracket state.',
-          'Spades owns gameplay.',
+          'Each game owns its own gameplay.',
           'Tournament match links require account-issued player tickets.',
         ],
       },

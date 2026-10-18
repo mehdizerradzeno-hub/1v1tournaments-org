@@ -271,7 +271,7 @@ export async function resolveGameAccountIdentities(identityKeysValue, audienceVa
 export async function createGameAuthorization(identity, audienceValue, options = {}) {
   const audience = normalizeGameAudience(audienceValue);
   if (!audience) {
-    throw new SharedAccountContractError('Choose Spades or Euchre for account authorization.', 400, 'invalid_audience');
+    throw new SharedAccountContractError('Choose a configured game for account authorization.', 400, 'invalid_audience');
   }
   if (!identity?.canonicalAccountId || identity.protocolVersion !== SHARED_IDENTITY_PROTOCOL_VERSION) {
     throw new SharedAccountContractError('A current canonical identity is required.', 400, 'invalid_identity');

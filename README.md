@@ -6,7 +6,7 @@ Standalone Expo Router project for `1v1tournaments.org`.
 
 - A mobile-first dark public organization website.
 - A home page with the public organization snapshot and upcoming tournaments.
-- A Spades landing page plus a reusable Euchre route that now stays marked as coming soon.
+- Spades, Euchre, and Gin Rummy game routes, with Gin using the same account, ticket, bracket, and result-callback contract while it remains release-gated.
 - About and contact pages for the organization.
 - Tournament detail pages.
 - A general rules page.
@@ -102,6 +102,33 @@ REQUIRE_VERIFIED_PLAYER_EMAILS=true
 
 Existing accounts without an `emailVerified` field remain treated as verified, so enabling the
 flag does not lock out the current roster.
+
+## Gin Rummy Integration
+
+Gin Rummy uses the same canonical player account as Spades and Euchre, but retains a
+Gin-only server-authoritative game engine and Gin-owned game data. The hub issues a
+single-use `gin` authorization when a player opens a Gin tournament match, then issues a
+player-, identity-, game-, and seat-bound match ticket. Gin verifies the ticket with the hub
+and posts its authoritative result back to the existing bracket endpoint.
+
+Before enabling a Gin event in a hosted environment, configure the following server-only
+values in both services:
+
+```text
+# 1v1 Tournaments
+SHARED_ACCOUNT_GIN_SECRET=<Gin account-exchange secret>
+TOURNAMENT_MATCH_RESULT_TOKEN=<shared result callback token>
+GIN_MATCH_BASE_URL=https://onev1-gin-staging.onrender.com/
+
+# Gin service
+SHARED_ACCOUNT_GIN_SECRET=<same Gin account-exchange secret>
+TOURNAMENT_MATCH_RESULT_TOKEN=<same result callback token>
+GIN_TOURNAMENTS_ENABLED=true
+GIN_TOURNAMENT_MATCHES_ENABLED=true
+```
+
+The code supports host-created Gin tournaments, but this repository does not enable a
+public Gin event or deploy/configure any external service by itself.
 
 ## Scheduled Operations
 

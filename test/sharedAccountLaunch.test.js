@@ -97,7 +97,7 @@ test('tournament match launch authorizes the game returned by match access', asy
   const originalFetch = globalThis.fetch;
 
   try {
-    for (const game of ['spades', 'euchre']) {
+    for (const game of ['spades', 'euchre', 'gin']) {
       const requests = [];
       globalThis.fetch = async (endpoint, options) => {
         const body = JSON.parse(options.body);
@@ -106,7 +106,7 @@ test('tournament match launch authorizes the game returned by match access', asy
         if (body.action === 'issue-ticket') {
           return response(201, {
             game,
-            roomUrl: `https://${game}.example/play?ticket=opaque-ticket${game === 'euchre' ? '&tournamentReturnPath=%2Ftournaments%2Fcontrolled-smoke' : ''}`,
+            roomUrl: `https://${game}.example/play?ticket=opaque-ticket${game !== 'spades' ? '&tournamentReturnPath=%2Ftournaments%2Fcontrolled-smoke' : ''}`,
           });
         }
 
@@ -128,7 +128,7 @@ test('tournament match launch authorizes the game returned by match access', asy
       assert.equal(new URL(launch.roomUrl).searchParams.get('sharedAccountCode'), `${game}-account-code`);
       assert.equal(
         new URL(launch.roomUrl).searchParams.get('tournamentReturnPath'),
-        game === 'euchre' ? '/tournaments/controlled-smoke' : null,
+        game !== 'spades' ? '/tournaments/controlled-smoke' : null,
       );
     }
   } finally {

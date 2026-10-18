@@ -4,6 +4,7 @@ export const APPLE_RELEASE_STATES = Object.freeze({
   APPROVED_COMING_SOON: "approved-coming-soon",
   AVAILABLE: "available",
   UPDATE_PENDING: "update-pending",
+  STAGING: "staging",
 });
 
 export const APPLE_RELEASE_LABELS = Object.freeze({
@@ -13,6 +14,7 @@ export const APPLE_RELEASE_LABELS = Object.freeze({
   [APPLE_RELEASE_STATES.AVAILABLE]: "Available on App Store",
   [APPLE_RELEASE_STATES.UPDATE_PENDING]:
     "Current version available — update pending",
+  [APPLE_RELEASE_STATES.STAGING]: "Staging integration",
 });
 
 export const PLATFORM_APP_STORE_STATEMENT =
@@ -41,6 +43,18 @@ export const PLATFORM_GAME_PRESENTATION = Object.freeze({
       "Ranked",
       "Bot practice",
       "Invited tournaments",
+    ]),
+  }),
+  gin: Object.freeze({
+    slug: "gin",
+    name: "1v1 Gin Rummy",
+    releaseState: APPLE_RELEASE_STATES.STAGING,
+    description:
+      "Standard Gin Rummy with shared-account tournament assignments and a Gin-only authoritative engine.",
+    capabilities: Object.freeze([
+      "Shared account",
+      "Tournament tickets",
+      "Release-gated",
     ]),
   }),
 });
