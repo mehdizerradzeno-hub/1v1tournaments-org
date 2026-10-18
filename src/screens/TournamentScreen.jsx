@@ -1291,7 +1291,7 @@ function TournamentLobbyHero({
         {hostAccount ? <Text style={styles.playerStatusWarning}>Host account cannot play. Use a separate player account.</Text> : null}
         <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
           {hostAccount ? (
-            <ActionButton href="/admin">Open Host Controls</ActionButton>
+            <ActionButton href="/admin/tournaments">Open Host Controls</ActionButton>
           ) : (
             <ActionButton
               disabled={!isComplete && Boolean(currentMatch) && opening}
