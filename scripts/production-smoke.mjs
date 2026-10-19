@@ -6,7 +6,7 @@ const pageChecks = [
   { path: '/', markers: ['YOUR GAME. YOUR BRACKET.', 'Choose your table'] },
   { path: '/next', markers: ['Next tournament'] },
   { path: '/live', markers: ['Control room', 'Broadcast hub'] },
-  { path: '/admin', markers: ['Private admin unavailable', 'Sponsors'] },
+  { path: '/admin', markers: ['Admin dashboard', 'Sponsors'] },
   { path: '/admin/sponsors', markers: ['Sponsor CRM', 'Host access required'] },
   { path: '/sponsors', markers: ['Sponsor 1v1 Tournaments', 'Sponsor inquiry'] },
   { path: '/media-kit', markers: ['Media Kit', 'Sponsorship packages'] },
