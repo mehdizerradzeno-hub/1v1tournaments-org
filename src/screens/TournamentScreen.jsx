@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   ActionButton,
@@ -53,6 +53,8 @@ import { downloadLinks } from '../lib/downloadLinks.js';
 import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import { useVisibleNow } from '../lib/useVisibleNow.js';
 import { startVisibilityAwarePolling } from '../lib/visibilityPoller.js';
+import { theme } from '../lib/theme.js';
+import '../styles/tournamentResponsive.css';
 
 function signupCountLabel(count, loading = false) {
   if (loading) return 'Loading';
@@ -267,13 +269,15 @@ function getOpenSeats(count, size) {
 }
 
 function getCountdownLabel(tournament, nowMs) {
-  const startMs = new Date(tournament?.date).getTime();
+  const startMs = tournament?.date ? new Date(tournament.date).getTime() : Number.NaN;
 
   if (!Number.isFinite(startMs)) {
     return 'Date TBA';
   }
 
-  const remainingMinutes = Math.max(Math.floor((startMs - nowMs) / 60000), 0);
+  if (startMs <= nowMs) return 'Awaiting start';
+
+  const remainingMinutes = Math.ceil((startMs - nowMs) / 60000);
   const days = Math.floor(remainingMinutes / 1440);
   const hours = Math.floor((remainingMinutes % 1440) / 60);
   const minutes = remainingMinutes % 60;
@@ -641,7 +645,10 @@ export default function TournamentScreen({ slug }) {
     visibleTournament.status === 'live'
     || ['live', 'active', 'in-progress'].includes(bracketStatus)
   );
-  const registrationMeta = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: isBracketLive });
+  const registrationDecision = getEffectiveRegistrationStatus(visibleTournament, { hasLiveBracket: isBracketLive });
+  const registrationMeta = registrationDecision.reason === 'event-started' && !isBracketLive && !isBracketComplete
+    ? { ...registrationDecision, label: 'Registration closed', actionCopy: 'The scheduled start time has passed. Registration is closed.' }
+    : registrationDecision;
   const showSignupSection = !isBracketLive;
   const bracketPresentation = getPublicBracketPresentation({
     hasBracket: Boolean(liveBracket),
@@ -735,6 +742,7 @@ export default function TournamentScreen({ slug }) {
           aria-labelledby="tournament-tab-play"
           nativeID="tournament-panel-play">
           <LiveBroadcastStrip
+            isBracketComplete={isBracketComplete}
             isBracketLive={isBracketLive}
             nextMatch={getNextPublicMatch(liveBracket)}
             streams={streams}
@@ -836,7 +844,7 @@ export default function TournamentScreen({ slug }) {
               isBracketComplete
                 ? 'Review the final match results and tournament champion.'
                 : isBracketLive
-                  ? 'Follow the active match flow, table links, winners, and bracket status.'
+                  ? 'Follow the active match flow, assigned players, winners, and bracket status.'
                   : liveBracket
                     ? 'Review the published match assignments. Live status appears only after play is confirmed.'
                     : 'Bracket preview is ready. Assigned match cards appear after the host publishes the bracket.'
@@ -846,14 +854,14 @@ export default function TournamentScreen({ slug }) {
             stats={[
               { label: 'Bracket', value: isBracketComplete ? 'Complete' : isBracketLive ? 'Live' : liveBracket ? 'Published' : 'Preview' },
               { label: 'Players', value: liveBracket ? String(liveBracket.participantCount || 0) : seatLabel(signupSummary.count, advertisedRosterCap, signupSummary.loading) },
-              { label: 'Next', value: getNextPublicMatch(liveBracket)?.label || 'After seed' },
+              { label: isBracketComplete ? 'Result' : 'Next', value: isBracketComplete ? 'Complete' : getNextPublicMatch(liveBracket)?.label || 'After seed' },
             ]}
             title="Tournament Bracket"
           />
 
           {liveBracket ? (
             <Section
-              description={`Match cards show assigned players, winners, and ${gameName} match links.`}
+              description={`Match cards show assigned players, winners, and match status. Signed-in players open their assigned ${gameName} table through My Match.`}
               nativeID="live-bracket"
               title={bracketSectionTitle}>
               <LiveBracketBoard bracket={liveBracket} bracketPresentation={bracketPresentation} />
@@ -862,7 +870,7 @@ export default function TournamentScreen({ slug }) {
 
           {!liveBracket ? (
             <Section
-              description={`After the host generates a bracket, match cards show the assigned players and ${gameName} match links.`}
+              description={`After the host publishes the bracket, match cards show assigned players and match status. Signed-in players use My Match to open their ${gameName} table when it is ready.`}
               nativeID="live-bracket"
               title={bracketSectionTitle}>
               <BracketBoard bracket={visibleTournament.bracket} />
@@ -878,10 +886,10 @@ export default function TournamentScreen({ slug }) {
               {!isBracketLive ? (
                 <QuickActionCard
                   actionLabel={primaryPlayerAction.label}
-                  body="Use this before the bracket is seeded."
+                  body={registrationMeta.value === 'open' && !isBracketComplete ? 'Reserve your roster spot before registration closes.' : 'Review your account-linked roster and event status.'}
                   href={primaryPlayerAction.href}
                   meta={signupCountLabel(signupSummary.count, signupSummary.loading)}
-                  title="Player signup"
+                  title={registrationMeta.value === 'open' && !isBracketComplete ? 'Player signup' : 'Player account'}
                   tone="green"
                 />
               ) : null}
@@ -1050,7 +1058,7 @@ export default function TournamentScreen({ slug }) {
   );
 }
 
-function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
+function LiveBroadcastStrip({ isBracketComplete, isBracketLive, nextMatch, streams }) {
   const liveStream = streams.find((stream) => stream.kind === 'live') || streams[0];
   const twitchHref = liveStream?.href || downloadLinks.twitch || '/live';
   const discordHref = downloadLinks.discord || '/live';
@@ -1060,9 +1068,11 @@ function LiveBroadcastStrip({ isBracketLive, nextMatch, streams }) {
       <View style={styles.broadcastStatus}>
         <View style={[styles.broadcastDot, isBracketLive && styles.broadcastDotLive]} />
         <View style={styles.broadcastCopy}>
-          <Text style={styles.broadcastEyebrow}>{isBracketLive ? 'Live tournament hub' : 'Stream-day hub'}</Text>
+          <Text style={styles.broadcastEyebrow}>{isBracketComplete ? 'Completed tournament' : isBracketLive ? 'Live tournament hub' : 'Stream-day hub'}</Text>
           <Text style={styles.broadcastTitle}>
-            {nextMatch ? `Next: ${matchPlayersLabel(nextMatch)}` : 'Twitch, Discord, bracket, and signups stay one tap away.'}
+            {isBracketComplete
+              ? 'Review the final bracket and tournament outcome.'
+              : nextMatch ? `Next: ${matchPlayersLabel(nextMatch)}` : 'Twitch, Discord, bracket, and signups stay one tap away.'}
           </Text>
         </View>
       </View>
@@ -1137,7 +1147,7 @@ function TournamentTabs({ activeTab, onSelectTab }) {
   const tabIds = TOURNAMENT_TABS.map((tab) => tab.id);
 
   return (
-    <View accessibilityRole="tablist" style={styles.tournamentTabBar}>
+    <View accessibilityRole="tablist" dataSet={{ tournamentLayout: 'tabs' }} style={styles.tournamentTabBar}>
       {TOURNAMENT_TABS.map((tab) => {
         const selected = activeTab === tab.id;
 
@@ -1226,12 +1236,13 @@ function TournamentLobbyHero({
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState('');
   const { width } = useWindowDimensions();
-  const isPhone = width > 0 && width < 420;
+  const isPhone = width > 0 && width < 720;
   const signups = signupSummary.signups || [];
   const signupCount = signupSummary.loading ? '--' : `${signupSummary.count}/${advertisedRosterCap}`;
   const openSeats = signupSummary.loading ? '--' : String(getOpenSeats(signupSummary.count, advertisedRosterCap));
   const nextMatch = getNextPublicMatch(liveBracket);
   const isComplete = liveBracket?.status === 'complete' || Boolean(result);
+  const showTimingStatus = isComplete || isBracketLive || countdownLabel === 'Awaiting start' || countdownLabel === 'Date TBA';
   const championName = getPublicChampionLabel(liveBracket) || result?.winner || '';
   const currentMatch = playerStatus.data?.currentMatch || null;
   const hostAccount = Boolean(playerStatus.data?.account?.hostApproved);
@@ -1273,23 +1284,30 @@ function TournamentLobbyHero({
         </Text>
       </View>
 
-      <View style={[styles.lobbyCountdownPanel, isPhone && styles.lobbyCountdownPanelPhone]}>
-        <View style={styles.lobbyCopy}>
-          <Text style={styles.lobbyCountdownLabel}>{isComplete ? 'CHAMPION' : isBracketLive ? 'LIVE NOW' : 'STARTS IN'}</Text>
-          <Text style={[styles.lobbyCountdownValue, isPhone && styles.lobbyCountdownValuePhone]}>
-            {isComplete ? championName || 'Results posted' : countdownLabel}
-          </Text>
-          <Text accessibilityRole="heading" aria-level={1} style={styles.lobbyTitle}>
-            {isComplete ? 'Tournament Complete' : isBracketLive ? 'Tournament Live' : tournament.name || 'Tournament Lobby'}
+      <View dataSet={{ tournamentLayout: 'detail-hero' }} style={[styles.lobbyCountdownPanel, isPhone && styles.lobbyCountdownPanelPhone]}>
+        <View dataSet={{ tournamentLayout: 'event-copy' }} style={styles.lobbyCopy}>
+          <Text accessibilityRole="heading" aria-level={1} style={[styles.lobbyTitle, isPhone && styles.lobbyTitlePhone]}>
+            {tournament.title || tournament.name || 'Tournament Lobby'}
           </Text>
           <Text style={styles.lobbySummary}>
             {isComplete
               ? result?.summary || 'Final results are posted for this tournament.'
               : `${tournament.format} | ${tournament.location} | ${tournament.entryLine}`}
           </Text>
+          <Text style={styles.lobbyCountdownLabel}>
+            {isComplete ? 'CHAMPION' : isBracketLive ? 'TOURNAMENT STATUS' : countdownLabel === 'Awaiting start' ? 'TOURNAMENT STATUS' : countdownLabel === 'Date TBA' ? 'SCHEDULE' : 'STARTS IN'}
+          </Text>
+          <Text style={[
+            styles.lobbyCountdownValue,
+            isPhone && styles.lobbyCountdownValuePhone,
+            showTimingStatus && styles.lobbyTimingStatus,
+            showTimingStatus && isPhone && styles.lobbyTimingStatusPhone,
+          ]}>
+            {isComplete ? championName || 'Results posted' : isBracketLive ? 'Live now' : countdownLabel}
+          </Text>
         </View>
         {hostAccount ? <Text style={styles.playerStatusWarning}>Host account cannot play. Use a separate player account.</Text> : null}
-        <View style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
+        <View dataSet={{ tournamentLayout: 'event-actions' }} style={[styles.lobbyActions, isPhone && styles.lobbyActionsPhone]}>
           {hostAccount ? (
             <ActionButton href="/admin/tournaments">Open Host Controls</ActionButton>
           ) : (
@@ -1463,7 +1481,7 @@ function statusBadgeLabel(nextStep) {
   }
 }
 
-function playerSpotlightTitle(playerStatus, result) {
+function playerSpotlightTitle(playerStatus, result, isBracketLive, registrationMeta) {
   const data = playerStatus.data;
 
   if (playerStatus.loading) return 'Checking your tournament status...';
@@ -1471,6 +1489,8 @@ function playerSpotlightTitle(playerStatus, result) {
   if (data?.nextStep === 'champion') return 'You are the champion.';
   if (result || data?.nextStep === 'complete') return 'Tournament results are posted.';
   if (data?.signup) return 'You are signed up.';
+  if (isBracketLive) return data?.account ? 'Follow the live bracket.' : 'Sign in to find your match.';
+  if (registrationMeta.value !== 'open') return 'Follow this tournament.';
   if (data?.account) return 'Join the roster to play.';
   return 'Create an account to join.';
 }
@@ -1485,8 +1505,9 @@ function playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, game
   if (data?.nextStep === 'champion') return 'Nice. The bracket has you marked as tournament winner.';
   if (data?.nextStep === 'complete') return 'This event is complete. You can review the final bracket and results.';
   if (signupName) return `${signupName} is on the roster. The host will publish match links when the bracket is ready.`;
-  if (accountName && registrationMeta.value === 'open') return `${accountName} is signed in. Join this tournament to reserve a roster seat.`;
   if (accountName && isBracketLive) return `${accountName} is signed in, but this bracket is already live. Check with the host if you expected a seat.`;
+  if (isBracketLive) return 'Already registered? Sign in to see your assigned match. Spectators can follow the Bracket tab without an account.';
+  if (accountName && registrationMeta.value === 'open') return `${accountName} is signed in. Join this tournament to reserve a roster seat.`;
   if (registrationMeta.value === 'open') return 'Sign in or create an account, then reserve your spot on the tournament roster.';
   return registrationMeta.actionCopy || 'Registration is not open right now.';
 }
@@ -1500,17 +1521,30 @@ function PlayerStatusSpotlight({
 }) {
   const data = playerStatus.data || {};
   const currentMatch = data.currentMatch || null;
+  const registrationOpen = registrationMeta.value === 'open' && !isBracketLive;
   const steps = getTournamentPlayerSteps({
     account: data.account,
     currentMatch,
     signup: data.signup,
+  }).map((step) => {
+    if (registrationOpen || data.signup || currentMatch) return step;
+    if (step.id === 'account' && !data.account) {
+      return { ...step, body: 'Sign in if you already have a roster spot.' };
+    }
+    if (step.id === 'join') {
+      return { ...step, title: 'Roster', body: 'Registration is not open for this event.', current: false };
+    }
+    if (step.id === 'match') {
+      return { ...step, title: 'Follow the event', body: 'Open the Bracket tab for match status.', current: false };
+    }
+    return step;
   });
   return (
     <Surface style={[styles.statusSpotlight, currentMatch && styles.statusSpotlightReady]}>
       <View style={styles.statusSpotlightTopRow}>
         <View style={styles.statusSpotlightCopy}>
           <Badge tone={statusTone(data.nextStep)}>{statusBadgeLabel(data.nextStep)}</Badge>
-          <Text style={styles.statusSpotlightTitle}>{playerSpotlightTitle(playerStatus, result)}</Text>
+          <Text style={styles.statusSpotlightTitle}>{playerSpotlightTitle(playerStatus, result, isBracketLive, registrationMeta)}</Text>
           <Text style={styles.statusSpotlightBody}>
             {playerSpotlightBody(playerStatus, isBracketLive, registrationMeta, gameName)}
           </Text>
@@ -1530,7 +1564,7 @@ function PlayerStatusSpotlight({
             </Text>
             <View style={styles.statusSpotlightStepCopy}>
               <Text style={styles.statusSpotlightStepLabel}>{step.title}</Text>
-              <Text numberOfLines={1} style={styles.statusSpotlightStepValue}>{step.body}</Text>
+              <Text style={styles.statusSpotlightStepValue}>{step.body}</Text>
             </View>
           </View>
         ))}
@@ -1645,7 +1679,7 @@ function RegisteredPlayersPanel({
 function LiveBracketBoard({ bracket, bracketPresentation }) {
   const matches = getBracketMatches(bracket);
   const completedCount = matches.filter((match) => match.status === 'final').length;
-  const readyCount = matches.filter((match) => match.status === 'ready' || match.status === 'active').length;
+  const readyOrActiveCount = matches.filter((match) => match.status === 'ready' || match.status === 'active').length;
   const nextMatch = getNextPublicMatch(bracket);
 
   return (
@@ -1655,7 +1689,7 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
           <Badge tone={bracketPresentation.state === 'complete' ? 'green' : 'accent'}>{bracketPresentation.statusLabel}</Badge>
           <Text style={styles.liveBracketTitle}>Public bracket</Text>
           <Text style={styles.liveBracketMeta}>
-            {bracket.participantCount} players • {completedCount}/{matches.length} matches final • {readyCount} ready
+            {bracket.participantCount} players • {completedCount}/{matches.length} matches final • {readyOrActiveCount} ready or active
           </Text>
         </View>
         <View style={styles.liveBracketStats}>
@@ -1678,7 +1712,7 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
           </Text>
         </View>
       ) : null}
-      {nextMatch ? (
+      {bracketPresentation.state !== 'complete' && nextMatch ? (
         <View style={styles.upNextCard}>
           <View style={styles.upNextTopRow}>
             <Badge tone={getMatchTone(nextMatch)}>{getMatchStatusLabel(nextMatch)}</Badge>
@@ -1723,7 +1757,7 @@ function LiveBracketBoard({ bracket, bracketPresentation }) {
                       <Text style={styles.liveMatchLocked}>Assigned players open this table from the Overview.</Text>
                     ) : (
                       <Text style={styles.liveMatchLocked}>
-                        {match.status === 'final' ? 'Match complete' : 'Opens when both players are set'}
+                        {match.status === 'final' ? 'Match complete' : match.status === 'active' ? 'Match in progress' : 'Opens when both players are set'}
                       </Text>
                     )}
                   </View>
@@ -1757,21 +1791,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: '#5E7FA3',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   arrivalCommandLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     marginRight: 2,
     textTransform: 'uppercase',
   },
   arrivalCommandRow: {
     alignItems: 'center',
-    borderTopColor: 'rgba(244, 239, 230, 0.10)',
+    borderTopColor: theme.colors.line,
     borderTopWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1780,9 +1814,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   arrivalEyebrow: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
@@ -1804,13 +1838,13 @@ const styles = StyleSheet.create({
     minWidth: 190,
   },
   arrivalRail: {
-    backgroundColor: 'rgba(8, 25, 21, 0.96)',
+    backgroundColor: theme.colors.surface,
     borderColor: 'rgba(94, 127, 163, 0.26)',
     marginBottom: 16,
   },
   arrivalStep: {
     backgroundColor: 'rgba(244, 239, 230, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderColor: theme.colors.line,
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 190,
@@ -1819,7 +1853,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   arrivalStepBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -1828,162 +1862,195 @@ const styles = StyleSheet.create({
   arrivalStepLabel: {
     color: '#5E7FA3',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   arrivalStepTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 22,
     marginTop: 5,
   },
   arrivalTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 30,
     marginTop: 2,
   },
   lobbyCard: {
-    borderColor: 'rgba(244, 239, 230, 0.12)',
-    marginBottom: 24,
+    borderColor: theme.colors.lineStrong,
+    marginBottom: 18,
     overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
+    padding: 28,
   },
   lobbyCountdownLabel: {
-    color: '#D6A24E',
-    fontSize: 12,
-    fontWeight: '900',
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
     lineHeight: 16,
     textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginTop: 22,
   },
   lobbyCountdownPanel: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(5, 11, 10, 0.72)',
-    borderColor: 'rgba(214, 162, 78, 0.20)',
-    borderRadius: 16,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 24,
+    gap: 20,
     justifyContent: 'space-between',
-    padding: 24,
+    padding: 0,
   },
   lobbyCountdownPanelPhone: {
     gap: 16,
-    padding: 16,
+    padding: 0,
   },
   lobbyCountdownValue: {
-    color: '#F4EFE6',
-    fontSize: 64,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 70,
-    marginTop: 8,
+    color: theme.colors.text,
+    fontSize: 38,
+    fontWeight: '500',
+    letterSpacing: -1,
+    lineHeight: 46,
+    marginTop: 6,
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
   },
   lobbyCountdownValuePhone: {
-    fontSize: 46,
-    lineHeight: 52,
+    fontSize: 30,
+    lineHeight: 38,
+  },
+  lobbyTimingStatus: {
+    fontFamily: Platform.select({ web: '"DM Sans", system-ui, sans-serif', ios: 'System', default: 'sans-serif' }),
+    fontSize: 30,
+    fontWeight: '700',
+    fontVariant: [],
+    lineHeight: 38,
+    letterSpacing: -0.5,
+  },
+  lobbyTimingStatusPhone: {
+    fontSize: 24,
+    lineHeight: 32,
   },
   lobbyCopy: {
     flex: 1.3,
-    minWidth: 240,
+    minWidth: 0,
+    flexBasis: 380,
+    flexShrink: 1,
   },
   lobbyBadgeRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   lobbyDate: {
-    color: '#D6A24E',
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 17,
-    textTransform: 'uppercase',
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 20,
   },
   lobbyTitle: {
-    color: '#F4EFE6',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 34,
-    marginTop: 4,
+    color: theme.colors.text,
+    fontSize: 40,
+    fontWeight: '400',
+    letterSpacing: -0.8,
+    lineHeight: 48,
+    marginTop: 0,
+    fontFamily: Platform.select({ web: 'Georgia, "Times New Roman", serif', ios: 'Georgia', default: 'serif' }),
+  },
+  lobbyTitlePhone: {
+    fontSize: 32,
+    lineHeight: 39,
+    letterSpacing: -0.5,
   },
   lobbySummary: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 23,
-    marginTop: 8,
+    fontWeight: '400',
+    lineHeight: 24,
+    marginTop: 12,
+    maxWidth: 650,
   },
   lobbyActions: {
     alignContent: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    justifyContent: 'flex-end',
-    minWidth: 220,
-  },
-  lobbyActionsPhone: {
-    flexBasis: '100%',
     justifyContent: 'flex-start',
     minWidth: 0,
+    flexBasis: 200,
+    flexShrink: 1,
+    alignSelf: 'flex-start',
+  },
+  lobbyActionsPhone: {
+    flexBasis: 'auto',
+    justifyContent: 'flex-start',
+    minWidth: 0,
+    width: '100%',
   },
   lobbyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 16,
+    gap: 10,
+    marginTop: 24,
   },
   lobbyMetric: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexGrow: 1,
     flexBasis: 150,
-    minHeight: 84,
-    padding: 16,
+    minHeight: 78,
+    padding: 14,
   },
   lobbyMatchMetric: {
     flexBasis: 260,
   },
   lobbyMetricLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0,
+    fontWeight: '500',
+    letterSpacing: 0.6,
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   lobbyMetricValue: {
-    color: '#F4EFE6',
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 34,
-    marginTop: 8,
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '500',
+    lineHeight: 30,
+    marginTop: 6,
+    fontFamily: 'monospace',
   },
   lobbyMetricSub: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 16,
   },
   lobbyMatchText: {
-    color: '#F4EFE6',
-    fontSize: 17,
-    fontWeight: '900',
-    lineHeight: 22,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
     marginTop: 8,
   },
   lobbyRosterPreview: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 16,
-    padding: 16,
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.line,
+    borderRadius: 0,
+    borderWidth: 0,
+    marginTop: 20,
+    padding: 0,
+    borderTopWidth: 1,
+    paddingTop: 18,
   },
   lobbyRosterHeader: {
     alignItems: 'center',
@@ -1993,16 +2060,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lobbyRosterTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 22,
   },
   lobbyRosterMeta: {
-    color: '#D6A24E',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+    fontWeight: '500',
   },
   lobbyRosterChips: {
     flexDirection: 'row',
@@ -2010,58 +2076,60 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   lobbyPlayerChip: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.24)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     maxWidth: 180,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   lobbyPlayerText: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '500',
   },
   lobbyEmpty: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '400',
     lineHeight: 20,
   },
   lobbyMore: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     paddingVertical: 8,
   },
   broadcastStrip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 25, 21, 0.96)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   broadcastStatus: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
     gap: 12,
-    minWidth: 260,
+    minWidth: 0,
+    flexBasis: 300,
   },
   broadcastDot: {
-    backgroundColor: 'rgba(214, 162, 78, 0.45)',
+    backgroundColor: theme.colors.muted,
     borderColor: 'rgba(214, 162, 78, 0.74)',
     borderRadius: 999,
-    borderWidth: 3,
-    height: 18,
-    width: 18,
+    borderWidth: 0,
+    height: 8,
+    width: 8,
+    flexShrink: 0,
   },
   broadcastDotLive: {
-    backgroundColor: '#F05252',
+    backgroundColor: theme.colors.success,
     borderColor: 'rgba(255, 180, 168, 0.84)',
   },
   broadcastCopy: {
@@ -2069,17 +2137,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   broadcastEyebrow: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 15,
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   broadcastTitle: {
-    color: '#F4EFE6',
-    fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 24,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 23,
     marginTop: 2,
   },
   broadcastActions: {
@@ -2088,9 +2157,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   timelineCard: {
-    borderColor: 'rgba(244, 239, 230, 0.12)',
+    borderColor: theme.colors.line,
     marginBottom: 24,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    backgroundColor: theme.colors.backgroundAlt,
   },
   timelineTrack: {
     flexDirection: 'row',
@@ -2099,16 +2169,16 @@ const styles = StyleSheet.create({
   },
   timelineStep: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.line,
+    borderRadius: 0,
+    borderWidth: 0,
     flexBasis: 150,
     flexDirection: 'row',
     flexGrow: 1,
     gap: 10,
-    minHeight: 70,
-    padding: 10,
+    minHeight: 58,
+    padding: 6,
   },
   timelineMarker: {
     alignItems: 'center',
@@ -2129,43 +2199,44 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.62)',
   },
   timelineMarkerText: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 17,
   },
   timelineMarkerTextActive: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   timelineCopy: {
     flex: 1,
     minWidth: 0,
   },
   timelineLabel: {
-    color: '#A7A29A',
-    fontSize: 11,
-    fontWeight: '900',
+    color: theme.colors.muted,
+    fontSize: 10,
+    fontWeight: '500',
     lineHeight: 15,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   timelineValue: {
-    color: '#F4EFE6',
-    fontSize: 15,
-    fontWeight: '900',
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '500',
     lineHeight: 20,
     marginTop: 2,
   },
   timelineValueActive: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   timelineValueDone: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   eventConsole: {
-    backgroundColor: 'rgba(17, 29, 26, 0.90)',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
-    marginBottom: 18,
-    paddingBottom: 10,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    marginBottom: 20,
+    paddingBottom: 18,
   },
   eventConsoleBadgeRow: {
     alignItems: 'center',
@@ -2175,10 +2246,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   eventConsoleBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 22,
     marginTop: 4,
   },
   eventConsoleCopy: {
@@ -2186,23 +2257,24 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   eventConsoleMeta: {
-    color: '#D6A24E',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 15,
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   eventConsoleSignals: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
+    gap: 0,
+    marginTop: 16,
   },
   eventConsoleTitle: {
-    color: '#F4EFE6',
-    fontSize: 24,
-    fontWeight: '900',
-    lineHeight: 30,
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '600',
+    lineHeight: 29,
   },
   eventConsoleTopRow: {
     alignItems: 'stretch',
@@ -2212,77 +2284,91 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   eventSignal: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.line,
+    borderRadius: 0,
+    borderWidth: 0,
     flexBasis: 96,
     flexGrow: 1,
-    minHeight: 68,
+    minHeight: 56,
     padding: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: theme.colors.lineStrong,
   },
   eventSignalReady: {
-    backgroundColor: 'rgba(214, 162, 78, 0.09)',
-    borderColor: 'rgba(214, 162, 78, 0.24)',
+    backgroundColor: theme.colors.successSoft,
+    borderColor: theme.colors.success,
   },
   eventSignalLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 14,
     textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
   eventSignalValue: {
-    color: '#F4EFE6',
-    fontSize: 16,
-    fontWeight: '900',
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '500',
     lineHeight: 21,
     marginTop: 5,
   },
   eventSignalValueReady: {
-    color: '#D6A24E',
+    color: theme.colors.success,
   },
   tournamentTabBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 4,
     marginBottom: 0,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    padding: 4,
   },
   tournamentTabButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
-    borderRadius: 999,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    borderRadius: 6,
     borderWidth: 1,
-    flexBasis: 104,
+    flexBasis: 96,
     flexGrow: 1,
     justifyContent: 'center',
     marginBottom: 0,
     marginRight: 0,
-    minHeight: 46,
+    minHeight: 44,
     minWidth: 0,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
   },
   tournamentTabButtonSelected: {
-    backgroundColor: 'rgba(214, 162, 78, 0.14)',
-    borderColor: 'rgba(214, 162, 78, 0.58)',
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: 'rgba(214, 162, 78, 0.35)',
+    borderBottomColor: theme.colors.accent,
+    borderBottomWidth: 2,
   },
   tournamentTabButtonPressed: {
     opacity: 0.82,
   },
   tournamentTabLabel: {
-    color: '#A7A29A',
-    fontSize: 12,
-    fontWeight: '900',
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
+    lineHeight: 18,
   },
   tournamentTabLabelSelected: {
-    color: '#F0C86A',
+    color: theme.colors.text,
+    fontWeight: '700',
   },
   dashboardCard: {
-    borderColor: 'rgba(214, 162, 78, 0.34)',
-    backgroundColor: 'rgba(8, 25, 21, 0.92)',
+    borderColor: theme.colors.lineStrong,
+    backgroundColor: theme.colors.surface,
   },
   dashboardTopRow: {
     flexDirection: 'row',
@@ -2294,16 +2380,16 @@ const styles = StyleSheet.create({
     minWidth: 260,
   },
   dashboardTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 32,
     marginTop: 12,
   },
   dashboardText: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 23,
     marginTop: 8,
   },
@@ -2322,7 +2408,7 @@ const styles = StyleSheet.create({
   },
   dashboardTile: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderColor: theme.colors.line,
     borderRadius: 16,
     borderWidth: 1,
     flexGrow: 1,
@@ -2330,22 +2416,22 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   dashboardTileLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.9,
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   dashboardTileValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 28,
     marginTop: 5,
   },
   dashboardTileMeta: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
@@ -2360,7 +2446,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   dashboardPolicyText: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 20,
@@ -2380,8 +2466,8 @@ const styles = StyleSheet.create({
     minWidth: 280,
   },
   formatCard: {
-    backgroundColor: 'rgba(8, 25, 21, 0.90)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
   },
   formatTopRow: {
     flexDirection: 'row',
@@ -2393,17 +2479,17 @@ const styles = StyleSheet.create({
     minWidth: 260,
   },
   formatTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 30,
     marginTop: 10,
   },
   formatBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
+    fontWeight: '400',
+    lineHeight: 23,
     marginTop: 6,
   },
   formatStats: {
@@ -2414,25 +2500,26 @@ const styles = StyleSheet.create({
     minWidth: 250,
   },
   formatStat: {
-    backgroundColor: 'rgba(244, 239, 230, 0.045)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexBasis: 132,
     flexGrow: 1,
     padding: 12,
   },
   formatStatLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 14,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   formatStatValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 20,
     marginTop: 5,
   },
@@ -2446,35 +2533,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   formatRuleMarker: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 22,
   },
   formatRuleText: {
     color: '#E4DED4',
     flex: 1,
     fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
+    fontWeight: '400',
+    lineHeight: 23,
   },
   formatFooter: {
     alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.08)',
-    borderColor: 'rgba(214, 162, 78, 0.22)',
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.line,
+    borderRadius: 0,
+    borderWidth: 0,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 16,
-    padding: 12,
+    padding: 0,
+    borderTopWidth: 1,
+    paddingTop: 16,
   },
   formatFooterText: {
-    color: '#D6A24E',
+    color: theme.colors.muted,
     flex: 1,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '400',
     lineHeight: 19,
     minWidth: 220,
   },
@@ -2487,15 +2576,15 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   tabCommandBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 22,
     marginTop: 5,
   },
   tabCommandCard: {
-    backgroundColor: 'rgba(17, 29, 26, 0.82)',
-    borderColor: 'rgba(214, 162, 78, 0.28)',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
     marginBottom: 18,
   },
   tabCommandCopy: {
@@ -2503,16 +2592,16 @@ const styles = StyleSheet.create({
     minWidth: 240,
   },
   tabCommandLabel: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   tabCommandStat: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexBasis: 110,
     flexGrow: 1,
@@ -2520,11 +2609,12 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   tabCommandStatLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 14,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   tabCommandStats: {
     flexDirection: 'row',
@@ -2533,16 +2623,16 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   tabCommandStatValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 21,
     marginTop: 5,
   },
   tabCommandTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 28,
     marginTop: 4,
   },
@@ -2564,20 +2654,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.3)',
   },
   launchCopy: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
   },
   launchPath: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 12,
     letterSpacing: 0.8,
     fontWeight: '800',
     fontFamily: 'monospace',
   },
   launchTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 24,
     lineHeight: 28,
     fontWeight: '800',
@@ -2602,13 +2692,13 @@ const styles = StyleSheet.create({
     marginRight: -12,
   },
   bracketLoadNote: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 10,
   },
   rosterCard: {
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    borderColor: theme.colors.lineStrong,
   },
   rosterHeroRow: {
     flexDirection: 'row',
@@ -2617,36 +2707,38 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterHeroTile: {
-    backgroundColor: 'rgba(214, 162, 78, 0.08)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
-    borderRadius: 16,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexGrow: 1,
     flexBasis: 180,
     padding: 14,
   },
   rosterHeroLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 15,
     textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   rosterHeroValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 34,
     marginTop: 3,
+    fontFamily: 'monospace',
   },
   rosterHeroSubValue: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 18,
   },
   rosterHeroMeta: {
-    color: '#D6A24E',
+    color: theme.colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '500',
     lineHeight: 17,
     marginTop: 2,
   },
@@ -2658,10 +2750,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rosterCapacity: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     flex: 1,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 19,
     minWidth: 220,
   },
@@ -2673,19 +2765,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   rosterEmptyText: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 15,
     lineHeight: 22,
   },
   rosterNote: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 22,
     marginBottom: 12,
   },
   rosterList: {
-    gap: 10,
+    gap: 6,
   },
   rosterGroupGrid: {
     flexDirection: 'row',
@@ -2693,13 +2785,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rosterGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    backgroundColor: theme.colors.backgroundAlt,
     borderColor: 'rgba(244, 239, 230, 0.09)',
-    borderRadius: 16,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     flexBasis: 250,
     flexGrow: 1,
-    padding: 12,
+    padding: 14,
+    flexShrink: 1,
   },
   rosterGroupHeader: {
     alignItems: 'center',
@@ -2708,47 +2801,50 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rosterGroupCount: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 25,
+    fontFamily: 'monospace',
   },
   rosterRow: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexDirection: 'row',
-    padding: 12,
+    padding: 14,
+    minHeight: 64,
   },
   rosterRowCurrent: {
-    backgroundColor: 'rgba(214, 162, 78, 0.11)',
-    borderColor: 'rgba(214, 162, 78, 0.44)',
+    backgroundColor: 'rgba(214, 162, 78, 0.06)',
+    borderColor: 'rgba(214, 162, 78, 0.35)',
   },
   rosterRank: {
     alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.14)',
-    borderColor: 'rgba(214, 162, 78, 0.42)',
-    borderRadius: 999,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: 6,
     borderWidth: 1,
-    height: 34,
+    height: 32,
     justifyContent: 'center',
     marginRight: 12,
-    width: 34,
+    width: 32,
+    flexShrink: 0,
   },
   rosterRankCurrent: {
     backgroundColor: 'rgba(214, 162, 78, 0.18)',
     borderColor: 'rgba(214, 162, 78, 0.60)',
   },
   rosterRankText: {
-    color: '#D6A24E',
+    color: theme.colors.muted,
     fontFamily: 'monospace',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '500',
   },
   rosterRankTextCurrent: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   rosterPlayerCopy: {
     flex: 1,
@@ -2761,28 +2857,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rosterPlayerName: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     flexShrink: 1,
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '600',
     lineHeight: 23,
   },
   rosterPlayerMeta: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 19,
     marginTop: 2,
   },
   statusSpotlight: {
-    backgroundColor: 'rgba(8, 25, 21, 0.94)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: 'rgba(214, 162, 78, 0.24)',
     marginBottom: 18,
   },
   statusSpotlightReady: {
-    backgroundColor: 'rgba(20, 45, 32, 0.96)',
-    borderColor: 'rgba(77, 217, 133, 0.58)',
-    boxShadow: '0 0 24px rgba(77, 217, 133, 0.18)',
+    backgroundColor: theme.colors.successSoft,
+    borderColor: 'rgba(64, 181, 111, 0.40)',
+    boxShadow: 'none',
   },
   statusSpotlightTopRow: {
     alignItems: 'stretch',
@@ -2793,7 +2889,8 @@ const styles = StyleSheet.create({
   },
   statusSpotlightCopy: {
     flex: 1,
-    minWidth: 260,
+    minWidth: 0,
+    flexBasis: 280,
   },
   statusSpotlightAction: {
     alignItems: 'stretch',
@@ -2804,24 +2901,24 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   statusSpotlightTitle: {
-    color: '#F4EFE6',
-    fontSize: 26,
-    fontWeight: '900',
-    lineHeight: 32,
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '600',
+    lineHeight: 31,
     marginTop: 12,
   },
   statusSpotlightBody: {
-    color: '#D4DDD7',
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
+    fontWeight: '400',
+    lineHeight: 24,
     marginTop: 8,
   },
   statusSpotlightMatchCallout: {
     alignItems: 'center',
-    backgroundColor: 'rgba(214, 162, 78, 0.14)',
-    borderColor: 'rgba(214, 162, 78, 0.58)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: 'rgba(214, 162, 78, 0.32)',
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2834,25 +2931,25 @@ const styles = StyleSheet.create({
     minWidth: 230,
   },
   statusSpotlightMatchLabel: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.6,
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   statusSpotlightMatchTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 26,
     marginTop: 5,
   },
   statusSpotlightMatchPlayers: {
-    color: '#D4DDD7',
+    color: theme.colors.text,
     fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 20,
+    fontWeight: '500',
+    lineHeight: 22,
     marginTop: 4,
   },
   statusSpotlightPlayButton: {
@@ -2869,9 +2966,9 @@ const styles = StyleSheet.create({
   },
   statusSpotlightStep: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexBasis: 150,
     flexDirection: 'row',
@@ -2882,12 +2979,12 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   statusSpotlightStepDone: {
-    backgroundColor: 'rgba(77, 217, 133, 0.09)',
-    borderColor: 'rgba(77, 217, 133, 0.34)',
+    backgroundColor: theme.colors.successSoft,
+    borderColor: 'rgba(64, 181, 111, 0.24)',
   },
   statusSpotlightStepReady: {
-    backgroundColor: 'rgba(214, 162, 78, 0.14)',
-    borderColor: 'rgba(214, 162, 78, 0.58)',
+    backgroundColor: 'rgba(214, 162, 78, 0.08)',
+    borderColor: 'rgba(214, 162, 78, 0.32)',
   },
   statusSpotlightStepNumber: {
     alignItems: 'center',
@@ -2895,35 +2992,36 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.30)',
     borderRadius: 999,
     borderWidth: 1,
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontFamily: 'monospace',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     height: 34,
     lineHeight: 32,
     textAlign: 'center',
     width: 34,
   },
   statusSpotlightStepNumberDone: {
-    backgroundColor: 'rgba(77, 217, 133, 0.14)',
-    borderColor: 'rgba(77, 217, 133, 0.42)',
-    color: '#4DD985',
+    backgroundColor: theme.colors.successSoft,
+    borderColor: 'rgba(64, 181, 111, 0.30)',
+    color: theme.colors.success,
   },
   statusSpotlightStepCopy: {
     flex: 1,
     minWidth: 0,
   },
   statusSpotlightStepLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 14,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statusSpotlightStepValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 19,
     marginTop: 2,
   },
@@ -2931,8 +3029,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.26)',
   },
   playerStatusCardReady: {
-    backgroundColor: 'rgba(12, 36, 28, 0.96)',
-    borderColor: 'rgba(214, 162, 78, 0.58)',
+    backgroundColor: theme.colors.successSoft,
+    borderColor: 'rgba(64, 181, 111, 0.40)',
   },
   playerStatusTopRow: {
     alignItems: 'center',
@@ -2942,20 +3040,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   playerStatusMeta: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
   },
   playerStatusTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: '800',
     lineHeight: 28,
   },
   playerStatusCopy: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 21,
     marginTop: 8,
@@ -2968,7 +3066,7 @@ const styles = StyleSheet.create({
   },
   playerStatusStep: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderColor: theme.colors.line,
     borderRadius: 14,
     borderWidth: 1,
     flexGrow: 1,
@@ -2985,22 +3083,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(214, 162, 78, 0.52)',
   },
   playerStatusStepLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   playerStatusStepLabelDone: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   playerStatusStepLabelReady: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   playerStatusStepValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 20,
     marginTop: 3,
   },
@@ -3013,21 +3111,21 @@ const styles = StyleSheet.create({
   },
   playerMatchBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
+    borderColor: theme.colors.line,
     borderRadius: 14,
     borderWidth: 1,
     marginTop: 14,
     padding: 12,
   },
   playerMatchLabel: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 18,
     textTransform: 'uppercase',
   },
   playerMatchPlayers: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 21,
@@ -3040,7 +3138,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   liveBracketCard: {
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    borderColor: theme.colors.lineStrong,
   },
   liveBracketHeader: {
     alignItems: 'flex-start',
@@ -3055,14 +3153,14 @@ const styles = StyleSheet.create({
     minWidth: 230,
   },
   liveBracketTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 30,
     marginTop: 10,
   },
   liveBracketMeta: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
@@ -3073,55 +3171,56 @@ const styles = StyleSheet.create({
   },
   liveBracketStat: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.045)',
-    borderColor: 'rgba(244, 239, 230, 0.12)',
-    borderRadius: 16,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     minWidth: 74,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   liveBracketStatValue: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 26,
+    fontFamily: 'monospace',
   },
   liveBracketStatLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 15,
     marginTop: 2,
     textTransform: 'uppercase',
   },
   liveBracketChampionPanel: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
-    borderRadius: 18,
+    backgroundColor: 'rgba(214, 162, 78, 0.07)',
+    borderColor: 'rgba(214, 162, 78, 0.28)',
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   liveBracketChampionLabel: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontFamily: 'monospace',
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.8,
     lineHeight: 16,
     textTransform: 'uppercase',
   },
   liveBracketChampionName: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 32,
     marginTop: 5,
   },
   liveBracketChampionBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
@@ -3134,12 +3233,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   upNextCard: {
-    backgroundColor: 'rgba(214, 162, 78, 0.10)',
-    borderColor: 'rgba(214, 162, 78, 0.36)',
-    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: 'rgba(214, 162, 78, 0.32)',
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     marginBottom: 16,
-    padding: 14,
+    padding: 18,
   },
   upNextTopRow: {
     alignItems: 'center',
@@ -3148,17 +3247,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   upNextRound: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     flex: 1,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 18,
     textTransform: 'uppercase',
   },
   upNextPlayers: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 21,
-    fontWeight: '900',
+    fontWeight: '600',
     lineHeight: 27,
     marginTop: 10,
   },
@@ -3174,26 +3273,28 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   liveRoundTitle: {
-    color: '#F4EFE6',
-    fontSize: 18,
-    fontWeight: '800',
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 10,
+    lineHeight: 24,
+    marginTop: 8,
   },
   liveMatch: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(244, 239, 230, 0.10)',
-    borderRadius: 18,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    marginBottom: 10,
-    padding: 14,
+    marginBottom: 12,
+    padding: 16,
   },
   liveMatchReady: {
-    backgroundColor: 'rgba(214, 162, 78, 0.09)',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: 'rgba(214, 162, 78, 0.06)',
+    borderColor: 'rgba(214, 162, 78, 0.32)',
   },
   liveMatchFinal: {
-    backgroundColor: 'rgba(214, 162, 78, 0.07)',
-    borderColor: 'rgba(214, 162, 78, 0.28)',
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
   },
   liveMatchTopRow: {
     alignItems: 'center',
@@ -3202,64 +3303,68 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   liveMatchLabel: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 19,
+    fontWeight: '500',
   },
   liveMatchPlayerList: {
-    gap: 8,
+    gap: 4,
     marginTop: 12,
   },
   liveMatchPlayerRow: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(244, 239, 230, 0.08)',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderColor: 'transparent',
+    borderRadius: 6,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
-    minHeight: 42,
-    paddingHorizontal: 10,
+    minHeight: 48,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   liveMatchPlayerWinner: {
-    backgroundColor: 'rgba(214, 162, 78, 0.11)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
+    backgroundColor: 'rgba(214, 162, 78, 0.07)',
+    borderColor: 'rgba(214, 162, 78, 0.22)',
   },
   liveMatchSeed: {
     alignItems: 'center',
-    backgroundColor: 'rgba(244, 239, 230, 0.08)',
-    borderRadius: 999,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderRadius: 4,
     height: 24,
     justifyContent: 'center',
     width: 24,
+    flexShrink: 0,
   },
   liveMatchSeedText: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 14,
+    fontFamily: 'monospace',
   },
   liveMatchPlayerName: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     flex: 1,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '500',
     lineHeight: 20,
+    minWidth: 0,
   },
   liveMatchPlayerNameWinner: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
   },
   liveMatchWinnerChip: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 15,
     textTransform: 'uppercase',
   },
   liveMatchWinner: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 19,
@@ -3271,29 +3376,28 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   liveMatchLocked: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 18,
-    textTransform: 'uppercase',
+    fontWeight: '400',
+    lineHeight: 20,
   },
   snapshotCard: {
     borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   snapshotLabel: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 10,
     fontWeight: '700',
   },
   snapshotCopy: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 21,
   },
   snapshotCallout: {
-    color: '#D6A24E',
+    color: theme.colors.accent,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 10,
@@ -3305,7 +3409,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sponsorSoftwareBody: {
-    color: '#A7A29A',
+    color: theme.colors.muted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 21,
@@ -3317,7 +3421,7 @@ const styles = StyleSheet.create({
   },
   sponsorSoftwareStrip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(7, 17, 15, 0.94)',
+    backgroundColor: theme.colors.surface,
     borderColor: 'rgba(214, 162, 78, 0.28)',
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -3326,9 +3430,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sponsorSoftwareTitle: {
-    color: '#F4EFE6',
+    color: theme.colors.text,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 28,
     marginTop: 8,
   },

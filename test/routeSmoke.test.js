@@ -771,10 +771,10 @@ test('the private admin route stays wired to the hub editor shell', () => {
   assert.match(adminScreenSource, /Choose a game first/);
   assert.match(adminScreenSource, /New \{game\.label\} event/);
   assert.match(adminScreenSource, /Refresh roster/);
-  assert.match(adminScreenSource, /Clear roster only/);
+  assert.match(adminScreenSource, /Clear roster and bracket/);
   assert.match(adminScreenSource, /tournamentScrollContent/);
   assert.match(adminScreenSource, /registration settings, and player accounts will be preserved/);
-  assert.match(adminScreenSource, /Yes, safely close and clear/);
+  assert.match(adminScreenSource, /Yes, clear roster and bracket/);
   assert.doesNotMatch(homeScreenSource, /HomepageFrontDoor/);
   assert.match(adminScreenSource, /title=\{isCreatingNewEvent \? 'Create event' : 'Edit event'\}/);
   assert.match(adminScreenSource, /Tournament mode/);

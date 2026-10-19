@@ -47,6 +47,7 @@ import {
 } from "../lib/tournamentHostingClient.js";
 import { startVisibilityAwarePolling } from "../lib/visibilityPoller.js";
 import { useVisibleNow } from "../lib/useVisibleNow.js";
+import { theme } from "../lib/theme.js";
 
 const DEFAULT_ROSTER_CAP = 8;
 const NEXT_CHAT_COMMANDS = [
@@ -56,47 +57,6 @@ const NEXT_CHAT_COMMANDS = [
   { command: "!discord", label: "Discord" },
 ];
 const NEXT_MOTION_CSS = `
-@keyframes nextCountdownTick {
-  0% { opacity: .78; filter: blur(.35px) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
-  42% { opacity: 1; filter: blur(0) drop-shadow(0 0 14px rgba(214, 162, 78, .22)); }
-  100% { opacity: 1; filter: blur(0) drop-shadow(0 0 0 rgba(214, 162, 78, 0)); }
-}
-
-@keyframes nextTitleBreath {
-  0%, 100% {
-    text-shadow: 0 0 0 rgba(214, 162, 78, 0);
-    transform: scale(1);
-  }
-  50% {
-    text-shadow: 0 0 18px rgba(214, 162, 78, .20), 0 0 34px rgba(214, 162, 78, .08);
-    transform: scale(1.024);
-  }
-}
-
-@keyframes nextProgressSheen {
-  0% { opacity: 0; transform: translateX(-120%); }
-  16% { opacity: .46; }
-  56% { opacity: .20; }
-  100% { opacity: 0; transform: translateX(220%); }
-}
-
-@keyframes nextCtaBreath {
-  0%, 100% { box-shadow: 0 12px 28px rgba(214, 162, 78, .14); transform: translateY(0); }
-  45% { box-shadow: 0 18px 44px rgba(214, 162, 78, .24); transform: translateY(-1px); }
-}
-
-@keyframes nextCtaSweep {
-  0% { opacity: 0; transform: translateX(-140%) skewX(-18deg); }
-  18% { opacity: .44; }
-  42% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
-  100% { opacity: 0; transform: translateX(160%) skewX(-18deg); }
-}
-
-[data-next-motion="countdown"] {
-  animation: nextCountdownTick 440ms cubic-bezier(.2, .86, .22, 1) both;
-  will-change: opacity, filter;
-}
-
 [data-countdown-clock="true"] {
   display: block;
   font-feature-settings: "tnum" 1;
@@ -106,80 +66,18 @@ const NEXT_MOTION_CSS = `
   word-break: normal;
 }
 
-[data-next-motion="title"] {
-  animation: nextTitleBreath 3.1s ease-in-out infinite;
-  display: inline-block;
-  transform-origin: left center;
-  will-change: transform, text-shadow;
-}
-
-[data-next-motion="progress"] {
-  position: relative;
-}
-
-[data-next-motion="progress"]::after {
-  animation: nextProgressSheen 3.8s cubic-bezier(.2, .8, .2, 1) infinite;
-  background: linear-gradient(90deg, transparent, rgba(255, 239, 184, .64), transparent);
-  border-radius: 999px;
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 42%;
-}
-
 [data-next-motion="progress-fill"] {
-  transition: width 780ms cubic-bezier(.2, .8, .2, 1);
-  will-change: width;
+  transition: width 200ms ease;
 }
 
 [data-next-motion="cta"] {
-  animation: nextCtaBreath 4.8s ease-in-out infinite;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  transition: filter 180ms ease, transform 180ms ease;
+  border-radius: 10px;
 }
 
-[data-next-motion="cta"]::after {
-  animation: nextCtaSweep 5.6s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, rgba(255, 247, 214, .38), transparent);
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 52%;
-  z-index: 2;
-}
-
-[data-next-motion="cta"] a > div,
-[data-next-motion="cta"] [role="link"] > div,
-[data-next-motion="cta"] [role="button"] > div {
-  background: linear-gradient(135deg, #F0C86A 0%, #D6A24E 46%, #9F6B24 100%);
-  border-color: rgba(255, 236, 181, .56);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
-}
-
-[data-next-motion="cta"]:hover {
-  filter: saturate(1.05);
-  transform: translateY(-2px);
-}
-
-[data-next-motion="cta"]:active {
-  filter: saturate(.98);
-  transform: translateY(1px);
-}
-
-[data-next-motion="panel"],
-[data-next-motion="card"] {
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
-}
-
-[data-next-motion="panel"]:hover,
-[data-next-motion="card"]:hover {
-  border-color: rgba(214, 162, 78, .24);
-  box-shadow: 0 24px 62px rgba(0, 0, 0, .30), 0 0 34px rgba(214, 162, 78, .07);
-  transform: translateY(-1px);
+@media (prefers-reduced-motion: reduce) {
+  [data-next-motion="progress-fill"] {
+    transition: none;
+  }
 }
 `;
 
@@ -196,12 +94,36 @@ function sortTournamentsByDate(tournaments) {
   );
 }
 
-function getCountdownParts(tournament, nowMs) {
-  const startMs = new Date(tournament?.date).getTime();
+function getCountdownParts(tournament, nowMs, { bracket, isBracketLive }) {
+  const bracketStatus = String(bracket?.status || "").trim().toLowerCase();
+
+  if (bracketStatus === "complete" || isBracketLive) {
+    return {
+      label: "Tournament status",
+      statusLabel: bracketStatus === "complete" ? "Completed" : "Live now",
+      clockLabel: "",
+      dayLabel: "",
+    };
+  }
+
+  const startMs = tournament?.date
+    ? new Date(tournament.date).getTime()
+    : Number.NaN;
 
   if (!Number.isFinite(startMs)) {
     return {
-      clockLabel: "Date TBA",
+      label: "Schedule",
+      statusLabel: "Date TBA",
+      clockLabel: "",
+      dayLabel: "",
+    };
+  }
+
+  if (startMs <= nowMs) {
+    return {
+      label: "Tournament status",
+      statusLabel: "Awaiting start",
+      clockLabel: "",
       dayLabel: "",
     };
   }
@@ -216,6 +138,8 @@ function getCountdownParts(tournament, nowMs) {
   const secondLabel = String(seconds).padStart(2, "0");
 
   return {
+    label: "Starts in",
+    statusLabel: "",
     clockLabel: `${hourLabel}:${minuteLabel}:${secondLabel}`,
     dayLabel: days > 0 ? `${days}d` : "",
   };
@@ -388,11 +312,14 @@ export default function NextScreen({ showDiscovery = false }) {
   };
   const bracket = eventData.bracket || null;
   const isBracketLive = isConfirmedLiveBracket(tournament, bracket);
-  const registrationMeta = tournament
+  const registrationDecision = tournament
     ? getEffectiveRegistrationStatus(tournament, {
         hasLiveBracket: isBracketLive,
       })
     : { label: "Coming soon", tone: "neutral", value: "coming-soon" };
+  const registrationMeta = registrationDecision.reason === "event-started" && !isBracketLive && bracket?.status !== "complete"
+    ? { ...registrationDecision, label: "Registration closed", actionCopy: "The scheduled start time has passed. Registration is closed." }
+    : registrationDecision;
   const tournamentPath = tournament ? getTournamentPath(tournament.slug) : "/";
   const checkInPath = tournament ? getCheckInPath(tournament.slug) : "/";
   const competitionStatus = tournament
@@ -697,7 +624,10 @@ export default function NextScreen({ showDiscovery = false }) {
       <NextLobbyHero
         bracket={bracket}
         isBracketLive={isBracketLive}
-        countdownParts={getCountdownParts(tournament, nowMs)}
+        countdownParts={getCountdownParts(tournament, nowMs, {
+          bracket,
+          isBracketLive,
+        })}
         joinUrl={joinUrl}
         openSeats={openSeats}
         registrationMeta={registrationMeta}
@@ -739,7 +669,7 @@ function NextLobbyHero({
   statusTone,
 }) {
   const { width } = useWindowDimensions();
-  const isPhone = width > 0 && width < 420;
+  const isPhone = width > 0 && width < 720;
   const signups = signupSummary.signups || [];
   const signedUpValue = signupSummary.loading
     ? "--"
@@ -755,50 +685,22 @@ function NextLobbyHero({
   const primaryLabel = primaryAction.label;
   const appStoreUrl = downloadLinks.appStoreSpades;
   const sponsor = getTournamentSponsor(tournament);
-  const countdownKey = `${countdownParts.dayLabel}-${countdownParts.clockLabel}`;
+  const countdownKey =
+    countdownParts.statusLabel
+    || `${countdownParts.dayLabel}-${countdownParts.clockLabel}`;
 
   return (
     <Surface style={[styles.lobbyHero, isPhone && styles.lobbyHeroPhone]}>
       <NextMotionStyles />
       <View
-        dataSet={getMotionDataSet("panel")}
+        dataSet={{ ...getMotionDataSet("panel"), tournamentLayout: "next-hero" }}
         style={[styles.countdownPanel, isPhone && styles.countdownPanelPhone]}
       >
         <View
+          dataSet={{ tournamentLayout: "event-copy" }}
           style={[styles.countdownCopy, isPhone && styles.countdownCopyPhone]}
         >
-          <Text style={styles.countdownLabel}>Starts in</Text>
-          <View
-            dataSet={getMotionDataSet("countdown")}
-            key={countdownKey}
-            style={styles.countdownStack}
-          >
-            {countdownParts.dayLabel ? (
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.countdownDays,
-                  isPhone && styles.countdownDaysPhone,
-                ]}
-              >
-                {countdownParts.dayLabel}
-              </Text>
-            ) : null}
-            <Text
-              dataSet={{ countdownClock: "true" }}
-              numberOfLines={1}
-              style={[
-                styles.countdownClock,
-                isPhone && styles.countdownClockPhone,
-                !countdownParts.dayLabel && styles.countdownClockSolo,
-                isPhone &&
-                  !countdownParts.dayLabel &&
-                  styles.countdownClockSoloPhone,
-              ]}
-            >
-              {countdownParts.clockLabel}
-            </Text>
-          </View>
+          <Text style={styles.heroKicker}>Featured tournament</Text>
           <Text
             accessibilityRole="heading"
             aria-level={1}
@@ -807,7 +709,55 @@ function NextLobbyHero({
           >
             {tournament.title}
           </Text>
+          <Text style={styles.heroDate}>
+            {formatDateLine(tournament.date, tournament.timeZone, tournament.timeZoneLabel)}
+          </Text>
           <PresentedBy sponsor={sponsor} />
+          <Text style={styles.countdownLabel}>{countdownParts.label}</Text>
+          <View
+            dataSet={getMotionDataSet("countdown")}
+            key={countdownKey}
+            style={styles.countdownStack}
+          >
+            {countdownParts.statusLabel ? (
+              <Text
+                style={[
+                  styles.eventTimingStatus,
+                  isPhone && styles.eventTimingStatusPhone,
+                ]}
+              >
+                {countdownParts.statusLabel}
+              </Text>
+            ) : (
+              <>
+                {countdownParts.dayLabel ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.countdownDays,
+                      isPhone && styles.countdownDaysPhone,
+                    ]}
+                  >
+                    {countdownParts.dayLabel}
+                  </Text>
+                ) : null}
+                <Text
+                  dataSet={{ countdownClock: "true" }}
+                  numberOfLines={1}
+                  style={[
+                    styles.countdownClock,
+                    isPhone && styles.countdownClockPhone,
+                    !countdownParts.dayLabel && styles.countdownClockSolo,
+                    isPhone &&
+                      !countdownParts.dayLabel &&
+                      styles.countdownClockSoloPhone,
+                  ]}
+                >
+                  {countdownParts.clockLabel}
+                </Text>
+              </>
+            )}
+          </View>
           <View style={styles.heroFacts}>
             <Text style={styles.heroFact}>Free Entry</Text>
             <Text style={styles.heroFactDivider}>/</Text>
@@ -817,6 +767,7 @@ function NextLobbyHero({
           </View>
 
           <View
+            dataSet={{ tournamentLayout: "event-actions" }}
             style={[styles.heroExitGrid, isPhone && styles.heroExitGridPhone]}
           >
             <ActionButton href={primaryHref} style={styles.heroExitButton}>
@@ -888,7 +839,7 @@ function NextLobbyHero({
         </View>
 
         <View
-          dataSet={getMotionDataSet("card")}
+          dataSet={{ ...getMotionDataSet("card"), tournamentLayout: "event-panel" }}
           style={[styles.eventPanel, isPhone && styles.eventPanelPhone]}
         >
           {isPhone ? null : (
@@ -908,7 +859,7 @@ function NextLobbyHero({
             <StatusRow label="Competition" value={competitionStatus} />
             <StatusRow
               label="Status"
-              value={isBracketLive ? "Bracket live" : bracket?.status === "complete" ? "Bracket complete" : bracket ? "Bracket published" : "Online"}
+              value={isBracketLive ? "Bracket live" : bracket?.status === "complete" ? "Bracket complete" : bracket ? "Bracket published" : "Awaiting bracket"}
             />
             <StatusRow label="Players registered" value={signedUpValue} />
             <StatusRow
@@ -945,6 +896,7 @@ function NextLobbyHero({
                 <ActionButton
                   href={primaryHref}
                   style={styles.primaryCtaButton}
+                  variant="secondary"
                 >
                   {primaryLabel}
                 </ActionButton>
@@ -972,14 +924,7 @@ function NextLobbyHero({
 
       <View style={styles.heroBadgeRow}>
         <Badge tone={statusTone}>{competitionStatus}</Badge>
-        <Badge tone="accent">SEASON 1 · LIVE</Badge>
-        <Text style={styles.heroDate}>
-          {formatDateLine(
-            tournament.date,
-            tournament.timeZone,
-            tournament.timeZoneLabel,
-          )}
-        </Text>
+        <Badge tone={registrationMeta.tone}>{registrationMeta.label}</Badge>
       </View>
 
       <View style={styles.lobbyBottom}>
@@ -1183,33 +1128,55 @@ function StreamQrGrid({ appStoreUrl, isPhone, joinUrl }) {
 
       <View style={styles.heroQrGrid}>
         <View style={styles.heroQrCard}>
-          <View style={styles.heroQrWrap}>
-            <Image
-              accessibilityLabel="QR code for the next tournament signup"
-              resizeMode="contain"
-              source={{ uri: getQrUrl(joinUrl) }}
-              style={[styles.heroQr, isPhone && styles.heroQrPhone]}
-            />
-          </View>
+          <TournamentQrImage
+            accessibilityLabel="QR code for the next tournament signup"
+            actionLabel="Open registration"
+            isPhone={isPhone}
+            url={joinUrl}
+          />
           <Text style={styles.heroQrLabel}>Scan to join</Text>
           <Text style={styles.heroQrMeta}>Registration and bracket</Text>
         </View>
 
         {appStoreUrl ? (
           <View style={[styles.heroQrCard, styles.heroQrCardApp]}>
-            <View style={styles.heroQrWrap}>
-              <Image
-                accessibilityLabel="QR code for 1v1 Spades on the App Store"
-                resizeMode="contain"
-                source={{ uri: getQrUrl(appStoreUrl) }}
-                style={[styles.heroQr, isPhone && styles.heroQrPhone]}
-              />
-            </View>
+            <TournamentQrImage
+              accessibilityLabel="QR code for 1v1 Spades on the App Store"
+              actionLabel="Get the app"
+              isPhone={isPhone}
+              url={appStoreUrl}
+            />
             <Text style={styles.heroQrLabel}>Get 1v1 Spades</Text>
             <Text style={styles.heroQrMeta}>Apple App Store</Text>
           </View>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function TournamentQrImage({ accessibilityLabel, actionLabel, isPhone, url }) {
+  const [failedUrl, setFailedUrl] = useState(null);
+  const unavailable = failedUrl === url;
+
+  return (
+    <View style={[styles.heroQrWrap, unavailable && styles.heroQrWrapUnavailable]}>
+      {unavailable ? (
+        <View accessibilityRole="status" style={styles.heroQrFallback}>
+          <Text style={styles.heroQrFallbackText}>QR unavailable</Text>
+          <ActionButton external href={url} style={styles.heroQrFallbackAction} variant="secondary">
+            {actionLabel}
+          </ActionButton>
+        </View>
+      ) : (
+        <Image
+          accessibilityLabel={accessibilityLabel}
+          onError={() => setFailedUrl(url)}
+          resizeMode="contain"
+          source={{ uri: getQrUrl(url) }}
+          style={[styles.heroQr, isPhone && styles.heroQrPhone]}
+        />
+      )}
     </View>
   );
 }
@@ -1267,97 +1234,113 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   scheduleNoticeText: {
-    color: "#A9A39A",
+    color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 21,
     marginTop: 4,
   },
   scheduleNoticeTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 15,
     fontWeight: "800",
   },
   countdownCopy: {
     flex: 1.45,
-    minWidth: 280,
+    minWidth: 0,
     width: "100%",
+    flexBasis: 360,
+    flexShrink: 1,
   },
   countdownCopyPhone: {
     flexBasis: "100%",
     minWidth: 0,
   },
   countdownLabel: {
-    color: "#D6A24E",
-    fontSize: 12,
-    fontWeight: "900",
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
     lineHeight: 16,
     textTransform: "uppercase",
+    letterSpacing: 1.4,
+    marginTop: 24,
   },
   countdownPanel: {
     alignItems: "flex-start",
-    backgroundColor: "rgba(5, 5, 5, 0.94)",
-    borderColor: "rgba(214, 162, 78, 0.22)",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    boxShadow:
-      "0 30px 88px rgba(0, 0, 0, 0.44), 0 0 44px rgba(214, 162, 78, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+    boxShadow: "none",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 32,
+    gap: 28,
     justifyContent: "space-between",
     minWidth: 0,
     overflow: "hidden",
-    padding: 40,
+    padding: 32,
     width: "100%",
   },
   countdownPanelPhone: {
     gap: 24,
-    padding: 24,
+    padding: 20,
   },
   countdownStack: {
-    alignItems: "flex-start",
+    alignItems: "center",
     alignSelf: "stretch",
-    marginTop: 12,
+    marginTop: 8,
     minWidth: 0,
     width: "100%",
+    flexDirection: "row",
+    gap: 12,
+  },
+  eventTimingStatus: {
+    color: theme.colors.text,
+    fontSize: 36,
+    fontWeight: "700",
+    lineHeight: 44,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  eventTimingStatusPhone: {
+    fontSize: 28,
+    lineHeight: 36,
   },
   countdownDays: {
-    color: "#F4EFE6",
-    fontSize: "clamp(3.5rem, 10vw, 7.5rem)",
-    fontWeight: "900",
+    color: theme.colors.muted,
+    fontSize: 36,
+    fontWeight: "500",
     letterSpacing: 0,
-    lineHeight: "clamp(3.8rem, 10.4vw, 7.85rem)",
-    textShadow: "0 0 18px rgba(214, 162, 78, 0.22)",
+    lineHeight: 48,
     whiteSpace: "nowrap",
-    width: "100%",
+    fontFamily: "monospace",
   },
   countdownDaysPhone: {
-    fontSize: "clamp(3.5rem, 16vw, 5.4rem)",
-    lineHeight: "clamp(3.8rem, 16.8vw, 5.8rem)",
+    fontSize: 28,
+    lineHeight: 40,
   },
   countdownClock: {
-    color: "#F4EFE6",
-    fontSize: "clamp(2.7rem, 7.6vw, 5.7rem)",
+    color: theme.colors.text,
+    fontSize: 52,
     fontVariant: ["tabular-nums"],
-    fontWeight: "900",
-    letterSpacing: 0,
-    lineHeight: "clamp(3rem, 8vw, 6rem)",
+    fontWeight: "500",
+    letterSpacing: -1.5,
+    lineHeight: 62,
     minWidth: 0,
-    textShadow: "0 0 18px rgba(214, 162, 78, 0.22)",
     whiteSpace: "nowrap",
-    width: "100%",
+    fontFamily: "monospace",
   },
   countdownClockPhone: {
-    fontSize: "clamp(2.35rem, 11.2vw, 3.9rem)",
-    lineHeight: "clamp(2.7rem, 12vw, 4.25rem)",
+    fontSize: 36,
+    lineHeight: 44,
+    letterSpacing: -1,
   },
   countdownClockSolo: {
-    fontSize: "clamp(3.1rem, 8.8vw, 6.35rem)",
-    lineHeight: "clamp(3.45rem, 9.3vw, 6.7rem)",
+    fontSize: 52,
+    lineHeight: 62,
   },
   countdownClockSoloPhone: {
-    fontSize: "clamp(2.35rem, 11.2vw, 3.9rem)",
-    lineHeight: "clamp(2.7rem, 12vw, 4.25rem)",
+    fontSize: 36,
+    lineHeight: 44,
   },
   heroActions: {
     alignContent: "flex-start",
@@ -1378,18 +1361,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   heroDate: {
-    color: "#D6A24E",
-    fontSize: 12,
-    fontWeight: "900",
-    lineHeight: 17,
-    textTransform: "uppercase",
+    color: theme.colors.muted,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
+    marginTop: 12,
   },
   heroText: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "400",
     lineHeight: 24,
-    marginTop: 20,
+    marginTop: 18,
     maxWidth: 620,
   },
   heroTextPhone: {
@@ -1397,23 +1380,23 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   heroQr: {
-    height: 152,
-    width: 152,
+    height: 112,
+    width: 112,
   },
   heroQrCard: {
     alignItems: "center",
-    backgroundColor: "rgba(214, 162, 78, 0.07)",
-    borderColor: "rgba(214, 162, 78, 0.28)",
-    borderRadius: 12,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flex: 1,
-    flexBasis: 180,
-    minWidth: 160,
-    padding: 10,
+    flexBasis: 142,
+    minWidth: 142,
+    padding: 8,
   },
   heroQrCardApp: {
-    backgroundColor: "rgba(94, 127, 163, 0.08)",
-    borderColor: "rgba(94, 127, 163, 0.34)",
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
   },
   heroQrGrid: {
     flexDirection: "row",
@@ -1424,17 +1407,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   heroQrLabel: {
-    color: "#F4EFE6",
-    fontSize: 14,
-    fontWeight: "900",
-    lineHeight: 19,
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
     marginTop: 9,
     textAlign: "center",
   },
   heroQrMeta: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "400",
     lineHeight: 15,
     marginTop: 2,
     textAlign: "center",
@@ -1452,39 +1435,71 @@ const styles = StyleSheet.create({
   heroQrWrap: {
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
-    padding: 8,
+    padding: 6,
+  },
+  heroQrWrapUnavailable: {
+    backgroundColor: "transparent",
+    padding: 0,
+    width: "100%",
+  },
+  heroQrFallback: {
+    alignItems: "stretch",
+    justifyContent: "center",
+    minHeight: 124,
+    gap: 12,
+  },
+  heroQrFallbackText: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  heroQrFallbackAction: {
+    marginBottom: 0,
+    marginRight: 0,
+    minHeight: 44,
+  },
+  heroKicker: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1.6,
+    lineHeight: 16,
+    textTransform: "uppercase",
   },
   heroTitle: {
-    color: "#F4EFE6",
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: 0,
-    lineHeight: 42,
-    marginTop: 14,
+    color: theme.colors.text,
+    fontSize: 44,
+    fontWeight: "400",
+    letterSpacing: -0.9,
+    lineHeight: 50,
+    marginTop: 12,
+    fontFamily: Platform.select({ web: 'Georgia, "Times New Roman", serif', ios: "Georgia", default: "serif" }),
+    maxWidth: 660,
   },
   heroTitlePhone: {
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: -0.6,
   },
   heroFacts: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 16,
+    marginTop: 18,
   },
   heroFact: {
-    color: "#D6A24E",
+    color: theme.colors.text,
     fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.3,
+    fontWeight: "500",
+    letterSpacing: 0,
     lineHeight: 17,
-    textTransform: "uppercase",
   },
   heroFactDivider: {
     color: "rgba(244, 239, 230, 0.28)",
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 17,
   },
   heroExitGrid: {
@@ -1498,20 +1513,28 @@ const styles = StyleSheet.create({
   },
   heroExitButton: {
     minWidth: 150,
+    minHeight: 46,
+    marginBottom: 0,
+    marginRight: 0,
   },
   lobbyHero: {
-    backgroundColor: "rgba(17, 17, 17, 0.78)",
-    borderColor: "rgba(214, 162, 78, 0.14)",
-    marginBottom: 32,
-    overflow: "hidden",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    marginBottom: 24,
+    overflow: "visible",
+    borderWidth: 0,
+    borderRadius: 0,
+    boxShadow: "none",
+    elevation: 0,
+    padding: 0,
   },
   lobbyHeroPhone: {
     marginBottom: 18,
   },
   loadingLabel: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 16,
     textTransform: "uppercase",
   },
@@ -1520,15 +1543,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loadingText: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "400",
     lineHeight: 23,
   },
   loadingTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 28,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 34,
   },
   lobbyBottom: {
@@ -1547,34 +1570,37 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   eventPanel: {
-    backgroundColor: "rgba(18, 18, 18, 0.88)",
-    borderColor: "rgba(244, 239, 230, 0.12)",
-    borderRadius: 14,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    boxShadow:
-      "0 20px 54px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.035)",
+    boxShadow: "none",
     flex: 0.9,
-    gap: 20,
-    minWidth: 304,
-    padding: 24,
+    gap: 18,
+    minWidth: 340,
+    padding: 20,
+    flexBasis: 360,
+    flexShrink: 1,
   },
   eventPanelHeader: {
     gap: 4,
   },
   eventPanelLabel: {
-    color: "#F4EFE6",
-    fontSize: 20,
-    fontWeight: "900",
-    lineHeight: 26,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
   },
   eventPanelMeta: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "400",
     lineHeight: 18,
   },
   eventPanelPhone: {
     flexBasis: "100%",
+    minWidth: 0,
+    padding: 16,
   },
   metricGrid: {
     flexDirection: "row",
@@ -1586,22 +1612,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metricLabel: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 15,
     textTransform: "uppercase",
   },
   metricLink: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 22,
     marginTop: 8,
   },
   metricTile: {
     backgroundColor: "rgba(255, 255, 255, 0.035)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderColor: theme.colors.line,
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: 145,
@@ -1610,9 +1636,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   metricValue: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 28,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 34,
     marginTop: 8,
   },
@@ -1624,25 +1650,25 @@ const styles = StyleSheet.create({
     flexBasis: 260,
   },
   matchFocus: {
-    borderTopColor: "rgba(244, 239, 230, 0.10)",
+    borderTopColor: theme.colors.line,
     borderTopWidth: 1,
     gap: 8,
-    paddingTop: 18,
+    paddingTop: 14,
   },
   matchFocusText: {
-    color: "#F4EFE6",
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 24,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 23,
   },
   mobileHeroCta: {
     alignSelf: "stretch",
     marginTop: 20,
   },
   playerChip: {
-    backgroundColor: "rgba(214, 162, 78, 0.12)",
-    borderColor: "rgba(214, 162, 78, 0.24)",
-    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceLift,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     maxWidth: 180,
     paddingHorizontal: 10,
@@ -1654,20 +1680,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playerChipText: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "500",
   },
   playerEmpty: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "400",
     lineHeight: 20,
   },
   playerMore: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "700",
     paddingVertical: 8,
   },
   primaryCtaMotion: {
@@ -1675,30 +1701,28 @@ const styles = StyleSheet.create({
   },
   primaryCtaButton: {
     alignSelf: "stretch",
-    boxShadow: "0 16px 36px rgba(214, 162, 78, 0.18)",
     marginBottom: 0,
     marginRight: 0,
   },
   progressFill: {
-    backgroundColor: "#D6A24E",
+    backgroundColor: theme.colors.accent,
     borderRadius: 999,
-    boxShadow: "0 0 18px rgba(214, 162, 78, 0.26)",
     height: "100%",
     minWidth: 2,
   },
   progressText: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "400",
     lineHeight: 17,
     marginTop: 8,
   },
   progressTrack: {
     backgroundColor: "rgba(244, 239, 230, 0.08)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderColor: theme.colors.line,
     borderRadius: 999,
-    borderWidth: 1,
-    height: 12,
+    borderWidth: 0,
+    height: 6,
     overflow: "hidden",
   },
   lobbySideRail: {
@@ -1707,11 +1731,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rosterPreview: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
-    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    boxShadow: "0 18px 48px rgba(0, 0, 0, 0.20)",
+    boxShadow: "none",
     flexBasis: 360,
     flexGrow: 1.4,
     padding: 16,
@@ -1724,32 +1748,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rosterPreviewMeta: {
-    color: "#D6A24E",
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
+    fontWeight: "500",
   },
   rosterPreviewTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 22,
   },
   shortcutCommand: {
-    backgroundColor: "rgba(255, 255, 255, 0.035)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
-    borderRadius: 8,
+    backgroundColor: theme.colors.backgroundAlt,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexBasis: 96,
     flexGrow: 1,
-    minHeight: 62,
+    minHeight: 56,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   shortcutCommandLabel: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "400",
     marginTop: 3,
   },
   shortcutCommands: {
@@ -1758,36 +1781,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   shortcutCommandText: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "500",
     lineHeight: 21,
+    fontFamily: "monospace",
   },
   shortcutCopy: {
     gap: 4,
   },
   shortcutLabel: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 15,
     textTransform: "uppercase",
   },
   shortcutStrip: {
     alignItems: "stretch",
-    backgroundColor: "rgba(255, 255, 255, 0.035)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
-    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    boxShadow: "0 18px 48px rgba(0, 0, 0, 0.20)",
+    boxShadow: "none",
     flexDirection: "column",
     gap: 12,
-    padding: 14,
+    padding: 16,
   },
   shortcutTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 23,
     marginTop: 4,
   },
@@ -1812,7 +1836,7 @@ const styles = StyleSheet.create({
   },
   sponsorSoftwareConsole: {
     backgroundColor: "rgba(5, 5, 5, 0.44)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderColor: theme.colors.line,
     borderRadius: 14,
     borderWidth: 1,
     flex: 1,
@@ -1821,9 +1845,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sponsorSoftwareConsoleLabel: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0.4,
     lineHeight: 15,
     textTransform: "uppercase",
@@ -1848,7 +1872,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   sponsorSoftwareNote: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 19,
@@ -1870,9 +1894,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   sponsorSoftwareStatLabel: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 13,
     textTransform: "uppercase",
   },
@@ -1882,14 +1906,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sponsorSoftwareStatValue: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 23,
     marginTop: 4,
   },
   sponsorSoftwareSummary: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 15,
     fontWeight: "700",
     lineHeight: 23,
@@ -1897,22 +1921,21 @@ const styles = StyleSheet.create({
     maxWidth: 680,
   },
   sponsorSoftwareTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 30,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 36,
     marginTop: 10,
   },
   statusLabel: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     flex: 1,
-    fontSize: 11,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "400",
     letterSpacing: 0.2,
     lineHeight: 16,
     minWidth: 116,
-    textTransform: "uppercase",
   },
   statusRow: {
     alignItems: "flex-start",
@@ -1926,24 +1949,23 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statusValue: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     flex: 1.2,
-    fontSize: 14,
-    fontWeight: "900",
+    fontSize: 13,
+    fontWeight: "600",
     lineHeight: 20,
     textAlign: "right",
   },
   statusValueEmphasis: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 16,
   },
   urgencyLabel: {
-    color: "#D6A24E",
-    fontSize: 11,
-    fontWeight: "900",
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: "600",
     letterSpacing: 0.3,
     lineHeight: 16,
-    textTransform: "uppercase",
   },
   urgencyTopRow: {
     alignItems: "center",
@@ -1957,31 +1979,35 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   urgencyValue: {
-    color: "#F4EFE6",
-    fontSize: 14,
-    fontWeight: "900",
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: "500",
     lineHeight: 20,
     textAlign: "right",
   },
   urgencyValuePhone: {
     textAlign: "left",
+    fontSize: 13,
   },
   heroUrgencyCard: {
-    backgroundColor: "rgba(214, 162, 78, 0.085)",
-    borderColor: "rgba(214, 162, 78, 0.22)",
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: "transparent",
+    borderColor: theme.colors.line,
+    borderRadius: 0,
+    borderWidth: 0,
     boxShadow:
       "0 16px 44px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.035)",
     marginTop: 24,
     maxWidth: 560,
-    padding: 16,
+    padding: 0,
+    borderTopWidth: 1,
+    paddingTop: 16,
+    gap: 12,
   },
   presentedBy: {
     alignItems: "center",
     alignSelf: "flex-start",
     backgroundColor: "rgba(244, 239, 230, 0.045)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
+    borderColor: theme.colors.line,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -1995,9 +2021,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   presentedByLabel: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 13,
     textTransform: "uppercase",
   },
@@ -2007,9 +2033,9 @@ const styles = StyleSheet.create({
     width: 28,
   },
   presentedByName: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 17,
     maxWidth: 240,
   },
@@ -2029,23 +2055,24 @@ const styles = StyleSheet.create({
     minWidth: 260,
   },
   communityEyebrow: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   communityTitle: {
-    color: "#F4EFE6",
-    fontSize: 30,
-    fontWeight: "900",
+    color: theme.colors.text,
+    fontSize: 28,
+    fontWeight: "600",
     lineHeight: 36,
     marginTop: 8,
+    letterSpacing: -0.5,
   },
   communityBody: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "400",
     lineHeight: 23,
     marginTop: 8,
     maxWidth: 760,
@@ -2057,9 +2084,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   hierarchyCard: {
-    backgroundColor: "rgba(244, 239, 230, 0.035)",
-    borderColor: "rgba(244, 239, 230, 0.10)",
-    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     flexGrow: 1,
     flexShrink: 1,
@@ -2073,27 +2100,27 @@ const styles = StyleSheet.create({
     borderColor: "rgba(214, 162, 78, 0.34)",
   },
   hierarchyLabel: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "700",
     textTransform: "uppercase",
   },
   hierarchyValue: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   hierarchyMeta: {
-    color: "#A7A29A",
+    color: theme.colors.muted,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "400",
     lineHeight: 19,
   },
   communityEventCard: {
     alignItems: "center",
-    backgroundColor: "rgba(12, 36, 30, 0.76)",
-    borderColor: "rgba(65, 194, 116, 0.38)",
-    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2111,23 +2138,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   communityEventTitle: {
-    color: "#F4EFE6",
+    color: theme.colors.text,
     fontSize: 24,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 30,
     marginTop: 10,
   },
   communityEventDate: {
-    color: "#D6A24E",
+    color: theme.colors.accent,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "500",
     lineHeight: 21,
     marginTop: 6,
   },
   communityEventInstructions: {
     color: "#C9C2B8",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "400",
     lineHeight: 22,
     marginTop: 9,
   },

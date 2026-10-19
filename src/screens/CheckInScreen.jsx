@@ -348,6 +348,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   );
   const tournamentSlug = tournament?.slug || '';
   const accountLoadIdRef = useRef(0);
+  const accountSubmissionRef = useRef(false);
+  const recoverySubmissionRef = useRef(false);
+  const verificationSubmissionRef = useRef(false);
   const [playerName, setPlayerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [playerHandle, setPlayerHandle] = useState('');
@@ -606,6 +609,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   }
 
   async function handleSubmitSignup() {
+    if (submitting) return;
     if (!account) {
       setError('Create or sign in to a player account before signing up.');
       return;
@@ -648,6 +652,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   }
 
   async function handleCreateAccount() {
+    if (accountSubmitting || accountSubmissionRef.current) return;
     const passwordError = getPasswordError(password, confirmPassword);
 
     if (passwordError) {
@@ -657,6 +662,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     }
 
     accountLoadIdRef.current += 1;
+    accountSubmissionRef.current = true;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -696,13 +702,16 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
         setAccountError(createError instanceof Error ? createError.message : 'Player account could not be created.');
       }
     } finally {
+      accountSubmissionRef.current = false;
       setAccountSubmitting(false);
       setAccountLoading(false);
     }
   }
 
   async function handleLoginAccount() {
+    if (accountSubmitting || accountSubmissionRef.current) return;
     accountLoadIdRef.current += 1;
+    accountSubmissionRef.current = true;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -733,17 +742,20 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } catch (loginError) {
       setAccountError(loginError instanceof Error ? loginError.message : 'Player account could not be opened.');
     } finally {
+      accountSubmissionRef.current = false;
       setAccountSubmitting(false);
       setAccountLoading(false);
     }
   }
 
   async function handleClaimUsername() {
+    if (accountSubmitting || accountSubmissionRef.current) return;
     if (!username.trim()) {
       setAccountError('Choose a unique username first.');
       return;
     }
 
+    accountSubmissionRef.current = true;
     setAccountSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -759,6 +771,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } catch (claimError) {
       setAccountError(claimError instanceof Error ? claimError.message : 'Username could not be claimed.');
     } finally {
+      accountSubmissionRef.current = false;
       setAccountSubmitting(false);
     }
   }
@@ -784,11 +797,13 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
   }
 
   async function handleRequestPasswordReset() {
+    if (recoverySubmitting || recoverySubmissionRef.current) return;
     if (!contactEmail.trim()) {
       setAccountError('Enter the account email first.');
       return;
     }
 
+    recoverySubmissionRef.current = true;
     setRecoverySubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -800,15 +815,18 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } catch (recoveryError) {
       setAccountError(recoveryError instanceof Error ? recoveryError.message : 'A recovery link could not be requested.');
     } finally {
+      recoverySubmissionRef.current = false;
       setRecoverySubmitting(false);
     }
   }
 
   async function handleRequestEmailVerification() {
+    if (verificationSubmitting || verificationSubmissionRef.current) return;
     if (!account?.email) {
       return;
     }
 
+    verificationSubmissionRef.current = true;
     setVerificationSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -820,16 +838,20 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } catch (verificationError) {
       setAccountError(verificationError instanceof Error ? verificationError.message : 'A verification code could not be requested.');
     } finally {
+      verificationSubmissionRef.current = false;
       setVerificationSubmitting(false);
     }
   }
 
   async function handleVerifyEmail() {
-    if (!verificationCode.trim()) {
-      setAccountError('Enter the verification code from your email.');
+    if (verificationSubmitting || verificationSubmissionRef.current) return;
+    const trimmedCode = verificationCode.trim();
+    if (trimmedCode.length !== 6) {
+      setAccountError('Enter the six-digit verification code from your email.');
       return;
     }
 
+    verificationSubmissionRef.current = true;
     setVerificationSubmitting(true);
     setAccountError('');
     setAccountMessage('');
@@ -837,7 +859,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     try {
       const result = await verifyPlayerEmail({
         contactEmail: account?.email,
-        code: verificationCode,
+        code: trimmedCode,
       });
 
       setAccount(result.account || account);
@@ -848,6 +870,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     } catch (verificationError) {
       setAccountError(verificationError instanceof Error ? verificationError.message : 'The email could not be verified.');
     } finally {
+      verificationSubmissionRef.current = false;
       setVerificationSubmitting(false);
     }
   }
@@ -933,6 +956,22 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
     playerHandle,
     registrationOpen,
   });
+  function handleSubmitAccount() {
+    if (accountSubmitting || accountSubmissionRef.current || !accountFormStatus.ready) {
+      if (accountMode === 'create') {
+        const passwordError = getPasswordError(password, confirmPassword);
+        if (passwordError) setAccountError(passwordError);
+      }
+      return;
+    }
+
+    if (accountMode === 'create') {
+      void handleCreateAccount();
+      return;
+    }
+
+    void handleLoginAccount();
+  }
   const tournamentPath = getTournamentPath(visibleTournament.slug);
   const accountAccessPath = buildTournamentAccountPath(
     `/check-in/${visibleTournament.slug}`,
@@ -1056,11 +1095,13 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                       onChangeText={setUsername}
-                      placeholder="3–20 letters, numbers, or underscores"
+                      onSubmitEditing={handleClaimUsername}
+                      placeholder="Choose a username"
                       placeholderTextColor="#6B766F"
                       style={styles.input}
                       value={username}
                     />
+                    <Text style={styles.fieldHint}>3–20 letters, numbers, or underscores.</Text>
                   </View>
                   <ActionButton disabled={accountSubmitting || !username.trim()} onPress={handleClaimUsername}>
                     {accountSubmitting ? 'Saving...' : 'Claim Username'}
@@ -1131,6 +1172,9 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                         inputMode="numeric"
                         maxLength={6}
                         onChangeText={setVerificationCode}
+                        onSubmitEditing={() => {
+                          if (verificationCode.trim().length === 6) handleVerifyEmail();
+                        }}
                         placeholder="000000"
                         placeholderTextColor="#6B766F"
                         style={styles.input}
@@ -1225,12 +1269,12 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                     autoCapitalize="none"
                     autoCorrect={false}
                     onChangeText={setPlayerHandle}
-                    placeholder="3–20 letters, numbers, or underscores"
+                    placeholder="Choose a username"
                     placeholderTextColor="#6B766F"
                     style={styles.input}
                     value={playerHandle}
                   />
-                  <Text style={styles.fieldHint}>This public name appears in Spades, Euchre, leagues, and tournaments. You can change it later when another username is available.</Text>
+                  <Text style={styles.fieldHint}>3–20 letters, numbers, or underscores. This public name appears in Spades, Euchre, leagues, and tournaments. You can change it later when another username is available.</Text>
                 </View>
               ) : null}
 
@@ -1267,11 +1311,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={setPassword}
-                  onSubmitEditing={() => {
-                    if (accountMode === 'login' && accountFormStatus.ready) {
-                      handleLoginAccount();
-                    }
-                  }}
+                  onSubmitEditing={handleSubmitAccount}
                   placeholder="At least 8 characters"
                   placeholderTextColor="#6B766F"
                   returnKeyType={accountMode === 'login' ? 'go' : 'next'}
@@ -1295,11 +1335,7 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                       onChangeText={setConfirmPassword}
-                      onSubmitEditing={() => {
-                        if (accountFormStatus.ready) {
-                          handleCreateAccount();
-                        }
-                      }}
+                      onSubmitEditing={handleSubmitAccount}
                       placeholder="Type it again"
                       placeholderTextColor="#6B766F"
                       returnKeyType="go"
@@ -1333,11 +1369,11 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
 
               <View style={styles.buttonRow}>
                 {accountMode === 'create' ? (
-                  <ActionButton disabled={!accountFormStatus.ready} onPress={handleCreateAccount}>
+                  <ActionButton disabled={!accountFormStatus.ready || accountSubmitting} onPress={handleSubmitAccount}>
                     {accountSubmitting ? 'Creating...' : authActionLabel}
                   </ActionButton>
                 ) : (
-                  <ActionButton disabled={!accountFormStatus.ready} onPress={handleLoginAccount}>
+                  <ActionButton disabled={!accountFormStatus.ready || accountSubmitting} onPress={handleSubmitAccount}>
                     {accountSubmitting ? 'Opening...' : authActionLabel}
                   </ActionButton>
                 )}
@@ -1384,8 +1420,8 @@ export default function CheckInScreen({ slug, initialAccountMode = 'create' }) {
           )}
 
           {!hasSignupConfirmation && accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
-          {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
-          {!hasSignupConfirmation && error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {accountError ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorText}>{accountError}</Text> : null}
+          {!hasSignupConfirmation && error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
         </Surface>
       </Section>
 
@@ -1470,7 +1506,7 @@ function SignupCompleteState({
         Signed up as {playerName}. Your name is in Current roster. Come back when the bracket is live, open My Match, play, then return here for results.
       </Text>
       {accountMessage ? <Text style={styles.successText}>{accountMessage}</Text> : null}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
 
       <View style={styles.confirmationStatusGrid}>
         <View style={styles.confirmationStatusItem}>
@@ -1971,7 +2007,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorText: {
-    color: '#8F1D2C',
+    color: '#FFB4B4',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 12,
@@ -2008,7 +2044,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: Platform.OS === 'web' ? 16 : 15,
   },
   fieldHint: {
     color: '#A7A29A',
@@ -2088,7 +2124,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: Platform.OS === 'web' ? 16 : 15,
     lineHeight: 21,
     textAlignVertical: 'top',
   },

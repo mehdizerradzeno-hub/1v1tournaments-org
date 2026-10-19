@@ -31,10 +31,10 @@ export const theme = {
     display: 34,
   },
   radius: {
-    xl: 30,
-    lg: 22,
-    md: 18,
-    sm: 12,
+    xl: 24,
+    lg: 20,
+    md: 16,
+    sm: 10,
     pill: 999,
   },
   space: {
@@ -47,12 +47,12 @@ export const theme = {
   },
   shadow: {
     card: {
-      boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
-      elevation: 8,
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.20)',
+      elevation: 4,
     },
     premium: {
-      boxShadow: '0 16px 30px rgba(214, 162, 78, 0.14)',
-      elevation: 10,
+      boxShadow: '0 16px 40px rgba(0, 0, 0, 0.28)',
+      elevation: 6,
     },
   },
 };

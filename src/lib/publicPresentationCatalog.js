@@ -39,7 +39,7 @@ export const PUBLIC_GAME_PRESENTATIONS = Object.freeze([
     webReady: true,
     infoPath: '/games/euchre',
     playPath: downloadLinks.webEuchre,
-    summary: 'A compact trump game with a court-card focus and one opponent across the table.',
+    summary: 'Call trump. Read your opponent. Make every trick count.',
     facts: Object.freeze(['Head-to-head game', 'Tournament status announced per event']),
   }),
   Object.freeze({
@@ -56,7 +56,7 @@ export const PUBLIC_GAME_PRESENTATIONS = Object.freeze([
     webReady: false,
     infoPath: '/games/gin-rummy',
     playPath: null,
-    summary: 'A meld-building table game presented here without implying a released tournament integration.',
+    summary: 'Build your melds and plan your next move. Coming soon to 1V1.',
     facts: Object.freeze(['Information available', 'No public event announced']),
   }),
   Object.freeze({
@@ -73,7 +73,7 @@ export const PUBLIC_GAME_PRESENTATIONS = Object.freeze([
     webReady: false,
     infoPath: '/games/cribbage',
     playPath: null,
-    summary: 'A pegging-and-counting classic shown as a public game lane, not as a claimed live integration.',
+    summary: 'Every peg counts. A new head-to-head challenge, coming soon.',
     facts: Object.freeze(['Information available', 'No public event announced']),
   }),
 ]);

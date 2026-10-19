@@ -96,7 +96,7 @@ function getStickyActionItems(paths) {
   ];
 }
 
-const DISPLAY_FONT = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Kufam, Georgia, serif' });
+const DISPLAY_FONT = Platform.select({ ios: 'System', android: 'sans-serif', default: 'DM Sans, Arial, sans-serif' });
 const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'DM Mono, monospace' });
 
 function isInternalHref(href) {
@@ -464,15 +464,17 @@ export function QuickActionCard({
   const borderColor = getToneColor(tone);
 
   return (
-    <CardLink accessibilityLabel={title} accent={borderColor} external={external} href={href} style={styles.quickActionWrap}>
-      <View style={styles.quickActionTopRow}>
-        <Badge tone={tone}>{meta}</Badge>
-        <Text style={styles.quickActionArrow}>Go</Text>
-      </View>
-      <Text style={styles.quickActionTitle}>{title}</Text>
-      <Text style={styles.quickActionBody}>{body}</Text>
-      {actionLabel ? <Text style={styles.quickActionCta}>{actionLabel}</Text> : null}
-    </CardLink>
+    <View style={styles.quickActionWrap}>
+      <CardLink accessibilityLabel={title} accent={borderColor} external={external} href={href}>
+        <View style={styles.quickActionTopRow}>
+          <Badge tone={tone}>{meta}</Badge>
+          <Text style={styles.quickActionArrow}>Go</Text>
+        </View>
+        <Text style={styles.quickActionTitle}>{title}</Text>
+        <Text style={styles.quickActionBody}>{body}</Text>
+        {actionLabel ? <Text style={styles.quickActionCta}>{actionLabel}</Text> : null}
+      </CardLink>
+    </View>
   );
 }
 
@@ -940,7 +942,7 @@ export function HubScreen({
             ) : null}
 
             {showTopNav ? (
-              <View style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
+              <View accessibilityLabel="Primary" accessibilityRole="navigation" style={[styles.navRow, showLaptopLayout && styles.navRowLaptop]}>
                 {navItems.map((item) => {
                   const active = isNavItemActive(pathname, item);
                   return (
@@ -997,7 +999,7 @@ export function HubScreen({
 
             {footerNote ? (
               <Surface style={styles.footerSurface}>
-                <Text style={styles.footerLabel}>Site note</Text>
+                <Text style={styles.footerLabel}>1v1 Tournaments</Text>
                 <Text style={styles.footerText}>{footerNote}</Text>
               </Surface>
             ) : null}
@@ -1040,8 +1042,8 @@ export function HubScreen({
 }
 
 const sharedCardShadow = {
-  boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
-  elevation: 8,
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.16)',
+  elevation: 4,
 };
 
 const styles = StyleSheet.create({
@@ -1112,22 +1114,10 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   backdropBandTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 220,
-    backgroundColor: theme.colors.backgroundAlt,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.line,
+    position: 'absolute', top: 0, left: 0, right: 0, height: 140, backgroundColor: theme.colors.backgroundAlt,
   },
   backdropBandBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 260,
-    backgroundColor: 'rgba(94, 127, 163, 0.04)',
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 0, backgroundColor: 'transparent',
   },
   mainScroll: {
     flex: 1,
@@ -1147,41 +1137,22 @@ const styles = StyleSheet.create({
     paddingBottom: 166,
   },
   page: {
-    width: '100%',
-    maxWidth: 1120,
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 12,
   },
   pageLaptop: {
-    maxWidth: 1280,
-    paddingHorizontal: 24,
-    paddingTop: 12,
+    maxWidth: 1280, paddingHorizontal: 32, paddingTop: 16,
   },
   brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 10,
-    padding: 10,
-    borderRadius: 18,
-    backgroundColor: 'rgba(9, 19, 17, 0.82)',
-    borderWidth: 1,
-    borderColor: theme.colors.line,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 8, paddingVertical: 10, backgroundColor: 'transparent',
   },
   brandRowPublic: {
-    backgroundColor: 'rgba(9, 13, 18, 0.92)',
-    borderColor: 'rgba(214, 162, 78, 0.34)',
+    backgroundColor: 'transparent',
   },
   brandRowLaptop: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   brandRowTiny: {
-    flexWrap: 'nowrap',
-    gap: 8,
-    padding: 8,
+    flexWrap: 'nowrap', gap: 8, paddingVertical: 6,
   },
   brandLink: {
     flexDirection: 'row',
@@ -1198,22 +1169,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   brandMark: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceLift,
-    borderWidth: 1,
-    borderColor: theme.colors.lineStrong,
-    ...sharedCardShadow,
+    width: 44, height: 44, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.accent,
   },
   brandMarkText: {
-    color: theme.colors.accent,
-    fontSize: 18,
-    fontFamily: DISPLAY_FONT,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    color: theme.colors.background, fontSize: 18, fontFamily: DISPLAY_FONT, fontWeight: '900', letterSpacing: -0.8,
   },
   brandCopy: {
     flex: 1,
@@ -1224,127 +1183,64 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   brandTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontFamily: DISPLAY_FONT,
-    fontWeight: '800',
-    letterSpacing: -0.45,
+    color: theme.colors.text, fontSize: 20, fontFamily: DISPLAY_FONT, fontWeight: '800', letterSpacing: -0.65,
   },
   brandDomain: {
-    color: theme.colors.muted,
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: MONO_FONT,
-    letterSpacing: 0.4,
+    color: theme.colors.muted, fontSize: 11, marginTop: 4, letterSpacing: 0.35,
   },
   brandUtility: {
-    alignItems: 'center',
-    flexShrink: 0,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    alignItems: 'center', flexShrink: 0, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8,
   },
   brandButton: {
-    marginRight: 0,
-    marginLeft: 8,
-    marginBottom: 8,
+    marginRight: 0, marginLeft: 0, marginBottom: 0,
   },
   accountChipShell: {
-    marginBottom: 8,
-    marginLeft: 8,
-    maxWidth: 178,
+    marginBottom: 0, marginLeft: 0, maxWidth: 178,
   },
   accountChip: {
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    minHeight: 50,
-    minWidth: 116,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: theme.radius.sm, borderWidth: 1, minHeight: 44, minWidth: 100, paddingHorizontal: 14, paddingVertical: 7,
   },
   accountChipSignedIn: {
-    backgroundColor: 'rgba(214, 162, 78, 0.12)',
-    borderColor: 'rgba(214, 162, 78, 0.62)',
+    backgroundColor: theme.colors.surfaceLift, borderColor: theme.colors.lineStrong,
   },
   accountChipSignedOut: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.surface, borderColor: theme.colors.lineStrong,
   },
   accountChipLabel: {
-    color: theme.colors.green,
-    fontSize: 10,
-    fontWeight: '900',
-    lineHeight: 13,
-    textTransform: 'uppercase',
+    color: theme.colors.muted, fontSize: 9, fontWeight: '700', lineHeight: 12, letterSpacing: 0.6, textTransform: 'uppercase',
   },
   accountChipLabelSignedOut: {
-    color: '#101010',
+    color: theme.colors.muted,
   },
   accountChipValue: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 17,
-    marginTop: 1,
+    color: theme.colors.text, fontSize: 13, fontWeight: '700', lineHeight: 17, marginTop: 1,
   },
   accountChipValueSignedOut: {
-    color: '#101010',
-    fontSize: 15,
-    textTransform: 'uppercase',
+    color: theme.colors.text, fontSize: 14,
   },
   navRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 18,
-    padding: 5,
-    borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(17, 29, 26, 0.72)',
-    borderWidth: 1,
-    borderColor: theme.colors.line,
-    alignSelf: 'flex-start',
+    flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 26, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.lineStrong, alignSelf: 'stretch',
   },
   navRowLaptop: {
-    marginBottom: 14,
+    marginBottom: 28,
   },
   navWrap: {
-    marginRight: 4,
-    marginBottom: 0,
+    marginRight: 0, marginBottom: 0,
   },
   navChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: theme.radius.pill,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center', borderRadius: theme.radius.sm, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'transparent',
   },
   navChipActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentSoft, borderColor: 'rgba(214, 162, 78, 0.24)',
   },
   navText: {
-    color: theme.colors.muted,
-    fontWeight: '700',
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    color: theme.colors.muted, fontWeight: '600', fontSize: 13, letterSpacing: 0,
   },
   navTextActive: {
-    color: theme.colors.text,
+    color: theme.colors.accent,
   },
   mobileBottomNav: {
-    flexShrink: 0,
-    marginBottom: 10,
-    marginHorizontal: 14,
-    zIndex: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(9, 19, 17, 0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(244, 239, 230, 0.10)',
+    flexShrink: 0, marginBottom: 10, marginHorizontal: 12, zIndex: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 5, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.lineStrong,
   },
   mobileInlineNav: {
     flexDirection: 'row',
@@ -1363,46 +1259,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   mobileBottomNavChip: {
-    alignItems: 'center',
-    borderRadius: 999,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    alignItems: 'center', borderRadius: theme.radius.sm, minHeight: 48, justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 3, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'transparent',
   },
   mobileBottomNavChipActive: {
     backgroundColor: 'rgba(214, 162, 78, 0.14)',
     borderColor: 'rgba(214, 162, 78, 0.58)',
   },
   mobileBottomNavText: {
-    color: theme.colors.muted,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
+    color: theme.colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0,
   },
   mobileBottomNavTextActive: {
     color: theme.colors.text,
   },
   stickyActionBar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 12,
-    zIndex: 30,
-    alignItems: 'center',
-    backgroundColor: 'rgba(9, 19, 17, 0.97)',
-    borderColor: 'rgba(214, 162, 78, 0.30)',
-    borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-    padding: 8,
-    ...sharedCardShadow,
+    position: 'absolute', left: 16, right: 16, bottom: 12, zIndex: 30, alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.lineStrong, borderRadius: theme.radius.md, borderWidth: 1, flexDirection: 'row', gap: 10, justifyContent: 'space-between', padding: 8, ...sharedCardShadow,
   },
   stickyActionBarWithMobileNav: {
     bottom: 76,
@@ -1437,16 +1307,7 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   stickyActionChip: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLift,
-    borderColor: theme.colors.lineStrong,
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 42,
-    minWidth: 66,
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    alignItems: 'center', backgroundColor: theme.colors.surfaceLift, borderColor: theme.colors.lineStrong, borderRadius: theme.radius.sm, borderWidth: 1, minHeight: 44, minWidth: 66, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 10,
   },
   stickyActionChipPrimary: {
     backgroundColor: theme.colors.accent,
@@ -1469,22 +1330,13 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   heroSurface: {
-    padding: 22,
-    borderRadius: 22,
-    marginBottom: 22,
-    borderColor: theme.colors.accentSoft,
-    overflow: 'hidden',
+    padding: 24, borderRadius: theme.radius.lg, marginBottom: 28, borderColor: theme.colors.line, overflow: 'hidden',
   },
   heroSurfaceCompact: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 18,
-    marginBottom: 12,
+    paddingHorizontal: 20, paddingVertical: 18, borderRadius: theme.radius.md, marginBottom: 20,
   },
   heroSurfaceLaptop: {
-    paddingHorizontal: 28,
-    paddingVertical: 20,
-    marginBottom: 20,
+    paddingHorizontal: 28, paddingVertical: 24, marginBottom: 28,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1498,37 +1350,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroDomain: {
-    color: theme.colors.muted,
-    fontFamily: MONO_FONT,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    flexShrink: 1,
+    color: theme.colors.muted, fontFamily: MONO_FONT, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', flexShrink: 1,
   },
   heroTitle: {
-    color: '#F0D59B',
-    fontSize: 35,
-    lineHeight: 38,
-    fontFamily: DISPLAY_FONT,
-    fontWeight: '800',
-    letterSpacing: -1.3,
-    maxWidth: 720,
+    color: theme.colors.text, fontSize: 38, lineHeight: 44, fontFamily: DISPLAY_FONT, fontWeight: '800', letterSpacing: -1.2, maxWidth: 800,
   },
   heroTitleCompact: {
-    fontSize: 25,
-    lineHeight: 29,
-    maxWidth: 860,
+    fontSize: 30, lineHeight: 36, maxWidth: 860,
   },
   heroTitleLaptop: {
     maxWidth: 980,
   },
   heroSubtitle: {
-    color: theme.colors.accent,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    marginTop: 12,
-    textTransform: 'uppercase',
+    color: theme.colors.accent, fontSize: 14, fontWeight: '600', letterSpacing: 0, marginTop: 10,
   },
   heroSubtitleCompact: {
     fontSize: 12,
@@ -1539,11 +1373,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   heroLead: {
-    color: theme.colors.text,
-    fontSize: 18,
-    lineHeight: 27,
-    marginTop: 10,
-    maxWidth: 760,
+    color: theme.colors.muted, fontSize: 16, lineHeight: 25, marginTop: 8, maxWidth: 760,
   },
   heroLeadCompact: {
     fontSize: 14,
@@ -1555,9 +1385,7 @@ const styles = StyleSheet.create({
     maxWidth: 1040,
   },
   actionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 20,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20,
   },
   actionRowCompact: {
     marginTop: 12,
@@ -1570,7 +1398,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   button: {
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.sm,
   },
   buttonPressed: {
     opacity: 0.86,
@@ -1580,20 +1408,13 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   actionButtonInner: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.accent,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
+    alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 18, paddingVertical: 12, borderRadius: theme.radius.sm, backgroundColor: theme.colors.accent, borderWidth: 1, borderColor: theme.colors.accent,
   },
   actionButtonInnerSecondary: {
-    backgroundColor: theme.colors.surfaceLift,
-    borderColor: theme.colors.lineStrong,
+    backgroundColor: theme.colors.surfaceLift, borderColor: theme.colors.lineStrong,
   },
   actionButtonInnerGhost: {
-    backgroundColor: 'transparent',
-    borderColor: theme.colors.lineStrong,
+    backgroundColor: 'transparent', borderColor: 'transparent',
   },
   actionButtonInnerDanger: {
     backgroundColor: 'rgba(143, 29, 44, 0.16)',
@@ -1604,11 +1425,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.line,
   },
   actionButtonText: {
-    color: '#101010',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    color: theme.colors.background, fontSize: 14, fontWeight: '700', fontFamily: DISPLAY_FONT, letterSpacing: 0, textAlign: 'center',
   },
   actionButtonTextSecondary: {
     color: theme.colors.text,
@@ -1674,57 +1491,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   section: {
-    marginBottom: 22,
+    marginBottom: 36,
   },
   sectionHead: {
-    marginBottom: 12,
+    alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, marginBottom: 18,
   },
   sectionTitleGroup: {
-    maxWidth: 760,
+    flexGrow: 1, flexShrink: 1, maxWidth: 760,
   },
   sectionEyebrow: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    fontFamily: MONO_FONT,
+    color: theme.colors.accent, fontSize: 10, fontWeight: '600', letterSpacing: 1.7, textTransform: 'uppercase', marginBottom: 7, fontFamily: MONO_FONT,
   },
   sectionTitle: {
-    color: theme.colors.text,
-    fontSize: 26,
-    lineHeight: 30,
-    fontFamily: DISPLAY_FONT,
-    fontWeight: '800',
-    letterSpacing: 0,
+    color: theme.colors.text, fontSize: 26, lineHeight: 32, fontFamily: DISPLAY_FONT, fontWeight: '700', letterSpacing: -0.65,
   },
   sectionDescription: {
-    color: theme.colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 6,
+    color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 6,
   },
   sectionAction: {
-    marginTop: 10,
+    marginTop: 0,
   },
   surface: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.line,
-    padding: 18,
-    ...sharedCardShadow,
+    backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.line, padding: 20, ...sharedCardShadow,
   },
   playerRouteStrip: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(9, 19, 17, 0.88)',
-    borderColor: theme.colors.accentGlow,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-    justifyContent: 'space-between',
-    marginBottom: 22,
+    alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.lineStrong, flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'space-between', marginBottom: 24,
   },
   playerRouteCopy: {
     flex: 1,
@@ -1751,12 +1542,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 18,
-    overflow: 'hidden',
-    ...sharedCardShadow,
+    backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, padding: 20, overflow: 'hidden', ...sharedCardShadow,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -1890,10 +1676,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   emptyTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    fontFamily: DISPLAY_FONT,
+    color: theme.colors.text, fontSize: 18, fontWeight: '700', fontFamily: DISPLAY_FONT,
   },
   emptyBody: {
     color: theme.colors.muted,
@@ -1907,6 +1690,7 @@ const styles = StyleSheet.create({
   quickActionWrap: {
     flexBasis: 240,
     flexGrow: 1,
+    minWidth: 0,
     marginRight: 12,
     marginBottom: 12,
   },
@@ -2281,6 +2065,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: theme.radius.pill,
@@ -2288,6 +2073,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: theme.colors.text,
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.6,

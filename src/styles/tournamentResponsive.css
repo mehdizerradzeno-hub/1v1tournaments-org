@@ -18,6 +18,59 @@
   max-width: 100%;
 }
 
+[data-tournament-layout] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-tournament-layout="tabs"] [role="tab"] {
+  min-height: 44px;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+[data-tournament-layout] a:focus-visible,
+[data-tournament-layout] [role="button"]:focus-visible,
+[data-tournament-layout="tabs"] [role="tab"]:focus-visible {
+  outline: 2px solid #D6A24E;
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  [data-tournament-layout="next-hero"] > [data-tournament-layout="event-copy"],
+  [data-tournament-layout="next-hero"] > [data-tournament-layout="event-panel"] {
+    flex-basis: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 719px) {
+  [data-tournament-layout="detail-hero"] {
+    flex-direction: column;
+  }
+
+  [data-tournament-layout="detail-hero"] > [data-tournament-layout="event-copy"] {
+    flex-basis: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  [data-tournament-layout="event-actions"] {
+    min-width: 0;
+    width: 100%;
+  }
+
+  [data-tournament-layout="event-actions"] > * {
+    flex-basis: 140px;
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  [data-tournament-layout="event-actions"] > :first-child {
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 430px) {
   [data-tournament-page="true"] {
     width: 100%;
@@ -44,5 +97,11 @@
   [data-tournament-page="true"] a {
     min-height: 44px;
     white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tournament-layout="tabs"] [role="tab"] {
+    transition: none;
   }
 }

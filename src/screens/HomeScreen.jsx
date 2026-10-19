@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, EmptyState, HubScreen, ResultCard, Section, Surface } from '../components/hub-ui.jsx';
+import { theme } from '../lib/theme.js';
 import { formatDateLine } from '../lib/format.js';
 import { getResults, siteData } from '../lib/siteData.js';
 import { fetchTournamentEvents } from '../lib/tournamentHostingClient.js';
@@ -127,22 +128,22 @@ function PhysicalGameCard({ game, pageVisible, selected, onSelect }) {
       setReturning(false);
     }
   }
-  return <View style={[styles.physicalGameCard, selected && styles.physicalGameCardSelected]}><Pressable accessibilityHint="Selects this game and updates the public schedule below." accessibilityLabel={'Select ' + game.name} accessibilityRole="radio" accessibilityState={{ selected }} dataSet={{ physicalCardHit: 'true', hovered: cardTurning ? 'true' : 'false' }} onHoverIn={startTurn} onHoverOut={stopTurn} onKeyDown={(event) => { if (event?.key === 'Enter' || event?.key === ' ') { event.preventDefault?.(); onSelect(game.slug); } }} onPress={() => onSelect(game.slug)}><View dataSet={{ physicalCardScene: 'true' }}><View dataSet={{ physicalCardRotor: 'true', pageVisible: pageVisible ? 'true' : 'false', returning: returning ? 'true' : 'false', turning: cardTurning ? 'true' : 'false' }} onTransitionEnd={continueTurn} style={{ transform: [{ rotateY: (turn * 360) + 'deg' }] }}><View dataSet={{ physicalCardFace: 'true', physicalCardFront: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><Text dataSet={{ cardCorner: 'true' }}>A{pip}</Text><Text dataSet={{ cardCorner: 'true', cardCornerBottom: 'true' }}>A{pip}</Text><View dataSet={{ cardCenter: 'true' }}><View><CardArtwork art={game.art} /><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardTitle: 'true' }}>{game.cardName}</Text><Text dataSet={{ cardKicker: 'true' }}>No partner. No excuses.</Text></View></View></View><View dataSet={{ physicalCardFace: 'true', physicalCardBack: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><View dataSet={{ cardCenter: 'true' }}><View><View dataSet={{ cardBackSeal: 'true' }}><Text dataSet={{ cardBackWord: 'true' }}>{backLabel}</Text></View><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardKicker: 'true' }}>Tournaments</Text></View></View></View></View></View></Pressable><View style={styles.cardInfo}><View style={styles.cardLabelRow}><Text style={styles.cardName}>{game.name}</Text>{selected ? <Text accessibilityLiveRegion="polite" style={styles.selectedMark}>SELECTED</Text> : null}</View><Text style={styles.cardSummary}>{game.summary}</Text><ActionButton disabled={isComingSoon} href={isDirectGameLaunch ? game.playPath : isComingSoon ? undefined : game.infoPath} variant={selected ? 'primary' : 'secondary'}>{isDirectGameLaunch ? 'Play ' + game.shortName : isComingSoon ? 'Coming soon' : 'Explore ' + game.shortName}</ActionButton></View></View>;
+  return <View style={[styles.physicalGameCard, selected && styles.physicalGameCardSelected]}><Pressable accessibilityHint="Selects this game and updates the public schedule below." accessibilityLabel={'Select ' + game.name} accessibilityRole="radio" accessibilityState={{ selected }} dataSet={{ physicalCardHit: 'true', hovered: cardTurning ? 'true' : 'false' }} onHoverIn={startTurn} onHoverOut={stopTurn} onKeyDown={(event) => { if (event?.key === 'Enter' || event?.key === ' ') { event.preventDefault?.(); onSelect(game.slug); } }} onPress={() => onSelect(game.slug)}><View dataSet={{ physicalCardScene: 'true' }}><View dataSet={{ physicalCardRotor: 'true', pageVisible: pageVisible ? 'true' : 'false', returning: returning ? 'true' : 'false', turning: cardTurning ? 'true' : 'false' }} onTransitionEnd={continueTurn} style={{ transform: [{ rotateY: (turn * 360) + 'deg' }] }}><View dataSet={{ physicalCardFace: 'true', physicalCardFront: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><Text dataSet={{ cardCorner: 'true' }}>A{'\n'}{pip}</Text><Text dataSet={{ cardCorner: 'true', cardCornerBottom: 'true' }}>A{'\n'}{pip}</Text><View dataSet={{ cardCenter: 'true' }}><View><CardArtwork art={game.art} /><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardTitle: 'true' }}>{game.cardName}</Text><Text dataSet={{ cardKicker: 'true' }}>No partner. No excuses.</Text></View></View></View><View dataSet={{ physicalCardFace: 'true', physicalCardBack: 'true', cardArt: game.art }}><View dataSet={{ cardOrnament: 'true' }} /><View dataSet={{ cardCenter: 'true' }}><View><View dataSet={{ cardBackSeal: 'true' }}><Text dataSet={{ cardBackWord: 'true' }}>{backLabel}</Text></View><Text dataSet={{ cardTitle: 'true' }}>1V1</Text><Text dataSet={{ cardKicker: 'true' }}>Tournaments</Text></View></View></View></View></View></Pressable><View style={styles.cardInfo}><View style={styles.cardLabelRow}><Text style={styles.cardName}>{game.name}</Text>{selected ? <Text accessibilityLiveRegion="polite" style={styles.selectedMark}>SELECTED</Text> : null}</View><Text style={styles.cardSummary}>{game.summary}</Text><ActionButton disabled={isComingSoon} href={isDirectGameLaunch ? game.playPath : isComingSoon ? undefined : game.infoPath} variant={selected ? 'primary' : 'secondary'}>{isDirectGameLaunch ? 'Play ' + game.shortName : isComingSoon ? 'Coming soon' : 'Explore ' + game.shortName}</ActionButton></View></View>;
 }
 
 function PublicEventCard({ event }) {
   const game = getPublicGamePresentation(event.gameSlug);
   const action = getPublicEventAction(event, game);
   const counts = event.registeredCount !== null && event.rosterCap !== null ? event.registeredCount + ' / ' + event.rosterCap + ' registered' : null;
-  return <Surface style={[styles.eventCard, { borderColor: game?.accent || '#D6A24E' }]}>{event.status === 'live' ? <Text style={styles.eventLive}>Live now</Text> : null}<Text style={styles.eventGame}>{game?.name || event.gameName}</Text><Text style={styles.eventTitle}>{event.title}</Text><Text style={styles.eventMeta}>{formatDateLine(event.date, event.timeZone, event.timeZoneLabel)}</Text>{[event.format, event.location, counts].filter(Boolean).map((detail) => <Text key={detail} style={styles.eventDetail}>{detail}</Text>)}<ActionButton href={action.href} variant={action.variant}>{action.label}</ActionButton></Surface>;
+  return <Surface style={[styles.eventCard, { borderTopColor: game?.accent || theme.colors.accent }]}>{event.status === 'live' ? <Text style={styles.eventLive}>Live now</Text> : null}<Text style={styles.eventGame}>{game?.name || event.gameName}</Text><Text style={styles.eventTitle}>{event.title}</Text><Text style={styles.eventMeta}>{formatDateLine(event.date, event.timeZone, event.timeZoneLabel)}</Text>{[event.format, event.location, counts].filter(Boolean).map((detail) => <Text key={detail} style={styles.eventDetail}>{detail}</Text>)}<ActionButton href={action.href} variant={action.variant}>{action.label}</ActionButton></Surface>;
 }
 
 function UpcomingSchedule({ activeGame, events, feedStatus, onRetry }) {
   const activeGameName = activeGame === 'all' ? 'All games' : getPublicGamePresentation(activeGame)?.name || 'Selected game';
-  if (feedStatus === 'loading') return <EmptyState body="The public schedule is loading. Existing event information will appear when the read completes." title="Loading schedule" />;
-  if (feedStatus === 'error') return <EmptyState action={<ActionButton onPress={onRetry} variant="secondary">Retry schedule</ActionButton>} body="The schedule could not be confirmed right now. Please retry before relying on event availability." title="Schedule temporarily unavailable" />;
-  if (!events.length) return <EmptyState action={<ActionButton href="/games" variant="secondary">Explore games</ActionButton>} body={activeGame === 'all' ? 'No eligible future public tournaments are scheduled.' : 'No public ' + activeGameName + ' tournaments are scheduled.'} title="No upcoming events" />;
-  return <View style={styles.eventGrid}>{events.map((event) => <PublicEventCard event={event} key={event.slug} />)}</View>;
+  if (feedStatus === 'loading') return <EmptyState body="Finding the next events. Please wait a moment." title="Loading schedule" />;
+  if (feedStatus === 'error') return <EmptyState action={<ActionButton onPress={onRetry} variant="secondary">Retry schedule</ActionButton>} body="We could not load the event schedule. Try again in a moment." title="Schedule temporarily unavailable" />;
+  if (!events.length) return <EmptyState action={<ActionButton href="/games" variant="secondary">Explore games</ActionButton>} body={activeGame === 'all' ? 'The next events will appear here as soon as they are announced.' : 'No public ' + activeGameName + ' tournaments are scheduled.'} title="No upcoming events" />;
+  return <View dataSet={{ homeEvents: 'true' }} style={styles.eventGrid}>{events.map((event) => <PublicEventCard event={event} key={event.slug} />)}</View>;
 }
 
 export default function HomeScreen() {
@@ -161,44 +162,105 @@ export default function HomeScreen() {
     const allResults = getResults();
     return activeGame === 'all' ? allResults : allResults.filter((result) => result.gameSlug === activeGame);
   }, [activeGame]);
-  const scheduleDescription = activeGame === 'all' ? 'Eligible published public events across every game.' : 'Eligible published public events for ' + (getPublicGamePresentation(activeGame)?.name || 'this game') + '.';
-  return <HubScreen accountHref="/account" footerNote="Creating the competitive 1v1 spades category." lead="Competitive head-to-head card games, with availability shown honestly." publicShell showHero={false} stickyActions={false} subtitle="No partner. No excuses." title="1v1 Tournaments"><PublicCountdownStrip event={nextEvent} feedStatus={feed.status} onDeadline={loadSchedule} onRetry={loadSchedule} /><Surface style={styles.homeHero}><Text accessibilityRole="header" aria-level={1} style={styles.heroTitle}>YOUR GAME. YOUR BRACKET.</Text><Text style={styles.heroTagline}>No partner. No excuses.</Text><Text style={styles.heroBody}>Pick a table to focus the schedule. The next-tournament strip always stays global.</Text><ActionButton href="/tournaments">Explore tournaments</ActionButton></Surface><Section description="Each card is still at rest. On a mouse or trackpad, only the card under the pointer turns; touch and keyboard selection remain direct." eyebrow="ALL GAMES" title="Choose your table"><View accessibilityLabel="Choose a game" accessibilityRole="radiogroup" dataSet={{ publicCardGrid: 'true' }}>{games.map((game) => <PhysicalGameCard game={game} key={game.slug} pageVisible={pageVisible} selected={activeGame === game.slug} onSelect={selectGame} />)}</View>{activeGame !== 'all' ? <View style={styles.clearFilter}><ActionButton onPress={() => selectGame('all')} variant="ghost">Show all games</ActionButton></View> : null}</Section>{liveEvent ? <Section description="Current play is shown only for an event with a verified public live state." title="Live now"><View style={styles.eventGrid}><PublicEventCard event={liveEvent} /></View></Section> : null}<Section description={scheduleDescription} title="Upcoming tournaments">{feed.status === 'stale' ? <Text style={styles.staleNote}>Showing the last confirmed schedule while a refresh is unavailable.</Text> : null}<UpcomingSchedule activeGame={activeGame} events={visibleEvents} feedStatus={feed.status} onRetry={loadSchedule} /></Section><Section action={<ActionButton href="/results" variant="secondary">View results</ActionButton>} description="Completed events appear here only after a public result record is posted." title="Recent results">{results.length ? <View style={styles.resultsGrid}>{results.slice(0, 3).map((result) => <ResultCard href={result.tournamentSlug ? '/tournaments/' + result.tournamentSlug : undefined} key={result.slug} result={result} />)}</View> : <EmptyState action={<ActionButton href="/results" variant="secondary">Open results</ActionButton>} body="Results will appear after verified event records are published." title="No posted results yet" />}</Section><Section description="A clear route from selecting a game to event details and your existing match path." title="How it works"><View style={styles.steps}><View style={styles.step}><Text style={styles.stepNumber}>01</Text><Text style={styles.stepTitle}>Choose your game</Text><Text style={styles.stepBody}>Select any card to focus the public schedule.</Text></View><View style={styles.step}><Text style={styles.stepNumber}>02</Text><Text style={styles.stepTitle}>Find an event</Text><Text style={styles.stepBody}>Open posted details and use registration only when it is offered.</Text></View><View style={styles.step}><Text style={styles.stepNumber}>03</Text><Text style={styles.stepTitle}>Play your match</Text><Text style={styles.stepBody}>Use the established account, check-in, and match paths when eligible.</Text></View></View></Section></HubScreen>;
+  const scheduleDescription = activeGame === 'all' ? 'Find your next competition across the 1V1 platform.' : 'The next events for ' + (getPublicGamePresentation(activeGame)?.name || 'this game') + '.';
+  return (
+    <HubScreen
+      accountHref="/account"
+      footerNote="No partner. No excuses."
+      lead="Your home for head-to-head card competition. Games, tournaments, leagues, and results in one place."
+      publicShell
+      showHero={false}
+      stickyActions={false}
+      subtitle="No partner. No excuses."
+      title="1v1 Tournaments">
+      <View dataSet={{ homeFeature: 'true' }} style={styles.homeHero}>
+        <View style={styles.heroCopy}>
+          <View style={styles.heroEyebrowRow}>
+            <View style={styles.heroRule} />
+            <Text style={styles.heroEyebrow}>THE 1V1 COMPETITION PLATFORM</Text>
+          </View>
+          <Text accessibilityRole="header" aria-level={1} dataSet={{ homeHeroTitle: 'true' }} style={styles.heroTitle}>YOUR GAME. YOUR BRACKET.</Text>
+          <Text style={styles.heroTagline}>No partner. No excuses.</Text>
+          <Text style={styles.heroBody}>Head-to-head card competition. Find your game, enter the next event, and follow every round.</Text>
+          <View style={styles.heroActions}>
+            <ActionButton href="/tournaments">Explore tournaments</ActionButton>
+            <ActionButton href="/stream" variant="secondary">Watch competition</ActionButton>
+          </View>
+        </View>
+        <PublicCountdownStrip event={nextEvent} feedStatus={feed.status} onDeadline={loadSchedule} onRetry={loadSchedule} />
+      </View>
+      <Section description="Pick your game. Find your competition." eyebrow="THE GAMES" title="Choose your table">
+        <View accessibilityLabel="Choose a game" accessibilityRole="radiogroup" dataSet={{ publicCardGrid: 'true' }}>
+          {games.map((game) => <PhysicalGameCard game={game} key={game.slug} pageVisible={pageVisible} selected={activeGame === game.slug} onSelect={selectGame} />)}
+        </View>
+        {activeGame !== 'all' ? <View style={styles.clearFilter}><ActionButton onPress={() => selectGame('all')} variant="ghost">Show all games</ActionButton></View> : null}
+      </Section>
+      {liveEvent ? (
+        <Section description="The competition is on. Follow the event and every result." eyebrow="ON THE TABLE" title="Live now">
+          <View dataSet={{ homeEvents: 'true' }} style={styles.eventGrid}><PublicEventCard event={liveEvent} /></View>
+        </Section>
+      ) : null}
+      <Section description={scheduleDescription} eyebrow="THE SCHEDULE" title="Upcoming tournaments">
+        {feed.status === 'stale' ? <Text style={styles.staleNote}>Showing the last confirmed schedule while a refresh is unavailable.</Text> : null}
+        <UpcomingSchedule activeGame={activeGame} events={visibleEvents} feedStatus={feed.status} onRetry={loadSchedule} />
+      </Section>
+      <Section action={<ActionButton href="/results" variant="secondary">View results</ActionButton>} description="The latest completed competitions and their final results." eyebrow="THE RECORD" title="Recent results">
+        {results.length ? (
+          <View style={styles.resultsGrid}>{results.slice(0, 3).map((result) => <ResultCard href={result.tournamentSlug ? '/tournaments/' + result.tournamentSlug : undefined} key={result.slug} result={result} />)}</View>
+        ) : (
+          <EmptyState body="Completed event results will appear here once they are posted." title="The next chapter is still being played" />
+        )}
+      </Section>
+      <Section description="From your first game to the final round." eyebrow="STEP UP TO THE TABLE" title="Your path to competition">
+        <View style={styles.steps}>
+          <View style={styles.step}><Text style={styles.stepNumber}>01 / CHOOSE</Text><Text style={styles.stepTitle}>Find your game</Text><Text style={styles.stepBody}>Select a game to explore its upcoming competitions.</Text></View>
+          <View style={styles.step}><Text style={styles.stepNumber}>02 / ENTER</Text><Text style={styles.stepTitle}>Join an event</Text><Text style={styles.stepBody}>Check the schedule and format, then register with your 1V1 account.</Text></View>
+          <View style={styles.step}><Text style={styles.stepNumber}>03 / COMPETE</Text><Text style={styles.stepTitle}>Take your seat</Text><Text style={styles.stepBody}>When your match is ready, open My Match and meet your opponent.</Text></View>
+        </View>
+      </Section>
+    </HubScreen>
+  );
 }
 
 const styles = StyleSheet.create({
-  countdownStrip: { alignItems: 'center', backgroundColor: '#10151c', borderColor: 'rgba(225,174,79,.46)', flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'space-between', marginBottom: 16, paddingVertical: 13 },
-  countdownCopy: { flex: 1, minWidth: 210 },
-  stripLabel: { color: '#e3ad4f', fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  stripTitle: { color: '#F8F5ED', fontSize: 18, fontWeight: '900', lineHeight: 23, marginTop: 3 },
-  stripMeta: { color: '#B9C2CD', fontSize: 12, lineHeight: 18, marginTop: 2 },
-  countdownUnits: { flexDirection: 'row', gap: 6 },
-  countdownUnit: { alignItems: 'center', backgroundColor: '#090d12', borderColor: 'rgba(255,255,255,.14)', borderRadius: 8, borderWidth: 1, minWidth: 43, paddingHorizontal: 5, paddingVertical: 5 },
-  countdownValue: { color: '#f4c566', fontFamily: 'monospace', fontSize: 18, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  countdownLabel: { color: '#b8c1cb', fontSize: 8, fontWeight: '800', letterSpacing: .3, textTransform: 'uppercase' },
-  homeHero: { alignItems: 'center', backgroundColor: '#0f141b', borderColor: 'rgba(225,174,79,.34)', marginBottom: 26, overflow: 'hidden', paddingVertical: 25, textAlign: 'center' },
-  heroTitle: { color: '#F8F5ED', fontFamily: 'Georgia', fontSize: 34, fontWeight: '900', letterSpacing: .3, lineHeight: 39, textAlign: 'center' },
-  heroTagline: { color: '#e3ad4f', fontSize: 18, fontWeight: '800', marginTop: 6, textAlign: 'center' },
-  heroBody: { color: '#BBC3CF', fontSize: 14, lineHeight: 21, marginBottom: 16, marginTop: 8, maxWidth: 570, textAlign: 'center' },
-  physicalGameCard: { backgroundColor: '#0d1117', borderColor: 'rgba(255,255,255,.14)', borderRadius: 19, borderWidth: 1, minWidth: 0, overflow: 'hidden', padding: 10 },
-  physicalGameCardSelected: { borderColor: '#e3ad4f', shadowColor: '#e3ad4f', shadowOpacity: .22, shadowRadius: 15 },
-  cardInfo: { paddingHorizontal: 4, paddingTop: 12 },
-  cardLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 5, justifyContent: 'space-between' },
-  cardName: { color: '#F6F1E7', flex: 1, fontSize: 16, fontWeight: '900' },
-  selectedMark: { color: '#f0c66c', fontFamily: 'monospace', fontSize: 9, fontWeight: '900', letterSpacing: .5 },
-  cardSummary: { color: '#B6C0CC', fontSize: 12, lineHeight: 18, marginBottom: 11, marginTop: 5, minHeight: 54 },
-  clearFilter: { alignItems: 'center', marginTop: 14 },
-  staleNote: { color: '#e5c176', fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  eventGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  eventCard: { flexGrow: 1, flexShrink: 1, minWidth: 235, padding: 17 },
-  eventLive: { color: '#8DCAA9', fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
-  eventGame: { color: '#e3ad4f', fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
-  eventTitle: { color: '#F6F1E7', fontSize: 20, fontWeight: '900', lineHeight: 25, marginTop: 4 },
-  eventMeta: { color: '#BEC7D1', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  eventDetail: { color: '#9DA9B6', fontSize: 12, lineHeight: 18, marginTop: 2 },
-  resultsGrid: { gap: 12 },
-  steps: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  step: { backgroundColor: '#10151c', borderColor: 'rgba(255,255,255,.11)', borderRadius: 12, borderWidth: 1, flex: 1, minWidth: 210, padding: 16 },
-  stepNumber: { color: '#e3ad4f', fontFamily: 'monospace', fontSize: 13, fontWeight: '900' },
-  stepTitle: { color: '#F6F1E7', fontSize: 17, fontWeight: '900', marginTop: 6 },
-  stepBody: { color: '#B6C0CC', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  countdownStrip: { backgroundColor: theme.colors.surface, borderColor: theme.colors.lineStrong, borderTopColor: theme.colors.accent, borderTopWidth: 2, flexDirection: 'column', gap: 20, justifyContent: 'space-between', padding: 24 },
+  countdownCopy: { minWidth: 0 },
+  stripLabel: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '600', letterSpacing: 1.5 },
+  stripTitle: { color: theme.colors.text, fontFamily: 'DM Sans, Arial, sans-serif', fontSize: 25, fontWeight: '700', letterSpacing: -0.5, lineHeight: 31, marginTop: 12 },
+  stripMeta: { color: theme.colors.muted, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  countdownUnits: { flexDirection: 'row', gap: 8 },
+  countdownUnit: { alignItems: 'center', backgroundColor: theme.colors.backgroundAlt, borderColor: theme.colors.line, borderRadius: theme.radius.sm, borderWidth: 1, flex: 1, minWidth: 44, paddingHorizontal: 8, paddingVertical: 12 },
+  countdownValue: { color: theme.colors.text, fontFamily: 'DM Mono, monospace', fontSize: 26, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  countdownLabel: { color: theme.colors.muted, fontSize: 8, fontWeight: '600', letterSpacing: 0.8, marginTop: 4, textTransform: 'uppercase' },
+  homeHero: { marginBottom: 46, paddingVertical: 22 },
+  heroCopy: { justifyContent: 'center', minWidth: 0, paddingVertical: 10 },
+  heroEyebrowRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 20 },
+  heroRule: { backgroundColor: theme.colors.accent, height: 2, width: 28 },
+  heroEyebrow: { color: theme.colors.accent, flexShrink: 1, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '500', letterSpacing: 1.6 },
+  heroTitle: { color: theme.colors.text, fontFamily: 'DM Sans, Arial, sans-serif', fontSize: 62, fontWeight: '900', letterSpacing: -2.6, lineHeight: 65, maxWidth: 650 },
+  heroTagline: { color: theme.colors.accent, fontSize: 20, fontWeight: '600', letterSpacing: -0.25, marginTop: 16 },
+  heroBody: { color: theme.colors.muted, fontSize: 16, lineHeight: 26, marginBottom: 22, marginTop: 12, maxWidth: 480 },
+  heroActions: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  physicalGameCard: { backgroundColor: theme.colors.surface, borderColor: theme.colors.line, borderRadius: theme.radius.md, borderWidth: 1, minWidth: 0, overflow: 'hidden', padding: 10 },
+  physicalGameCardSelected: { borderColor: theme.colors.accent, backgroundColor: theme.colors.surfaceLift },
+  cardInfo: { flex: 1, paddingHorizontal: 6, paddingBottom: 6, paddingTop: 16 },
+  cardLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'space-between' },
+  cardName: { color: theme.colors.text, flex: 1, fontFamily: 'DM Sans, Arial, sans-serif', fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
+  selectedMark: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 9, fontWeight: '500', letterSpacing: 0.5 },
+  cardSummary: { color: theme.colors.muted, fontSize: 13, lineHeight: 20, marginBottom: 16, marginTop: 8, minHeight: 60 },
+  clearFilter: { alignItems: 'center', marginTop: 18 },
+  staleNote: { color: theme.colors.accent, fontSize: 13, lineHeight: 20, marginBottom: 12 },
+  eventGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  eventCard: { borderTopWidth: 2, flexGrow: 1, flexShrink: 1, gap: 6, minWidth: 0, padding: 22 },
+  eventLive: { color: theme.colors.success, fontSize: 10, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' },
+  eventGame: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '500', letterSpacing: 1.2, textTransform: 'uppercase' },
+  eventTitle: { color: theme.colors.text, fontFamily: 'DM Sans, Arial, sans-serif', fontSize: 21, fontWeight: '700', letterSpacing: -0.4, lineHeight: 28, marginTop: 6 },
+  eventMeta: { color: theme.colors.text, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  eventDetail: { color: theme.colors.muted, fontSize: 13, lineHeight: 20 },
+  resultsGrid: { gap: 16 },
+  steps: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+  step: { borderTopColor: theme.colors.lineStrong, borderTopWidth: 1, flex: 1, minWidth: 210, paddingTop: 20, paddingBottom: 10 },
+  stepNumber: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '500', letterSpacing: 1.2 },
+  stepTitle: { color: theme.colors.text, fontFamily: 'DM Sans, Arial, sans-serif', fontSize: 21, fontWeight: '700', letterSpacing: -0.4, marginTop: 14 },
+  stepBody: { color: theme.colors.muted, fontSize: 14, lineHeight: 23, marginTop: 8 },
 });

@@ -181,12 +181,16 @@ function getBracketReadiness({ bracket, hasHostCredential, selectedMode, selecte
   const ready = !bracket && !firstBlocker;
 
   if (bracket) {
+    const isComplete = bracket.status === 'complete' || Boolean(bracket.winner);
+
     return {
-      body: `${bracket.participantCount || signupCount} players seeded. Refresh the bracket after reporting match winners.`,
+      body: isComplete
+        ? 'This bracket is complete. Start a new event for your next tournament.'
+        : `${bracket.participantCount || signupCount} players seeded. Refresh the bracket after reporting match winners.`,
       checks,
-      label: 'Published',
+      label: isComplete ? 'Complete' : 'Published',
       ready: true,
-      title: 'Bracket is live',
+      title: isComplete ? 'Tournament complete' : 'Bracket is live',
       tone: 'green',
     };
   }
@@ -2120,7 +2124,7 @@ export default function AdminScreen() {
               onPress={handleRequestClearTournamentData}
               style={styles.quickActionButton}
               variant="danger">
-              Clear roster only
+              Clear roster and bracket
             </ActionButton>
             <ActionButton
               disabled={!hasHostCredential || deleteLoading || deleteBlockedByActiveMatch}
@@ -2187,7 +2191,7 @@ export default function AdminScreen() {
               </Text>
               <View style={styles.buttonRow}>
                 <ActionButton disabled={clearLoading} onPress={handleClearTournamentData} variant="danger">
-                  {clearLoading ? 'Closing rooms...' : 'Yes, safely close and clear'}
+                  {clearLoading ? 'Closing rooms...' : 'Yes, clear roster and bracket'}
                 </ActionButton>
                 <ActionButton onPress={handleCancelClearTournamentData} variant="ghost">
                   Cancel
@@ -2862,7 +2866,7 @@ export default function AdminScreen() {
                   <Text style={styles.bracketChampionLabel}>Tournament complete</Text>
                   <Text style={styles.bracketChampionName}>{bracket.winner.name}</Text>
                   <Text style={styles.bracketChampionBody}>
-                    Results are ready for the public results page. Clear the tournament only when you want to reset this event for a fresh roster.
+                    Results are ready for the public results page. Start a new event from the selector above for your next tournament.
                   </Text>
                 </View>
               ) : null}
