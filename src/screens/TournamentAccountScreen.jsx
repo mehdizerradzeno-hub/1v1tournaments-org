@@ -1,17 +1,11 @@
 import { GameAccountConnectScreen } from './SpadesAccountConnectScreen.jsx';
 import {
+  prepareTournamentAccountReturn,
   resolveTournamentAccountDestination,
   SHARED_ACCOUNT_ACTIONS,
 } from '../lib/accountConnect.js';
 
 const TOURNAMENT_HOME_DESTINATION = '/';
-
-async function prepareTournamentAccountReturn(destination) {
-  return {
-    authorized: true,
-    url: destination,
-  };
-}
 
 export default function TournamentAccountScreen({
   initialEmail = '',

@@ -1,3 +1,5 @@
+import { prepareSharedAccountLaunch } from './sharedAccountLaunch.js';
+
 export const SHARED_ACCOUNT_ACTIONS = Object.freeze([
   { id: 'signin', label: 'Sign In' },
   { id: 'create', label: 'Create Account' },
@@ -19,6 +21,24 @@ export function resolveTournamentAccountDestination(value) {
   return TOURNAMENT_CHECK_IN_PATH.test(normalizedDestination)
     ? normalizedDestination
     : '/';
+}
+
+export async function prepareTournamentAccountReturn(
+  returnTo,
+  fetchImpl = globalThis.fetch,
+) {
+  const destination = resolveTournamentAccountDestination(returnTo);
+
+  if (destination === SPADES_HOSTING_DESTINATION) {
+    return prepareSharedAccountLaunch({
+      audience: 'spades',
+      destinationUrl: destination,
+      fetchImpl,
+      requireAccount: true,
+    });
+  }
+
+  return { authorized: true, url: destination };
 }
 
 export function buildTournamentAccountPath(returnTo = '/', mode = 'signin') {
