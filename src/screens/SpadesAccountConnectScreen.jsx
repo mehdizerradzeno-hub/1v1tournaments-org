@@ -95,20 +95,6 @@ export function GameAccountConnectScreen({
   const [account, setAccount] = useState(null);
   const hostingReturnRedirectRef = useRef(false);
 
-  useEffect(() => {
-    if (
-      Platform.OS !== 'web' ||
-      !account ||
-      !destination ||
-      destination === '/' ||
-      hostingReturnRedirectRef.current
-    ) {
-      return;
-    }
-
-    hostingReturnRedirectRef.current = true;
-    globalThis.location.assign(destination);
-  }, [account, destination]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -214,6 +200,21 @@ export function GameAccountConnectScreen({
       setError(handoffError instanceof Error ? handoffError.message : `${gameName} authorization could not be opened.`);
     }
   };
+
+  useEffect(() => {
+    if (
+      Platform.OS !== 'web' ||
+      !account ||
+      !destination ||
+      destination === '/' ||
+      hostingReturnRedirectRef.current
+    ) {
+      return;
+    }
+
+    hostingReturnRedirectRef.current = true;
+    void returnToGame();
+  }, [account, destination]);
 
   const signIn = async () => {
     if (!beginAccountSubmission()) return;
