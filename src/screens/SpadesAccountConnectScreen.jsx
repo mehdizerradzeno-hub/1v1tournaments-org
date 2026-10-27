@@ -93,6 +93,22 @@ export function GameAccountConnectScreen({
 }) {
   const [mode, setMode] = useState(initialMode);
   const [account, setAccount] = useState(null);
+  const hostingReturnRedirectRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      Platform.OS !== 'web' ||
+      !account ||
+      !destination ||
+      destination === '/' ||
+      hostingReturnRedirectRef.current
+    ) {
+      return;
+    }
+
+    hostingReturnRedirectRef.current = true;
+    globalThis.location.assign(destination);
+  }, [account, destination]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
