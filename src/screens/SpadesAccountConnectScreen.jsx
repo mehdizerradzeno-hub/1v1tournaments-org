@@ -87,6 +87,7 @@ export function GameAccountConnectScreen({
   accountActions = SPADES_SIGNED_OUT_ACCOUNT_ACTIONS,
   prepareReturn = prepareSpadesAccountReturn,
   passwordRecoveryPath = '/account',
+  requireAccountSelection = false,
   returnAfterSignOut = false,
   signedOutManageFallback = false,
   useHubShell = false,
@@ -113,7 +114,10 @@ export function GameAccountConnectScreen({
   const handoffStartedRef = useRef(false);
   const accountSubmissionRef = useRef(false);
   const usernameSubmissionRef = useRef(false);
-  const showSignInWhileAccountLoads = useHubShell && initialMode === 'signin' && !initialRecoveryToken;
+  const showSignInWhileAccountLoads = useHubShell
+    && !requireAccountSelection
+    && initialMode === 'signin'
+    && !initialRecoveryToken;
 
   const beginAccountSubmission = () => {
     if (submitting || accountSubmissionRef.current) return false;
@@ -204,6 +208,7 @@ export function GameAccountConnectScreen({
   useEffect(() => {
     if (
       Platform.OS !== 'web' ||
+      requireAccountSelection ||
       !account ||
       !destination ||
       destination === '/' ||
@@ -214,7 +219,7 @@ export function GameAccountConnectScreen({
 
     hostingReturnRedirectRef.current = true;
     void returnToGame();
-  }, [account, destination]);
+  }, [account, destination, requireAccountSelection]);
 
   const signIn = async () => {
     if (!beginAccountSubmission()) return;

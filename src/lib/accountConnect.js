@@ -7,7 +7,7 @@ export const SHARED_ACCOUNT_ACTIONS = Object.freeze([
 ]);
 
 const TOURNAMENT_CHECK_IN_PATH = /^\/check-in\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
-const SPADES_HOSTING_DESTINATION = 'https://1v1spades.com/hosting';
+export const SPADES_HOSTING_DESTINATION = 'https://1v1spades.com/hosting';
 
 export function resolveTournamentAccountDestination(value) {
   const destination = Array.isArray(value) ? value[0] : value;
