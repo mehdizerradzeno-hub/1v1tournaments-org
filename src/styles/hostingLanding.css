@@ -51,20 +51,21 @@
   gap: 13px;
 }
 
-#root [data-hosting-preview=true] [data-hosting-bracket=true] {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+#root [data-hosting-preview=true] .hosting-product-image-link {
+  display: block;
+  border-radius: 14px;
+  overflow: hidden;
 }
 
-#root [data-hosting-bracket-round=true],
-#root [data-hosting-match=true] {
-  min-width: 0;
+#root [data-hosting-preview=true] .hosting-product-image-link:focus-visible {
+  outline: 3px solid #D6A24E;
+  outline-offset: 4px;
 }
 
-#root [data-hosting-match-list=true] {
-  display: grid;
-  gap: 10px;
+#root [data-hosting-preview=true] .hosting-product-image {
+  display: block;
+  height: auto;
+  width: 100%;
 }
 
 #root [data-hosting-pricing=true] {
@@ -125,11 +126,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  #root [data-hosting-preview=true] [data-hosting-bracket=true] {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-  }
-
   #root [data-hosting-roadmap=true] {
     align-items: flex-start;
     flex-direction: column;
@@ -169,17 +165,12 @@
   }
 
   #root [data-hosting-step-grid=true],
-  #root [data-hosting-support-grid=true],
-  #root [data-hosting-preview=true] [data-hosting-bracket=true] {
+  #root [data-hosting-support-grid=true] {
     grid-template-columns: minmax(0, 1fr);
   }
 
   #root [data-hosting-preview=true] {
     padding: 20px;
-  }
-
-  #root [data-hosting-preview=true] [data-hosting-match-list=true] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   #root [data-hosting-pricing=true] > * {

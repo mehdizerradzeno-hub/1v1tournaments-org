@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { buildTournamentAccountPath, SPADES_HOSTING_DESTINATION } from '../src/lib/accountConnect.js';
@@ -26,7 +26,7 @@ test('public hosting route and both public navigation modes expose the page', ()
   assert.match(page, /stickyActions=\{false\}/);
 });
 
-test('pilot copy and request action retain the approved scope', () => {
+test('pilot copy and request action retain the approved scope', async () => {
   assert.deepEqual(HOSTING_PASS, {
     name: 'Single-Event Hosting Pass',
     priceUsd: 15,
@@ -42,11 +42,18 @@ test('pilot copy and request action retain the approved scope', () => {
   assert.equal(requestUrl.searchParams.get('subject'), 'Hosting access request');
   assert.match(page, /Request Hosting Access/);
   assert.match(page, /No checkout is live/);
-  assert.match(page, /ILLUSTRATIVE/);
-  assert.match(page, /not a tournament result or product screenshot/);
-  assert.doesNotMatch(page, /capture is required before publication|capture of the real product is prepared/);
+  assert.match(page, /LOCAL TEST TOURNAMENT/);
+  assert.match(page, /Privacy-edited image from a completed local test tournament/);
+  assert.match(page, /src="\/hosting\/eight-player-test-bracket.png"/);
+  assert.match(page, /Open the completed eight-player test tournament bracket at full size/);
+  assert.ok((await stat(new URL('../public/hosting/eight-player-test-bracket.png', import.meta.url))).size > 0);
+  assert.match(page, /Original pass valid 30 calendar days from purchase to start/);
+  assert.match(page, /Allowance used after successful start and first-round assignments/);
+  assert.match(page, /Player entry remains free/);
   assert.match(HOSTING_FAQS.find(({ id }) => id === 'delivery').answer, /1–3 business days/);
   assert.match(HOSTING_FAQS.find(({ id }) => id === 'expired').answer, /revoked or superseded/);
+  assert.match(HOSTING_FAQS.find(({ id }) => id === 'support').answer, /24\/7/);
+  assert.doesNotMatch(page, /Buy Now|Get Hosting Pass|Instant delivery/);
   assert.equal(new Set(HOSTING_FAQS.map(({ id }) => id)).size, HOSTING_FAQS.length);
 });
 

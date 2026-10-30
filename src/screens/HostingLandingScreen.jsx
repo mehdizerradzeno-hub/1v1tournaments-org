@@ -14,12 +14,6 @@ import {
 import { theme } from '../lib/theme.js';
 import '../styles/hostingLanding.css';
 
-const bracketRounds = [
-  { label: 'ROUND 01', matches: ['Match 01', 'Match 02', 'Match 03', 'Match 04'] },
-  { label: 'SEMIFINAL', matches: ['Match 05', 'Match 06'] },
-  { label: 'FINAL', matches: ['Match 07'] },
-];
-
 function RequestAccessButton({ variant = 'primary' }) {
   return <ActionButton external href={HOSTING_REQUEST_HREF} variant={variant}>Request Hosting Access</ActionButton>;
 }
@@ -33,29 +27,25 @@ function BracketPreview() {
     <View dataSet={{ hostingPreview: 'true' }} style={styles.preview}>
       <View style={styles.previewTop}>
         <View>
-          <Text style={styles.eyebrow}>FORMAT PREVIEW</Text>
-          <Text style={styles.previewTitle}>An eight-player field, one clear path.</Text>
+          <Text style={styles.eyebrow}>PRODUCT DEMONSTRATION</Text>
+          <Text style={styles.previewTitle}>A completed eight-player test event.</Text>
         </View>
-        <Text style={styles.previewBadge}>ILLUSTRATIVE</Text>
+        <Text style={styles.previewBadge}>LOCAL TEST TOURNAMENT</Text>
       </View>
-      <View accessibilityLabel="Illustrative eight-player single-elimination bracket layout" dataSet={{ hostingBracket: 'true' }}>
-        {bracketRounds.map((round) => (
-          <View dataSet={{ hostingBracketRound: 'true' }} key={round.label}>
-            <Text style={styles.roundLabel}>{round.label}</Text>
-            <View dataSet={{ hostingMatchList: 'true' }}>
-              {round.matches.map((match) => (
-                <View dataSet={{ hostingMatch: 'true' }} key={match} style={styles.match}>
-                  <Text style={styles.matchLabel}>{match}</Text>
-                  <View style={styles.matchSlot}><View style={styles.slotLine} /><Text style={styles.slotText}>Player slot</Text></View>
-                  <View style={styles.matchSlot}><View style={styles.slotLine} /><Text style={styles.slotText}>Player slot</Text></View>
-                </View>
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
+      <a
+        aria-label="Open the completed eight-player test tournament bracket at full size"
+        className="hosting-product-image-link"
+        href="/hosting/eight-player-test-bracket.png"
+        rel="noopener noreferrer"
+        target="_blank">
+        <img
+          alt="Completed local eight-player test tournament bracket. Player 5 wins the final over Player 1."
+          className="hosting-product-image"
+          src="/hosting/eight-player-test-bracket.png"
+        />
+      </a>
       <Text style={styles.previewCaption}>
-        Illustrative bracket structure, not a tournament result or product screenshot.
+        Privacy-edited image from a completed local test tournament. Generic player labels replace test account handles; the seven match outcomes and scores match the test record. Open the image for a closer look.
       </Text>
     </View>
   );
@@ -140,7 +130,7 @@ export default function HostingLandingScreen() {
           </View>
         </Section>
 
-        <Section eyebrow="THE BRACKET" title="See the shape of the competition" description="An illustrative view of an eight-player single-elimination field.">
+        <Section eyebrow="THE BRACKET" title="See the competition unfold" description="A completed local eight-player test tournament, shown with generic player labels.">
           <BracketPreview />
         </Section>
 
@@ -261,12 +251,6 @@ const styles = StyleSheet.create({
   previewTop: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 18, justifyContent: 'space-between', marginBottom: 28 },
   previewTitle: { color: theme.colors.text, fontSize: 23, fontWeight: '800', letterSpacing: -0.4, marginTop: 9 },
   previewBadge: { borderColor: theme.colors.accent, borderRadius: 999, borderWidth: 1, color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '700', letterSpacing: 1, overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 8 },
-  roundLabel: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12 },
-  match: { backgroundColor: '#111923', borderColor: theme.colors.lineStrong, borderRadius: 12, borderWidth: 1, minWidth: 0, padding: 13 },
-  matchLabel: { color: theme.colors.muted, fontFamily: 'DM Mono, monospace', fontSize: 10, fontWeight: '600', marginBottom: 9 },
-  matchSlot: { alignItems: 'center', borderTopColor: theme.colors.line, borderTopWidth: 1, flexDirection: 'row', gap: 9, minHeight: 28 },
-  slotLine: { backgroundColor: theme.colors.accent, height: 4, width: 4, borderRadius: 2 },
-  slotText: { color: theme.colors.muted, fontSize: 12 },
   previewCaption: { color: theme.colors.muted, fontSize: 12, lineHeight: 19, marginTop: 24 },
   stepNumber: { color: theme.colors.accent, fontFamily: 'DM Mono, monospace', fontSize: 26, fontWeight: '600' },
   pricing: { backgroundColor: '#111923', borderColor: 'rgba(214,162,78,0.34)', borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
