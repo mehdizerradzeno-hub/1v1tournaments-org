@@ -55,7 +55,7 @@ function BracketPreview() {
         ))}
       </View>
       <Text style={styles.previewCaption}>
-        Illustrative bracket structure, not a tournament result or product screenshot. A verified product capture is required before publication.
+        Illustrative bracket structure, not a tournament result or product screenshot.
       </Text>
     </View>
   );
@@ -140,7 +140,7 @@ export default function HostingLandingScreen() {
           </View>
         </Section>
 
-        <Section eyebrow="THE BRACKET" title="See the shape of the competition" description="An honest format preview while a privacy-reviewed capture of the real product is prepared.">
+        <Section eyebrow="THE BRACKET" title="See the shape of the competition" description="An illustrative view of an eight-player single-elimination field.">
           <BracketPreview />
         </Section>
 

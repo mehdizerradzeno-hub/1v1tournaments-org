@@ -36,11 +36,15 @@ test('pilot copy and request action retain the approved scope', () => {
     automaticRenewal: false,
   });
   assert.equal(HOSTING_SUPPORT_EMAIL, 'mehdi.zerrad@1v1spades.com');
-  assert.equal(new URL(HOSTING_REQUEST_HREF).protocol, 'mailto:');
+  const requestUrl = new URL(HOSTING_REQUEST_HREF);
+  assert.equal(requestUrl.protocol, 'mailto:');
+  assert.equal(requestUrl.pathname, HOSTING_SUPPORT_EMAIL);
+  assert.equal(requestUrl.searchParams.get('subject'), 'Hosting access request');
   assert.match(page, /Request Hosting Access/);
   assert.match(page, /No checkout is live/);
   assert.match(page, /ILLUSTRATIVE/);
   assert.match(page, /not a tournament result or product screenshot/);
+  assert.doesNotMatch(page, /capture is required before publication|capture of the real product is prepared/);
   assert.match(HOSTING_FAQS.find(({ id }) => id === 'delivery').answer, /1–3 business days/);
   assert.match(HOSTING_FAQS.find(({ id }) => id === 'expired').answer, /revoked or superseded/);
   assert.equal(new Set(HOSTING_FAQS.map(({ id }) => id)).size, HOSTING_FAQS.length);
