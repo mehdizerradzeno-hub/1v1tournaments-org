@@ -48,7 +48,13 @@ test('pilot copy and request action retain the approved scope', async () => {
   assert.match(page, /src="\/hosting\/eight-player-test-bracket.png"/);
   assert.match(page, /Open the completed eight-player test tournament bracket at full size/);
   assert.ok((await stat(new URL('../public/hosting/eight-player-test-bracket.png', import.meta.url))).size > 0);
-  assert.match(page, /Original pass valid 30 calendar days from purchase to start/);
+  assert.match(page, /Calendar days from agreed license start/);
+  assert.match(page, /Original pass valid 30 calendar days from the agreed and activated license start/);
+  assert.doesNotMatch(page, /from purchase to start|from redemption to start/);
+  const validity = HOSTING_FAQS.find(({ id }) => id === 'validity').answer;
+  assert.match(validity, /license start time explicitly agreed with the owner and activated on the license/);
+  assert.match(validity, /Payment or key redemption does not start the term automatically/);
+  assert.match(validity, /exact start and expiry timestamps are confirmed before delivery/);
   assert.match(page, /Allowance used after successful start and first-round assignments/);
   assert.match(page, /Player entry remains free/);
   assert.match(HOSTING_FAQS.find(({ id }) => id === 'delivery').answer, /1–3 business days/);

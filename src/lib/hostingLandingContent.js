@@ -69,7 +69,7 @@ export const HOSTING_FAQS = Object.freeze([
   {
     id: 'validity',
     question: 'When does the 30-day period begin?',
-    answer: 'The original pass is valid for 30 calendar days from purchase. Plan to start your tournament within that period.',
+    answer: 'The original pass is valid for 30 calendar days from the license start time explicitly agreed with the owner and activated on the license. Payment or key redemption does not start the term automatically. Your exact start and expiry timestamps are confirmed before delivery. Start your tournament within that term.',
   },
   {
     id: 'consumption',

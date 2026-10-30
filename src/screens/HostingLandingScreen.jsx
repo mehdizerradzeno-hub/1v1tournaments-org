@@ -115,7 +115,7 @@ export default function HostingLandingScreen() {
         <View dataSet={{ hostingFactGrid: 'true' }} style={styles.factGrid}>
           <View style={styles.fact}><Text style={styles.factValue}>01</Text><Text style={styles.factLabel}>Tournament included</Text></View>
           <View style={styles.fact}><Text style={styles.factValue}>08</Text><Text style={styles.factLabel}>Player capacity</Text></View>
-          <View style={styles.fact}><Text style={styles.factValue}>30</Text><Text style={styles.factLabel}>Calendar days from purchase to start</Text></View>
+          <View style={styles.fact}><Text style={styles.factValue}>30</Text><Text style={styles.factLabel}>Calendar days from agreed license start</Text></View>
         </View>
 
         <Section eyebrow="FOR ORGANIZERS" title="A clear path from setup to start" description="The pilot focuses on the steps an organizer needs to prepare an eight-player Spades event.">
@@ -159,7 +159,7 @@ export default function HostingLandingScreen() {
               <Text style={styles.detailTitle}>WHAT IS INCLUDED</Text>
               <Text style={styles.detailItem}>One tournament allowance</Text>
               <Text style={styles.detailItem}>Up to eight players</Text>
-              <Text style={styles.detailItem}>Original pass valid 30 calendar days from purchase to start</Text>
+              <Text style={styles.detailItem}>Original pass valid 30 calendar days from the agreed and activated license start</Text>
               <Text style={styles.detailItem}>Key redemption and lobby creation use no event allowance</Text>
               <Text style={styles.detailItem}>Allowance used after successful start and first-round assignments</Text>
             </View>
