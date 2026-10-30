@@ -185,6 +185,7 @@ export default function HomeScreen() {
           <View style={styles.heroActions}>
             <ActionButton href="/tournaments">Explore tournaments</ActionButton>
             <ActionButton href="/stream" variant="secondary">Watch competition</ActionButton>
+            <ActionButton href="/hosting" variant="secondary">Host a tournament</ActionButton>
           </View>
         </View>
         <PublicCountdownStrip event={nextEvent} feedStatus={feed.status} onDeadline={loadSchedule} onRetry={loadSchedule} />

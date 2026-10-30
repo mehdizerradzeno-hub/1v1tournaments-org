@@ -1,0 +1,11 @@
+#root [data-public-mobile-nav=true] > a {
+  align-items: center;
+  display: flex;
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 0;
+}
+
+#root [data-public-mobile-nav=true] > a > div {
+  width: 100%;
+}

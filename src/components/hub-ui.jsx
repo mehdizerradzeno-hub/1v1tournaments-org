@@ -5,6 +5,7 @@ import { Link, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 
 import { theme } from '../lib/theme.js';
+import '../styles/publicMobileNav.css';
 import { buildTournamentAccountPath } from '../lib/accountConnect.js';
 import { handleTabKeyNavigation } from '../lib/accessibleTabs.js';
 import { formatPlacement, formatResultDate, formatShortDate } from '../lib/format.js';
@@ -60,6 +61,7 @@ function getPublicNavItems(paths) {
   return [
     { label: 'Games', href: '/games' },
     { label: 'Tournaments', href: '/tournaments' },
+    { label: 'Host', href: '/hosting' },
     { label: 'Watch', href: '/stream' },
     { label: 'Rankings', href: '/leaderboard' },
     { label: 'Results', href: '/results' },
@@ -73,6 +75,7 @@ function getPublicMobileNavItems(paths) {
     { label: 'Games', href: '/games' },
     { label: 'Match', href: paths.matchPath, activePath: paths.tournamentPath },
     { label: 'Events', href: '/tournaments' },
+    { label: 'Host', href: '/hosting' },
     { label: 'Results', href: '/results' },
     { label: 'Profile', href: '/account' },
   ];
@@ -305,8 +308,9 @@ function HeaderAccountChip({ account, loading, href }) {
 }
 
 function MobileNav({ items, pathname, style }) {
+  const compact = items.length > 5;
   return (
-    <View accessibilityLabel="Primary" accessibilityRole="navigation" style={style}>
+    <View accessibilityLabel="Primary" accessibilityRole="navigation" dataSet={{ publicMobileNav: compact ? 'true' : undefined }} style={style}>
       {items.map((item) => {
         const active = isNavItemActive(pathname, item);
 
@@ -314,10 +318,10 @@ function MobileNav({ items, pathname, style }) {
           <LinkShell
             key={`mobile-${item.label}-${item.href}`}
             href={item.href}
-            style={styles.mobileBottomNavItem}
+            style={[styles.mobileBottomNavItem, compact && styles.mobileBottomNavItemCompact]}
             variant={active ? 'primary' : 'secondary'}>
             <View style={[styles.mobileBottomNavChip, active && styles.mobileBottomNavChipActive]}>
-              <Text style={[styles.mobileBottomNavText, active && styles.mobileBottomNavTextActive]}>
+              <Text style={[styles.mobileBottomNavText, compact && styles.mobileBottomNavTextCompact, active && styles.mobileBottomNavTextActive]}>
                 {item.label}
               </Text>
             </View>
@@ -1006,7 +1010,7 @@ export function HubScreen({
           </View>
         </ScrollView>
       </SafeAreaView>
-      {showDockedMobileNav ? <MobileNav items={mobileNavItems} pathname={pathname} style={styles.mobileBottomNav} /> : null}
+      {showDockedMobileNav ? <MobileNav items={mobileNavItems} pathname={pathname} style={[styles.mobileBottomNav, publicShell && styles.mobileBottomNavPublic]} /> : null}
       {showStickyActions ? (
         <View style={[styles.stickyActionBar, showDockedMobileNav && styles.stickyActionBarWithMobileNav]}>
           {showStickyActionCopy ? (
@@ -1242,6 +1246,9 @@ const styles = StyleSheet.create({
   mobileBottomNav: {
     flexShrink: 0, marginBottom: 10, marginHorizontal: 12, zIndex: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 5, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.lineStrong,
   },
+  mobileBottomNavPublic: {
+    marginHorizontal: 6, padding: 4,
+  },
   mobileInlineNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1258,6 +1265,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     minWidth: 0,
   },
+  mobileBottomNavItemCompact: {
+    marginHorizontal: 1,
+  },
   mobileBottomNavChip: {
     alignItems: 'center', borderRadius: theme.radius.sm, minHeight: 48, justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 3, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'transparent',
   },
@@ -1267,6 +1277,9 @@ const styles = StyleSheet.create({
   },
   mobileBottomNavText: {
     color: theme.colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0,
+  },
+  mobileBottomNavTextCompact: {
+    fontSize: 10,
   },
   mobileBottomNavTextActive: {
     color: theme.colors.text,

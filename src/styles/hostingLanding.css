@@ -1,0 +1,205 @@
+#root [data-hosting-landing=true],
+#root [data-hosting-landing=true] * {
+  box-sizing: border-box;
+}
+
+#root [data-hosting-landing=true] {
+  min-width: 0;
+}
+
+#root [data-hosting-landing=true] [aria-level="2"] {
+  font-family: "DM Sans", Arial, sans-serif;
+  font-size: clamp(29px, 3.2vw, 39px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+#root [data-hosting-hero=true] {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, .72fr);
+}
+
+#root [data-hosting-hero-copy=true],
+#root [data-hosting-hero-aside=true] {
+  min-width: 0;
+}
+
+#root [data-hosting-hero-title=true] {
+  font-size: clamp(43px, 4.9vw, 72px);
+  line-height: 1.03;
+  letter-spacing: -.055em;
+  overflow-wrap: normal;
+}
+
+#root [data-hosting-fact-grid=true] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#root [data-hosting-benefit-grid=true],
+#root [data-hosting-support-grid=true] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+
+#root [data-hosting-step-grid=true] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+}
+
+#root [data-hosting-preview=true] [data-hosting-bracket=true] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+#root [data-hosting-bracket-round=true],
+#root [data-hosting-match=true] {
+  min-width: 0;
+}
+
+#root [data-hosting-match-list=true] {
+  display: grid;
+  gap: 10px;
+}
+
+#root [data-hosting-pricing=true] {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, .85fr);
+}
+
+#root [data-hosting-roadmap=true] {
+  flex-direction: row;
+}
+
+#root [data-hosting-faq=true] {
+  max-width: 920px;
+}
+
+#root [data-hosting-faq-button=true]:hover {
+  background: rgba(214, 162, 78, .06);
+}
+
+#root [data-hosting-faq-button=true]:focus-visible {
+  outline: 3px solid #D6A24E;
+  outline-offset: 3px;
+}
+
+@media (max-width: 1023px) {
+  #root [data-hosting-hero=true] {
+    grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr);
+  }
+
+  #root [data-hosting-hero-title=true] {
+    font-size: clamp(41px, 5vw, 58px);
+  }
+
+  #root [data-hosting-step-grid=true] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #root [data-hosting-support-grid=true] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  #root [data-hosting-hero=true],
+  #root [data-hosting-pricing=true] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #root [data-hosting-hero-aside=true] {
+    border-top: 1px solid rgba(244, 239, 230, .16);
+  }
+
+  #root [data-hosting-hero-title=true] {
+    font-size: clamp(39px, 8vw, 56px);
+  }
+
+  #root [data-hosting-benefit-grid=true] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #root [data-hosting-preview=true] [data-hosting-bracket=true] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  #root [data-hosting-roadmap=true] {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  #root [data-hosting-hero-copy=true] {
+    padding: 28px 23px;
+  }
+
+  #root [data-hosting-hero-aside=true] {
+    padding: 24px;
+  }
+
+  #root [data-hosting-hero-title=true] {
+    font-size: clamp(36px, 9vw, 43px);
+    line-height: 1.05;
+  }
+
+  #root [data-hosting-actions=true] {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #root [data-hosting-actions=true] > * {
+    width: 100%;
+  }
+
+  #root [data-hosting-fact-grid=true] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  #root [data-hosting-fact-grid=true] > * {
+    padding: 13px 10px;
+  }
+
+  #root [data-hosting-step-grid=true],
+  #root [data-hosting-support-grid=true],
+  #root [data-hosting-preview=true] [data-hosting-bracket=true] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #root [data-hosting-preview=true] {
+    padding: 20px;
+  }
+
+  #root [data-hosting-preview=true] [data-hosting-match-list=true] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #root [data-hosting-pricing=true] > * {
+    padding: 25px;
+  }
+
+  #root [data-hosting-closing=true] {
+    padding: 27px 23px;
+  }
+}
+
+@media (max-width: 370px) {
+  #root [data-hosting-fact-grid=true] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root [data-hosting-landing=true] * {
+    scroll-behavior: auto;
+    transition-duration: 0ms;
+  }
+}
