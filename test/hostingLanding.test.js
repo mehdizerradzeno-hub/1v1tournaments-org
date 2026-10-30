@@ -43,6 +43,7 @@ test('pilot copy and request action retain the approved scope', async () => {
   assert.match(page, /Request Hosting Access/);
   assert.match(page, /No checkout is live/);
   assert.match(page, /LOCAL TEST TOURNAMENT/);
+  assert.match(page, /Eight-player test tournament demonstration/);
   assert.match(page, /Privacy-edited image from a completed local test tournament/);
   assert.match(page, /src="\/hosting\/eight-player-test-bracket.png"/);
   assert.match(page, /Open the completed eight-player test tournament bracket at full size/);

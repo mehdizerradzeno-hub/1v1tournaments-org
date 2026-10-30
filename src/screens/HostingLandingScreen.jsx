@@ -28,7 +28,7 @@ function BracketPreview() {
       <View style={styles.previewTop}>
         <View>
           <Text style={styles.eyebrow}>PRODUCT DEMONSTRATION</Text>
-          <Text style={styles.previewTitle}>A completed eight-player test event.</Text>
+          <Text style={styles.previewTitle}>Eight-player test tournament demonstration</Text>
         </View>
         <Text style={styles.previewBadge}>LOCAL TEST TOURNAMENT</Text>
       </View>
