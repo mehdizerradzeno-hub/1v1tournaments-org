@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { connectLambda } from '@netlify/blobs';
 
 import {
+  accountCanonicalId,
   cleanEmail,
   clearSessionCookie,
   createPasswordRecord,
@@ -33,8 +34,8 @@ import {
   consumePlayerEmailCode,
   emailProviderConfigured,
   issuePlayerEmailCode,
-  verifiedEmailsRequired,
 } from './_player-email.mjs';
+import { emailVerificationEvidenceForAccount } from './_email-verification.mjs';
 import { enforceRateLimit } from './_rate-limit.mjs';
 
 const headers = {
@@ -114,7 +115,6 @@ export async function createAccount(payload, options = {}) {
   const releaseUsername = options.releasePlayerUsernameReservation || releasePlayerUsernameReservation;
   const persistAccount = options.saveAccount || saveAccount;
   const startSession = options.createSession || createSession;
-  const shouldVerifyEmails = options.verifiedEmailsRequired || verifiedEmailsRequired;
   const providerConfigured = options.emailProviderConfigured || emailProviderConfigured;
   const issueEmailCode = options.issuePlayerEmailCode || issuePlayerEmailCode;
   const existing = await resolveAccount(email);
@@ -141,7 +141,10 @@ export async function createAccount(payload, options = {}) {
     playerName: username,
     playerHandle: username,
     usernameClaimedAt: now,
-    emailVerified: !shouldVerifyEmails(),
+    // A deployment flag or browser payload must never auto-verify a new email.
+    // Historical accounts retain their existing login flag and are handled
+    // separately by the additive verification provenance contract.
+    emailVerified: false,
     password: createPasswordRecord(passwordCheck.password),
     createdAt: now,
     updatedAt: now,
@@ -182,6 +185,7 @@ export async function createAccount(payload, options = {}) {
       email: account.email,
       playerName: account.playerName,
       purpose: 'verify-email',
+      canonicalAccountId: accountCanonicalId(account),
     }).catch((error) => ({ error: error.message, ok: false }));
   }
 
@@ -358,6 +362,7 @@ export async function requestEmailCode(payload, purpose, options = {}) {
         email,
         playerName: account.playerName,
         purpose,
+        ...(purpose === 'verify-email' ? { canonicalAccountId: accountCanonicalId(account) } : {}),
         recoveryPath: purpose === 'reset-password' ? payload.recoveryPath : undefined,
       });
     } catch {
@@ -380,26 +385,32 @@ export async function requestEmailCode(payload, purpose, options = {}) {
   });
 }
 
-async function verifyAccountEmail(payload) {
+export async function verifyAccountEmail(payload, options = {}) {
   const email = cleanEmail(payload.contactEmail || payload.email);
-  const account = await getAccountByEmail(email);
-  const valid = account && await consumePlayerEmailCode({
+  const resolveAccount = options.getAccountByEmail || getAccountByEmail;
+  const consumeCode = options.consumePlayerEmailCode || consumePlayerEmailCode;
+  const persistAccount = options.saveAccount || saveAccount;
+  const account = await resolveAccount(email);
+  const valid = account && await consumeCode({
     code: payload.code,
     email,
     purpose: 'verify-email',
+    canonicalAccountId: accountCanonicalId(account),
   });
 
   if (!valid) {
     return json(400, { error: 'That verification code is invalid or expired.' });
   }
 
+  const now = new Date(options.now?.() ?? Date.now()).toISOString();
   const updated = {
     ...account,
     emailVerified: true,
-    updatedAt: new Date().toISOString(),
+    emailVerification: emailVerificationEvidenceForAccount(account, now),
+    updatedAt: now,
   };
 
-  await saveAccount(updated);
+  await persistAccount(updated);
   return json(200, { ok: true, account: publicPlayerAccount(updated) });
 }
 

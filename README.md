@@ -12,7 +12,7 @@ Standalone Expo Router project for `1v1tournaments.org`.
 - A general rules page.
 - A results archive page.
 - A live / YouTube links page.
-- Account-based check-in with password recovery and optional email verification.
+- Account-based check-in with password recovery and email verification for new accounts.
 - A host-approved production admin route with token and localhost fallbacks.
 - Netlify Blob-backed tournaments, rosters, brackets, sponsor records, and daily snapshots.
 
@@ -81,7 +81,8 @@ Future edits:
 Player passwords are stored as salted scrypt hashes. Password reset uses a hashed,
 256-bit single-use credential in a production `https://1v1tournaments.org/account`
 link. The credential stays in the URL fragment so it is not sent in the page request or
-referrer. Optional email verification continues to use a six-digit single-use code.
+referrer. Email verification uses a six-digit single-use code bound to the account's
+canonical ID and normalized email.
 Both credentials expire after 15 minutes. Account actions are rate-limited by a hashed
 network/account fingerprint, and a successful password reset invalidates existing player
 sessions before the user signs in with the new password.
@@ -93,15 +94,24 @@ RESEND_API_KEY=<private Resend key>
 TOURNAMENT_EMAIL_FROM=1v1 Tournaments <support@your-verified-domain.example>
 ```
 
-Email verification remains opt-in for a staged rollout. Set this only after the sender domain
-and recovery flow pass a live smoke test:
+New registrations always require email verification, including when this historical flag is
+absent or false. Keep this setting explicit for compatible deployments and verify the existing
+sender domain and recovery flow before activation:
 
 ```text
 REQUIRE_VERIFIED_PLAYER_EMAILS=true
 ```
 
-Existing accounts without an `emailVerified` field remain treated as verified, so enabling the
-flag does not lock out the current roster.
+Existing accounts with a true or missing `emailVerified` flag keep their existing sign-in,
+session restoration, and game admission behavior. That compatibility flag is not proof of
+historical email verification. The additive server-resolved `emailVerification` claim reports
+`legacy_unknown` until the account completes a fresh normal email challenge. The account
+profile offers that challenge without changing canonical IDs or existing tournament history.
+New owner-issued hosting licenses require `status=verified`, `method=email-code` proof through
+the server-authenticated canonical lookup; existing entitlement access is not mass-revoked.
+
+See [the verification rollout plan](docs/qa/email-verification-launch-preparation-20261030.md)
+for evidence, deployment gates, and the legacy-account policy.
 
 ## Gin Rummy Integration
 

@@ -9,6 +9,7 @@ import {
 import { Buffer } from 'node:buffer';
 
 import { getStore } from '@netlify/blobs';
+import { emailVerificationForAccount } from './_email-verification.mjs';
 
 export const PLAYER_SESSION_COOKIE = 'one_v_one_player_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -413,6 +414,7 @@ export function publicAccount(account) {
     username,
     usernameRequired: !username,
     emailVerified: account.emailVerified !== false,
+    emailVerification: emailVerificationForAccount(account),
     createdAt: account.createdAt,
   };
 }

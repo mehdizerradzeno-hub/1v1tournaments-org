@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
+import { emailVerificationForAccount } from './_email-verification.mjs';
 
 import {
   accountCanonicalId,
@@ -189,6 +190,7 @@ export async function sharedIdentityForAccount(account, options = {}) {
     displayName: handle,
     handle,
     emailVerified: account.emailVerified !== false,
+    emailVerification: emailVerificationForAccount(account),
     aliases: await listAccountAliases(canonicalAccountId, options),
   };
 }

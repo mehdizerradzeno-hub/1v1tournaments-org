@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -18,7 +18,9 @@ import {
   loginPlayerAccount,
   logoutPlayerAccount,
   requestPlayerPasswordReset,
+  requestPlayerEmailVerification,
   resetPlayerPassword,
+  verifyPlayerEmail,
 } from '../lib/tournamentHostingClient.js';
 import {
   prepareSpadesAccountReturn,
@@ -28,6 +30,7 @@ import {
 } from '../lib/spadesAccountConnect.js';
 import {
   clearPasswordRecoveryFragment,
+  accountEmailVerificationStatus,
   resolveAccountConnectMode,
   returnToGameWithoutAccountChange,
   runAccountHandoffOnce,
@@ -111,6 +114,7 @@ export function GameAccountConnectScreen({
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteExpanded, setDeleteExpanded] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
   const handoffStartedRef = useRef(false);
   const accountSubmissionRef = useRef(false);
   const usernameSubmissionRef = useRef(false);
@@ -188,7 +192,11 @@ export function GameAccountConnectScreen({
     void signIn();
   };
 
-  const returnToGame = async () => {
+  const returnToGame = useCallback(async () => {
+    if (account?.emailVerified === false) {
+      setError('Verify your email before continuing to a game.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -203,13 +211,14 @@ export function GameAccountConnectScreen({
       setSubmitting(false);
       setError(handoffError instanceof Error ? handoffError.message : `${gameName} authorization could not be opened.`);
     }
-  };
+  }, [account?.emailVerified, gameName, prepareReturn]);
 
   useEffect(() => {
     if (
       Platform.OS !== 'web' ||
       requireAccountSelection ||
       !account ||
+      account.emailVerified === false ||
       !destination ||
       destination === '/' ||
       hostingReturnRedirectRef.current
@@ -219,7 +228,7 @@ export function GameAccountConnectScreen({
 
     hostingReturnRedirectRef.current = true;
     void returnToGame();
-  }, [account, destination, requireAccountSelection]);
+  }, [account, destination, requireAccountSelection, returnToGame]);
 
   const signIn = async () => {
     if (!beginAccountSubmission()) return;
@@ -228,7 +237,8 @@ export function GameAccountConnectScreen({
       const result = await loginPlayerAccount({ contactEmail, password });
       setAccount(result.account || null);
       setUsernameDraft(result.account?.playerHandle || '');
-      await returnToGame();
+      if (result.account?.emailVerified !== false) await returnToGame();
+      else setMessage('Sign-in succeeded. Verify your email with the code sent to your account email.');
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Sign in could not be completed.');
     } finally {
@@ -256,9 +266,42 @@ export function GameAccountConnectScreen({
       });
       setAccount(result.account || null);
       setUsernameDraft(result.account?.playerHandle || playerHandle);
-      await returnToGame();
+      setMessage(result.verificationDelivery?.ok
+        ? 'Account created. Enter the verification code sent to your email.'
+        : 'Account created. Request a verification code below before continuing to a game.');
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Account creation could not be completed.');
+    } finally {
+      finishAccountSubmission();
+    }
+  };
+
+  const requestVerification = async () => {
+    if (!account || !beginAccountSubmission()) return;
+    setError('');
+    setMessage('');
+    try {
+      const result = await requestPlayerEmailVerification({ contactEmail: account.email });
+      if (!result.configured) throw new Error('Email verification is not configured. Contact the tournament host.');
+      setMessage(result.message || 'If that account exists, a verification code was sent.');
+    } catch (verificationError) {
+      setError(verificationError instanceof Error ? verificationError.message : 'Verification email could not be requested.');
+    } finally {
+      finishAccountSubmission();
+    }
+  };
+
+  const verifyEmail = async () => {
+    if (!account || !/^\d{6}$/.test(verificationCode.trim()) || !beginAccountSubmission()) return;
+    setError('');
+    setMessage('');
+    try {
+      const result = await verifyPlayerEmail({ contactEmail: account.email, code: verificationCode.trim() });
+      setAccount(result.account || null);
+      setVerificationCode('');
+      setMessage('Email verified. Your account identity and existing game history are unchanged.');
+    } catch (verificationError) {
+      setError(verificationError instanceof Error ? verificationError.message : 'Email verification could not be completed.');
     } finally {
       finishAccountSubmission();
     }
@@ -348,6 +391,7 @@ export function GameAccountConnectScreen({
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
       setDeleteExpanded(false);
+      setVerificationCode('');
       setMessage(
         'Your 1v1 account has been deleted. Historical competitive results may remain without your identifying account information.',
       );
@@ -410,6 +454,7 @@ export function GameAccountConnectScreen({
       setRecoveryConfirmPassword('');
       setDeleteConfirmation('');
       setDeleteExpanded(false);
+      setVerificationCode('');
       setMessage(`Signed out. Sign in with the account you want to use with ${gameName}.`);
       if (returnAfterSignOut) {
         returnToGameWithoutAccountChange(destination);
@@ -471,6 +516,32 @@ export function GameAccountConnectScreen({
               <Text accessibilityRole="header" aria-level={2} style={styles.sectionTitle}>{account.playerName || 'Shared 1v1 account'}</Text>
               <Text style={styles.muted}>{account.email || 'Account identity verified'}</Text>
             </View>
+            {accountEmailVerificationStatus(account) !== 'verified' ? (
+              <View style={styles.field}>
+                <Text accessibilityRole="header" aria-level={3} style={styles.fieldLabel}>
+                  {account.emailVerified === false ? 'Verify your email' : 'Verify your email to host'}
+                </Text>
+                <Text style={styles.hint}>
+                  {account.emailVerified === false
+                    ? 'Complete the email challenge before connecting to a game.'
+                    : 'Your existing sign-in and game access stay available. A fresh email challenge is required before a new hosting license can be issued to this account.'}
+                </Text>
+                <ActionButton disabled={submitting} onPress={requestVerification} style={styles.formAction} variant="secondary">
+                  Send verification code
+                </ActionButton>
+                <TextInput
+                  {...inputProps(setVerificationCode, { autoComplete: 'one-time-code', label: 'Email verification code', name: 'verification-code', textContentType: 'oneTimeCode' })}
+                  inputMode="numeric"
+                  maxLength={6}
+                  onSubmitEditing={verifyEmail}
+                  placeholder="6-digit code"
+                  value={verificationCode}
+                />
+                <ActionButton disabled={submitting || !/^\d{6}$/.test(verificationCode.trim())} onPress={verifyEmail} style={styles.formAction} variant="secondary">
+                  Verify email
+                </ActionButton>
+              </View>
+            ) : <Text style={styles.hint}>Email verified through an account-bound challenge.</Text>}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Username</Text>
               <TextInput
@@ -490,7 +561,7 @@ export function GameAccountConnectScreen({
                 {submitting ? 'Saving...' : 'Save Username'}
               </ActionButton>
             </View>
-            <ActionButton disabled={submitting} onPress={returnToGame} style={styles.formAction}>
+            <ActionButton disabled={submitting || account.emailVerified === false} onPress={returnToGame} style={styles.formAction}>
               {submitting ? 'Connecting...' : `Continue to ${gameName}`}
             </ActionButton>
             <Text style={styles.hint}>Switch accounts by signing out of this browser.</Text>

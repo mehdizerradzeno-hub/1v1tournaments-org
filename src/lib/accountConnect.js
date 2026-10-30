@@ -116,7 +116,17 @@ export function shouldShowConnectedAccount(account, mode) {
 }
 
 export function verifiedAccountReturnCopy(gameName) {
-  return `Your verified 1v1 account is ready to return to ${gameName}.`;
+  return `Your 1v1 account is ready to return to ${gameName}.`;
+}
+
+export function accountEmailVerificationStatus(account) {
+  if (account?.emailVerified === false) return 'required';
+  const evidence = account?.emailVerification;
+  return evidence?.protocolVersion === '2026-10-30-email-challenge-1'
+    && evidence?.status === 'verified'
+    && evidence?.method === 'email-code'
+    && Number.isFinite(Date.parse(evidence?.verifiedAt || ''))
+    ? 'verified' : 'legacy_unknown';
 }
 
 export function returnToGameWithoutAccountChange(destination, location = globalThis.location) {

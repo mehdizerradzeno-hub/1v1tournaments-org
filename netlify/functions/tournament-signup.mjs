@@ -206,7 +206,8 @@ function tournamentStartedMessage(dateValue) {
     : '';
 }
 
-export async function handler(event) {
+export async function handler(event, dependencies = {}) {
+  const resolveAccount = dependencies.getAccountFromEvent || getAccountFromEvent;
   if (event.blobs) {
     connectLambda(event);
   }
@@ -227,7 +228,7 @@ export async function handler(event) {
       let account = null;
 
       try {
-        account = await getAccountFromEvent(event);
+        account = await resolveAccount(event);
       } catch (accountError) {
         console.error('Account lookup failed during signup summary', accountError);
       }
@@ -260,7 +261,7 @@ export async function handler(event) {
   let account;
 
   try {
-    account = await getAccountFromEvent(event);
+    account = await resolveAccount(event);
   } catch (accountError) {
     console.error('Account lookup failed during signup', accountError);
     return json(500, { error: 'Player account lookup is not available yet.' });
@@ -277,7 +278,9 @@ export async function handler(event) {
     });
   }
 
-  if (String(process.env.REQUIRE_VERIFIED_PLAYER_EMAILS || '').trim().toLowerCase() === 'true' && account.emailVerified === false) {
+  // New registrations must prove email possession. Existing true/missing
+  // legacy flags preserve their admission semantics without claiming proof.
+  if (account.emailVerified === false) {
     return json(403, { error: 'Verify this player account email before joining a tournament.' });
   }
 

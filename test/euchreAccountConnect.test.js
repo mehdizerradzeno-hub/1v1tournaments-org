@@ -136,7 +136,7 @@ test('Return to Euchre is navigation-only and account copy stays game-specific',
   });
 
   assert.equal(destination, EUCHRE_ACCOUNT_DESTINATION);
-  assert.equal(verifiedAccountReturnCopy('Euchre'), 'Your verified 1v1 account is ready to return to Euchre.');
+  assert.equal(verifiedAccountReturnCopy('Euchre'), 'Your 1v1 account is ready to return to Euchre.');
 });
 
 test('sign out rejects a response that did not clear the authoritative account', async () => {

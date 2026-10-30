@@ -43,7 +43,9 @@ export function emailProviderConfigured() {
 }
 
 export function verifiedEmailsRequired() {
-  return String(process.env.REQUIRE_VERIFIED_PLAYER_EMAILS || '').trim().toLowerCase() === 'true';
+  // Retained for callers of the historical helper. New account registration
+  // requires a genuine email challenge even when the old flag is absent/false.
+  return true;
 }
 
 export async function sendPlayerEmail({ to, subject, text, idempotencyKey = '' }) {
@@ -98,7 +100,7 @@ function recoveryCredential(purpose, options = {}) {
 }
 
 export async function issuePlayerEmailCode(
-  { email, playerName = 'Player', purpose, recoveryPath = DEFAULT_PASSWORD_RECOVERY_PATH },
+  { email, playerName = 'Player', purpose, canonicalAccountId, recoveryPath = DEFAULT_PASSWORD_RECOVERY_PATH },
   options = {},
 ) {
   const providerConfigured = options.providerConfigured ?? emailProviderConfigured();
@@ -107,11 +109,16 @@ export async function issuePlayerEmailCode(
     return { configured: false, ok: false };
   }
 
+  if (purpose === 'verify-email' && !String(canonicalAccountId || '').trim()) {
+    throw new Error('Email verification requires the canonical account identity.');
+  }
+
   const credential = recoveryCredential(purpose, options);
   const now = options.now?.() ?? Date.now();
   const record = {
     email: cleanEmail(email),
     purpose,
+    ...(purpose === 'verify-email' ? { canonicalAccountId: String(canonicalAccountId).trim() } : {}),
     codeHash: codeHash(purpose, email, credential),
     credentialType: purpose === 'reset-password' ? 'opaque-link-token' : 'six-digit-code',
     createdAt: new Date(now).toISOString(),
@@ -159,7 +166,7 @@ export async function issuePlayerEmailCode(
 }
 
 export async function consumePlayerEmailCode(
-  { email, purpose, code, token },
+  { email, purpose, code, token, canonicalAccountId },
   options = {},
 ) {
   const store = options.store || getStoreWithFallback(CODE_STORE);
@@ -181,6 +188,12 @@ export async function consumePlayerEmailCode(
 
   if (
     !record
+    || (purpose === 'verify-email' && (
+      !String(canonicalAccountId || '').trim()
+      || record.canonicalAccountId !== String(canonicalAccountId).trim()
+      || record.purpose !== 'verify-email'
+      || cleanEmail(record.email) !== cleanEmail(email)
+    ))
     || record.consumedAt
     || !suppliedCredential
     || !Number.isFinite(expiresAt)

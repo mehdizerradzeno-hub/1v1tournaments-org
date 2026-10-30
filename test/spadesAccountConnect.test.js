@@ -171,7 +171,7 @@ test('Sign Out uses the authoritative shared player-account logout action', asyn
   );
 
   assert.deepEqual(body, { action: 'logout' });
-  assert.equal(verifiedAccountReturnCopy('Spades'), 'Your verified 1v1 account is ready to return to Spades.');
+  assert.equal(verifiedAccountReturnCopy('Spades'), 'Your 1v1 account is ready to return to Spades.');
 });
 
 
