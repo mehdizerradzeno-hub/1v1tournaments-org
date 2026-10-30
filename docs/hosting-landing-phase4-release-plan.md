@@ -12,7 +12,8 @@ Status: **HOLD — no push, merge, deployment, or production change authorized.*
 ## Phase 4 verification
 
 - Focused hosting, route, and account interaction tests; TypeScript; lint; and web static export must pass on the final commit. Record any existing lint warnings separately.
-- The local static preview serves `/hosting` and its bracket image. The dashboard action reaches `/account?mode=signin&returnTo=https%3A%2F%2F1v1spades.com%2Fhosting` and shows the normal sign-in form. This local preview does not provide the deployed authentication backend, so a signed-in return to Spades remains unverified here.
+- The local static preview serves `/hosting` and its bracket image. Its **Open Hosting Dashboard** action reaches `/account?mode=signin&returnTo=https%3A%2F%2F1v1spades.com%2Fhosting` and shows the normal sign-in form. The static preview has no deployed authentication backend, so it cannot complete a continuous signed-in return by itself.
+- On October 30, the existing `1v1tournaments` session on the production Account Hub used the same allowlisted return destination through the normal **Continue to Spades hosting** action. The browser reached `https://1v1spades.com/hosting`; Spades displayed **Verified account: 1v1tournaments**. No hosting license was present or created, and no tournament action was taken. This verifies the live Hub-to-Spades handoff for that account, while the unpublished preview's local-account leg remains separate.
 - On October 30, the owner opened the corrected local `/hosting` preview on a phone and confirmed that **Request Hosting Access** opened an email draft addressed to `mehdi.zerrad@1v1spades.com` with the exact subject `Hosting access request`. This verifies the real-device action in the local preview; it does not verify a production deployment or a sent email.
 - Verify the full bracket image, alternate text, full-size link, and phone layout before publication.
 
