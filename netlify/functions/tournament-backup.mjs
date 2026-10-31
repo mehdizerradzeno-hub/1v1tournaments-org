@@ -13,6 +13,15 @@ async function snapshotStore(name) {
 }
 
 export async function runTournamentBackup(now = new Date()) {
+  if (process.env.SEASON1_TEMPORARY_WRITE_BARRIER === '1') {
+    return {
+      maintenance: true,
+      createdAt: new Date(now).toISOString(),
+      storeCount: 0,
+      recordCount: 0,
+    };
+  }
+
   const createdAt = new Date(now).toISOString();
   const stores = {};
 

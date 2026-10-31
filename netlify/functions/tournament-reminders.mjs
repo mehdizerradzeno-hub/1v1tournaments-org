@@ -19,6 +19,10 @@ async function loadSignups(tournamentSlug) {
 }
 
 export async function runTournamentReminders(now = new Date()) {
+  if (process.env.SEASON1_TEMPORARY_WRITE_BARRIER === '1') {
+    return { enabled: false, maintenance: true, configured: emailProviderConfigured(), dueEvents: 0, sent: 0, failed: 0 };
+  }
+
   if (!remindersEnabled()) {
     return { enabled: false, configured: emailProviderConfigured(), dueEvents: 0, sent: 0, failed: 0 };
   }
