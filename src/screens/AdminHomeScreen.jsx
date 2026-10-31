@@ -1,10 +1,35 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton, HubScreen, Section, Surface } from '../components/hub-ui.jsx';
 import { ADMIN_COMPETITION_WORKSPACES } from '../lib/adminNavigation.js';
 import { theme } from '../lib/theme.js';
+import { fetchPlayerAccount } from '../lib/tournamentHostingClient.js';
 
 export default function AdminHomeScreen() {
-  return <HubScreen title="Admin dashboard" eyebrow="Host workspace"
+  const [playerAccount, setPlayerAccount] = useState(null);
+  const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    void fetchPlayerAccount()
+      .then((result) => {
+        if (active) setPlayerAccount(result.account || null);
+      })
+      .catch(() => {
+        if (active) setPlayerAccount(null);
+      })
+      .finally(() => {
+        if (active) setPlayerAccountLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return <HubScreen accountOverride={playerAccount} accountLoadingOverride={playerAccountLoading}
+    title="Admin dashboard" eyebrow="Host workspace"
     lead="Choose a tournament or league to manage."
     actions={[{ label: 'Account', href: '/account', variant: 'secondary' }, { label: 'Public site', href: '/', variant: 'ghost' }]}
     heroVariant="compact" stickyActions={false}

@@ -734,6 +734,7 @@ export function RuleBlock({ section }) {
 
 export function HubScreen({
   accountOverride,
+  accountLoadingOverride,
   accountHref = null,
   eyebrow,
   title,
@@ -757,8 +758,11 @@ export function HubScreen({
   const [playerAccount, setPlayerAccount] = useState(null);
   const [playerAccountLoading, setPlayerAccountLoading] = useState(true);
   const [navTournamentSlug, setNavTournamentSlug] = useState(null);
-  const resolvedPlayerAccount = accountOverride !== undefined ? accountOverride : playerAccount;
-  const resolvedPlayerAccountLoading = accountOverride !== undefined ? false : playerAccountLoading;
+  const hasAccountOverride = accountOverride !== undefined || accountLoadingOverride !== undefined;
+  const resolvedPlayerAccount = hasAccountOverride ? accountOverride || null : playerAccount;
+  const resolvedPlayerAccountLoading = hasAccountOverride
+    ? Boolean(accountLoadingOverride)
+    : playerAccountLoading;
   const primaryPaths = buildPrimaryPaths(navTournamentSlug);
   const fallbackAccountPath = navTournamentSlug
     ? buildTournamentAccountPath(
@@ -797,7 +801,7 @@ export function HubScreen({
   }, [isHydrated, pathname]);
 
   useEffect(() => {
-    if (!isHydrated || accountOverride !== undefined) {
+    if (!isHydrated || hasAccountOverride) {
       return undefined;
     }
 
@@ -860,7 +864,7 @@ export function HubScreen({
         globalThis.removeEventListener(PLAYER_ACCOUNT_CHANGED_EVENT, refreshPlayerAccount);
       }
     };
-  }, [accountOverride, isHydrated]);
+  }, [hasAccountOverride, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) {
