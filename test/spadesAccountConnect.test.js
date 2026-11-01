@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -16,10 +17,11 @@ import {
   deletePlayerAccount,
   loginPlayerAccount,
   logoutPlayerAccount,
+  fetchPlayerAccount,
   requestPlayerPasswordReset,
   resetPlayerPassword,
 } from '../src/lib/tournamentHostingClient.js';
-import { verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
+import { signOutAccountConnectSession, verifiedAccountReturnCopy } from '../src/lib/accountConnect.js';
 
 async function captureAccountAction(run, payload = { ok: true, account: { playerName: 'Test Player' } }) {
   const originalFetch = globalThis.fetch;
@@ -172,6 +174,45 @@ test('Sign Out uses the authoritative shared player-account logout action', asyn
 
   assert.deepEqual(body, { action: 'logout' });
   assert.equal(verifiedAccountReturnCopy('Spades'), 'Your 1v1 account is ready to return to Spades.');
+});
+
+test('Spades manage mode stops auto handoff and offers server logout before another account signs in', async () => {
+  const screen = await readFile(new URL('../src/screens/SpadesAccountConnectScreen.jsx', import.meta.url), 'utf8');
+  assert.match(screen, /requireAccountSelection=\{initialMode === 'manage'\}/);
+  assert.match(screen, /switchAccountActionLabel=\{initialMode === 'manage' \? 'Use another account'/);
+  assert.match(screen, /signOutAccountConnectSession\(logoutPlayerAccount\)/);
+
+  const previousFetch = globalThis.fetch;
+  const accountA = { id: 'acct-A', playerHandle: 'player_a', emailVerified: true };
+  const accountB = { id: 'acct-B', playerHandle: 'player_b', emailVerified: true };
+  let hubSession = accountA;
+  const actions = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const payload = init.body ? JSON.parse(init.body) : null;
+    actions.push({ url: String(url), action: payload?.action ?? 'read', credentials: init.credentials });
+    if (payload?.action === 'logout') {
+      hubSession = null;
+      return new Response(JSON.stringify({ ok: true, account: null }), { status: 200 });
+    }
+    if (payload?.action === 'login') {
+      hubSession = payload.contactEmail === 'b@example.test' ? accountB : accountA;
+      return new Response(JSON.stringify({ ok: true, account: hubSession }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ ok: true, account: hubSession }), { status: 200 });
+  };
+  try {
+    assert.equal((await fetchPlayerAccount()).account.id, 'acct-A');
+    assert.deepEqual(await signOutAccountConnectSession(logoutPlayerAccount), { account: null, mode: 'signin' });
+    assert.equal((await fetchPlayerAccount()).account, null);
+    assert.equal((await loginPlayerAccount({ contactEmail: 'b@example.test', password: 'synthetic' })).account.id, 'acct-B');
+    assert.equal((await fetchPlayerAccount()).account.id, 'acct-B');
+    assert.deepEqual(await signOutAccountConnectSession(logoutPlayerAccount), { account: null, mode: 'signin' });
+    assert.equal((await loginPlayerAccount({ contactEmail: 'a@example.test', password: 'synthetic' })).account.id, 'acct-A');
+    assert.ok(actions.every(entry => entry.credentials === 'include'));
+    assert.deepEqual(actions.filter(entry => entry.action !== 'read').map(entry => entry.action), ['logout', 'login', 'logout', 'login']);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
 });
 
 

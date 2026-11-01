@@ -94,6 +94,7 @@ export function GameAccountConnectScreen({
   returnAfterSignOut = false,
   signedOutManageFallback = false,
   useHubShell = false,
+  switchAccountActionLabel = 'Sign Out',
 }) {
   const [mode, setMode] = useState(initialMode);
   const [account, setAccount] = useState(null);
@@ -566,7 +567,7 @@ export function GameAccountConnectScreen({
             </ActionButton>
             <Text style={styles.hint}>Switch accounts by signing out of this browser.</Text>
             <ActionButton disabled={submitting} onPress={signOut} style={styles.formAction} variant="secondary">
-              {submitting ? 'Signing out...' : 'Sign Out'}
+              {submitting ? 'Signing out...' : switchAccountActionLabel}
             </ActionButton>
 
             <View style={styles.deleteSection}>
@@ -846,6 +847,9 @@ export default function SpadesAccountConnectScreen({ initialMode = 'signin' }) {
     <GameAccountConnectScreen
       initialMode={initialMode}
       destination={destination}
+      requireAccountSelection={initialMode === 'manage'}
+      signedOutManageFallback
+      switchAccountActionLabel={initialMode === 'manage' ? 'Use another account' : 'Sign Out'}
       prepareReturn={() =>
         prepareSpadesAccountReturn(globalThis.fetch, destination)
       }
