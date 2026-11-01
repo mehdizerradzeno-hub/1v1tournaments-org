@@ -68,7 +68,7 @@ test('authenticated Gin uses only the Gin audience', async () => {
   let requestBody;
   const launch = await prepareSharedAccountLaunch({
     audience: 'gin',
-    destinationUrl: 'https://onev1-gin-staging.onrender.com/',
+    destinationUrl: 'https://onev1-gin-production-sn3e.onrender.com/',
     fetchImpl: async (_endpoint, options) => {
       requestBody = JSON.parse(options.body);
       return issueResponse('gin', 'gin-code');

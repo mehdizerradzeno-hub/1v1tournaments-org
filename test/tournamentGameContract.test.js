@@ -122,10 +122,10 @@ test('Gin Rummy launch uses the configured Gin route and preserves its hub retur
     matchId: 'gin-season-one-r1-m1',
     ticket: 'opaque-ticket',
     tournamentSlug: 'gin-season-one',
-    ginBaseUrl: 'https://onev1-gin-staging.onrender.com/',
+    ginBaseUrl: 'https://onev1-gin-production-sn3e.onrender.com/',
   }));
 
-  assert.equal(launch.origin, 'https://onev1-gin-staging.onrender.com');
+  assert.equal(launch.origin, 'https://onev1-gin-production-sn3e.onrender.com');
   assert.equal(launch.pathname, '/');
   assert.equal(launch.searchParams.get('matchId'), 'gin-season-one-r1-m1');
   assert.equal(launch.searchParams.get('ticket'), 'opaque-ticket');

@@ -35,7 +35,7 @@ import {
 
 const SPADES_MATCH_BASE_URL = process.env.SPADES_MATCH_BASE_URL || 'https://1v1spades.com/match';
 const EUCHRE_MATCH_BASE_URL = process.env.EUCHRE_MATCH_BASE_URL || '';
-const GIN_MATCH_BASE_URL = process.env.GIN_MATCH_BASE_URL || 'https://onev1-gin-staging.onrender.com/';
+const GIN_MATCH_BASE_URL = process.env.GIN_MATCH_BASE_URL || 'https://onev1-gin-production-sn3e.onrender.com/';
 const MATCH_ID_RE = /^([a-z0-9]+(?:-[a-z0-9]+)*)-r([1-9]\d*)-m([1-9]\d*)$/i;
 
 const headers = {

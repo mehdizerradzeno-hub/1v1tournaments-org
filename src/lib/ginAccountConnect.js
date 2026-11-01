@@ -1,7 +1,7 @@
 import { prepareSharedAccountLaunch } from './sharedAccountLaunch.js';
 
 export const GIN_ACCOUNT_ENTRY_ROUTE = '/connect/gin';
-export const GIN_ACCOUNT_DESTINATION = 'https://onev1-gin-staging.onrender.com/';
+export const GIN_ACCOUNT_DESTINATION = 'https://onev1-gin-production-sn3e.onrender.com/';
 export const GIN_SIGNED_OUT_ACCOUNT_ACTIONS = Object.freeze([
   { id: 'signin', label: 'Sign In' },
   { id: 'create', label: 'Create Account' },

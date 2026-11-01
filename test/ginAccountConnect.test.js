@@ -7,10 +7,12 @@ import {
   normalizeGinAccountMode,
   prepareGinAccountReturn,
 } from '../src/lib/ginAccountConnect.js';
+import { WEB_GIN_URL } from '../src/lib/downloadLinks.js';
 
-test('Gin account entry preserves supported modes and targets protected staging', () => {
+test('Gin account entry preserves supported modes and targets the retained ticketed runtime', () => {
   assert.equal(GIN_ACCOUNT_ENTRY_ROUTE, '/connect/gin');
-  assert.equal(GIN_ACCOUNT_DESTINATION, 'https://onev1-gin-staging.onrender.com/');
+  assert.equal(GIN_ACCOUNT_DESTINATION, 'https://onev1-gin-production-sn3e.onrender.com/');
+  assert.equal(WEB_GIN_URL, GIN_ACCOUNT_DESTINATION);
   assert.equal(normalizeGinAccountMode('create'), 'create');
   assert.equal(normalizeGinAccountMode(['reset']), 'reset');
   assert.equal(normalizeGinAccountMode('unknown'), 'signin');

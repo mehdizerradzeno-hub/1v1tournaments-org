@@ -128,7 +128,7 @@ values in both services:
 # 1v1 Tournaments
 SHARED_ACCOUNT_GIN_SECRET=<Gin account-exchange secret>
 TOURNAMENT_MATCH_RESULT_TOKEN=<shared result callback token>
-GIN_MATCH_BASE_URL=https://onev1-gin-staging.onrender.com/
+GIN_MATCH_BASE_URL=https://onev1-gin-production-sn3e.onrender.com/
 
 # Gin service
 SHARED_ACCOUNT_GIN_SECRET=<same Gin account-exchange secret>
